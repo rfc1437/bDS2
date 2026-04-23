@@ -4,7 +4,9 @@ defmodule BDS.Posts do
   import Ecto.Query
 
   alias BDS.Frontmatter
+  alias BDS.Metadata
   alias BDS.Posts.Post
+  alias BDS.Posts.Translation
   alias BDS.Projects
   alias BDS.Repo
   alias BDS.Search
@@ -111,6 +113,7 @@ defmodule BDS.Posts do
         |> Repo.update()
         |> case do
           {:ok, updated_post} ->
+            :ok = publish_post_translations(updated_post)
             :ok = Search.sync_post(updated_post)
             {:ok, updated_post}
 
@@ -173,6 +176,120 @@ defmodule BDS.Posts do
   end
 
   def get_post!(post_id), do: Repo.get!(Post, post_id)
+
+  def get_post_translation!(translation_id), do: Repo.get!(Translation, translation_id)
+
+  def list_post_translations(post_id) do
+    {:ok,
+     Repo.all(
+       from translation in Translation,
+         where: translation.translation_for == ^post_id,
+         order_by: [asc: translation.language]
+     )}
+  end
+
+  def upsert_post_translation(post_id, language, attrs) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Post{do_not_translate: true} = post ->
+        {:error,
+         post
+         |> Post.changeset(%{})
+         |> Ecto.Changeset.add_error(:do_not_translate, "cannot add translations when do_not_translate is true")}
+
+      %Post{} = post ->
+        now = System.system_time(:second)
+        normalized_language = normalize_language(language)
+
+        translation =
+          Repo.get_by(Translation, translation_for: post.id, language: normalized_language) || %Translation{}
+
+        updates = normalize_translation_updates(post, translation, normalized_language, attrs, now)
+
+        translation
+        |> Translation.changeset(updates)
+        |> Repo.insert_or_update()
+        |> case do
+          {:ok, saved_translation} ->
+            :ok = Search.sync_post(post.id)
+            {:ok, saved_translation}
+
+          error ->
+            error
+        end
+    end
+  end
+
+  def delete_post_translation(translation_id) do
+    case Repo.get(Translation, translation_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Translation{} = translation ->
+        :ok = delete_translation_file(translation)
+        Repo.delete!(translation)
+        :ok = Search.sync_post(translation.translation_for)
+        {:ok, :deleted}
+    end
+  end
+
+  def validate_translations(project_id) do
+    {:ok, metadata} = Metadata.get_project_metadata(project_id)
+
+    posts =
+      Repo.all(
+        from post in Post,
+          where: post.project_id == ^project_id and post.status == :published,
+          order_by: [asc: post.created_at, asc: post.slug]
+      )
+
+    translation_languages =
+      Repo.all(
+        from translation in Translation,
+          join: post in Post,
+          on: post.id == translation.translation_for,
+          where: post.project_id == ^project_id,
+          select: {translation.translation_for, translation.language}
+      )
+      |> Enum.group_by(fn {post_id, _language} -> post_id end, fn {_post_id, language} -> language end)
+
+    required_languages =
+      metadata.blog_languages
+      |> Enum.map(&normalize_language/1)
+      |> Enum.reject(&(&1 == normalize_language(metadata.main_language)))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    missing =
+      posts
+      |> Enum.flat_map(fn post ->
+        available = Map.get(translation_languages, post.id, [])
+
+        cond do
+          post.do_not_translate -> []
+          true ->
+            required_languages
+            |> Enum.reject(&(&1 in available))
+            |> Enum.map(&%{post_id: post.id, language: &1})
+        end
+      end)
+
+    do_not_translate_posts =
+      posts
+      |> Enum.filter(& &1.do_not_translate)
+      |> Enum.map(& &1.id)
+
+    orphan_files = orphan_translation_files(project_id)
+
+    {:ok,
+     %{
+       missing: missing,
+       orphan_files: orphan_files,
+       do_not_translate_posts: do_not_translate_posts
+     }}
+  end
 
   def rewrite_published_post(post_id) do
     post = Repo.get!(Post, post_id)
@@ -406,6 +523,156 @@ defmodule BDS.Posts do
       {:error, :enoent} -> :ok
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp normalize_translation_updates(post, %Translation{} = translation, language, attrs, now) do
+    updates =
+      %{}
+      |> maybe_put(:title, attr(attrs, :title))
+      |> maybe_put(:excerpt, attr(attrs, :excerpt))
+      |> maybe_put(:content, attr(attrs, :content))
+
+    reopened? = translation.status == :published and translation_content_change?(translation, updates)
+
+    %{
+      id: translation.id || Ecto.UUID.generate(),
+      project_id: post.project_id,
+      translation_for: post.id,
+      language: language,
+      title: Map.get(updates, :title, translation.title),
+      excerpt: Map.get(updates, :excerpt, translation.excerpt),
+      content: Map.get(updates, :content, translation.content),
+      status: if(reopened?, do: :draft, else: translation.status || :draft),
+      created_at: translation.created_at || now,
+      updated_at: now,
+      published_at: translation.published_at,
+      file_path: translation.file_path || "",
+      checksum: translation.checksum
+    }
+  end
+
+  defp translation_content_change?(translation, updates) do
+    Enum.any?([:title, :excerpt, :content], fn field ->
+      case Map.fetch(updates, field) do
+        {:ok, value} -> value != Map.get(translation, field)
+        :error -> false
+      end
+    end)
+  end
+
+  defp publish_post_translations(%Post{} = post) do
+    Repo.all(from translation in Translation, where: translation.translation_for == ^post.id)
+    |> Enum.each(fn translation ->
+      if translation.status == :draft do
+        publish_translation(post, translation)
+      end
+    end)
+
+    :ok
+  end
+
+  defp publish_translation(%Post{} = post, %Translation{} = translation) do
+    project = Projects.get_project!(post.project_id)
+    published_at = translation.published_at || System.system_time(:second)
+    relative_path = build_translation_relative_path(post, translation.language)
+    full_path = Path.join(Projects.project_data_dir(project), relative_path)
+    updated_at = System.system_time(:second)
+    body = publishable_translation_body(translation, full_path)
+
+    :ok = File.mkdir_p(Path.dirname(full_path))
+    :ok = File.write(full_path, serialize_translation_file(%{translation | updated_at: updated_at, content: body}, published_at))
+
+    translation
+    |> Translation.changeset(%{
+      status: :published,
+      published_at: published_at,
+      file_path: relative_path,
+      content: nil,
+      updated_at: updated_at
+    })
+    |> Repo.update!()
+
+    :ok
+  end
+
+  defp build_translation_relative_path(post, language) do
+    datetime = DateTime.from_unix!(post.created_at)
+    year = Integer.to_string(datetime.year)
+    month = datetime.month |> Integer.to_string() |> String.pad_leading(2, "0")
+    Path.join(["posts", year, month, "#{post.slug}.#{language}.md"])
+  end
+
+  defp serialize_translation_file(translation, published_at) do
+    Frontmatter.serialize_document(
+      [
+        {:id, translation.id},
+        {:translation_for, translation.translation_for},
+        {:language, translation.language},
+        {:title, translation.title},
+        {:excerpt, translation.excerpt},
+        {:status, :published},
+        {:created_at, translation.created_at},
+        {:updated_at, translation.updated_at},
+        {:published_at, published_at}
+      ],
+      translation.content || ""
+    )
+  end
+
+  defp publishable_translation_body(%Translation{content: content}, _full_path) when is_binary(content), do: content
+
+  defp publishable_translation_body(_translation, full_path) do
+    case File.read(full_path) do
+      {:ok, contents} ->
+        case String.split(contents, "\n---\n", parts: 2) do
+          [_frontmatter, body] -> String.trim_trailing(body, "\n")
+          _parts -> ""
+        end
+
+      {:error, _reason} ->
+        ""
+    end
+  end
+
+  defp delete_translation_file(%Translation{project_id: _project_id, file_path: file_path}) when file_path in [nil, ""], do: :ok
+
+  defp delete_translation_file(%Translation{} = translation) do
+    project = Projects.get_project!(translation.project_id)
+    full_path = Path.join(Projects.project_data_dir(project), translation.file_path)
+
+    case File.rm(full_path) do
+      :ok -> :ok
+      {:error, :enoent} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp orphan_translation_files(project_id) do
+    project = Projects.get_project!(project_id)
+    translation_paths = MapSet.new(Repo.all(from translation in Translation, where: translation.project_id == ^project_id, select: translation.file_path))
+
+    project
+    |> Projects.project_data_dir()
+    |> Path.join("posts")
+    |> list_matching_files("*.md")
+    |> Enum.map(&Path.relative_to(&1, Projects.project_data_dir(project)))
+    |> Enum.filter(&translation_file?/1)
+    |> Enum.reject(&MapSet.member?(translation_paths, &1))
+    |> Enum.sort()
+  end
+
+  defp translation_file?(relative_path) do
+    Regex.match?(~r/\.[a-z]{2}\.md$/i, relative_path)
+  end
+
+  defp normalize_language(nil), do: ""
+
+  defp normalize_language(language) do
+    language
+    |> to_string()
+    |> String.downcase()
+    |> String.split("-", parts: 2)
+    |> hd()
   end
 
   defp has_attr?(attrs, key) do
