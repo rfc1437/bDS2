@@ -78,9 +78,10 @@ defmodule BDS.Posts do
         relative_path = build_post_relative_path(post.slug, post.created_at)
         full_path = Path.join(Projects.project_data_dir(project), relative_path)
         updated_at = System.system_time(:second)
+        body = publishable_post_body(post, full_path, project)
 
         :ok = File.mkdir_p(Path.dirname(full_path))
-        :ok = File.write(full_path, serialize_post_file(%{post | updated_at: updated_at}, published_at))
+        :ok = File.write(full_path, serialize_post_file(%{post | updated_at: updated_at, content: body}, published_at))
 
         post
         |> Post.changeset(%{
@@ -92,6 +93,19 @@ defmodule BDS.Posts do
         })
         |> Repo.update()
     end
+  end
+
+  def rebuild_posts_from_files(project_id) do
+    project = Projects.get_project!(project_id)
+
+    posts =
+      project
+      |> Projects.project_data_dir()
+      |> Path.join("posts")
+      |> list_matching_files("*.md")
+      |> Enum.map(&upsert_post_from_file(project_id, project, &1))
+
+    {:ok, posts}
   end
 
   def delete_post(post_id) do
@@ -244,6 +258,19 @@ defmodule BDS.Posts do
     Path.join(["posts", year, month, "#{slug}.md"])
   end
 
+  defp publishable_post_body(%Post{content: content}, _full_path, _project) when is_binary(content), do: content
+
+  defp publishable_post_body(%Post{file_path: file_path} = post, full_path, project) do
+    source_path =
+      if file_path in [nil, ""] do
+        full_path
+      else
+        Path.join(Projects.project_data_dir(project), file_path)
+      end
+
+    published_post_body(post, source_path)
+  end
+
   defp serialize_post_file(post, published_at) do
     Frontmatter.serialize_document(
       [
@@ -278,6 +305,58 @@ defmodule BDS.Posts do
 
       {:error, _reason} ->
         ""
+    end
+  end
+
+  defp upsert_post_from_file(project_id, project, path) do
+    contents = File.read!(path)
+    {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
+    relative_path = Path.relative_to(path, Projects.project_data_dir(project))
+    now = System.system_time(:second)
+
+    attrs = %{
+      id: Map.get(fields, "id") || Ecto.UUID.generate(),
+      project_id: project_id,
+      title: Map.get(fields, "title") || "",
+      slug: Map.fetch!(fields, "slug"),
+      excerpt: Map.get(fields, "excerpt"),
+      content: nil,
+      status: parse_post_status(Map.get(fields, "status", "published")),
+      author: Map.get(fields, "author"),
+      created_at: Map.get(fields, "created_at", now),
+      updated_at: Map.get(fields, "updated_at", now),
+      published_at: Map.get(fields, "published_at"),
+      file_path: relative_path,
+      checksum: nil,
+      tags: Map.get(fields, "tags", []),
+      categories: Map.get(fields, "categories", []),
+      template_slug: Map.get(fields, "template_slug"),
+      language: Map.get(fields, "language"),
+      do_not_translate: Map.get(fields, "do_not_translate", false),
+      published_title: nil,
+      published_content: nil,
+      published_tags: nil,
+      published_categories: nil,
+      published_excerpt: nil
+    }
+
+    post = Repo.get_by(Post, project_id: project_id, slug: attrs.slug) || %Post{}
+
+    post
+    |> Post.changeset(attrs)
+    |> Repo.insert_or_update!()
+  end
+
+  defp parse_post_status(status) when is_atom(status), do: status
+  defp parse_post_status(status), do: String.to_existing_atom(status)
+
+  defp list_matching_files(dir, pattern) do
+    if File.dir?(dir) do
+      Path.join([dir, "**", pattern])
+      |> Path.wildcard()
+      |> Enum.sort()
+    else
+      []
     end
   end
 

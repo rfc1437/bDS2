@@ -190,6 +190,95 @@ defmodule BDS.PostsTest do
     assert archived_published.published_at == published_post.published_at
   end
 
+  test "publish_post republishes archived posts without losing the existing body or original published_at" do
+    temp_dir = Path.join(System.tmp_dir!(), "bds-post-republish-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, project} = BDS.Projects.create_project(%{name: "Republish", data_path: temp_dir})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Republish Me",
+               content: "Body"
+             })
+
+    assert {:ok, published} = BDS.Posts.publish_post(post.id)
+    assert {:ok, archived} = BDS.Posts.archive_post(published.id)
+    assert archived.status == :archived
+    assert archived.content == nil
+
+    assert {:ok, republished} = BDS.Posts.publish_post(archived.id)
+    assert republished.status == :published
+    assert republished.published_at == published.published_at
+
+    contents = File.read!(Path.join(temp_dir, republished.file_path))
+    assert contents =~ "\n---\nBody\n"
+  end
+
+  test "rebuild_posts_from_files recreates published posts from disk" do
+    temp_dir = Path.join(System.tmp_dir!(), "bds-post-rebuild-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, project} = BDS.Projects.create_project(%{name: "Rebuild", data_path: temp_dir})
+
+    posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2026", "04"])
+    File.mkdir_p!(posts_dir)
+
+    file_path = Path.join(posts_dir, "recovered-post.md")
+
+    File.write!(
+      file_path,
+      [
+        "---",
+        "id: post-from-file",
+        "title: Recovered Post",
+        "slug: recovered-post",
+        "excerpt: Summary",
+        "status: published",
+        "author: Writer",
+        "language: en",
+        "do_not_translate: true",
+        "template_slug: article",
+        "created_at: 1711843200",
+        "updated_at: 1711929600",
+        "published_at: 1712016000",
+        "tags:",
+        "  - alpha",
+        "categories:",
+        "  - notes",
+        "---",
+        "Restored body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, posts} = BDS.Posts.rebuild_posts_from_files(project.id)
+    assert length(posts) == 1
+
+    [post] = posts
+    assert post.id == "post-from-file"
+    assert post.project_id == project.id
+    assert post.title == "Recovered Post"
+    assert post.slug == "recovered-post"
+    assert post.excerpt == "Summary"
+    assert post.status == :published
+    assert post.author == "Writer"
+    assert post.language == "en"
+    assert post.do_not_translate == true
+    assert post.template_slug == "article"
+    assert post.created_at == 1711843200
+    assert post.updated_at == 1711929600
+    assert post.published_at == 1712016000
+    assert post.tags == ["alpha"]
+    assert post.categories == ["notes"]
+    assert post.file_path == "posts/2026/04/recovered-post.md"
+    assert post.content == nil
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->
