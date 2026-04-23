@@ -218,7 +218,9 @@ defmodule BDS.Scripts do
   end
 
   defp parse_script_kind(kind) when is_atom(kind), do: kind
-  defp parse_script_kind(kind), do: String.to_existing_atom(kind)
+  defp parse_script_kind("macro"), do: :macro
+  defp parse_script_kind("utility"), do: :utility
+  defp parse_script_kind("transform"), do: :transform
 
   defp list_matching_files(dir, pattern) do
     if File.dir?(dir) do

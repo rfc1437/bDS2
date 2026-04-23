@@ -324,7 +324,10 @@ defmodule BDS.Templates do
   end
 
   defp parse_template_kind(kind) when is_atom(kind), do: kind
-  defp parse_template_kind(kind), do: String.to_existing_atom(kind)
+  defp parse_template_kind("post"), do: :post
+  defp parse_template_kind("list"), do: :list
+  defp parse_template_kind("not_found"), do: :not_found
+  defp parse_template_kind("partial"), do: :partial
 
   defp list_matching_files(dir, pattern) do
     if File.dir?(dir) do

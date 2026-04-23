@@ -1,0 +1,247 @@
+defmodule BDS.Media do
+  @moduledoc false
+
+  alias BDS.Media.Media
+  alias BDS.Projects
+  alias BDS.Repo
+  alias BDS.Sidecar
+
+  def import_media(attrs) do
+    project = Projects.get_project!(attr(attrs, :project_id))
+    source_path = attr(attrs, :source_path)
+    original_name = Path.basename(source_path)
+    now = System.system_time(:second)
+    file_name = Ecto.UUID.generate() <> Path.extname(original_name)
+    file_path = media_file_path(file_name, now)
+    sidecar_path = file_path <> ".meta"
+    destination = Path.join(Projects.project_data_dir(project), file_path)
+    stat = File.stat!(source_path)
+
+    Repo.transaction(fn ->
+      media =
+        %Media{}
+        |> Media.changeset(%{
+          id: Ecto.UUID.generate(),
+          project_id: project.id,
+          filename: file_name,
+          original_name: original_name,
+          mime_type: detect_mime(original_name),
+          size: stat.size,
+          width: attr(attrs, :width),
+          height: attr(attrs, :height),
+          title: attr(attrs, :title),
+          alt: attr(attrs, :alt),
+          caption: attr(attrs, :caption),
+          author: attr(attrs, :author),
+          language: attr(attrs, :language),
+          file_path: file_path,
+          sidecar_path: sidecar_path,
+          checksum: attr(attrs, :checksum),
+          tags: attr(attrs, :tags) || [],
+          created_at: now,
+          updated_at: now
+        })
+        |> Repo.insert!()
+
+      :ok = File.mkdir_p(Path.dirname(destination))
+      :ok = File.cp(source_path, destination)
+      :ok = write_sidecar(project, media)
+      media
+    end)
+    |> case do
+      {:ok, media} -> {:ok, media}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def update_media(media_id, attrs) do
+    case Repo.get(Media, media_id) do
+      nil ->
+        {:error, :not_found}
+
+      media ->
+        updates = %{}
+        |> maybe_put(:title, attr(attrs, :title))
+        |> maybe_put(:alt, attr(attrs, :alt))
+        |> maybe_put(:caption, attr(attrs, :caption))
+        |> maybe_put(:author, attr(attrs, :author))
+        |> maybe_put(:language, attr(attrs, :language))
+        |> maybe_put(:tags, attr(attrs, :tags))
+        |> maybe_put(:width, attr(attrs, :width))
+        |> maybe_put(:height, attr(attrs, :height))
+        |> Map.put(:updated_at, System.system_time(:second))
+
+        project = Projects.get_project!(media.project_id)
+
+        Repo.transaction(fn ->
+          updated_media =
+            media
+            |> Media.changeset(updates)
+            |> Repo.update!()
+
+          :ok = write_sidecar(project, updated_media)
+          updated_media
+        end)
+        |> case do
+          {:ok, updated_media} -> {:ok, updated_media}
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
+  def delete_media(media_id) do
+    case Repo.get(Media, media_id) do
+      nil ->
+        {:error, :not_found}
+
+      media ->
+        delete_file_if_present(media.project_id, media.file_path)
+        delete_file_if_present(media.project_id, media.sidecar_path)
+        Repo.delete!(media)
+        {:ok, :deleted}
+    end
+  end
+
+  def rebuild_media_from_files(project_id) do
+    project = Projects.get_project!(project_id)
+
+    media_items =
+      project
+      |> Projects.project_data_dir()
+      |> Path.join("media")
+      |> list_matching_files("*.meta")
+      |> Enum.filter(&binary_exists_for_sidecar?/1)
+      |> Enum.map(&upsert_media_from_sidecar(project, &1))
+
+    {:ok, media_items}
+  end
+
+  defp upsert_media_from_sidecar(project, sidecar_path) do
+    {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
+    relative_sidecar_path = Path.relative_to(sidecar_path, Projects.project_data_dir(project))
+    relative_file_path = String.trim_trailing(relative_sidecar_path, ".meta")
+    filename = Path.basename(relative_file_path)
+    now = System.system_time(:second)
+
+    attrs = %{
+      id: Map.get(fields, "id") || Ecto.UUID.generate(),
+      project_id: project.id,
+      filename: filename,
+      original_name: Map.get(fields, "original_name") || filename,
+      mime_type: Map.get(fields, "mime_type") || detect_mime(filename),
+      size: Map.get(fields, "size", 0),
+      width: blank_to_nil(Map.get(fields, "width")),
+      height: blank_to_nil(Map.get(fields, "height")),
+      title: Map.get(fields, "title"),
+      alt: Map.get(fields, "alt"),
+      caption: Map.get(fields, "caption"),
+      author: Map.get(fields, "author"),
+      language: Map.get(fields, "language"),
+      file_path: relative_file_path,
+      sidecar_path: relative_sidecar_path,
+      checksum: nil,
+      tags: Map.get(fields, "tags", []),
+      created_at: Map.get(fields, "created_at", now),
+      updated_at: Map.get(fields, "updated_at", now)
+    }
+
+    media = Repo.get(Media, attrs.id) || Repo.get_by(Media, project_id: project.id, file_path: relative_file_path) || %Media{}
+
+    media
+    |> Media.changeset(attrs)
+    |> Repo.insert_or_update!()
+  end
+
+  defp write_sidecar(project, media) do
+    path = Path.join(Projects.project_data_dir(project), media.sidecar_path)
+    :ok = File.mkdir_p(Path.dirname(path))
+
+    atomic_write(
+      path,
+      Sidecar.serialize_document([
+        {:id, media.id},
+        {:original_name, media.original_name},
+        {:mime_type, media.mime_type},
+        {:size, media.size},
+        {:width, media.width},
+        {:height, media.height},
+        {:title, media.title},
+        {:alt, media.alt},
+        {:caption, media.caption},
+        {:author, media.author},
+        {:language, media.language},
+        {:created_at, media.created_at},
+        {:updated_at, media.updated_at},
+        {:tags, media.tags || []}
+      ])
+    )
+  end
+
+  defp media_file_path(file_name, timestamp) do
+    datetime = DateTime.from_unix!(timestamp)
+    year = Integer.to_string(datetime.year)
+    month = datetime.month |> Integer.to_string() |> String.pad_leading(2, "0")
+    Path.join(["media", year, month, file_name])
+  end
+
+  defp detect_mime(file_name) do
+    case String.downcase(Path.extname(file_name)) do
+      ".txt" -> "text/plain"
+      ".md" -> "text/markdown"
+      ".jpg" -> "image/jpeg"
+      ".jpeg" -> "image/jpeg"
+      ".png" -> "image/png"
+      ".gif" -> "image/gif"
+      ".webp" -> "image/webp"
+      _ -> "application/octet-stream"
+    end
+  end
+
+  defp binary_exists_for_sidecar?(sidecar_path) do
+    sidecar_path
+    |> String.trim_trailing(".meta")
+    |> File.exists?()
+  end
+
+  defp list_matching_files(dir, pattern) do
+    if File.dir?(dir) do
+      Path.join([dir, "**", pattern])
+      |> Path.wildcard()
+      |> Enum.sort()
+    else
+      []
+    end
+  end
+
+  defp delete_file_if_present(project_id, relative_path) do
+    project = Projects.get_project!(project_id)
+    full_path = Path.join(Projects.project_data_dir(project), relative_path)
+
+    case File.rm(full_path) do
+      :ok -> :ok
+      {:error, :enoent} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp atomic_write(path, contents) do
+    temp_path = path <> ".tmp"
+    :ok = File.write(temp_path, contents)
+    File.rename(temp_path, path)
+  end
+
+  defp blank_to_nil(nil), do: nil
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(value), do: value
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp attr(attrs, key) do
+    cond do
+      Map.has_key?(attrs, key) -> Map.get(attrs, key)
+      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
+      true -> nil
+    end
+  end
+end
