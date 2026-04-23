@@ -87,6 +87,53 @@ defmodule BDS.PostsTest do
     assert reopened.updated_at >= published.updated_at
   end
 
+  test "publish_post writes frontmatter to the project data directory and clears draft content" do
+    temp_dir = Path.join(System.tmp_dir!(), "bds-post-publish-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, project} = BDS.Projects.create_project(%{name: "Filesystem", data_path: temp_dir})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Published Post",
+               excerpt: "Summary",
+               content: "Hello from markdown",
+               tags: ["alpha"],
+               categories: ["notes"],
+               author: "Writer",
+               language: "en",
+               template_slug: "article"
+             })
+
+    assert {:ok, post} = BDS.Posts.update_post(post.id, %{do_not_translate: true})
+    assert {:ok, published} = BDS.Posts.publish_post(post.id)
+
+    assert published.status == :published
+    assert published.content == nil
+    assert published.file_path =~ ~r/^posts\/\d{4}\/\d{2}\/published-post\.md$/
+    assert is_integer(published.published_at)
+
+    full_path = Path.join(temp_dir, published.file_path)
+    assert File.exists?(full_path)
+
+    file_contents = File.read!(full_path)
+
+    assert file_contents =~ "---\nid: #{published.id}\n"
+    assert file_contents =~ "title: Published Post\n"
+    assert file_contents =~ "slug: published-post\n"
+    assert file_contents =~ "status: published\n"
+    assert file_contents =~ "excerpt: Summary\n"
+    assert file_contents =~ "author: Writer\n"
+    assert file_contents =~ "language: en\n"
+    assert file_contents =~ "do_not_translate: true\n"
+    assert file_contents =~ "template_slug: article\n"
+    assert file_contents =~ "tags:\n  - alpha\n"
+    assert file_contents =~ "categories:\n  - notes\n"
+    assert file_contents =~ "\n---\nHello from markdown\n"
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->

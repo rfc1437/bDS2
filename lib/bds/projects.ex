@@ -8,11 +8,43 @@ defmodule BDS.Projects do
   alias BDS.Repo
   alias BDS.Slug
 
+  @default_project_id "default"
+  @default_project_name "My Blog"
+
   def list_projects do
     Repo.all(from project in Project, order_by: [asc: project.created_at])
   end
 
+  def get_project(id), do: Repo.get(Project, id)
   def get_project!(id), do: Repo.get!(Project, id)
+
+  def ensure_default_project do
+    case Repo.get(Project, @default_project_id) do
+      %Project{} = project ->
+        {:ok, project}
+
+      nil ->
+        now = System.system_time(:second)
+        is_active = not Repo.exists?(from project in Project, where: project.is_active == true)
+
+        %Project{}
+        |> Project.changeset(%{
+          id: @default_project_id,
+          name: @default_project_name,
+          slug: unique_slug(Slug.slugify(@default_project_name)),
+          description: nil,
+          data_path: nil,
+          created_at: now,
+          updated_at: now,
+          is_active: is_active
+        })
+        |> Repo.insert()
+    end
+  end
+
+  def project_data_dir(%Project{} = project) do
+    project.data_path || Path.expand("../../priv/data/projects/#{project.id}", __DIR__)
+  end
 
   def create_project(attrs) do
     now = System.system_time(:second)
@@ -79,6 +111,10 @@ defmodule BDS.Projects do
   end
 
   defp attr(attrs, key) do
-    Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
+    cond do
+      Map.has_key?(attrs, key) -> Map.get(attrs, key)
+      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
+      true -> nil
+    end
   end
 end

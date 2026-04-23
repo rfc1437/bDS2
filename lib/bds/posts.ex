@@ -4,6 +4,7 @@ defmodule BDS.Posts do
   import Ecto.Query
 
   alias BDS.Posts.Post
+  alias BDS.Projects
   alias BDS.Repo
   alias BDS.Slug
 
@@ -62,6 +63,32 @@ defmodule BDS.Posts do
         else
           {:error, changeset} -> {:error, changeset}
         end
+    end
+  end
+
+  def publish_post(post_id) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Post{} = post ->
+        project = Projects.get_project!(post.project_id)
+        published_at = post.published_at || System.system_time(:second)
+        relative_path = build_post_relative_path(post.slug, post.created_at)
+        full_path = Path.join(Projects.project_data_dir(project), relative_path)
+
+        :ok = File.mkdir_p(Path.dirname(full_path))
+        :ok = File.write(full_path, serialize_post_file(post, published_at))
+
+        post
+        |> Post.changeset(%{
+          status: :published,
+          published_at: published_at,
+          file_path: relative_path,
+          content: nil,
+          updated_at: System.system_time(:second)
+        })
+        |> Repo.update()
     end
   end
 
@@ -162,11 +189,58 @@ defmodule BDS.Posts do
   defp default_slug_source(""), do: "untitled"
   defp default_slug_source(title), do: title
 
+  defp build_post_relative_path(slug, created_at) do
+    datetime = DateTime.from_unix!(created_at)
+    year = Integer.to_string(datetime.year)
+    month = datetime.month |> Integer.to_string() |> String.pad_leading(2, "0")
+    Path.join(["posts", year, month, "#{slug}.md"])
+  end
+
+  defp serialize_post_file(post, published_at) do
+    frontmatter_lines = [
+      "id: #{post.id}",
+      "title: #{post.title}",
+      "slug: #{post.slug}",
+      maybe_line("excerpt", post.excerpt),
+      "status: published",
+      maybe_line("author", post.author),
+      maybe_line("language", post.language),
+      maybe_boolean_line("do_not_translate", post.do_not_translate),
+      maybe_line("template_slug", post.template_slug),
+      "created_at: #{post.created_at}",
+      "updated_at: #{post.updated_at}",
+      "published_at: #{published_at}",
+      list_lines("tags", post.tags),
+      list_lines("categories", post.categories)
+    ]
+    |> List.flatten()
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join("\n")
+
+    ["---", frontmatter_lines, "---", post.content || "", ""]
+    |> Enum.join("\n")
+  end
+
+  defp list_lines(label, items) do
+    ["#{label}:" | Enum.map(items || [], &"  - #{&1}")]
+  end
+
+  defp maybe_line(_label, nil), do: nil
+  defp maybe_line(_label, ""), do: nil
+  defp maybe_line(label, value), do: "#{label}: #{value}"
+
+  defp maybe_boolean_line(_label, false), do: nil
+  defp maybe_boolean_line(label, true), do: "#{label}: true"
+
   defp has_attr?(attrs, key) do
     Map.has_key?(attrs, key) or Map.has_key?(attrs, Atom.to_string(key))
   end
 
   defp attr(attrs, key) do
-    Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
+    cond do
+      Map.has_key?(attrs, key) -> Map.get(attrs, key)
+      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
+      true -> nil
+    end
   end
 end

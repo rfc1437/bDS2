@@ -1,6 +1,9 @@
 defmodule BDS.ProjectsTest do
   use ExUnit.Case, async: false
 
+  alias BDS.Projects.Project
+  alias BDS.Repo
+
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
   end
@@ -36,5 +39,19 @@ defmodule BDS.ProjectsTest do
     assert refetched_first.is_active == false
     assert refetched_second.is_active == true
     assert Enum.count(BDS.Projects.list_projects(), & &1.is_active) == 1
+  end
+
+  test "ensure_default_project creates the default project once and keeps it active" do
+    Repo.delete_all(Project)
+
+    assert {:ok, default_project} = BDS.Projects.ensure_default_project()
+    assert default_project.id == "default"
+    assert default_project.name == "My Blog"
+    assert default_project.slug == "my-blog"
+    assert default_project.is_active == true
+
+    assert {:ok, same_project} = BDS.Projects.ensure_default_project()
+    assert same_project.id == default_project.id
+    assert Repo.aggregate(Project, :count, :id) == 1
   end
 end
