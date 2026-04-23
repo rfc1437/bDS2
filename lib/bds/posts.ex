@@ -94,6 +94,36 @@ defmodule BDS.Posts do
     end
   end
 
+  def delete_post(post_id) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Post{} = post ->
+        delete_post_file(post)
+        Repo.delete!(post)
+        {:ok, :deleted}
+    end
+  end
+
+  def archive_post(post_id) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Post{status: status} = post when status in [:draft, :published] ->
+        post
+        |> Post.changeset(%{status: :archived, updated_at: System.system_time(:second)})
+        |> Repo.update()
+
+      %Post{} = post ->
+        {:error,
+         post
+         |> Post.changeset(%{})
+         |> Ecto.Changeset.add_error(:status, "cannot archive archived post")}
+    end
+  end
+
   def get_post!(post_id), do: Repo.get!(Post, post_id)
 
   def rewrite_published_post(post_id) do
@@ -248,6 +278,19 @@ defmodule BDS.Posts do
 
       {:error, _reason} ->
         ""
+    end
+  end
+
+  defp delete_post_file(%Post{project_id: _project_id, file_path: file_path}) when file_path in [nil, ""], do: :ok
+
+  defp delete_post_file(%Post{} = post) do
+    project = Projects.get_project!(post.project_id)
+    full_path = Path.join(Projects.project_data_dir(project), post.file_path)
+
+    case File.rm(full_path) do
+      :ok -> :ok
+      {:error, :enoent} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 

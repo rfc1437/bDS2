@@ -134,6 +134,62 @@ defmodule BDS.PostsTest do
     assert file_contents =~ "\n---\nHello from markdown\n"
   end
 
+  test "delete_post removes the database row and published markdown file when present" do
+    temp_dir = Path.join(System.tmp_dir!(), "bds-post-delete-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, project} = BDS.Projects.create_project(%{name: "Delete", data_path: temp_dir})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Delete Me",
+               content: "Body"
+             })
+
+    assert {:ok, published} = BDS.Posts.publish_post(post.id)
+    full_path = Path.join(temp_dir, published.file_path)
+    assert File.exists?(full_path)
+
+    assert {:ok, :deleted} = BDS.Posts.delete_post(published.id)
+
+    assert BDS.Repo.get(BDS.Posts.Post, published.id) == nil
+    refute File.exists?(full_path)
+  end
+
+  test "archive_post transitions draft and published posts to archived", %{project: project} do
+    assert {:ok, draft_post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Draft Archive",
+               content: "Body"
+             })
+
+    assert {:ok, archived_draft} = BDS.Posts.archive_post(draft_post.id)
+    assert archived_draft.status == :archived
+
+    temp_dir = Path.join(System.tmp_dir!(), "bds-post-archive-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, publish_project} = BDS.Projects.create_project(%{name: "Archive Published", data_path: temp_dir})
+
+    assert {:ok, published_post} =
+             BDS.Posts.create_post(%{
+               project_id: publish_project.id,
+               title: "Published Archive",
+               content: "Body"
+             })
+
+    assert {:ok, published_post} = BDS.Posts.publish_post(published_post.id)
+    assert {:ok, archived_published} = BDS.Posts.archive_post(published_post.id)
+
+    assert archived_published.status == :archived
+    assert archived_published.file_path == published_post.file_path
+    assert archived_published.published_at == published_post.published_at
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->
