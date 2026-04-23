@@ -7,6 +7,7 @@ defmodule BDS.Posts do
   alias BDS.Posts.Post
   alias BDS.Projects
   alias BDS.Repo
+  alias BDS.Search
   alias BDS.Slug
 
   def create_post(attrs) do
@@ -42,6 +43,14 @@ defmodule BDS.Posts do
       published_excerpt: nil
     })
     |> Repo.insert()
+    |> case do
+      {:ok, post} ->
+        :ok = Search.sync_post(post)
+        {:ok, post}
+
+      error ->
+        error
+    end
   end
 
   def update_post(post_id, attrs) do
@@ -61,6 +70,14 @@ defmodule BDS.Posts do
           post
           |> Post.changeset(updates)
           |> Repo.update()
+          |> case do
+            {:ok, updated_post} ->
+              :ok = Search.sync_post(updated_post)
+              {:ok, updated_post}
+
+            error ->
+              error
+          end
         else
           {:error, changeset} -> {:error, changeset}
         end
@@ -92,6 +109,14 @@ defmodule BDS.Posts do
           updated_at: updated_at
         })
         |> Repo.update()
+        |> case do
+          {:ok, updated_post} ->
+            :ok = Search.sync_post(updated_post)
+            {:ok, updated_post}
+
+          error ->
+            error
+        end
     end
   end
 
@@ -116,6 +141,7 @@ defmodule BDS.Posts do
       %Post{} = post ->
         delete_post_file(post)
         Repo.delete!(post)
+        :ok = Search.delete_post(post.id)
         {:ok, :deleted}
     end
   end
@@ -129,6 +155,14 @@ defmodule BDS.Posts do
         post
         |> Post.changeset(%{status: :archived, updated_at: System.system_time(:second)})
         |> Repo.update()
+        |> case do
+          {:ok, updated_post} ->
+            :ok = Search.sync_post(updated_post)
+            {:ok, updated_post}
+
+          error ->
+            error
+        end
 
       %Post{} = post ->
         {:error,
@@ -345,6 +379,7 @@ defmodule BDS.Posts do
     post
     |> Post.changeset(attrs)
     |> Repo.insert_or_update!()
+    |> tap(&Search.sync_post/1)
   end
 
   defp parse_post_status(status) when is_atom(status), do: status

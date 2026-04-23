@@ -7,6 +7,7 @@ defmodule BDS.Media do
   alias BDS.Media.Translation
   alias BDS.Projects
   alias BDS.Repo
+  alias BDS.Search
   alias BDS.Sidecar
 
   def import_media(attrs) do
@@ -52,6 +53,7 @@ defmodule BDS.Media do
       :ok = File.cp(source_path, destination)
       :ok = write_sidecar(project, media)
       :ok = ensure_thumbnails(project, media)
+      :ok = Search.sync_media(media)
       media
     end)
     |> case do
@@ -86,6 +88,7 @@ defmodule BDS.Media do
             |> Repo.update!()
 
           :ok = write_sidecar(project, updated_media)
+          :ok = Search.sync_media(updated_media)
           updated_media
         end)
         |> case do
@@ -113,6 +116,7 @@ defmodule BDS.Media do
         end)
 
         Repo.delete!(media)
+        :ok = Search.delete_media(media.id)
         {:ok, :deleted}
     end
   end
@@ -149,6 +153,7 @@ defmodule BDS.Media do
             |> Repo.insert_or_update!()
 
           :ok = write_translation_sidecar(project, media, updated_translation)
+          :ok = Search.sync_media(media.id)
           updated_translation
         end)
         |> case do
@@ -244,6 +249,7 @@ defmodule BDS.Media do
     |> Media.changeset(attrs)
     |> Repo.insert_or_update!()
     |> tap(fn reloaded_media -> ensure_thumbnails(project, reloaded_media) end)
+    |> tap(&Search.sync_media/1)
   end
 
   defp write_sidecar(project, media) do
@@ -316,6 +322,8 @@ defmodule BDS.Media do
           updated_at: now
         })
         |> Repo.insert_or_update!()
+
+        :ok = Search.sync_media(media.id)
     end
   end
 
