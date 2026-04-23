@@ -141,6 +141,16 @@ defmodule BDS.MaintenanceTest do
 
     assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
 
+    assert {:ok, post_translation} =
+             BDS.Posts.upsert_post_translation(published_post.id, "de", %{
+               title: "Ursprunglicher Beitrag",
+               excerpt: "Zusammenfassung",
+               content: "Ubersetzter Inhalt"
+             })
+
+    assert {:ok, _republished_post} = BDS.Posts.publish_post(published_post.id)
+    published_post_translation = Repo.get!(BDS.Posts.Translation, post_translation.id)
+
     assert {:ok, media} =
              BDS.Media.import_media(%{
                project_id: project.id,
@@ -151,6 +161,13 @@ defmodule BDS.MaintenanceTest do
                author: "Photographer",
                language: "en",
                tags: ["alpha"]
+             })
+
+    assert {:ok, media_translation} =
+             BDS.Media.upsert_media_translation(media.id, "de", %{
+               title: "Ubersetzter Medientitel",
+               alt: "Ubersetzter Alt-Text",
+               caption: "Ubersetzte Beschriftung"
              })
 
     assert {:ok, script} =
@@ -202,6 +219,27 @@ defmodule BDS.MaintenanceTest do
       |> Enum.join("\n")
     )
 
+    post_translation_path = Path.join(temp_dir, published_post_translation.file_path)
+    File.write!(
+      post_translation_path,
+      [
+        "---",
+        "id: #{published_post_translation.id}",
+        "translation_for: #{published_post_translation.translation_for}",
+        "language: #{published_post_translation.language}",
+        "title: Bearbeiteter Beitrag",
+        "excerpt: Bearbeitete Zusammenfassung",
+        "status: published",
+        "created_at: #{published_post_translation.created_at}",
+        "updated_at: #{published_post_translation.updated_at}",
+        "published_at: #{published_post_translation.published_at}",
+        "---",
+        "Bearbeiteter Inhalt",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
     media_sidecar_path = Path.join(temp_dir, media.sidecar_path)
     File.write!(
       media_sidecar_path,
@@ -219,6 +257,20 @@ defmodule BDS.MaintenanceTest do
         "updated_at: #{media.updated_at}",
         "tags:",
         "  - beta",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    media_translation_sidecar_path = Path.join(temp_dir, "#{media.file_path}.#{media_translation.language}.meta")
+    File.write!(
+      media_translation_sidecar_path,
+      [
+        "translation_for: #{media.id}",
+        "language: #{media_translation.language}",
+        "title: Bearbeiteter Medientitel",
+        "alt: Bearbeiteter Alt-Text",
+        "caption: Bearbeitete Beschriftung",
         ""
       ]
       |> Enum.join("\n")
@@ -266,8 +318,10 @@ defmodule BDS.MaintenanceTest do
     )
 
     File.write!(Path.join([temp_dir, "posts", "2026", "04", "orphan-post.md"]), "---\nid: orphan\ntitle: Orphan\nslug: orphan\nstatus: published\ncreated_at: 1\nupdated_at: 1\npublished_at: 1\ntags:\ncategories:\n---\nBody\n")
+    File.write!(Path.join([temp_dir, "posts", "2026", "04", "orphan-post.es.md"]), "---\nid: orphan-post-translation\ntranslation_for: orphan\nlanguage: es\ntitle: Huerfano\nstatus: published\ncreated_at: 1\nupdated_at: 1\npublished_at: 1\n---\nCuerpo\n")
     File.write!(Path.join([temp_dir, "media", "2026", "04", "orphan.txt"]), "orphan")
     File.write!(Path.join([temp_dir, "media", "2026", "04", "orphan.txt.meta"]), "id: orphan-media\noriginal_name: orphan.txt\nmime_type: text/plain\nsize: 6\ncreated_at: 1\nupdated_at: 1\ntags:\n")
+    File.write!(Path.join([temp_dir, "media", "2026", "04", "orphan.txt.es.meta"]), "translation_for: orphan-media\nlanguage: es\ntitle: Huerfano\nalt: Texto\ncaption: Leyenda\n")
     File.write!(Path.join([temp_dir, "scripts", "orphan.lua"]), "---\nid: orphan-script\nslug: orphan-script\ntitle: Orphan Script\nkind: utility\nentrypoint: main\nenabled: true\nversion: 1\ncreated_at: 1\nupdated_at: 1\n---\nfunction main() return true end\n")
     File.write!(Path.join([temp_dir, "templates", "orphan-view.liquid"]), "---\nid: orphan-template\nslug: orphan-view\ntitle: Orphan View\nkind: list\nenabled: true\nversion: 1\ncreated_at: 1\nupdated_at: 1\n---\n<section>Orphan</section>\n")
 
@@ -297,9 +351,23 @@ defmodule BDS.MaintenanceTest do
                Enum.any?(report.differences, &(&1.name == "enabled" and &1.file_value == "false"))
            end)
 
+    assert Enum.any?(diff_reports, fn report ->
+             report.entity_type == "post_translation" and report.entity_id == published_post_translation.id and
+               Enum.any?(report.differences, &(&1.name == "title" and &1.db_value == "Ursprunglicher Beitrag" and &1.file_value == "Bearbeiteter Beitrag")) and
+               Enum.any?(report.differences, &(&1.name == "excerpt" and &1.db_value == "Zusammenfassung" and &1.file_value == "Bearbeitete Zusammenfassung"))
+           end)
+
+    assert Enum.any?(diff_reports, fn report ->
+             report.entity_type == "media_translation" and report.entity_id == media_translation.id and
+               Enum.any?(report.differences, &(&1.name == "title" and &1.db_value == "Ubersetzter Medientitel" and &1.file_value == "Bearbeiteter Medientitel")) and
+               Enum.any?(report.differences, &(&1.name == "alt" and &1.db_value == "Ubersetzter Alt-Text" and &1.file_value == "Bearbeiteter Alt-Text"))
+           end)
+
     orphan_paths = Enum.map(orphan_reports, & &1.file_path)
     assert "posts/2026/04/orphan-post.md" in orphan_paths
+    assert "posts/2026/04/orphan-post.es.md" in orphan_paths
     assert "media/2026/04/orphan.txt.meta" in orphan_paths
+    assert "media/2026/04/orphan.txt.es.meta" in orphan_paths
     assert "scripts/orphan.lua" in orphan_paths
     assert "templates/orphan-view.liquid" in orphan_paths
   end
