@@ -1,6 +1,8 @@
 defmodule BDS.MaintenanceTest do
   use ExUnit.Case, async: false
 
+  import Ecto.Query
+
   alias BDS.Repo
 
   setup do
@@ -119,5 +121,186 @@ defmodule BDS.MaintenanceTest do
 
   test "rebuild_from_filesystem rejects unsupported entity types", %{project: project} do
     assert {:error, :unsupported_entity_type} = BDS.Maintenance.rebuild_from_filesystem(project.id, "unknown")
+  end
+
+  test "metadata_diff reports field differences and orphan files across managed entities", %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "sample.txt")
+    File.write!(source_path, "hello media")
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Original Post",
+               content: "Original body",
+               excerpt: "Original summary",
+               author: "Writer",
+               language: "en",
+               tags: ["alpha"],
+               categories: ["notes"]
+             })
+
+    assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Original media title",
+               alt: "Original alt",
+               caption: "Original caption",
+               author: "Photographer",
+               language: "en",
+               tags: ["alpha"]
+             })
+
+    assert {:ok, script} =
+             BDS.Scripts.create_script(%{
+               project_id: project.id,
+               title: "Original Script",
+               kind: :utility,
+               entrypoint: "main",
+               content: "function main() return true end"
+             })
+
+    assert {:ok, published_script} = BDS.Scripts.publish_script(script.id)
+
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Original Template",
+               kind: :list,
+               content: "<section>Original</section>"
+             })
+
+    assert {:ok, published_template} = BDS.Templates.publish_template(template.id)
+
+    post_path = Path.join(temp_dir, published_post.file_path)
+    File.write!(
+      post_path,
+      [
+        "---",
+        "id: #{published_post.id}",
+        "title: Edited Post",
+        "slug: #{published_post.slug}",
+        "excerpt: Edited summary",
+        "status: published",
+        "author: Editor",
+        "language: de",
+        "do_not_translate: false",
+        "template_slug: ",
+        "created_at: #{published_post.created_at}",
+        "updated_at: #{published_post.updated_at}",
+        "published_at: #{published_post.published_at}",
+        "tags:",
+        "  - beta",
+        "categories:",
+        "  - article",
+        "---",
+        "Changed body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    media_sidecar_path = Path.join(temp_dir, media.sidecar_path)
+    File.write!(
+      media_sidecar_path,
+      [
+        "id: #{media.id}",
+        "original_name: #{media.original_name}",
+        "mime_type: #{media.mime_type}",
+        "size: #{media.size}",
+        "title: Edited media title",
+        "alt: Edited alt",
+        "caption: Edited caption",
+        "author: Editor",
+        "language: de",
+        "created_at: #{media.created_at}",
+        "updated_at: #{media.updated_at}",
+        "tags:",
+        "  - beta",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    script_path = Path.join(temp_dir, published_script.file_path)
+    File.write!(
+      script_path,
+      [
+        "---",
+        "id: #{published_script.id}",
+        "slug: #{published_script.slug}",
+        "title: Edited Script",
+        "kind: utility",
+        "entrypoint: run",
+        "enabled: false",
+        "version: #{published_script.version}",
+        "created_at: #{published_script.created_at}",
+        "updated_at: #{published_script.updated_at}",
+        "---",
+        "function run() return false end",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    template_path = Path.join(temp_dir, published_template.file_path)
+    File.write!(
+      template_path,
+      [
+        "---",
+        "id: #{published_template.id}",
+        "slug: #{published_template.slug}",
+        "title: Edited Template",
+        "kind: list",
+        "enabled: false",
+        "version: #{published_template.version}",
+        "created_at: #{published_template.created_at}",
+        "updated_at: #{published_template.updated_at}",
+        "---",
+        "<section>Edited</section>",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(Path.join([temp_dir, "posts", "2026", "04", "orphan-post.md"]), "---\nid: orphan\ntitle: Orphan\nslug: orphan\nstatus: published\ncreated_at: 1\nupdated_at: 1\npublished_at: 1\ntags:\ncategories:\n---\nBody\n")
+    File.write!(Path.join([temp_dir, "media", "2026", "04", "orphan.txt"]), "orphan")
+    File.write!(Path.join([temp_dir, "media", "2026", "04", "orphan.txt.meta"]), "id: orphan-media\noriginal_name: orphan.txt\nmime_type: text/plain\nsize: 6\ncreated_at: 1\nupdated_at: 1\ntags:\n")
+    File.write!(Path.join([temp_dir, "scripts", "orphan.lua"]), "---\nid: orphan-script\nslug: orphan-script\ntitle: Orphan Script\nkind: utility\nentrypoint: main\nenabled: true\nversion: 1\ncreated_at: 1\nupdated_at: 1\n---\nfunction main() return true end\n")
+    File.write!(Path.join([temp_dir, "templates", "orphan-view.liquid"]), "---\nid: orphan-template\nslug: orphan-view\ntitle: Orphan View\nkind: list\nenabled: true\nversion: 1\ncreated_at: 1\nupdated_at: 1\n---\n<section>Orphan</section>\n")
+
+    assert {:ok, %{diff_reports: diff_reports, orphan_reports: orphan_reports}} = BDS.Maintenance.metadata_diff(project.id)
+
+    assert Enum.any?(diff_reports, fn report ->
+             report.entity_type == "post" and report.entity_id == published_post.id and
+               Enum.any?(report.differences, &(&1.name == "title" and &1.db_value == "Original Post" and &1.file_value == "Edited Post")) and
+               Enum.any?(report.differences, &(&1.name == "excerpt" and &1.db_value == "Original summary" and &1.file_value == "Edited summary"))
+           end)
+
+    assert Enum.any?(diff_reports, fn report ->
+             report.entity_type == "media" and report.entity_id == media.id and
+               Enum.any?(report.differences, &(&1.name == "title" and &1.file_value == "Edited media title")) and
+               Enum.any?(report.differences, &(&1.name == "language" and &1.file_value == "de"))
+           end)
+
+    assert Enum.any?(diff_reports, fn report ->
+             report.entity_type == "script" and report.entity_id == published_script.id and
+               Enum.any?(report.differences, &(&1.name == "title" and &1.file_value == "Edited Script")) and
+               Enum.any?(report.differences, &(&1.name == "entrypoint" and &1.file_value == "run"))
+           end)
+
+    assert Enum.any?(diff_reports, fn report ->
+             report.entity_type == "template" and report.entity_id == published_template.id and
+               Enum.any?(report.differences, &(&1.name == "title" and &1.file_value == "Edited Template")) and
+               Enum.any?(report.differences, &(&1.name == "enabled" and &1.file_value == "false"))
+           end)
+
+    orphan_paths = Enum.map(orphan_reports, & &1.file_path)
+    assert "posts/2026/04/orphan-post.md" in orphan_paths
+    assert "media/2026/04/orphan.txt.meta" in orphan_paths
+    assert "scripts/orphan.lua" in orphan_paths
+    assert "templates/orphan-view.liquid" in orphan_paths
   end
 end

@@ -59,6 +59,26 @@ defmodule BDS.ProjectsTest do
     assert {"not-found", :not_found} in starter_slugs
   end
 
+  test "starter template installation is idempotent for existing top-level templates", %{temp_root: temp_root} do
+    temp_dir = Path.join(temp_root, "idempotent-starter")
+    File.mkdir_p!(temp_dir)
+
+    assert {:ok, project} = BDS.Projects.create_project(%{name: "Starter Blog", data_path: temp_dir})
+
+    template_path = Path.join([temp_dir, "templates", "single-post.liquid"])
+    original_contents = File.read!(template_path)
+    assert {:ok, %{fields: original_fields}} = BDS.Frontmatter.parse_document(original_contents)
+    assert is_binary(original_fields["id"])
+
+    assert :ok = BDS.StarterTemplates.install(project)
+
+    reinstalled_contents = File.read!(template_path)
+    assert reinstalled_contents == original_contents
+
+    assert {:ok, %{fields: reinstalled_fields}} = BDS.Frontmatter.parse_document(reinstalled_contents)
+    assert reinstalled_fields["id"] == original_fields["id"]
+  end
+
   test "set_active_project clears the previous active project and activates the target", %{temp_root: temp_root} do
     first_dir = Path.join(temp_root, "active-first")
     second_dir = Path.join(temp_root, "active-second")

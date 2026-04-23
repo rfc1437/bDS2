@@ -23,27 +23,29 @@ defmodule BDS.StarterTemplates do
       target_path = Path.join(target_root, relative_path)
       :ok = File.mkdir_p(Path.dirname(target_path))
 
-      case Enum.find(@top_level_templates, &(&1.file_name == relative_path)) do
-        nil ->
-          File.cp!(source_path, target_path)
+      unless File.exists?(target_path) do
+        case Enum.find(@top_level_templates, &(&1.file_name == relative_path)) do
+          nil ->
+            File.cp!(source_path, target_path)
 
-        template ->
-          body = File.read!(source_path)
+          template ->
+            body = File.read!(source_path)
 
-          File.write!(
-            target_path,
-            Frontmatter.serialize_document(
-              [
-                {:id, Ecto.UUID.generate()},
-                {:slug, template.slug},
-                {:title, template.title},
-                {:kind, template.kind},
-                {:enabled, true},
-                {:version, 1}
-              ],
-              body
+            File.write!(
+              target_path,
+              Frontmatter.serialize_document(
+                [
+                  {:id, Ecto.UUID.generate()},
+                  {:slug, template.slug},
+                  {:title, template.title},
+                  {:kind, template.kind},
+                  {:enabled, true},
+                  {:version, 1}
+                ],
+                body
+              )
             )
-          )
+        end
       end
     end)
 
