@@ -1,0 +1,217 @@
+-- allium: 1
+-- bDS AI Integration
+-- Scope: core (one-shot operations), extension Bucket C (chat + streaming)
+-- Distilled from: src/main/engine/ChatEngine.ts, ai/providers.ts,
+--   ai/chat.ts, ai/tasks.ts, SecureKeyStore.ts
+-- The rewrite models AI access as two configurable OpenAI-compatible
+-- endpoints (online + airplane mode) instead of a fixed named-provider set.
+
+use "./post.allium" as post
+use "./media.allium" as media
+
+entity AiEndpoint {
+    kind: online | airplane
+    url: String
+    api_key: String?                    -- encrypted via SecureKeyStore; null for local models
+    model: String
+    -- online: cloud provider (OpenAI, Anthropic-via-proxy, etc.)
+    -- airplane: local model (Ollama, LM Studio, etc.)
+}
+
+surface AiEndpointSurface {
+    context endpoint: AiEndpoint
+
+    exposes:
+        endpoint.kind
+        endpoint.url
+        endpoint.api_key when endpoint.api_key != null
+        endpoint.model
+}
+
+entity SecureKeyStore {
+    -- Encrypts API keys using the host operating system's secure storage.
+    -- Stored in application settings in encrypted form.
+    -- No plain-text fallback
+}
+
+surface SecureKeyStoreSurface {
+    context _: SecureKeyStore
+}
+
+entity ChatConversation {
+    title: String
+    model: String
+    created_at: Timestamp
+    updated_at: Timestamp
+
+    messages: ChatMessage with conversation = this
+}
+
+surface ChatConversationSurface {
+    context conversation: ChatConversation
+
+    exposes:
+        conversation.title
+        conversation.model
+        conversation.created_at
+        conversation.updated_at
+        conversation.messages.count
+}
+
+entity ChatMessage {
+    conversation: ChatConversation
+    role: system | user | assistant | tool
+    content: String
+    token_usage_input: Integer?
+    token_usage_output: Integer?
+    created_at: Timestamp
+}
+
+surface ChatMessageSurface {
+    context message: ChatMessage
+
+    exposes:
+        message.conversation
+        message.role
+        message.content
+        message.token_usage_input when message.token_usage_input != null
+        message.token_usage_output when message.token_usage_output != null
+        message.created_at
+}
+
+surface OneShotAiSurface {
+    facing _: AiOperator
+
+    provides:
+        AnalyzeTaxonomyRequested(post)
+        AnalyzeImageRequested(media)
+        AnalyzePostRequested(post)
+        DetectLanguageRequested(text)
+        TranslatePostRequested(post, target_language)
+        TranslateMediaRequested(media, target_language)
+}
+
+surface AiChatSurface {
+    facing _: ChatOperator
+
+    provides:
+        StartChatRequested(model)
+        SendChatMessageRequested(conversation, content)
+        RefreshModelCatalogRequested(endpoint)
+}
+
+-- One-shot AI tasks (core scope, no streaming)
+-- All use OpenAI Chat Completions wire format.
+-- Endpoint routing: see AirplaneModeGating invariant below.
+-- When no endpoint configured for current mode: disable AI, show toast.
+
+rule AnalyzeTaxonomy {
+    when: AnalyzeTaxonomyRequested(post)
+    requires: active_endpoint_configured
+    -- Suggests tags and categories for a post
+    ensures: TaxonomySuggestion(tags, categories)
+}
+
+rule AnalyzeImage {
+    when: AnalyzeImageRequested(media)
+    requires: active_endpoint_configured
+    requires: is_image(media.mime_type)
+    -- Vision model generates alt text and caption
+    ensures: ImageAnalysisResult(alt, caption)
+}
+
+rule AnalyzePost {
+    when: AnalyzePostRequested(post)
+    requires: active_endpoint_configured
+    -- Generates title, excerpt, slug suggestions
+    ensures: PostAnalysisResult(title, excerpt, slug)
+}
+
+rule DetectLanguage {
+    when: DetectLanguageRequested(text)
+    requires: active_endpoint_configured
+    ensures: LanguageDetectionResult(language_code)
+}
+
+rule TranslatePost {
+    when: TranslatePostRequested(post, target_language)
+    requires: active_endpoint_configured
+    -- Translates title, excerpt, content to target language
+    ensures: TranslationResult(title, excerpt, content)
+}
+
+rule TranslateMedia {
+    when: TranslateMediaRequested(media, target_language)
+    requires: active_endpoint_configured
+    -- Translates title, alt, caption to target language
+    ensures: MediaTranslationResult(title, alt, caption)
+}
+
+-- Chat (extension Bucket C scope, with streaming and tool use)
+
+rule StartChat {
+    when: StartChatRequested(model)
+    ensures: ChatConversation.created(
+        title: generated_chat_title(model),
+        model: model,
+        created_at: now,
+        updated_at: now
+    )
+}
+
+rule SendChatMessage {
+    when: SendChatMessageRequested(conversation, content)
+    requires: active_endpoint_configured
+    ensures: ChatMessage.created(
+        conversation: conversation,
+        role: user,
+        content: content,
+        token_usage_input: null,
+        token_usage_output: null,
+        created_at: now
+    )
+    ensures: conversation.updated_at = now
+    ensures: AiStreamingResponse(conversation)
+        -- Streaming response with bounded tool-call loop.
+        -- Blog data tools for post/media querying during chat.
+        -- Token usage tracking (input, output, cache read/write).
+}
+
+-- Model catalog
+
+rule RefreshModelCatalog {
+    when: RefreshModelCatalogRequested(endpoint)
+    -- Queries the endpoint's model list API
+    -- 5-minute cache TTL
+    ensures: ModelCatalogUpdated(endpoint)
+}
+
+invariant AirplaneModeGating {
+    -- Endpoint routing based on airplane (offline) mode:
+    --   airplane_mode = true  -> use airplane endpoint (local model)
+    --   airplane_mode = false -> use online endpoint (cloud provider)
+    -- active_endpoint_configured = true iff the endpoint for the
+    --   current mode has a non-empty url (and api_key for online).
+    -- When active endpoint is not configured: AI is unavailable,
+    --   show toast "AI unavailable — configure {online|airplane} endpoint in Settings"
+}
+
+invariant TwoEndpointModel {
+    -- Two configurable OpenAI-compatible endpoints:
+    --   online: for cloud providers (requires API key)
+    --   airplane: for local models (no API key required)
+    -- Both use the OpenAI Chat Completions wire format.
+    -- Endpoint selection is configurable rather than tied to hard-coded providers.
+}
+
+invariant AiSpecPartitioning {
+    -- This file covers two distinct but related AI contracts:
+    --   1. Core one-shot operations (taxonomy, vision, translation, language detection)
+    --   2. Extension chat/model-catalog behaviour
+    -- Both share the same endpoint routing and airplane-mode gating rules.
+}
+
+invariant SecureKeyStorage {
+    -- API keys are never stored in plain text
+    -- Always encrypted via host secure storage before persistence
+}

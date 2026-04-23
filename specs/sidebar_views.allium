@@ -1,0 +1,799 @@
+-- allium: 1
+-- bDS Sidebar Views
+-- Scope: UI content (all waves + extensions)
+-- Distilled from: Sidebar.tsx, PostsList.tsx, MediaList.tsx,
+--   SidebarEntityList.tsx, SettingsNav.tsx, TagsNav.tsx,
+--   ChatList.tsx, ImportList.tsx, ScriptsList.tsx, TemplatesList.tsx,
+--   GitSidebar.tsx, sidebarDateFormatting.ts
+
+-- Describes the content and behaviour of each of the 10 sidebar views.
+-- The sidebar shell (visibility, resize, view switching) is in layout.allium.
+-- Tab opening behaviour is in tabs.allium.
+
+use "./layout.allium" as layout
+use "./tabs.allium" as tabs
+use "./post.allium" as post
+use "./media.allium" as media
+use "./tag.allium" as tag
+use "./i18n.allium" as i18n
+
+-- ─── Sidebar view registry ───────────────────────────────────
+
+-- 10 views: posts, pages, media, scripts, templates, settings, tags, chat, import, git
+-- Default view: posts
+-- The sidebar renders exactly one view at a time, selected by active_view.
+-- Each ActivityId maps 1:1 to a SidebarView of the same name.
+
+config {
+    default_sidebar_view: String = "posts"
+}
+
+-- ─── Shared patterns ─────────────────────────────────────────
+
+value LocaleMapping {
+    ui_locale: String                   -- en | de | fr | it | es
+    format_locale: String               -- en-US | de-DE | fr-FR | it-IT | es-ES
+}
+
+default LocaleMapping en_locale = { ui_locale: "en", format_locale: "en-US" }
+default LocaleMapping de_locale = { ui_locale: "de", format_locale: "de-DE" }
+default LocaleMapping fr_locale = { ui_locale: "fr", format_locale: "fr-FR" }
+default LocaleMapping it_locale = { ui_locale: "it", format_locale: "it-IT" }
+default LocaleMapping es_locale = { ui_locale: "es", format_locale: "es-ES" }
+
+config {
+    fallback_format_locale: String = "en-US"
+}
+
+value RelativeDateFormat {
+    timestamp: Timestamp
+    locale: String
+    diff_days: Integer                  -- (today - timestamp.date).days
+
+    -- Derived
+    display: String =
+        if diff_days = 0: timestamp.toLocaleTimeString(locale)
+        else if diff_days = 1: i18n/translate("sidebar.chat.yesterday", locale)
+        else if diff_days < 7: timestamp.toLocaleDateString(locale, weekday: short)
+        else: timestamp.toLocaleDateString(locale, month: short, day: numeric)
+}
+
+surface RelativeDateFormatSurface {
+    context format: RelativeDateFormat
+
+    exposes:
+        format.timestamp
+        format.locale
+        format.diff_days
+        format.display
+}
+
+value PostDateFormat {
+    timestamp: Timestamp
+    locale: String
+
+    -- Derived
+    display: String = timestamp.toLocaleDateString(locale, month: short, day: numeric, year: numeric)
+    -- Example: "Feb 10, 2026"
+}
+
+surface PostDateFormatSurface {
+    context format: PostDateFormat
+
+    exposes:
+        format.timestamp
+        format.locale
+        format.display
+}
+
+value PostTypeIcon {
+    categories: List<String>
+
+    -- Derived: first category match wins, case-insensitive
+    icon: String =
+        if categories.any(c => lowercase(c) in {"picture", "photo", "image"}): "camera"
+        else if categories.any(c => lowercase(c) in {"aside", "note", "quick"}): "notepad"
+        else if categories.any(c => lowercase(c) in {"link", "bookmark"}): "link"
+        else if categories.any(c => lowercase(c) = "video"): "film"
+        else if categories.any(c => lowercase(c) = "quote"): "speech_bubble"
+        else: "document"
+}
+
+surface PostTypeIconSurface {
+    context icon: PostTypeIcon
+
+    exposes:
+        icon.categories
+        icon.icon
+}
+
+invariant SidebarEntityListPattern {
+    -- Views following this pattern (scripts, templates, chat, import) must provide:
+    -- 1. Header with localised title and create button.
+    -- 2. Scrollable list of items.
+    -- 3. Empty state with localised message and action call-to-action when items list is empty.
+    -- 4. All text in list items uses CSS text-overflow:ellipsis on sidebar width overflow.
+}
+
+-- ─── 1. Posts view ────────────────────────────────────────────
+
+value PostsView {
+    mode: String                        -- "posts" or "pages"
+    search_query: String?               -- FTS via posts.search(query)
+    filter_panel_visible: Boolean       -- collapsible, toggled by icon button
+    calendar_filter: CalendarFilter?    -- year/month archive tree
+    tag_filter: List<String>            -- selected tags (multi-select chips with colours)
+    category_filter: List<String>       -- selected categories (multi-select chips)
+    draft_section: List<PostListItem>
+    published_section: List<PostListItem>
+    archived_section: List<PostListItem>
+    has_more: Boolean                   -- pagination, 500 per batch
+}
+
+surface PostsViewSurface {
+    context view: PostsView
+
+    exposes:
+        view.mode
+        view.search_query
+        view.filter_panel_visible
+        view.calendar_filter when view.calendar_filter != null
+        view.tag_filter
+        view.category_filter
+        view.draft_section.count
+        view.published_section.count
+        view.archived_section.count
+        view.has_more
+}
+
+-- Drafts section always shows all drafts regardless of filters.
+-- Published and archived sections respect active filters.
+-- "Clear All Filters" button resets search, date, tags, categories.
+-- Filters auto-refresh when any post's status changes.
+
+value PostListItem {
+    post_id: String
+    type_icon: String                   -- derived via PostTypeIcon from source post categories
+    title: String                       -- post.title, fallback "Untitled"
+    language_count: Integer?            -- shown when availableLanguages.count > 1
+    date: String                        -- locale-formatted via PostDateFormat
+    active: Boolean                     -- true when activeTabId = post.id
+}
+
+surface PostListItemEntry {
+    context item: PostListItem
+
+    exposes:
+        item.type_icon
+        item.title
+        item.language_count when item.language_count != null
+        item.date
+        item.active
+
+    provides:
+        PostListItemClicked(item.post_id, single)
+        PostListItemClicked(item.post_id, double)
+
+    @guarantee RowLayout
+        -- Row with two columns.
+        -- Left column: type_icon (fixed width, top-aligned).
+        -- Right column, line 1: title (fills available width, truncated with ellipsis)
+        --   and language_count badge (right-aligned pill, smaller font) when present.
+        -- Right column, line 2: date (smaller, muted colour).
+
+    @guarantee ActiveIndicator
+        -- When item.active is true, entry shows a coloured left-border accent.
+
+    @guarantee PostTypeBackground
+        -- Row has a subtle background tint derived from the type_icon category.
+
+    @guarantee DateSource
+        -- For published posts: date derives from publishedAt, falling back to updatedAt.
+        -- For draft and archived posts: date derives from updatedAt.
+}
+
+rule PostListClick {
+    when: PostListItemClicked(post_id, click_type)
+    if click_type = single:
+        ensures: OpenTabRequested(type: post, id: post_id, intent: preview)
+    if click_type = double:
+        ensures: OpenTabRequested(type: post, id: post_id, intent: pin)
+}
+
+-- ─── 2. Pages view ───────────────────────────────────────────
+
+-- Identical to PostsView but:
+--   mode = "pages"
+--   Filters to posts with "page" category
+--   Create button auto-adds "page" category
+--   Category filter excludes "page" from chips but auto-merges into backend calls
+
+-- ─── 3. Media view ────────────────────────────────────────────
+
+value MediaView {
+    search_query: String?               -- FTS via media.search(query)
+    filter_panel_visible: Boolean
+    calendar_filter: CalendarFilter?
+    tag_filter: List<String>            -- tags only, no categories for media
+    grid: List<MediaGridItem>           -- grid layout (not list)
+}
+
+surface MediaViewSurface {
+    context view: MediaView
+
+    exposes:
+        view.search_query
+        view.filter_panel_visible
+        view.calendar_filter when view.calendar_filter != null
+        view.tag_filter
+        view.grid.count
+}
+
+value MediaGridItem {
+    media_id: String
+    thumbnail_path: String?             -- small (150px) thumbnail on disk when image; null for non-image
+    name: String                        -- title truncated to config.media_title_max_length + "..."; fallback originalName (no truncation)
+    file_size: String                   -- formatted (B / KB / MB)
+    dimensions: String?                 -- "WxH" when width and height known; null otherwise
+    tooltip: String                     -- caption ?? originalName
+    active: Boolean                     -- true when activeTabId = media.id
+}
+
+surface MediaGridItemEntry {
+    context item: MediaGridItem
+
+    exposes:
+        item.thumbnail_path when item.thumbnail_path != null
+        item.name
+        item.file_size
+        item.dimensions when item.dimensions != null
+        item.tooltip
+        item.active
+
+    provides:
+        MediaGridItemClicked(item.media_id, single)
+        MediaGridItemClicked(item.media_id, double)
+
+    @guarantee CellLayout
+        -- Grid cell, row layout.
+        -- Left: 40x40 thumbnail (rounded, object-fit cover) loaded from
+        --   thumbnail_path (small 150px WebP) when present;
+        --   otherwise generic file icon of same dimensions.
+        -- Right column, line 1: name (truncated with ellipsis).
+        -- Right column, line 2: file_size (smaller, muted) followed by
+        --   dimensions when present, separated by " · ".
+
+    @guarantee NameTruncation
+        -- Title is hard-truncated at config.media_title_max_length characters
+        -- with "..." suffix appended. originalName is never hard-truncated.
+        -- CSS text-overflow:ellipsis applies as additional safety net on both.
+
+    @guarantee TooltipContent
+        -- Tooltip shows caption when available, otherwise originalName.
+}
+
+config {
+    media_title_max_length: Integer = 60
+}
+
+rule MediaListClick {
+    when: MediaGridItemClicked(media_id, click_type)
+    if click_type = single:
+        ensures: OpenTabRequested(type: media, id: media_id, intent: preview)
+    if click_type = double:
+        ensures: OpenTabRequested(type: media, id: media_id, intent: pin)
+}
+
+-- Import button: opens native file import dialog
+
+-- ─── 4. Scripts view ──────────────────────────────────────────
+
+-- Follows SidebarEntityListPattern.
+
+value ScriptsView {
+    items: List<ScriptListItem>
+}
+
+surface ScriptsViewSurface {
+    context view: ScriptsView
+
+    exposes:
+        view.items.count
+}
+
+value ScriptListItem {
+    script_id: String
+    title: String                       -- truncated with ellipsis on overflow
+    date: String                        -- relative date format via RelativeDateFormat
+    active: Boolean
+}
+
+surface ScriptListItemEntry {
+    context item: ScriptListItem
+
+    exposes:
+        item.title
+        item.date
+        item.active
+
+    provides:
+        ScriptListItemClicked(item.script_id, single)
+        ScriptListItemClicked(item.script_id, double)
+        ScriptDeleteRequested(item.script_id)
+
+    @guarantee RowLayout
+        -- Row with two areas.
+        -- Left area (fills width), two lines:
+        --   Line 1: title (truncated with ellipsis).
+        --   Line 2: date in relative format (smaller, muted).
+        -- Right area: delete button (x), visible only on row hover, turns red on hover.
+
+    @guarantee KeyboardNavigation
+        -- Enter key: pin (opens pinned tab).
+        -- Space key: preview (opens transient tab).
+        -- Row is focusable with tabIndex and has aria-label from title.
+
+    @guarantee DeleteBehaviour
+        -- Delete removes the script and closes its open tab if any.
+
+    @guarantee CreateDefaults
+        -- New scripts default to: kind=utility, content='print("new script")',
+        -- entrypoint='render', enabled=true.
+
+    @guarantee LiveRefresh
+        -- Item list refreshes on scripts-changed event.
+}
+
+rule ScriptListClick {
+    when: ScriptListItemClicked(script_id, click_type)
+    if click_type = single:
+        ensures: OpenTabRequested(type: scripts, id: script_id, intent: preview)
+    if click_type = double:
+        ensures: OpenTabRequested(type: scripts, id: script_id, intent: pin)
+}
+
+-- ─── 5. Templates view ───────────────────────────────────────
+
+-- Follows SidebarEntityListPattern. Same item layout as ScriptListItemEntry.
+
+value TemplatesView {
+    items: List<TemplateListItem>
+}
+
+surface TemplatesViewSurface {
+    context view: TemplatesView
+
+    exposes:
+        view.items.count
+}
+
+value TemplateListItem {
+    template_id: String
+    title: String                       -- truncated with ellipsis on overflow
+    date: String                        -- relative date format via RelativeDateFormat
+    active: Boolean
+}
+
+surface TemplateListItemEntry {
+    context item: TemplateListItem
+
+    exposes:
+        item.title
+        item.date
+        item.active
+
+    provides:
+        TemplateListItemClicked(item.template_id, single)
+        TemplateListItemClicked(item.template_id, double)
+        TemplateDeleteRequested(item.template_id)
+
+    @guarantee RowLayout
+        -- Row with two areas.
+        -- Left area (fills width), two lines:
+        --   Line 1: title (truncated with ellipsis).
+        --   Line 2: date in relative format (smaller, muted).
+        -- Right area: delete button (x), visible only on row hover, turns red on hover.
+
+    @guarantee KeyboardNavigation
+        -- Enter key: pin (opens pinned tab).
+        -- Space key: preview (opens transient tab).
+        -- Row is focusable with tabIndex and has aria-label from title.
+
+    @guarantee DeleteConfirmation
+        -- If template is referenced by posts or tags, shows confirmation dialog
+        -- with reference counts before force-delete.
+
+    @guarantee CreateDefaults
+        -- New templates default to: kind=post, content='', enabled=true.
+
+    @guarantee LiveRefresh
+        -- Item list refreshes on templates-changed event.
+}
+
+rule TemplateListClick {
+    when: TemplateListItemClicked(template_id, click_type)
+    if click_type = single:
+        ensures: OpenTabRequested(type: templates, id: template_id, intent: preview)
+    if click_type = double:
+        ensures: OpenTabRequested(type: templates, id: template_id, intent: pin)
+}
+
+-- ─── 6. Settings view ────────────────────────────────────────
+
+-- Navigation list that controls sections within the settings editor tab.
+
+value SettingsNavEntry {
+    section: String
+    icon: String
+    label_key: String
+    active: Boolean
+}
+
+invariant SettingsNavSections {
+    -- Settings navigation has exactly 9 entries in this fixed order:
+    -- 1. section="project",     icon="folder",     label_key="settings.nav.project"
+    -- 2. section="editor",      icon="notepad",    label_key="settings.nav.editor"
+    -- 3. section="content",     icon="clipboard",  label_key="settings.nav.content"
+    -- 4. section="ai",          icon="robot",      label_key="settings.nav.ai"
+    -- 5. section="technology",  icon="gear",       label_key="settings.nav.technology"
+    -- 6. section="publishing",  icon="rocket",     label_key="settings.nav.publishing"
+    -- 7. section="data",        icon="database",   label_key="settings.nav.data"
+    -- 8. section="mcp",         icon="plug",       label_key="settings.nav.mcp"
+    -- 9. section="style",       icon="palette",    label_key="settings.nav.style"
+    -- Labels are localised via their label_key through i18n.
+}
+
+surface SettingsNavEntryView {
+    context entry: SettingsNavEntry
+
+    exposes:
+        entry.icon
+        entry.label_key
+        entry.active
+
+    provides:
+        SettingsNavEntryClicked(entry.section)
+
+    @guarantee RowLayout
+        -- Row with icon (fixed 20px width, centred) and localised text label.
+        -- Active entry has distinct selection background and foreground colours.
+
+    @guarantee FixedOrder
+        -- Entries always appear in the order defined by SettingsNavSections invariant.
+}
+
+value SettingsNav {
+    active_section: String?             -- persisted across sidebar switches
+}
+
+surface SettingsNavSurface {
+    context nav: SettingsNav
+
+    exposes:
+        nav.active_section when nav.active_section != null
+}
+
+rule SettingsNavClick {
+    when: SettingsNavEntryClicked(section)
+    if section = style:
+        ensures: OpenTabRequested(type: style, id: style, intent: pin)
+    else:
+        ensures: OpenTabRequested(type: settings, id: settings, intent: pin)
+        ensures: ScrollToSection(section)
+    ensures: active_section = section
+    -- Active section is persisted across sidebar switches
+}
+
+-- ─── 7. Tags view ─────────────────────────────────────────────
+
+-- Navigation list that controls sections within the tags editor tab.
+
+value TagsNavEntry {
+    section: String
+    icon: String
+    label_key: String
+    active: Boolean
+}
+
+invariant TagsNavSections {
+    -- Tags navigation has exactly 3 entries in this fixed order:
+    -- 1. section="cloud",   icon="cloud",   label_key="tags.nav.cloud"     -- tag cloud visualisation
+    -- 2. section="manage",  icon="pencil",  label_key="tags.nav.manage"    -- create/edit tags
+    -- 3. section="merge",   icon="merge",   label_key="tags.nav.merge"     -- merge duplicate tags
+    -- Labels are localised via their label_key through i18n.
+}
+
+surface TagsNavEntryView {
+    context entry: TagsNavEntry
+
+    exposes:
+        entry.icon
+        entry.label_key
+        entry.active
+
+    provides:
+        TagsNavEntryClicked(entry.section)
+
+    @guarantee RowLayout
+        -- Row with icon (fixed 20px width, centred) and localised text label.
+        -- Active entry has distinct selection background and foreground colours.
+        -- Same visual structure as SettingsNavEntryView.
+
+    @guarantee FixedOrder
+        -- Entries always appear in the order defined by TagsNavSections invariant.
+}
+
+value TagsNav {
+    active_section: String?             -- persisted
+}
+
+surface TagsNavSurface {
+    context nav: TagsNav
+
+    exposes:
+        nav.active_section when nav.active_section != null
+}
+
+rule TagsNavClick {
+    when: TagsNavEntryClicked(section)
+    ensures: OpenTabRequested(type: tags, id: tags, intent: pin)
+    ensures: ScrollToSection(section)
+    ensures: active_section = section
+    -- Active section is persisted across sidebar switches
+}
+
+-- ─── 8. Chat view ─────────────────────────────────────────────
+
+-- Follows SidebarEntityListPattern.
+
+value ChatView {
+    api_ready: Boolean                  -- shows API key prompt if false
+    items: List<ChatListItem>
+}
+
+surface ChatViewSurface {
+    context view: ChatView
+
+    exposes:
+        view.api_ready
+        view.items.count
+}
+
+value ChatListItem {
+    conversation_id: String
+    title: String                       -- live-updated via onTitleUpdated
+    date: String                        -- relative date format via RelativeDateFormat
+}
+
+surface ChatListItemEntry {
+    context item: ChatListItem
+
+    exposes:
+        item.title
+        item.date
+
+    provides:
+        ChatListItemClicked(item.conversation_id)
+        ChatDeleteRequested(item.conversation_id)
+
+    @guarantee RowLayout
+        -- Row with two areas.
+        -- Left area (fills width), two lines:
+        --   Line 1: title (truncated with ellipsis, live-updated).
+        --   Line 2: date in relative format (smaller, muted).
+        -- Right area: delete button (x), visible only on row hover.
+
+    @guarantee DeleteBehaviour
+        -- Delete removes the conversation and closes its open tab if any.
+
+    @guarantee AlwaysPinned
+        -- Chat tabs are always opened as pinned (never transient).
+}
+
+rule ChatListClick {
+    when: ChatListItemClicked(conversation_id)
+    ensures: OpenTabRequested(type: chat, id: conversation_id, intent: pin)
+    -- Chat tabs are always pinned
+}
+
+-- ─── 9. Import view ──────────────────────────────────────────
+
+-- Follows SidebarEntityListPattern.
+
+value ImportView {
+    items: List<ImportListItem>
+}
+
+surface ImportViewSurface {
+    context view: ImportView
+
+    exposes:
+        view.items.count
+}
+
+value ImportListItem {
+    definition_id: String
+    name: String                        -- live-updated via onNameUpdated
+    date: String                        -- relative date format via RelativeDateFormat
+}
+
+surface ImportListItemEntry {
+    context item: ImportListItem
+
+    exposes:
+        item.name
+        item.date
+
+    provides:
+        ImportListItemClicked(item.definition_id)
+        ImportDeleteRequested(item.definition_id)
+
+    @guarantee RowLayout
+        -- Row with two areas.
+        -- Left area (fills width), two lines:
+        --   Line 1: name (truncated with ellipsis, live-updated).
+        --   Line 2: date in relative format (smaller, muted).
+        -- Right area: delete button (x), visible only on row hover.
+
+    @guarantee DeleteBehaviour
+        -- Delete removes the import definition and closes its open tab if any.
+
+    @guarantee AlwaysPinned
+        -- Import tabs are always opened as pinned (never transient).
+}
+
+rule ImportListClick {
+    when: ImportListItemClicked(definition_id)
+    ensures: OpenTabRequested(type: import, id: definition_id, intent: pin)
+    -- Import tabs are always pinned
+}
+
+-- ─── 10. Git view ─────────────────────────────────────────────
+
+-- Full git interface, not the SidebarEntityList pattern.
+-- Three possible states: loading, not_a_repo, active_repo.
+
+-- State: not_a_repo
+--   Remote URL text input + "Initialize Git" button.
+--   Init progress with phase/percentage/detail, collapsible transcript.
+
+-- State: active_repo
+value GitActiveView {
+    branch: String                      -- current branch name
+    upstream: String?                   -- tracking info (local -> upstream)
+    ahead: Integer
+    behind: Integer
+    status_files: List<GitStatusFile>
+    history_entries: List<GitHistoryEntry>
+    has_more_history: Boolean           -- paginated, 20 per page
+}
+
+surface GitActiveViewSurface {
+    context view: GitActiveView
+
+    exposes:
+        view.branch
+        view.upstream when view.upstream != null
+        view.ahead
+        view.behind
+        view.status_files.count
+        view.history_entries.count
+        view.has_more_history
+
+    provides:
+        GitCommitRequested(message)
+}
+
+value GitStatusFile {
+    path: String
+    status: String                      -- modified, added, deleted, renamed, etc.
+}
+
+surface GitStatusFileEntry {
+    context file: GitStatusFile
+
+    exposes:
+        file.path
+        file.status
+
+    provides:
+        GitStatusFileClicked(file.path, single)
+        GitStatusFileClicked(file.path, double)
+
+    @guarantee RowLayout
+        -- Row with two elements, justified space-between.
+        -- Left: file path (truncated with ellipsis, fills available width).
+        -- Right: status badge (short uppercase code e.g. "M", "A", "D"; muted colour, fixed width).
+
+    @guarantee Tooltip
+        -- Tooltip shows "status: path" (e.g. "modified: src/main.rs").
+}
+
+value GitHistoryEntry {
+    short_hash: String                  -- 7 chars
+    subject: String                     -- wraps (word-break), not truncated
+    author: String
+    date: String                        -- locale-formatted
+    sync_status: String                 -- synced, local_only, remote_only
+}
+
+surface GitHistoryEntryView {
+    context entry: GitHistoryEntry
+
+    exposes:
+        entry.short_hash
+        entry.subject
+        entry.author
+        entry.date
+        entry.sync_status
+
+    provides:
+        GitHistoryEntryClicked(entry.short_hash, single)
+        GitHistoryEntryClicked(entry.short_hash, double)
+
+    @guarantee EntryLayout
+        -- Two lines.
+        -- Line 1: subject (wraps with word-break, never truncated).
+        -- Line 2: short_hash + author + date + sync_status indicator, separated by spacing.
+
+    @guarantee SyncStatusIndicator
+        -- sync_status rendered as a coloured dot.
+        -- "synced" = both local and remote. "local_only" = local only. "remote_only" = remote only.
+        -- A colour legend is shown in the git view header.
+}
+
+-- Action buttons: fetch, pull, push, prune_lfs. All disabled while any action is loading.
+-- Changes section: file count, commit message input, commit button, file list.
+-- Changes list polls every 2 seconds in background.
+-- Remote state refreshes every 30 seconds with auto-fetch.
+
+rule GitFileClick {
+    when: GitStatusFileClicked(file_path, click_type)
+    if click_type = single:
+        ensures: OpenTabRequested(type: git_diff, id: "git-diff:" + file_path, intent: preview)
+    if click_type = double:
+        ensures: OpenTabRequested(type: git_diff, id: "git-diff:" + file_path, intent: pin)
+}
+
+rule GitHistoryClick {
+    when: GitHistoryEntryClicked(commit_hash, click_type)
+    if click_type = single:
+        ensures: OpenTabRequested(type: git_diff, id: "git-diff:commit:" + commit_hash, intent: preview)
+    if click_type = double:
+        ensures: OpenTabRequested(type: git_diff, id: "git-diff:commit:" + commit_hash, intent: pin)
+}
+
+rule GitCommit {
+    when: GitCommitRequested(message)
+    ensures: git.commitAll(message)
+    -- Also: all git_diff tabs are closed and git state is reloaded
+}
+
+-- ─── Calendar archive (shared widget) ─────────────────────────
+
+-- Collapsible year/month tree.
+-- Selecting a year loads all posts/media for that year.
+-- Selecting a month narrows to that month.
+
+value CalendarFilter {
+    selected_year: Integer?
+    selected_month: Integer?            -- 1-12
+}
+
+value CalendarYear {
+    year: Integer
+    months: List<CalendarMonth>
+}
+
+surface CalendarYearSurface {
+    context calendar_year: CalendarYear
+
+    exposes:
+        calendar_year.year
+        calendar_year.months.count
+}
+
+value CalendarMonth {
+    month: Integer                      -- 1-12
+    count: Integer                      -- number of items in this month
+}

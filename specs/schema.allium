@@ -1,0 +1,713 @@
+-- allium: 1
+-- bDS Persistence Data Contract
+-- Scope: core (Wave 1 — exact compatibility contract)
+-- Distilled from: ../bDS/src/main/database/schema.ts
+--
+-- This document specifies the persisted data model the rewrite must be able
+-- to read and write. It is the ground truth for storage compatibility.
+
+-- ============================================================================
+-- CORE ENTITIES
+-- ============================================================================
+
+entity Project {
+    id: String              -- UUID v4
+    name: String            -- Display name
+    slug: String            -- URL-safe identifier
+    description: String?    -- Optional description
+    data_path: String?      -- Custom data directory (null = default)
+    created_at: Timestamp   -- Unix timestamp
+    updated_at: Timestamp   -- Unix timestamp
+    is_active: Boolean      -- Exactly one project is active at a time
+}
+
+entity Post {
+    id: String              -- UUID v4
+    project_id: String
+    title: String
+    slug: String            -- URL-friendly identifier
+    excerpt: String?        -- Optional summary
+    content: String?        -- Draft body (null when published)
+    status: draft | published | archived
+    author: String?         -- Author name
+    created_at: Timestamp
+    updated_at: Timestamp
+    published_at: Timestamp?
+    file_path: String       -- Empty for never-published drafts
+    checksum: String?       -- SHA-256 of content
+    tags: Set<String>       -- JSON array stored as text
+    categories: Set<String> -- JSON array stored as text
+    template_slug: String?  -- User template override
+    language: String?       -- ISO 639-1 code
+    do_not_translate: Boolean
+
+    -- Published snapshot columns (written on publish for diff detection)
+    published_title: String?
+    published_content: String?
+    published_tags: String?
+    published_categories: String?
+    published_excerpt: String?
+}
+
+entity PostTranslation {
+    id: String              -- UUID v4
+    project_id: String
+    translation_for: String -- Canonical post ID
+    language: String        -- ISO 639-1 code
+    title: String
+    excerpt: String?
+    content: String?        -- Draft body (null when published)
+    status: draft | published
+    created_at: Timestamp
+    updated_at: Timestamp
+    published_at: Timestamp?
+    file_path: String
+    checksum: String?
+}
+
+entity Media {
+    id: String              -- UUID v4
+    project_id: String
+    filename: String        -- Generated filename
+    original_name: String   -- Original uploaded filename
+    mime_type: String       -- e.g. "image/jpeg"
+    size: Integer           -- Bytes
+    width: Integer?         -- Image dimensions
+    height: Integer?
+    title: String?
+    alt: String?
+    caption: String?
+    author: String?
+    file_path: String       -- Absolute path to binary
+    sidecar_path: String    -- Path to .meta sidecar file
+    created_at: Timestamp
+    updated_at: Timestamp
+    checksum: String?
+    tags: Set<String>       -- JSON array stored as text
+    language: String?       -- ISO 639-1 code
+}
+
+entity MediaTranslation {
+    id: String              -- UUID v4
+    project_id: String
+    translation_for: String -- Canonical media ID
+    language: String        -- ISO 639-1 code
+    title: String?
+    alt: String?
+    caption: String?
+    created_at: Timestamp
+    updated_at: Timestamp
+}
+
+entity Tag {
+    id: String              -- UUID v4
+    project_id: String
+    name: String            -- Case-insensitive unique per project
+    color: String?          -- Hex color like #ff0000
+    post_template_slug: String?  -- Template override for this tag
+    created_at: Timestamp
+    updated_at: Timestamp
+}
+
+entity Template {
+    id: String              -- UUID v4
+    project_id: String
+    slug: String            -- URL-safe identifier
+    title: String
+    kind: post | list | not_found | partial
+    enabled: Boolean
+    version: Integer        -- Incremented on each update
+    file_path: String       -- templates/{slug}.liquid
+    status: draft | published
+    content: String?        -- Draft body (null when published)
+    created_at: Timestamp
+    updated_at: Timestamp
+}
+
+entity Script {
+    id: String              -- UUID v4
+    project_id: String
+    slug: String            -- URL-safe identifier
+    title: String
+    kind: macro | utility | transform
+    entrypoint: String      -- Default: "render" for macros
+    enabled: Boolean
+    version: Integer        -- Incremented on each update
+    file_path: String       -- scripts/{slug}.{extension}
+    status: draft | published
+    content: String?        -- Draft body (null when published)
+    created_at: Timestamp
+    updated_at: Timestamp
+}
+
+-- ============================================================================
+-- RELATIONSHIP TABLES
+-- ============================================================================
+
+entity PostLink {
+    id: String              -- UUID v4
+    source_post_id: String  -- Post containing the link
+    target_post_id: String  -- Post being linked to
+    link_text: String?      -- Anchor text
+    created_at: Timestamp
+}
+
+entity PostMediaLink {
+    id: String              -- UUID v4
+    project_id: String
+    post_id: String
+    media_id: String
+    sort_order: Integer     -- For ordering media within a post
+    created_at: Timestamp
+}
+
+-- ============================================================================
+-- METADATA TABLES
+-- ============================================================================
+
+entity Setting {
+    key: String             -- Primary key
+    value: String           -- Serialized value
+    updated_at: Timestamp
+}
+
+entity GeneratedFileHash {
+    project_id: String
+    relative_path: String
+    content_hash: String    -- SHA-256 of file content
+    updated_at: Timestamp
+}
+
+-- ============================================================================
+-- SEARCH INDEX (FTS5 Virtual Tables)
+-- ============================================================================
+
+entity PostSearchIndex {
+    -- Full-text search index projection, not a user-authored entity
+    -- Indexed fields: title, excerpt, content, tags, categories
+    -- Plus all translation titles, excerpts, and content
+    post: Post
+    stemmed_content: String  -- Processed via Snowball stemmer
+}
+
+entity MediaSearchIndex {
+    -- Full-text search index projection
+    -- Indexed fields: title, alt, caption, original_name, tags
+    -- Plus all translation titles, alts, and captions
+    media: Media
+    stemmed_content: String  -- Processed via Snowball stemmer
+}
+
+-- ============================================================================
+-- AI / CHAT TABLES
+-- ============================================================================
+
+entity ChatConversation {
+    id: String              -- UUID v4
+    title: String
+    model: String?          -- Model used for conversation
+    copilot_session_id: String?  -- Legacy, no longer used
+    created_at: Timestamp
+    updated_at: Timestamp
+}
+
+entity ChatMessage {
+    id: Integer             -- Auto-increment
+    conversation_id: String
+    role: system | user | assistant | tool
+    content: String?
+    tool_call_id: String?   -- For tool responses
+    tool_calls: String?     -- JSON array of tool calls
+    created_at: Timestamp
+}
+
+entity AiProvider {
+    -- Provider catalog, populated from upstream model registry.
+    -- Managed by the application and treated as read-only during normal use.
+    id: String              -- PRIMARY KEY
+    name: String
+    env: String?            -- Environment variable for API key
+    package_ref: String?    -- Legacy package reference
+    api: String?            -- Base API URL
+    doc: String?            -- Documentation URL
+    updated_at: Timestamp
+}
+
+entity AiModel {
+    -- Full model catalog with capability metadata.
+    -- Composite primary key: (provider, model_id).
+    provider: AiProvider
+    model_id: String
+    name: String
+    family: String?
+    attachment: Boolean     -- supports file attachments
+    reasoning: Boolean      -- supports chain-of-thought
+    tool_call: Boolean      -- supports tool/function calling
+    structured_output: Boolean
+    temperature: Boolean    -- supports temperature parameter
+    knowledge: String?      -- training data cutoff
+    release_date: String?
+    last_updated_date: String?
+    open_weights: Boolean
+    input_price: Integer?   -- price per million input tokens
+    output_price: Integer?  -- price per million output tokens
+    cache_read_price: Integer?
+    cache_write_price: Integer?
+    context_window: Integer
+    max_input_tokens: Integer
+    max_output_tokens: Integer
+    interleaved: String?    -- interleaved capability descriptor
+    status: String?         -- active | deprecated | preview
+    provider_package_ref: String? -- provider-specific legacy package reference
+    updated_at: Timestamp
+}
+
+entity AiModelModality {
+    -- Input/output modality declarations per model.
+    provider: AiProvider
+    model_id: String
+    direction: String       -- "input" | "output"
+    modality: String        -- "text" | "image" | "audio" | "video"
+}
+
+entity AiCatalogMeta {
+    key: String             -- "{endpoint_kind}_etag" | "{endpoint_kind}_lastFetchedAt"
+    value: String
+}
+
+-- ============================================================================
+-- EMBEDDINGS TABLES
+-- ============================================================================
+
+entity EmbeddingKey {
+    label: Integer          -- USearch bigint key
+    post_id: String
+    project_id: String
+    content_hash: String    -- SHA-256 of title+content
+    vector: String          -- Encoded vector payload (1536 bytes for 384-dim)
+}
+
+entity DismissedDuplicatePair {
+    id: String              -- UUID v4
+    project_id: String
+    post_id_a: String
+    post_id_b: String
+    dismissed_at: Timestamp
+}
+
+-- ============================================================================
+-- IMPORT TABLES
+-- ============================================================================
+
+entity ImportDefinition {
+    id: String              -- UUID v4
+    project_id: String
+    name: String
+    wxr_file_path: String?  -- WordPress XML export file
+    uploads_folder_path: String?  -- WordPress uploads directory
+    last_analysis_result: String?  -- JSON text of ImportAnalysisReport
+    created_at: Timestamp
+    updated_at: Timestamp
+}
+
+-- ============================================================================
+-- NOTIFICATION TABLES
+-- ============================================================================
+
+entity DbNotification {
+    id: Integer             -- Auto-increment
+    entity_type: String     -- 'post' | 'media' | 'script' | 'template'
+    entity_id: String
+    action: created | updated | deleted
+    from_cli: Boolean       -- 1 = written by CLI
+    seen_at: Timestamp?     -- NULL = unprocessed
+    created_at: Timestamp
+}
+
+surface ProjectRecordSurface {
+    context project: Project
+
+    exposes:
+        project.id
+        project.name
+        project.slug
+        project.description when project.description != null
+        project.data_path when project.data_path != null
+        project.created_at
+        project.updated_at
+        project.is_active
+}
+
+surface PostTranslationRecordSurface {
+    context translation: PostTranslation
+
+    exposes:
+        translation.id
+        translation.project_id
+        translation.translation_for
+        translation.language
+        translation.title
+        translation.excerpt when translation.excerpt != null
+        translation.content when translation.content != null
+        translation.status
+        translation.created_at
+        translation.updated_at
+        translation.published_at when translation.published_at != null
+        translation.file_path
+        translation.checksum when translation.checksum != null
+}
+
+surface MediaTranslationRecordSurface {
+    context translation: MediaTranslation
+
+    exposes:
+        translation.id
+        translation.project_id
+        translation.translation_for
+        translation.language
+        translation.title when translation.title != null
+        translation.alt when translation.alt != null
+        translation.caption when translation.caption != null
+        translation.created_at
+        translation.updated_at
+}
+
+surface TagRecordSurface {
+    context tag: Tag
+
+    exposes:
+        tag.id
+        tag.project_id
+        tag.name
+        tag.color when tag.color != null
+        tag.post_template_slug when tag.post_template_slug != null
+        tag.created_at
+        tag.updated_at
+}
+
+surface TemplateRecordSurface {
+    context template: Template
+
+    exposes:
+        template.id
+        template.project_id
+        template.slug
+        template.title
+        template.kind
+        template.enabled
+        template.version
+        template.file_path
+        template.status
+        template.content when template.content != null
+        template.created_at
+        template.updated_at
+}
+
+surface ScriptRecordSurface {
+    context script: Script
+
+    exposes:
+        script.id
+        script.project_id
+        script.slug
+        script.title
+        script.kind
+        script.entrypoint
+        script.enabled
+        script.version
+        script.file_path
+        script.status
+        script.content when script.content != null
+        script.created_at
+        script.updated_at
+}
+
+surface PostLinkRecordSurface {
+    context link: PostLink
+
+    exposes:
+        link.id
+        link.source_post_id
+        link.target_post_id
+        link.link_text when link.link_text != null
+        link.created_at
+}
+
+surface PostMediaLinkRecordSurface {
+    context link: PostMediaLink
+
+    exposes:
+        link.id
+        link.project_id
+        link.post_id
+        link.media_id
+        link.sort_order
+        link.created_at
+}
+
+surface SettingRecordSurface {
+    context setting: Setting
+
+    exposes:
+        setting.key
+        setting.value
+        setting.updated_at
+}
+
+surface GeneratedFileHashRecordSurface {
+    context record: GeneratedFileHash
+
+    exposes:
+        record.project_id
+        record.relative_path
+        record.content_hash
+        record.updated_at
+}
+
+surface PostSearchIndexRecordSurface {
+    context record: PostSearchIndex
+
+    exposes:
+        record.post
+        record.stemmed_content
+}
+
+surface MediaSearchIndexRecordSurface {
+    context record: MediaSearchIndex
+
+    exposes:
+        record.media
+        record.stemmed_content
+}
+
+surface ChatConversationRecordSurface {
+    context conversation: ChatConversation
+
+    exposes:
+        conversation.id
+        conversation.title
+        conversation.model when conversation.model != null
+        conversation.copilot_session_id when conversation.copilot_session_id != null
+        conversation.created_at
+        conversation.updated_at
+}
+
+surface ChatMessageRecordSurface {
+    context message: ChatMessage
+
+    exposes:
+        message.id
+        message.conversation_id
+        message.role
+        message.content when message.content != null
+        message.tool_call_id when message.tool_call_id != null
+        message.tool_calls when message.tool_calls != null
+        message.created_at
+}
+
+surface AiModelRecordSurface {
+    context model: AiModel
+
+    exposes:
+        model.provider
+        model.model_id
+        model.name
+        model.family when model.family != null
+        model.attachment
+        model.reasoning
+        model.tool_call
+        model.structured_output
+        model.temperature
+        model.knowledge when model.knowledge != null
+        model.release_date when model.release_date != null
+        model.last_updated_date when model.last_updated_date != null
+        model.open_weights
+        model.input_price when model.input_price != null
+        model.output_price when model.output_price != null
+        model.cache_read_price when model.cache_read_price != null
+        model.cache_write_price when model.cache_write_price != null
+        model.context_window
+        model.max_input_tokens
+        model.max_output_tokens
+        model.interleaved when model.interleaved != null
+        model.status when model.status != null
+        model.provider_package_ref when model.provider_package_ref != null
+        model.updated_at
+}
+
+surface AiModelModalityRecordSurface {
+    context modality: AiModelModality
+
+    exposes:
+        modality.provider
+        modality.model_id
+        modality.direction
+        modality.modality
+}
+
+surface AiCatalogMetaRecordSurface {
+    context meta: AiCatalogMeta
+
+    exposes:
+        meta.key
+        meta.value
+}
+
+surface EmbeddingKeyRecordSurface {
+    context key: EmbeddingKey
+
+    exposes:
+        key.label
+        key.post_id
+        key.project_id
+        key.content_hash
+        key.vector
+}
+
+surface DismissedDuplicatePairRecordSurface {
+    context pair: DismissedDuplicatePair
+
+    exposes:
+        pair.id
+        pair.project_id
+        pair.post_id_a
+        pair.post_id_b
+        pair.dismissed_at
+}
+
+surface ImportDefinitionRecordSurface {
+    context definition: ImportDefinition
+
+    exposes:
+        definition.id
+        definition.project_id
+        definition.name
+        definition.wxr_file_path when definition.wxr_file_path != null
+        definition.uploads_folder_path when definition.uploads_folder_path != null
+        definition.last_analysis_result when definition.last_analysis_result != null
+        definition.created_at
+        definition.updated_at
+}
+
+surface DbNotificationRecordSurface {
+    context notification: DbNotification
+
+    exposes:
+        notification.id
+        notification.entity_type
+        notification.entity_id
+        notification.action
+        notification.from_cli
+        notification.seen_at when notification.seen_at != null
+        notification.created_at
+}
+
+surface Fts5PostSchemaSurface {
+    context schema: Fts5PostSchema
+
+    exposes:
+        schema.fields
+        schema.stemmer_languages
+}
+
+surface Fts5MediaSchemaSurface {
+    context schema: Fts5MediaSchema
+
+    exposes:
+        schema.fields
+        schema.stemmer_languages
+}
+
+surface MigrationVersionSurface {
+    context _: MigrationVersion
+}
+
+-- ============================================================================
+-- SCHEMA CONSTRAINTS AND INDEXES
+-- ============================================================================
+
+invariant UniqueProjectSlug {
+    -- projects.slug must be unique across all projects
+}
+
+invariant UniquePostSlugPerProject {
+    -- posts.slug must be unique within each project.project_id
+    -- Enforced by: posts_project_slug_idx unique index
+}
+
+invariant UniqueTranslationPerPostLanguage {
+    -- post_translations must have unique (translation_for, language)
+    -- Enforced by: post_translations_translation_language_idx
+}
+
+invariant UniqueMediaTranslationPerMediaLanguage {
+    -- media_translations must have unique (translation_for, language)
+    -- Enforced by: media_translations_translation_language_idx
+}
+
+invariant UniqueTagNamePerProject {
+    -- tags.name must be unique within each project.project_id
+    -- Enforced by: tags_project_name_idx unique index
+}
+
+invariant UniqueScriptSlugPerProject {
+    -- scripts.slug must be unique within each project.project_id
+    -- Enforced by: scripts_project_slug_idx unique index
+}
+
+invariant UniqueTemplateSlugPerProject {
+    -- templates.slug must be unique within each project.project_id
+    -- Enforced by: templates_project_slug_idx unique index
+}
+
+invariant UniquePostMediaLink {
+    -- post_media must have unique (post_id, media_id) pair
+    -- Enforced by: post_media_post_media_idx unique index
+}
+
+invariant UniqueGeneratedFileHash {
+    -- generated_file_hashes must have unique (project_id, relative_path)
+    -- Enforced by: generated_file_hashes_project_path_idx unique index
+}
+
+invariant UniqueDismissedDuplicatePair {
+    -- dismissed_duplicate_pairs must have unique (project_id, post_id_a, post_id_b)
+    -- Enforced by: dismissed_pairs_idx unique index
+}
+
+-- ============================================================================
+-- FTS5 VIRTUAL TABLE SCHEMAS (Snowball Stemmer Integration)
+-- ============================================================================
+
+value Fts5PostSchema {
+    -- CREATE VIRTUAL TABLE posts_fts USING fts5(
+    --   post_id UNINDEXED,
+    --   title, excerpt, content, tags, categories
+    -- );
+    -- Standalone table (no content-sync) because text is pre-stemmed
+    -- via Snowball before insertion; content-sync would read un-stemmed
+    -- base-table text at query time instead.
+    fields: Set<String>     -- {post_id UNINDEXED, title, excerpt, content, tags, categories}
+    stemmer_languages: Integer = 24
+}
+
+value Fts5MediaSchema {
+    -- CREATE VIRTUAL TABLE media_fts USING fts5(
+    --   media_id UNINDEXED,
+    --   title, alt, caption, original_name, tags
+    -- );
+    -- Standalone table (no content-sync) — same rationale as posts_fts.
+    fields: Set<String>     -- {media_id UNINDEXED, title, alt, caption, original_name, tags}
+    stemmer_languages: Integer = 24
+}
+
+-- ============================================================================
+-- MIGRATION HISTORY
+-- ============================================================================
+
+value MigrationVersion {
+    -- Schema version tracking via refinery migrations
+    -- Current version: 0007 (scripts and templates draft lifecycle)
+    -- Migration files located in: migrations/
+    -- Note: Migration list documented in comments, not as Allium value
+}

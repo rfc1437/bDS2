@@ -1,0 +1,96 @@
+-- allium: 1
+-- bDS Script Editor View
+-- Scope: UI content area — script editing surface
+-- Distilled from: ScriptEditor.tsx
+
+-- Describes the layout and behaviour of the script editor.
+-- See script.allium for entity model.
+
+use "./script.allium" as script
+use "./i18n.allium" as i18n
+
+-- ─── Script editor view ──────────────────────────────────────
+
+value ScriptEditorView {
+    script_id: String
+    title: String                       -- editable text input
+    slug: String                        -- editable text input, auto-generated from title
+    kind: String                        -- select: utility | macro | transform
+    entrypoint: String                  -- select: dynamically discovered functions, "main" always first
+    enabled: Boolean                    -- checkbox
+    content: String                     -- code editor content
+    created_at: String                  -- locale-formatted date
+    updated_at: String                  -- locale-formatted date
+}
+
+surface ScriptEditorSurface {
+    context editor: ScriptEditorView
+
+    exposes:
+        editor.title
+        editor.slug
+        editor.kind
+        editor.entrypoint
+        editor.enabled
+        editor.created_at
+        editor.updated_at
+
+    provides:
+        ScriptSaveRequested(editor.script_id)
+        ScriptRunRequested(editor.script_id)
+        ScriptCheckSyntaxRequested(editor.script_id)
+        ScriptDeleteRequested(editor.script_id)
+
+    @guarantee HeaderLayout
+        -- Header bar with script title tab.
+        -- Actions (right side): Save button, Run button,
+        --   Check Syntax button, Delete button (danger style).
+
+    @guarantee MetadataRow
+        -- Two rows of metadata fields above the editor.
+        -- Row 1: Title (text input), Slug (text input, auto-generated from title).
+        -- Row 2: Kind (select: utility/macro/transform),
+        --   Entrypoint (select: dynamically discovered functions with "main" always first),
+        --   Enabled (checkbox).
+
+    @guarantee EditorBody
+        -- Code editor with syntax highlighting for the configured scripting language.
+        -- Toolbar: "Content" label.
+        -- Syntax errors shown as inline markers in editor gutter.
+
+    @guarantee FooterLayout
+        -- Created date and Updated date, locale-formatted.
+}
+
+-- ─── Script editor actions ──────────────────────────────────
+
+rule ScriptSave {
+    when: ScriptSaveRequested(script_id)
+    -- Syntax check first using the configured scripting runtime semantics
+    -- If syntax error: blocks save, shows error inline in editor gutter
+    -- If valid: bumps version, saves to DB + rewrites the published script file
+    -- Entrypoint list re-discovered from AST after save
+}
+
+rule ScriptCheckSyntax {
+    when: ScriptCheckSyntaxRequested(script_id)
+    -- Validates script syntax without saving
+    -- Shows errors inline in editor gutter
+    -- Success shown as toast or status indicator
+}
+
+rule ScriptRun {
+    when: ScriptRunRequested(script_id)
+    -- Executes script in the configured runtime
+    -- Calls configured entrypoint function (default: main)
+    -- stdout/stderr directed to Output panel tab
+    -- Output panel auto-opens if not already visible
+    -- Errors shown in Output panel with line numbers
+}
+
+rule ScriptDelete {
+    when: ScriptDeleteRequested(script_id)
+    -- No confirmation dialog
+    -- Deletes DB record + published script file on disk
+    -- Closes script tab, sidebar removes item
+}

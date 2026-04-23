@@ -1,0 +1,188 @@
+-- allium: 1
+-- bDS Scripting System
+-- Scope: core (Wave 6 — scripting behaviour and file contracts)
+-- Distilled from: src/main/engine/ScriptEngine.ts, schema.ts
+-- The scripting runtime is intentionally unspecified here; only behavioural
+-- contracts are normative.
+
+config {
+    script_extension: String = "script"
+}
+
+entity Script {
+    slug: String
+    title: String
+    kind: macro | utility | transform
+    entrypoint: String          -- default: "render" for macros
+    enabled: Boolean
+    status: draft | published
+    content: String?
+    version: Integer
+    file_path: String
+    created_at: Timestamp
+    updated_at: Timestamp
+
+    -- Derived
+    content_location: if status = published: file_path else: content
+
+    transitions status {
+        draft -> published
+        published -> draft
+    }
+}
+
+surface ScriptSurface {
+    context script: Script
+
+    exposes:
+        script.slug
+        script.title
+        script.kind
+        script.entrypoint
+        script.enabled
+        script.status
+        script.content when script.content != null
+        script.version
+        script.file_path
+        script.created_at
+        script.updated_at
+        script.content_location
+}
+
+surface ScriptManagementSurface {
+    facing _: ScriptOperator
+
+    provides:
+        CreateScriptRequested(title, kind, content, entrypoint)
+        CreateAndPublishScriptRequested(title, kind, content, entrypoint)
+        UpdateScriptRequested(script, changes)
+        PublishScriptRequested(script)
+        DeleteScriptRequested(script)
+        RunUtilityRequested(script)
+        MacroExpansionRequested(script, template_context)
+        BlogmarkReceived(data)
+        RebuildScriptsFromFilesRequested(project)
+}
+
+invariant UniqueScriptSlug {
+    for a in Scripts:
+        for b in Scripts:
+            a != b implies a.slug != b.slug
+}
+
+invariant ScriptFileLayout {
+    for s in Scripts where file_path != "":
+        s.file_path = format("scripts/{slug}.{extension}", slug: s.slug, extension: config.script_extension)
+}
+-- Script files use standard --- YAML frontmatter
+
+rule CreateScript {
+    when: CreateScriptRequested(title, kind, content, entrypoint)
+    let slug = slugify(title)
+    -- Creates a draft script: content stored in DB, no file written yet
+    ensures:
+        let new_script = Script.created(
+            slug: slug,
+            title: title,
+            kind: kind,
+            content: content,
+            entrypoint: entrypoint ?? "render",
+            status: draft,
+            enabled: true,
+            version: 1,
+            file_path: ""
+        )
+        new_script.status = draft
+}
+
+rule UpdateScript {
+    when: UpdateScriptRequested(script, changes)
+    ensures: ScriptFieldsUpdated(script, changes)
+    ensures: script.updated_at = now
+    ensures: script.version = script.version + 1
+}
+
+rule ReopenPublishedScript {
+    when: UpdateScriptRequested(script, changes)
+    requires: script.status = published
+    requires: script_changes_affect_published_output(changes)
+    ensures: script.status = draft
+}
+
+rule CreateAndPublishScript {
+    -- Alternative creation path: create + immediately publish (file written)
+    -- Some implementations may expose this as a single user action
+    when: CreateAndPublishScriptRequested(title, kind, content, entrypoint)
+    let slug = slugify(title)
+    requires: ValidateScript(content) = valid
+    ensures:
+        let new_script = Script.created(
+            slug: slug,
+            title: title,
+            kind: kind,
+            content: null,
+            entrypoint: entrypoint ?? "render",
+            status: published,
+            enabled: true,
+            version: 1,
+            file_path: format("scripts/{slug}.{extension}", slug: slug, extension: config.script_extension)
+        )
+        ScriptFileWritten(new_script)
+}
+
+rule PublishScript {
+    when: PublishScriptRequested(script)
+    requires: script.status = draft
+    requires: ValidateScript(script.content) = valid
+        -- AST parsing must succeed
+    ensures: script.status = published
+    ensures: ScriptFileWritten(script)
+    ensures: script.content = null
+}
+
+rule DeleteScript {
+    when: DeleteScriptRequested(script)
+    ensures: not exists script
+    ensures: ScriptFileDeleted(script)
+}
+
+-- Script execution contracts by kind
+
+rule ExecuteMacro {
+    when: MacroExpansionRequested(script, template_context)
+    requires: script.kind = macro
+    requires: script.enabled = true
+    -- Macro scripts are invoked during template rendering
+    -- via [[slug param1=value1 param2=value2]] syntax in post content
+    -- They receive named parameters and the template context, return HTML
+    ensures: MacroOutputProduced(script, html_output)
+}
+
+rule ExecuteUtility {
+    when: RunUtilityRequested(script)
+    requires: script.kind = utility
+    requires: script.enabled = true
+    -- Runs on-demand from the UI, produces stdout output
+    ensures: UtilityOutputProduced(script, stdout)
+}
+
+rule ExecuteTransform {
+    when: BlogmarkReceived(data)
+    -- Transform scripts run sequentially on blogmark deep link data
+    -- Input: title, content, tags, categories, source url
+    -- Each transform can modify the data before post creation
+    let transforms = Scripts where kind = transform and enabled = true
+    for t in ordered_by(transforms, s => s.slug):
+        ensures: TransformApplied(t, data)
+
+    @guidance
+        -- bds://new-post deep links from browser bookmarks
+        -- Max 5 toast notifications per script, 20 total
+}
+
+rule RebuildScriptsFromFiles {
+    when: RebuildScriptsFromFilesRequested(project)
+    for file in scan_directory(project.effective_data_dir + "/scripts", "*." + config.script_extension):
+        let parsed = parse_script_file(file)
+        ensures: Script.created(parsed)
+}

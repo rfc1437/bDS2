@@ -1,0 +1,171 @@
+-- allium: 1
+-- bDS Translation System
+-- Scope: core (Wave 1)
+-- Distilled from: src/main/engine/PostEngine.ts (translation methods),
+--   postTranslationFileUtils.ts, MediaEngine.ts
+
+use "./post.allium" as post
+use "./media.allium" as media
+
+surface TranslationControlSurface {
+    facing _: TranslationOperator
+
+    provides:
+        UpsertPostTranslationRequested(post, language, title, content, excerpt)
+        DeletePostTranslationRequested(translation)
+        ValidateTranslationsRequested(project)
+}
+
+surface TranslationRuntimeSurface {
+    facing _: TranslationRuntime
+
+    provides:
+        PostPublished(post)
+        PublishTranslationRequested(translation)
+        TranslationEdited(translation, changes)
+}
+
+value SupportedLanguage {
+    -- en, de, fr, it, es
+    code: String
+}
+
+surface SupportedLanguageSurface {
+    context language: SupportedLanguage
+
+    exposes:
+        language.code
+}
+
+entity PostTranslation {
+    canonical_post: post/Post
+    language: SupportedLanguage
+    title: String
+    excerpt: String?
+    content: String?
+    status: draft | published
+    file_path: String
+    checksum: String?
+    created_at: Timestamp
+    updated_at: Timestamp
+    published_at: Timestamp?
+
+    -- Derived
+    content_location: if status = published: file_path else: content
+
+    transitions status {
+        draft -> published
+        published -> draft
+    }
+}
+
+surface PostTranslationSurface {
+    context translation: PostTranslation
+
+    exposes:
+        translation.canonical_post
+        translation.language.code
+        translation.title
+        translation.excerpt when translation.excerpt != null
+        translation.content when translation.content != null
+        translation.status
+        translation.file_path
+        translation.checksum when translation.checksum != null
+        translation.created_at
+        translation.updated_at
+        translation.published_at when translation.published_at != null
+        translation.content_location
+}
+
+invariant UniqueTranslationPerLanguage {
+    for a in PostTranslations:
+        for b in PostTranslations:
+            (a != b and a.canonical_post = b.canonical_post)
+                implies a.language != b.language
+}
+
+invariant TranslationFilePath {
+    -- posts/YYYY/MM/{slug}.{language}.md
+    for t in PostTranslations where file_path != "":
+        t.file_path = format("posts/{yyyy}/{mm}/{slug}.{lang}.md",
+            yyyy: t.canonical_post.created_at.year,
+            mm: t.canonical_post.created_at.month_padded,
+            slug: t.canonical_post.slug,
+            lang: t.language.code)
+}
+
+rule UpsertPostTranslation {
+    when: UpsertPostTranslationRequested(post, language, title, content, excerpt)
+    requires: not post.do_not_translate
+    ensures:
+        let translation = PostTranslation.created(
+            canonical_post: post,
+            language: language,
+            title: title,
+            content: content,
+            excerpt: excerpt,
+            status: draft,
+            file_path: ""
+        )
+        translation.status = draft
+    -- If translation already exists, update it instead
+}
+
+rule PublishPostTranslation {
+    when: PostPublished(post)
+    -- All translations are also published when the canonical post is published
+    for t in post.translations:
+        ensures: PublishTranslationRequested(t)
+}
+
+rule PublishTranslation {
+    when: PublishTranslationRequested(translation)
+    requires: translation.status = draft
+    ensures: translation.status = published
+    ensures: translation.published_at = translation.published_at ?? now
+    ensures: TranslationFileWritten(translation)
+    ensures: translation.content = null
+        -- Content moves to filesystem
+}
+
+rule ReopenPublishedTranslation {
+    when: TranslationEdited(translation, changes)
+    requires: translation.status = published
+    requires: translation_edit_affects_published_content(changes)
+    ensures: translation.status = draft
+    ensures: translation.updated_at = now
+}
+
+rule DeletePostTranslation {
+    when: DeletePostTranslationRequested(translation)
+    ensures: not exists translation
+    ensures: TranslationFileDeleted(translation)
+    ensures: SearchIndexUpdated(translation.canonical_post)
+        -- FTS index includes all translations of a post
+}
+
+rule ValidateTranslations {
+    when: ValidateTranslationsRequested(project)
+    -- Checks all posts against configured blog languages
+    -- Reports: missing translations, orphan translation files,
+    --   posts marked do_not_translate
+    for post in project.posts where status = published:
+        for lang in project.blog_languages:
+            if lang != project.main_language:
+                if not post.do_not_translate:
+                    if not (lang in post.available_languages):
+                        ensures: ValidationIssueReported(post, lang, "missing")
+
+    @guidance
+        -- This produces a validation report, not automatic fixes
+        -- The report drives targeted re-rendering
+}
+
+invariant FtsIncludesTranslations {
+    -- Full-text search index for a post includes stemmed content
+    -- from all its translations, not just the canonical language
+    for post in Posts:
+        includes_text(search_index(post), post.title)
+        for t in post.translations:
+            includes_text(search_index(post), t.title)
+}
