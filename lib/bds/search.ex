@@ -9,12 +9,63 @@ defmodule BDS.Search do
   alias BDS.Projects
   alias BDS.Repo
 
+  @stemmer_algorithms %{
+    "da" => :danish,
+    "nl" => :dutch,
+    "en" => :english,
+    "fi" => :finnish,
+    "fr" => :french,
+    "de" => :german,
+    "hu" => :hungarian,
+    "it" => :italian,
+    "no" => :norwegian,
+    "pt" => :portuguese,
+    "ro" => :romanian,
+    "ru" => :russian,
+    "es" => :spanish,
+    "sv" => :swedish,
+    "tr" => :turkish
+  }
+
+  @language_hints [
+    {"de", ~w(der die das und ein eine ist sind läuft laufen morgen fluss entlang)},
+    {"fr", ~w(je tu il elle nous vous ils elles le la les un une des courir cours matin travail)},
+    {"es", ~w(el la los las un una unos unas y que para con pero)},
+    {"it", ~w(il lo la gli le un una uno e che per con ogni mattina)}
+  ]
+
+  def list_stemmer_languages do
+    @stemmer_algorithms
+    |> Map.keys()
+    |> Enum.sort()
+  end
+
+  def detect_language(text) do
+    normalized_text = text |> to_string() |> String.downcase()
+
+    cond do
+      normalized_text == "" -> "en"
+      String.match?(normalized_text, ~r/[äöüß]/u) -> "de"
+      String.match?(normalized_text, ~r/[àâçéèêëîïôùûüÿœ]/u) -> "fr"
+      String.match?(normalized_text, ~r/[ñ¡¿]/u) -> "es"
+      true -> detect_language_from_hints(normalized_text)
+    end
+  end
+
+  def stem(text, language \\ nil) do
+    language = normalize_language(language || detect_language(text))
+
+    text
+    |> tokenize_text()
+    |> Enum.map_join(" ", &stem_token(&1, language))
+  end
+
   def search_posts(project_id, query, filters \\ %{}) do
     filters = normalize_filters(filters)
 
     posts =
       project_id
-      |> candidate_post_ids(query)
+      |> candidate_post_ids(query, filters.language)
       |> load_posts_in_order()
       |> filter_posts(filters)
 
@@ -32,7 +83,7 @@ defmodule BDS.Search do
 
     media_items =
       project_id
-      |> candidate_media_ids(query)
+      |> candidate_media_ids(query, filters.language)
       |> load_media_in_order()
 
     {:ok,
@@ -111,10 +162,12 @@ defmodule BDS.Search do
     :ok
   end
 
-  defp candidate_post_ids(project_id, query) do
+  defp candidate_post_ids(project_id, query, language) do
     if blank_query?(query) do
       Repo.all(from post in Post, where: post.project_id == ^project_id, select: post.id)
     else
+      match_query = build_match_query(query, language)
+
       Repo.query!(
         """
         SELECT posts_fts.post_id
@@ -123,16 +176,18 @@ defmodule BDS.Search do
         WHERE posts.project_id = ? AND posts_fts MATCH ?
         ORDER BY bm25(posts_fts), posts_fts.rowid
         """,
-        [project_id, query]
+        [project_id, match_query]
       ).rows
       |> Enum.map(fn [post_id] -> post_id end)
     end
   end
 
-  defp candidate_media_ids(project_id, query) do
+  defp candidate_media_ids(project_id, query, language) do
     if blank_query?(query) do
       Repo.all(from media in Media, where: media.project_id == ^project_id, select: media.id)
     else
+      match_query = build_match_query(query, language)
+
       Repo.query!(
         """
         SELECT media_fts.media_id
@@ -141,7 +196,7 @@ defmodule BDS.Search do
         WHERE media.project_id = ? AND media_fts MATCH ?
         ORDER BY bm25(media_fts), media_fts.rowid
         """,
-        [project_id, query]
+        [project_id, match_query]
       ).rows
       |> Enum.map(fn [media_id] -> media_id end)
     end
@@ -242,16 +297,23 @@ defmodule BDS.Search do
 
   defp post_index_fields(post) do
     translations = post_translations(post.id)
+    post_language = normalize_language(post.language)
 
-    title = [post.title | Enum.map(translations, &Map.get(&1, "title"))] |> join_text()
-    excerpt = [post.excerpt | Enum.map(translations, &Map.get(&1, "excerpt"))] |> join_text()
-
-    content =
-      [post_content(post) | Enum.map(translations, &translation_content(post.project_id, &1))]
+    title =
+      [stem(post.title, post_language) | Enum.map(translations, &stem(Map.get(&1, "title"), Map.get(&1, "language")))]
       |> join_text()
 
-    tags = Enum.join(post.tags || [], " ")
-    categories = Enum.join(post.categories || [], " ")
+    excerpt =
+      [stem(post.excerpt, post_language) | Enum.map(translations, &stem(Map.get(&1, "excerpt"), Map.get(&1, "language")))]
+      |> join_text()
+
+    content =
+      [stem(post_content(post), post_language) |
+       Enum.map(translations, &stem(translation_content(post.project_id, &1), Map.get(&1, "language")))]
+      |> join_text()
+
+    tags = stem(Enum.join(post.tags || [], " "), post_language)
+    categories = stem(Enum.join(post.categories || [], " "), post_language)
 
     {title, excerpt, content, tags, categories}
   end
@@ -260,11 +322,17 @@ defmodule BDS.Search do
     translations =
       Repo.all(from translation in MediaTranslation, where: translation.translation_for == ^media.id)
 
-    title = [media.title | Enum.map(translations, & &1.title)] |> join_text()
-    alt = [media.alt | Enum.map(translations, & &1.alt)] |> join_text()
-    caption = [media.caption | Enum.map(translations, & &1.caption)] |> join_text()
-    original_name = media.original_name || ""
-    tags = Enum.join(media.tags || [], " ")
+    media_language = normalize_language(media.language)
+
+    title = [stem(media.title, media_language) | Enum.map(translations, &stem(&1.title, &1.language))] |> join_text()
+    alt = [stem(media.alt, media_language) | Enum.map(translations, &stem(&1.alt, &1.language))] |> join_text()
+
+    caption =
+      [stem(media.caption, media_language) | Enum.map(translations, &stem(&1.caption, &1.language))]
+      |> join_text()
+
+    original_name = stem(media.original_name || "", media_language)
+    tags = stem(Enum.join(media.tags || [], " "), media_language)
 
     {title, alt, caption, original_name, tags}
   end
@@ -327,6 +395,73 @@ defmodule BDS.Search do
     values
     |> Enum.reject(&(&1 in [nil, ""]))
     |> Enum.join("\n")
+  end
+
+  defp build_match_query(query, language) do
+    query
+    |> query_variants(language)
+    |> Enum.map_join(" OR ", fn tokens ->
+      tokens
+      |> Enum.map_join(" AND ", &quoted_term/1)
+      |> then(&"(" <> &1 <> ")")
+    end)
+  end
+
+  defp query_variants(query, language) do
+    languages = query_languages(query, language)
+    tokens = tokenize_text(query)
+
+    languages
+    |> Enum.map(fn stemmer_language -> Enum.map(tokens, &stem_token(&1, stemmer_language)) end)
+    |> Enum.reject(&Enum.empty?/1)
+    |> Enum.uniq()
+  end
+
+  defp query_languages(query, nil) do
+    detected = detect_language(query)
+
+    ([detected] ++ list_stemmer_languages())
+    |> Enum.uniq()
+  end
+
+  defp query_languages(_query, language), do: [normalize_language(language)]
+
+  defp quoted_term(term), do: ~s("#{String.replace(term, ~s("), ~s(\"))}")
+
+  defp tokenize_text(nil), do: []
+
+  defp tokenize_text(text) do
+    Regex.scan(~r/[[:alnum:]]+/u, to_string(text))
+    |> List.flatten()
+    |> Enum.map(&String.downcase/1)
+  end
+
+  defp stem_token(token, language) do
+    case Map.fetch(@stemmer_algorithms, normalize_language(language)) do
+      {:ok, algorithm} -> apply(Stemex, algorithm, [token])
+      :error -> token
+    end
+  rescue
+    _error -> token
+  end
+
+  defp normalize_language(nil), do: "en"
+
+  defp normalize_language(language) do
+    language
+    |> to_string()
+    |> String.downcase()
+    |> String.split("-", parts: 2)
+    |> hd()
+    |> then(fn code -> if Map.has_key?(@stemmer_algorithms, code), do: code, else: "en" end)
+  end
+
+  defp detect_language_from_hints(text) do
+    tokens = MapSet.new(tokenize_text(text))
+
+    Enum.find_value(@language_hints, "en", fn {language, hints} ->
+      if Enum.any?(hints, &MapSet.member?(tokens, &1)), do: language, else: false
+    end)
   end
 
   defp normalize_filters(filters) do

@@ -224,4 +224,40 @@ defmodule BDS.SearchTest do
     assert {:ok, media_results} = BDS.Search.search_media(project.id, "imported", %{})
     assert Enum.map(media_results.media, & &1.id) == ["search-media-from-file"]
   end
+
+  test "search_posts applies language-aware stemming to indexed and query text", %{project: project} do
+    assert {:ok, german_post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Morgenroutine",
+               content: "Die Katzen schlafen am Fenster.",
+               language: "de"
+             })
+
+    assert {:ok, french_post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Routine matinale",
+               content: "Je cours chaque matin avant le travail.",
+               language: "fr"
+             })
+
+    assert {:ok, german_results} = BDS.Search.search_posts(project.id, "katze", %{})
+    assert Enum.map(german_results.posts, & &1.id) == [german_post.id]
+
+    assert {:ok, french_results} = BDS.Search.search_posts(project.id, "courir", %{})
+    assert Enum.map(french_results.posts, & &1.id) == [french_post.id]
+  end
+
+  test "lists supported stemmer languages using normalized ISO codes" do
+    languages = BDS.Search.list_stemmer_languages()
+
+    assert is_list(languages)
+    assert "en" in languages
+    assert "de" in languages
+    assert "fr" in languages
+    assert "it" in languages
+    assert "es" in languages
+    assert Enum.uniq(languages) == languages
+  end
 end

@@ -26,7 +26,8 @@ defmodule BDS.MixProject do
       {:luerl, "~> 1.5"},
       {:jason, "~> 1.4"},
       {:plug, "~> 1.18"},
-      {:image, "~> 0.65"}
+      {:image, "~> 0.65"},
+      {:stemex, "~> 0.2.1"}
     ]
   end
 
