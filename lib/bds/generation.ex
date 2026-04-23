@@ -4,8 +4,62 @@ defmodule BDS.Generation do
   import Ecto.Query
 
   alias BDS.Generation.GeneratedFileHash
+  alias BDS.Metadata
+  alias BDS.Posts.Post
+  alias BDS.Posts.Translation
   alias BDS.Projects
   alias BDS.Repo
+
+  @core_sections [:core, :single]
+
+  def plan_generation(project_id, sections \\ [:core]) when is_binary(project_id) and is_list(sections) do
+    project = Projects.get_project!(project_id)
+    {:ok, metadata} = Metadata.get_project_metadata(project_id)
+    {:ok, generated_files} = list_generated_files(project_id)
+
+    {:ok,
+     %{
+       project_id: project_id,
+       project_name: project.name,
+       base_url: normalize_base_url(metadata.public_url),
+       language: metadata.main_language,
+       blog_languages: normalize_blog_languages(metadata.main_language, metadata.blog_languages),
+       max_posts_per_page: metadata.max_posts_per_page,
+       pico_theme: metadata.pico_theme,
+       sections: normalize_sections(sections),
+       generated_files: generated_files
+     }}
+  end
+
+  def generate_site(project_id, sections \\ [:core]) when is_binary(project_id) and is_list(sections) do
+    with {:ok, plan} <- plan_generation(project_id, sections) do
+      outputs = build_outputs(plan)
+
+      Enum.each(outputs, fn {relative_path, content} ->
+        {:ok, _write} = write_generated_file(project_id, relative_path, content)
+      end)
+
+      {:ok, generated_files} = list_generated_files(project_id)
+      {:ok, %{sections: plan.sections, generated_files: generated_files}}
+    end
+  end
+
+  def post_output_path(%Post{} = post), do: post_output_path(post, nil)
+
+  def post_output_path(%Post{} = post, language) do
+    datetime = DateTime.from_unix!(post.created_at)
+    year = Integer.to_string(datetime.year)
+    month = datetime.month |> Integer.to_string() |> String.pad_leading(2, "0")
+    day = datetime.day |> Integer.to_string() |> String.pad_leading(2, "0")
+
+    path_parts = [year, month, day, post.slug, "index.html"]
+
+    case language do
+      nil -> Path.join(path_parts)
+      "" -> Path.join(path_parts)
+      value -> Path.join([value | path_parts])
+    end
+  end
 
   def write_generated_file(project_id, relative_path, content)
       when is_binary(project_id) and is_binary(relative_path) and is_binary(content) do
@@ -64,6 +118,228 @@ defmodule BDS.Generation do
     )
 
     :ok
+  end
+
+  defp build_outputs(plan) do
+    published_posts = list_published_posts(plan.project_id)
+    published_translations = list_published_translations(plan.project_id)
+    post_by_id = Map.new(published_posts, &{&1.id, &1})
+
+    core_outputs =
+      if :core in plan.sections do
+        build_core_outputs(plan, published_posts)
+      else
+        []
+      end
+
+    single_outputs =
+      if :single in plan.sections do
+        build_single_outputs(plan.project_id, published_posts, published_translations, post_by_id)
+      else
+        []
+      end
+
+    urls =
+      core_outputs ++ single_outputs
+      |> Enum.map(fn {relative_path, _content} -> url_for_output(plan.base_url, relative_path) end)
+
+    sitemap =
+      if :core in plan.sections do
+        [{"sitemap.xml", render_sitemap(urls)}]
+      else
+        []
+      end
+
+    core_outputs ++ single_outputs ++ sitemap
+  end
+
+  defp build_core_outputs(plan, published_posts) do
+    language = plan.language
+    additional_languages = Enum.reject(plan.blog_languages, &(&1 == language))
+
+    [
+      {"index.html", render_home(plan, language)},
+      {"feed.xml", render_feed(plan, language, published_posts)},
+      {"atom.xml", render_atom(plan, language, published_posts)},
+      {"calendar.json", render_calendar(published_posts)}
+    ] ++
+      Enum.flat_map(additional_languages, fn localized_language ->
+        [
+          {Path.join(localized_language, "index.html"), render_home(plan, localized_language)},
+          {Path.join(localized_language, "feed.xml"), render_feed(plan, localized_language, published_posts)},
+          {Path.join(localized_language, "atom.xml"), render_atom(plan, localized_language, published_posts)}
+        ]
+      end)
+  end
+
+  defp build_single_outputs(project_id, published_posts, published_translations, post_by_id) do
+    post_outputs =
+      Enum.map(published_posts, fn post ->
+        {post_output_path(post), render_post_page(post.title, load_body(project_id, post.file_path, post.content), post.slug, post.language)}
+      end)
+
+    translation_outputs =
+      Enum.flat_map(published_translations, fn translation ->
+        case post_by_id[translation.translation_for] do
+          nil ->
+            []
+
+          post ->
+            [
+              {post_output_path(post, translation.language),
+               render_post_page(translation.title, load_body(project_id, translation.file_path, translation.content), post.slug, translation.language)}
+            ]
+        end
+      end)
+
+    post_outputs ++ translation_outputs
+  end
+
+  defp list_published_posts(project_id) do
+    Repo.all(
+      from post in Post,
+        where: post.project_id == ^project_id and post.status == :published,
+        order_by: [asc: post.created_at, asc: post.slug]
+    )
+  end
+
+  defp list_published_translations(project_id) do
+    Repo.all(
+      from translation in Translation,
+        where: translation.project_id == ^project_id and translation.status == :published,
+        order_by: [asc: translation.created_at, asc: translation.language]
+    )
+  end
+
+  defp normalize_sections(sections) do
+    sections
+    |> Enum.filter(&(&1 in @core_sections))
+    |> Enum.uniq()
+    |> case do
+      [] -> [:core]
+      values -> values
+    end
+  end
+
+  defp normalize_base_url(nil), do: nil
+  defp normalize_base_url(url), do: String.trim_trailing(url, "/")
+
+  defp normalize_blog_languages(main_language, blog_languages) do
+    ([main_language] ++ (blog_languages || []))
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.uniq()
+  end
+
+  defp render_home(plan, language) do
+    [
+      "<html>",
+      "<head><title>",
+      plan.project_name,
+      "</title></head>",
+      "<body data-language=\"",
+      to_string(language),
+      "\"><main><h1>",
+      plan.project_name,
+      "</h1></main></body>",
+      "</html>"
+    ]
+    |> IO.iodata_to_binary()
+  end
+
+  defp render_feed(plan, language, published_posts) do
+    items =
+      published_posts
+      |> Enum.filter(&(&1.language == language or language == plan.language))
+      |> Enum.map(fn post ->
+        "<item><title>#{xml_escape(post.title)}</title><link>#{url_for_output(plan.base_url, post_output_path(post))}</link></item>"
+      end)
+      |> Enum.join()
+
+    "<rss><channel><title>#{xml_escape(plan.project_name)} (#{xml_escape(language || "default")})</title>#{items}</channel></rss>"
+  end
+
+  defp render_atom(plan, language, published_posts) do
+    entries =
+      published_posts
+      |> Enum.filter(&(&1.language == language or language == plan.language))
+      |> Enum.map(fn post ->
+        "<entry><title>#{xml_escape(post.title)}</title><id>#{url_for_output(plan.base_url, post_output_path(post))}</id></entry>"
+      end)
+      |> Enum.join()
+
+    "<feed><title>#{xml_escape(plan.project_name)} (#{xml_escape(language || "default")})</title>#{entries}</feed>"
+  end
+
+  defp render_calendar(published_posts) do
+    published_posts
+    |> Enum.map(fn post ->
+      datetime = DateTime.from_unix!(post.created_at)
+      %{date: Date.to_iso8601(DateTime.to_date(datetime)), slug: post.slug, title: post.title}
+    end)
+    |> Jason.encode!()
+  end
+
+  defp render_sitemap(urls) do
+    entries = Enum.map_join(urls, "", fn url -> "<url><loc>#{xml_escape(url)}</loc></url>" end)
+    "<urlset>#{entries}</urlset>"
+  end
+
+  defp render_post_page(title, body, slug, language) do
+    [
+      "<html>",
+      "<head><title>",
+      to_string(title),
+      "</title></head>",
+      "<body data-slug=\"",
+      to_string(slug),
+      "\" data-language=\"",
+      to_string(language),
+      "\"><article data-pagefind-body>",
+      body,
+      "</article></body>",
+      "</html>"
+    ]
+    |> IO.iodata_to_binary()
+  end
+
+  defp load_body(_project_id, _file_path, inline_content) when is_binary(inline_content), do: inline_content
+
+  defp load_body(project_id, file_path, _inline_content) do
+    case file_path do
+      nil -> ""
+      "" -> ""
+      value ->
+        project_path = Path.expand(value, Projects.project_data_dir(Projects.get_project!(project_id)))
+        case File.read(project_path) do
+          {:ok, contents} -> parse_frontmatter_body(contents)
+          {:error, _reason} -> ""
+        end
+    end
+  end
+
+  defp parse_frontmatter_body(contents) do
+    case String.split(contents, "\n---\n", parts: 2) do
+      [_frontmatter, body] -> String.trim_trailing(body, "\n")
+      _parts -> contents
+    end
+  end
+
+  defp url_for_output(nil, relative_path), do: "/" <> String.trim_leading(relative_path, "/")
+
+  defp url_for_output(base_url, relative_path) do
+    cleaned = relative_path |> String.trim_leading("/") |> String.trim_trailing("index.html")
+    suffix = if cleaned == "", do: "/", else: "/" <> cleaned
+    String.trim_trailing(base_url, "/") <> suffix
+  end
+
+  defp xml_escape(value) do
+    value
+    |> to_string()
+    |> String.replace("&", "&amp;")
+    |> String.replace("<", "&lt;")
+    |> String.replace(">", "&gt;")
+    |> String.replace("\"", "&quot;")
+    |> String.replace("'", "&apos;")
   end
 
   defp output_path(project, relative_path) do

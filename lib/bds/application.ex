@@ -8,6 +8,8 @@ defmodule BDS.Application do
     children = [
       BDS.Repo,
       BDS.Tasks,
+      BDS.Preview,
+      BDS.Publishing,
       {Task.Supervisor, name: BDS.Tasks.TaskSupervisor},
       BDS.Scripting.JobStore,
       {Task.Supervisor, name: BDS.Scripting.TaskSupervisor},
