@@ -5,6 +5,12 @@
 
 use "./project.allium" as project
 
+enum PostStatus {
+    draft
+    published
+    archived
+}
+
 value Slug {
     value: String
 
@@ -81,7 +87,7 @@ entity Post {
     slug: Slug
     excerpt: String?
     content: String?
-    status: draft | published | archived
+    status: PostStatus
     author: String?
     language: String?
     do_not_translate: Boolean

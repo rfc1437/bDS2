@@ -6,6 +6,27 @@
 -- This document specifies the persisted data model the rewrite must be able
 -- to read and write. It is the ground truth for storage compatibility.
 
+enum PostStatus {
+    draft
+    published
+    archived
+}
+
+enum PostTranslationStatus {
+    draft
+    published
+}
+
+enum TemplateStatus {
+    draft
+    published
+}
+
+enum ScriptStatus {
+    draft
+    published
+}
+
 -- ============================================================================
 -- CORE ENTITIES
 -- ============================================================================
@@ -28,7 +49,7 @@ entity Post {
     slug: String            -- URL-friendly identifier
     excerpt: String?        -- Optional summary
     content: String?        -- Draft body (null when published)
-    status: draft | published | archived
+    status: PostStatus
     author: String?         -- Author name
     created_at: Timestamp
     updated_at: Timestamp
@@ -57,7 +78,7 @@ entity PostTranslation {
     title: String
     excerpt: String?
     content: String?        -- Draft body (null when published)
-    status: draft | published
+    status: PostTranslationStatus
     created_at: Timestamp
     updated_at: Timestamp
     published_at: Timestamp?
@@ -118,7 +139,7 @@ entity Template {
     enabled: Boolean
     version: Integer        -- Incremented on each update
     file_path: String       -- templates/{slug}.liquid
-    status: draft | published
+    status: TemplateStatus
     content: String?        -- Draft body (null when published)
     created_at: Timestamp
     updated_at: Timestamp
@@ -134,7 +155,7 @@ entity Script {
     enabled: Boolean
     version: Integer        -- Incremented on each update
     file_path: String       -- scripts/{slug}.{extension}
-    status: draft | published
+    status: ScriptStatus
     content: String?        -- Draft body (null when published)
     created_at: Timestamp
     updated_at: Timestamp

@@ -5,12 +5,19 @@
 
 use "./metadata.allium" as meta
 
+enum PublishJobStatus {
+    pending
+    running
+    completed
+    failed
+}
+
 entity PublishJob {
     ssh_host: String
     ssh_user: String
     ssh_remote_path: String
     ssh_mode: scp | rsync
-    status: pending | running | completed | failed
+    status: PublishJobStatus
 
     transitions status {
         pending -> running

@@ -4,12 +4,17 @@
 -- Distilled from: src/main/engine/TemplateEngine.ts, PageRenderer.ts, schema.ts,
 --   bundled starter templates in src/main/engine/templates/
 
+enum TemplateStatus {
+    draft
+    published
+}
+
 entity Template {
     slug: String
     title: String
     kind: post | list | not_found | partial
     enabled: Boolean
-    status: draft | published
+    status: TemplateStatus
     content: String?
     version: Integer
     file_path: String

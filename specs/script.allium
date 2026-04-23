@@ -9,13 +9,18 @@ config {
     script_extension: String = "script"
 }
 
+enum ScriptStatus {
+    draft
+    published
+}
+
 entity Script {
     slug: String
     title: String
     kind: macro | utility | transform
     entrypoint: String          -- default: "render" for macros
     enabled: Boolean
-    status: draft | published
+    status: ScriptStatus
     content: String?
     version: Integer
     file_path: String

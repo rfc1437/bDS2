@@ -7,6 +7,11 @@
 use "./post.allium" as post
 use "./media.allium" as media
 
+enum PostTranslationStatus {
+    draft
+    published
+}
+
 surface TranslationControlSurface {
     facing _: TranslationOperator
 
@@ -43,7 +48,7 @@ entity PostTranslation {
     title: String
     excerpt: String?
     content: String?
-    status: draft | published
+    status: PostTranslationStatus
     file_path: String
     checksum: String?
     created_at: Timestamp

@@ -8,6 +8,13 @@ use "./media.allium" as media
 use "./script.allium" as script
 use "./template.allium" as template
 
+enum ProposalStatus {
+    pending
+    accepted
+    discarded
+    expired
+}
+
 entity McpServer {
     transport: http | stdio
     host: String                        -- 127.0.0.1 for HTTP
@@ -27,7 +34,7 @@ surface McpServerSurface {
 
 entity Proposal {
     kind: draft_post | propose_script | propose_template | propose_media_metadata | propose_post_metadata
-    status: pending | accepted | discarded | expired
+    status: ProposalStatus
     entity_id: String
     data: String
     created_at: Timestamp
