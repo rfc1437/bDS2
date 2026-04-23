@@ -142,4 +142,105 @@ defmodule BDS.TemplatesTest do
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
     assert %{"tags" => [%{"name" => "Feature"}]} = Jason.decode!(File.read!(tags_path))
   end
+
+  test "update_template cascades slug changes to posts and tags and renames the published file", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Article View",
+               kind: :post,
+               content: "<article>{{ content }}</article>"
+             })
+
+    assert {:ok, published} = BDS.Templates.publish_template(template.id)
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Uses Template",
+               content: "Body",
+               template_slug: published.slug
+             })
+
+    assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
+
+    assert {:ok, _tag} =
+             BDS.Tags.create_tag(%{
+               project_id: project.id,
+               name: "Feature",
+               post_template_slug: published.slug
+             })
+
+    old_template_path = Path.join(temp_dir, published.file_path)
+    assert File.exists?(old_template_path)
+
+    assert {:ok, updated} = BDS.Templates.update_template(published.id, %{slug: "feature-view"})
+
+    assert updated.slug == "feature-view"
+    assert updated.file_path == "templates/feature-view.liquid"
+
+    reloaded_post = Repo.get!(Post, published_post.id)
+    assert reloaded_post.template_slug == "feature-view"
+
+    reloaded_tag = Repo.get_by!(Tag, project_id: project.id, name: "Feature")
+    assert reloaded_tag.post_template_slug == "feature-view"
+
+    refute File.exists?(old_template_path)
+    new_template_path = Path.join(temp_dir, updated.file_path)
+    assert File.exists?(new_template_path)
+
+    template_contents = File.read!(new_template_path)
+    assert template_contents =~ "slug: feature-view\n"
+    assert template_contents =~ "\n---\n<article>{{ content }}</article>\n"
+
+    post_contents = File.read!(Path.join(temp_dir, reloaded_post.file_path))
+    assert post_contents =~ "template_slug: feature-view\n"
+    assert post_contents =~ "\n---\nBody\n"
+
+    tags_path = Path.join([temp_dir, "meta", "tags.json"])
+    assert %{"tags" => [%{"name" => "Feature", "post_template_slug" => "feature-view"}]} =
+             Jason.decode!(File.read!(tags_path))
+  end
+
+  test "rebuild_templates_from_files recreates published templates from disk", %{project: project, temp_dir: temp_dir} do
+    template_dir = Path.join(temp_dir, "templates")
+    File.mkdir_p!(template_dir)
+
+    file_path = Path.join(template_dir, "recovered-view.liquid")
+
+    File.write!(
+      file_path,
+      [
+        "---",
+        "id: template-from-file",
+        "slug: recovered-view",
+        "title: Recovered View",
+        "kind: list",
+        "enabled: true",
+        "version: 3",
+        "created_at: 101",
+        "updated_at: 202",
+        "---",
+        "<section>Recovered</section>",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, templates} = BDS.Templates.rebuild_templates_from_files(project.id)
+    assert length(templates) == 1
+
+    [template] = Repo.all(BDS.Templates.Template)
+    assert template.id == "template-from-file"
+    assert template.slug == "recovered-view"
+    assert template.title == "Recovered View"
+    assert template.kind == :list
+    assert template.enabled == true
+    assert template.version == 3
+    assert template.status == :published
+    assert template.file_path == "templates/recovered-view.liquid"
+    assert template.content == nil
+    assert template.created_at == 101
+    assert template.updated_at == 202
+  end
 end

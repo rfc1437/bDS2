@@ -104,6 +104,19 @@ defmodule BDS.Scripts do
     end
   end
 
+  def rebuild_scripts_from_files(project_id) do
+    project = Projects.get_project!(project_id)
+
+    scripts =
+      project
+      |> Projects.project_data_dir()
+      |> Path.join("scripts")
+      |> list_matching_files("*.lua")
+      |> Enum.map(&upsert_script_from_file(project_id, project, &1))
+
+    {:ok, scripts}
+  end
+
   defp default_entrypoint(:macro), do: "render"
   defp default_entrypoint(_kind), do: "main"
 
@@ -172,6 +185,48 @@ defmodule BDS.Scripts do
       :ok -> :ok
       {:error, :enoent} -> :ok
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp upsert_script_from_file(project_id, project, path) do
+    contents = File.read!(path)
+    {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
+    relative_path = Path.relative_to(path, Projects.project_data_dir(project))
+    now = System.system_time(:second)
+
+    attrs = %{
+      id: Map.get(fields, "id") || Ecto.UUID.generate(),
+      project_id: project_id,
+      slug: Map.fetch!(fields, "slug"),
+      title: Map.get(fields, "title") || "",
+      kind: parse_script_kind(Map.fetch!(fields, "kind")),
+      entrypoint: Map.get(fields, "entrypoint") || "main",
+      enabled: Map.get(fields, "enabled", true),
+      version: Map.get(fields, "version", 1),
+      file_path: relative_path,
+      status: :published,
+      content: nil,
+      created_at: Map.get(fields, "created_at", now),
+      updated_at: Map.get(fields, "updated_at", now)
+    }
+
+    script = Repo.get_by(Script, project_id: project_id, slug: attrs.slug) || %Script{}
+
+    script
+    |> Script.changeset(attrs)
+    |> Repo.insert_or_update!()
+  end
+
+  defp parse_script_kind(kind) when is_atom(kind), do: kind
+  defp parse_script_kind(kind), do: String.to_existing_atom(kind)
+
+  defp list_matching_files(dir, pattern) do
+    if File.dir?(dir) do
+      Path.join(dir, pattern)
+      |> Path.wildcard()
+      |> Enum.sort()
+    else
+      []
     end
   end
 

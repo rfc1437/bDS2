@@ -115,4 +115,48 @@ defmodule BDS.ScriptsTest do
     assert Repo.get(Script, published.id) == nil
     refute File.exists?(Path.join(temp_dir, published.file_path))
   end
+
+  test "rebuild_scripts_from_files recreates published scripts from disk", %{project: project, temp_dir: temp_dir} do
+    script_dir = Path.join(temp_dir, "scripts")
+    File.mkdir_p!(script_dir)
+
+    file_path = Path.join(script_dir, "recovered.lua")
+
+    File.write!(
+      file_path,
+      [
+        "---",
+        "id: script-from-file",
+        "slug: recovered",
+        "title: Recovered Script",
+        "kind: utility",
+        "entrypoint: main",
+        "enabled: true",
+        "version: 4",
+        "created_at: 301",
+        "updated_at: 404",
+        "---",
+        "function main() return 'restored' end",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, scripts} = BDS.Scripts.rebuild_scripts_from_files(project.id)
+    assert length(scripts) == 1
+
+    [script] = Repo.all(Script)
+    assert script.id == "script-from-file"
+    assert script.slug == "recovered"
+    assert script.title == "Recovered Script"
+    assert script.kind == :utility
+    assert script.entrypoint == "main"
+    assert script.enabled == true
+    assert script.version == 4
+    assert script.status == :published
+    assert script.file_path == "scripts/recovered.lua"
+    assert script.content == nil
+    assert script.created_at == 301
+    assert script.updated_at == 404
+  end
 end

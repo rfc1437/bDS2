@@ -73,6 +73,30 @@ defmodule BDS.Tags do
     end
   end
 
+  def delete_tag(tag_id) do
+    case Repo.get(Tag, tag_id) do
+      nil ->
+        {:error, :not_found}
+
+      tag ->
+        Repo.transaction(fn ->
+          affected_posts = posts_with_tag(tag.project_id, tag.name)
+
+          Enum.each(affected_posts, fn post ->
+            updated_tags = Enum.reject(post.tags || [], &(&1 == tag.name))
+            update_post_tags(post, updated_tags)
+          end)
+
+          Repo.delete!(tag)
+          write_tags_json(tag.project_id)
+        end)
+        |> case do
+          {:ok, _} -> {:ok, :deleted}
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
   def rename_tag(tag_id, new_name) do
     case Repo.get(Tag, tag_id) do
       nil ->

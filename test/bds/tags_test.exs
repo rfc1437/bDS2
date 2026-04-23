@@ -115,6 +115,36 @@ defmodule BDS.TagsTest do
     assert %{"tags" => [%{"name" => "Gamma"}]} = Jason.decode!(File.read!(tags_path))
   end
 
+  test "delete_tag removes the tag from posts, rewrites published files, deletes the row, and refreshes tags.json", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, doomed} = BDS.Tags.create_tag(%{project_id: project.id, name: "Alpha"})
+    assert {:ok, _other} = BDS.Tags.create_tag(%{project_id: project.id, name: "Beta"})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Delete Me",
+               content: "Body",
+               tags: ["Alpha", "Beta"]
+             })
+
+    assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
+
+    assert {:ok, :deleted} = BDS.Tags.delete_tag(doomed.id)
+
+    reloaded_post = Repo.get!(Post, published_post.id)
+    assert reloaded_post.tags == ["Beta"]
+    assert Repo.get(BDS.Tags.Tag, doomed.id) == nil
+
+    post_path = Path.join(temp_dir, reloaded_post.file_path)
+    contents = File.read!(post_path)
+    refute contents =~ "  - Alpha\n"
+    assert contents =~ "tags:\n  - Beta\n"
+    assert contents =~ "\n---\nBody\n"
+
+    tags_path = Path.join([temp_dir, "meta", "tags.json"])
+    assert %{"tags" => [%{"name" => "Beta"}]} = Jason.decode!(File.read!(tags_path))
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->
