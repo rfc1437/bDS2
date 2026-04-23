@@ -16,7 +16,7 @@ value ScriptEditorView {
     title: String                       -- editable text input
     slug: String                        -- editable text input, auto-generated from title
     kind: String                        -- select: utility | macro | transform
-    entrypoint: String                  -- select: dynamically discovered functions, "main" always first
+    entrypoint: String                  -- select: discovered Lua functions available as entrypoints
     enabled: Boolean                    -- checkbox
     content: String                     -- code editor content
     created_at: String                  -- locale-formatted date
@@ -50,11 +50,11 @@ surface ScriptEditorSurface {
         -- Two rows of metadata fields above the editor.
         -- Row 1: Title (text input), Slug (text input, auto-generated from title).
         -- Row 2: Kind (select: utility/macro/transform),
-        --   Entrypoint (select: dynamically discovered functions with "main" always first),
+        --   Entrypoint (select: discovered Lua functions exposed by the script),
         --   Enabled (checkbox).
 
     @guarantee EditorBody
-        -- Code editor with syntax highlighting for the configured scripting language.
+        -- Code editor with Lua syntax highlighting.
         -- Toolbar: "Content" label.
         -- Syntax errors shown as inline markers in editor gutter.
 
@@ -66,23 +66,23 @@ surface ScriptEditorSurface {
 
 rule ScriptSave {
     when: ScriptSaveRequested(script_id)
-    -- Syntax check first using the configured scripting runtime semantics
+    -- Lua syntax check first using the configured runtime semantics
     -- If syntax error: blocks save, shows error inline in editor gutter
     -- If valid: bumps version, saves to DB + rewrites the published script file
-    -- Entrypoint list re-discovered from AST after save
+    -- Entrypoint list re-discovered from Lua source after save
 }
 
 rule ScriptCheckSyntax {
     when: ScriptCheckSyntaxRequested(script_id)
-    -- Validates script syntax without saving
+    -- Validates Lua syntax without saving
     -- Shows errors inline in editor gutter
     -- Success shown as toast or status indicator
 }
 
 rule ScriptRun {
     when: ScriptRunRequested(script_id)
-    -- Executes script in the configured runtime
-    -- Calls configured entrypoint function (default: main)
+    -- Executes the script in the configured Lua runtime
+    -- Calls the configured Lua entrypoint function
     -- stdout/stderr directed to Output panel tab
     -- Output panel auto-opens if not already visible
     -- Errors shown in Output panel with line numbers

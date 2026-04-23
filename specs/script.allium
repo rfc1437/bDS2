@@ -2,11 +2,12 @@
 -- bDS Scripting System
 -- Scope: core (Wave 6 — scripting behaviour and file contracts)
 -- Distilled from: src/main/engine/ScriptEngine.ts, schema.ts
--- The scripting runtime is intentionally unspecified here; only behavioural
--- contracts are normative.
+-- Lua is the normative scripting language for user-authored scripts in the
+-- rewrite. The concrete embedding strategy remains an implementation choice;
+-- only the behavioural contract is normative here.
 
 config {
-    script_extension: String = "script"
+    script_extension: String = "lua"
 }
 
 enum ScriptStatus {
@@ -18,7 +19,7 @@ entity Script {
     slug: String
     title: String
     kind: macro | utility | transform
-    entrypoint: String          -- default: "render" for macros
+    entrypoint: String          -- named Lua function used as the script entrypoint
     enabled: Boolean
     status: ScriptStatus
     content: String?
@@ -139,7 +140,7 @@ rule PublishScript {
     when: PublishScriptRequested(script)
     requires: script.status = draft
     requires: ValidateScript(script.content) = valid
-        -- AST parsing must succeed
+        -- Lua parsing must succeed before a script can be published
     ensures: script.status = published
     ensures: ScriptFileWritten(script)
     ensures: script.content = null
@@ -160,6 +161,8 @@ rule ExecuteMacro {
     -- Macro scripts are invoked during template rendering
     -- via [[slug param1=value1 param2=value2]] syntax in post content
     -- They receive named parameters and the template context, return HTML
+    -- from a bounded Lua execution environment that exposes only approved
+    -- host capabilities
     ensures: MacroOutputProduced(script, html_output)
 }
 
@@ -167,7 +170,8 @@ rule ExecuteUtility {
     when: RunUtilityRequested(script)
     requires: script.kind = utility
     requires: script.enabled = true
-    -- Runs on-demand from the UI, produces stdout output
+    -- Runs on-demand from the UI in a bounded Lua execution environment,
+    -- produces stdout output
     ensures: UtilityOutputProduced(script, stdout)
 }
 
@@ -175,7 +179,8 @@ rule ExecuteTransform {
     when: BlogmarkReceived(data)
     -- Transform scripts run sequentially on blogmark deep link data
     -- Input: title, content, tags, categories, source url
-    -- Each transform can modify the data before post creation
+    -- Each transform can modify the data before post creation.
+    -- Execution uses the same bounded Lua host API contract as other scripts.
     let transforms = Scripts where kind = transform and enabled = true
     for t in ordered_by(transforms, s => s.slug):
         ensures: TransformApplied(t, data)

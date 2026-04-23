@@ -22,6 +22,18 @@ The following are intentionally not part of the behavioral contract:
 - ORM choice.
 - Internal state management, concurrency model, or runtime libraries.
 
+## Scripting Direction
+
+bDS2 should use Lua as its user-facing scripting language.
+
+The reason is host fit, not language fashion: Lua has a better embedding story for the BEAM than Python does, while still being small, expressive, and suitable for user-authored macros, transforms, and utility scripts. The current direction is:
+
+- Lua script files as the persisted user script format.
+- A BEAM-hosted execution boundary with explicit host capabilities instead of unrestricted runtime access.
+- Bounded script execution for user-authored code.
+
+This keeps the scripting surface lightweight and aligned with the Elixir host application. Python remains a possible integration boundary for specialized tasks, but it is no longer the default scripting model for the rewrite.
+
 ## Repository Layout
 
 - [mix.exs](/Users/gb/Projects/bDS2/mix.exs): Mix project definition.

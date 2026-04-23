@@ -79,7 +79,7 @@ surface MenuOpmlSurface {
 }
 
 config {
-    script_extension: String = "script"
+    script_extension: String = "lua"
 }
 
 -- ============================================================================
@@ -202,7 +202,7 @@ value ScriptFrontmatter {
     slug: String
     title: String
     kind: macro | utility | transform
-    entrypoint: String      -- Default: "render"
+    entrypoint: String      -- Named Lua function used when invoking the script
     enabled: Boolean
     version: Integer
     created_at: Timestamp
