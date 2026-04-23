@@ -46,6 +46,96 @@ defmodule BDS.PublishingTest do
     assert_receive {:uploaded, :media, "/srv/blog/media", ["asset.jpg"], :rsync}
   end
 
+  test "upload_site runs rsync commands with SSH agent env and media exclude filters", %{project: project, temp_dir: temp_dir} do
+    test_pid = self()
+
+    File.mkdir_p!(Path.join([temp_dir, "html"]))
+    File.write!(Path.join([temp_dir, "html", "index.html"]), "<html />")
+    File.mkdir_p!(Path.join([temp_dir, "thumbnails"]))
+    File.write!(Path.join([temp_dir, "thumbnails", "thumb.jpg"]), "thumb")
+    File.mkdir_p!(Path.join([temp_dir, "media"]))
+    File.write!(Path.join([temp_dir, "media", "asset.jpg"]), "asset")
+    File.write!(Path.join([temp_dir, "media", "asset.jpg.meta"]), "meta")
+
+    runner = fn command, args, opts ->
+      send(test_pid, {:command_run, command, args, opts})
+      {"", 0}
+    end
+
+    credentials = %{
+      ssh_host: "example.com",
+      ssh_user: "deploy",
+      ssh_remote_path: "/srv/blog",
+      ssh_mode: :rsync
+    }
+
+    assert {:ok, job} =
+             BDS.Publishing.upload_site(project.id, credentials,
+               command_runner: runner,
+               ssh_auth_sock: "/tmp/test-agent.sock"
+             )
+
+    assert wait_for_publish_job(job.id, &(&1.status == :completed)).status == :completed
+
+    assert_receive {:command_run, "rsync", html_args, html_opts}
+    assert html_args == ["--update", "--compress", "--verbose", "-e", "ssh", Path.join([temp_dir, "html"]) <> "/", "deploy@example.com:/srv/blog/"]
+    assert html_opts[:env] == [{"SSH_AUTH_SOCK", "/tmp/test-agent.sock"}]
+
+    assert_receive {:command_run, "rsync", thumb_args, _thumb_opts}
+    assert thumb_args == ["--update", "--compress", "--verbose", "-e", "ssh", Path.join([temp_dir, "thumbnails"]) <> "/", "deploy@example.com:/srv/blog/thumbnails/"]
+
+    assert_receive {:command_run, "rsync", media_args, _media_opts}
+    assert media_args == ["--update", "--compress", "--verbose", "--exclude=*.meta", "-e", "ssh", Path.join([temp_dir, "media"]) <> "/", "deploy@example.com:/srv/blog/media/"]
+  end
+
+  test "upload_site runs scp commands for each eligible file and fails when a command exits non-zero", %{project: project, temp_dir: temp_dir} do
+    test_pid = self()
+    html_index = Path.join([temp_dir, "html", "index.html"])
+    html_entry = Path.join([temp_dir, "html", "posts", "entry.html"])
+    thumb_path = Path.join([temp_dir, "thumbnails", "thumb.jpg"])
+
+    File.mkdir_p!(Path.join([temp_dir, "html", "posts"]))
+    File.write!(html_index, "<html />")
+    File.write!(html_entry, "<html />")
+    File.mkdir_p!(Path.join([temp_dir, "thumbnails"]))
+    File.write!(thumb_path, "thumb")
+    File.mkdir_p!(Path.join([temp_dir, "media"]))
+    File.write!(Path.join([temp_dir, "media", "asset.jpg"]), "asset")
+    File.write!(Path.join([temp_dir, "media", "asset.jpg.meta"]), "meta")
+
+    runner = fn command, args, opts ->
+      send(test_pid, {:command_run, command, args, opts})
+
+      if List.last(args) == "deploy@example.com:/srv/blog/thumbnails/thumb.jpg" do
+        {"thumbnail failure", 1}
+      else
+        {"", 0}
+      end
+    end
+
+    credentials = %{
+      ssh_host: "example.com",
+      ssh_user: "deploy",
+      ssh_remote_path: "/srv/blog",
+      ssh_mode: :scp
+    }
+
+    assert {:ok, job} =
+             BDS.Publishing.upload_site(project.id, credentials,
+               command_runner: runner,
+               ssh_auth_sock: "/tmp/test-agent.sock"
+             )
+
+    failed_job = wait_for_publish_job(job.id, &(&1.status == :failed))
+    assert failed_job.error =~ "thumbnail failure"
+
+    assert_receive {:command_run, "scp", ["-q", ^html_index, "deploy@example.com:/srv/blog/index.html"], opts_a}
+    assert opts_a[:env] == [{"SSH_AUTH_SOCK", "/tmp/test-agent.sock"}]
+    assert_receive {:command_run, "scp", ["-q", ^html_entry, "deploy@example.com:/srv/blog/posts/entry.html"], _opts_b}
+    assert_receive {:command_run, "scp", ["-q", ^thumb_path, "deploy@example.com:/srv/blog/thumbnails/thumb.jpg"], _opts_c}
+    refute_receive {:command_run, "scp", ["-q", _, "deploy@example.com:/srv/blog/media/asset.jpg"], _opts_d}
+  end
+
   test "upload_site marks the publish job failed when a target upload fails", %{project: project, temp_dir: temp_dir} do
     File.mkdir_p!(Path.join([temp_dir, "html"]))
     File.write!(Path.join([temp_dir, "html", "index.html"]), "<html />")

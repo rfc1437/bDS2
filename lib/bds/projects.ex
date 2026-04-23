@@ -6,7 +6,9 @@ defmodule BDS.Projects do
   alias Ecto.Multi
   alias BDS.Projects.Project
   alias BDS.Repo
+  alias BDS.StarterTemplates
   alias BDS.Slug
+  alias BDS.Templates
 
   @default_project_id "default"
   @default_project_name "My Blog"
@@ -27,18 +29,29 @@ defmodule BDS.Projects do
         now = System.system_time(:second)
         is_active = not Repo.exists?(from project in Project, where: project.is_active == true)
 
-        %Project{}
-        |> Project.changeset(%{
-          id: @default_project_id,
-          name: @default_project_name,
-          slug: unique_slug(Slug.slugify(@default_project_name)),
-          description: nil,
-          data_path: nil,
-          created_at: now,
-          updated_at: now,
-          is_active: is_active
-        })
-        |> Repo.insert()
+        Repo.transaction(fn ->
+          project =
+            %Project{}
+            |> Project.changeset(%{
+              id: @default_project_id,
+              name: @default_project_name,
+              slug: unique_slug(Slug.slugify(@default_project_name)),
+              description: nil,
+              data_path: nil,
+              created_at: now,
+              updated_at: now,
+              is_active: is_active
+            })
+            |> Repo.insert!()
+
+          :ok = StarterTemplates.install(project)
+          {:ok, _templates} = Templates.rebuild_templates_from_files(project.id)
+          project
+        end)
+        |> case do
+          {:ok, project} -> {:ok, project}
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
 
@@ -51,18 +64,29 @@ defmodule BDS.Projects do
     name = attr(attrs, :name) || ""
     slug = unique_slug(attr(attrs, :slug) || Slug.slugify(name))
 
-    %Project{}
-    |> Project.changeset(%{
-      id: Ecto.UUID.generate(),
-      name: name,
-      slug: slug,
-      description: attr(attrs, :description),
-      data_path: attr(attrs, :data_path),
-      created_at: now,
-      updated_at: now,
-      is_active: false
-    })
-    |> Repo.insert()
+    Repo.transaction(fn ->
+      project =
+        %Project{}
+        |> Project.changeset(%{
+          id: Ecto.UUID.generate(),
+          name: name,
+          slug: slug,
+          description: attr(attrs, :description),
+          data_path: attr(attrs, :data_path),
+          created_at: now,
+          updated_at: now,
+          is_active: false
+        })
+        |> Repo.insert!()
+
+      :ok = StarterTemplates.install(project)
+      {:ok, _templates} = Templates.rebuild_templates_from_files(project.id)
+      project
+    end)
+    |> case do
+      {:ok, project} -> {:ok, project}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   def set_active_project(project_id) do

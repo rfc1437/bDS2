@@ -43,7 +43,7 @@ defmodule BDS.Publishing do
 
   def handle_call({:upload_site, project_id, credentials, targets, opts}, _from, state) do
     job_id = "publish-" <> Integer.to_string(System.unique_integer([:positive, :monotonic]))
-    uploader = Keyword.get(opts, :uploader, fn _target, _files, _credentials -> :ok end)
+    uploader = build_uploader(opts)
 
     job = %{
       id: job_id,
@@ -98,6 +98,74 @@ defmodule BDS.Publishing do
   defp update_job(job_id, attrs) do
     GenServer.call(__MODULE__, {:update_job, job_id, attrs})
   end
+
+  defp build_uploader(opts) do
+    case Keyword.get(opts, :uploader) do
+      nil ->
+        runner = Keyword.get(opts, :command_runner, &System.cmd/3)
+        ssh_auth_sock = Keyword.get(opts, :ssh_auth_sock, System.get_env("SSH_AUTH_SOCK"))
+
+        fn target, files, credentials ->
+          run_command_upload(target, files, credentials, runner, ssh_auth_sock)
+        end
+
+      uploader ->
+        uploader
+    end
+  end
+
+  defp run_command_upload(target, _files, %{ssh_mode: :rsync} = credentials, runner, ssh_auth_sock) do
+    args =
+      ["--update", "--compress", "--verbose"] ++
+        rsync_excludes(target) ++
+        ["-e", "ssh", ensure_trailing_slash(target.local_dir), remote_dir_spec(credentials, target.remote_dir)]
+
+    run_command(runner, "rsync", args, ssh_auth_sock)
+  end
+
+  defp run_command_upload(target, files, credentials, runner, ssh_auth_sock) do
+    Enum.reduce_while(files, :ok, fn relative_path, :ok ->
+      local_path = Path.join(target.local_dir, relative_path)
+      remote_path = remote_file_spec(credentials, target.remote_dir, relative_path)
+
+      case run_command(runner, "scp", ["-q", local_path, remote_path], ssh_auth_sock) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp run_command(runner, command, args, ssh_auth_sock) do
+    opts = command_opts(ssh_auth_sock)
+    {output, exit_status} = runner.(command, args, opts)
+
+    if exit_status == 0 do
+      :ok
+    else
+      {:error, normalize_command_error(command, output, exit_status)}
+    end
+  end
+
+  defp command_opts(nil), do: [stderr_to_stdout: true]
+  defp command_opts(ssh_auth_sock), do: [stderr_to_stdout: true, env: [{"SSH_AUTH_SOCK", ssh_auth_sock}]]
+
+  defp normalize_command_error(_command, output, _status) when is_binary(output) and output != "", do: output
+  defp normalize_command_error(command, _output, status), do: "#{command} exited with status #{status}"
+
+  defp rsync_excludes(%{kind: :media}), do: ["--exclude=*.meta"]
+  defp rsync_excludes(_target), do: []
+
+  defp ensure_trailing_slash(path), do: String.trim_trailing(path, "/") <> "/"
+
+  defp remote_dir_spec(credentials, remote_dir) do
+    remote_base(credentials) <> ":" <> ensure_trailing_slash(remote_dir)
+  end
+
+  defp remote_file_spec(credentials, remote_dir, relative_path) do
+    remote_base(credentials) <> ":" <> Path.join(remote_dir, relative_path)
+  end
+
+  defp remote_base(credentials), do: "#{credentials.ssh_user}@#{credentials.ssh_host}"
 
   defp build_upload_targets(base_dir, credentials) do
     remote_root = String.trim_trailing(credentials.ssh_remote_path, "/")

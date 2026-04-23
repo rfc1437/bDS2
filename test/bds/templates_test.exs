@@ -228,9 +228,9 @@ defmodule BDS.TemplatesTest do
     )
 
     assert {:ok, templates} = BDS.Templates.rebuild_templates_from_files(project.id)
-    assert length(templates) == 1
+    assert length(templates) == 4
 
-    [template] = Repo.all(BDS.Templates.Template)
+    template = Repo.get!(BDS.Templates.Template, "template-from-file")
     assert template.id == "template-from-file"
     assert template.slug == "recovered-view"
     assert template.title == "Recovered View"

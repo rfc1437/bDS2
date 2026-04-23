@@ -1,8 +1,11 @@
 defmodule BDS.GenerationTest do
   use ExUnit.Case, async: false
 
+  import Ecto.Query
+
   alias BDS.Metadata
   alias BDS.Posts
+  alias BDS.Repo
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
@@ -91,6 +94,108 @@ defmodule BDS.GenerationTest do
     assert File.read!(Path.join([temp_dir, "html", "sitemap.xml"])) =~ "https://example.com/blog/"
   end
 
+  test "generation renders published list and post templates for core and single pages", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, list_template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "List View",
+               kind: :list,
+               content: "<main class=\"list-template\"><h1>{{ page_title }}</h1>{% for post in posts %}<a href=\"{{ post.href }}\">{{ post.title }}</a>{% endfor %}</main>"
+             })
+
+    assert {:ok, _published_list} = BDS.Templates.publish_template(list_template.id)
+
+    assert {:ok, post_template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Post View",
+               kind: :post,
+               content: "<article class=\"post-template\"><h1>{{ post.title }}</h1><div class=\"body\">{{ post.content }}</div></article>"
+             })
+
+    assert {:ok, published_post_template} = BDS.Templates.publish_template(post_template.id)
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Rendered Post",
+               content: "Rendered body",
+               language: "en",
+               template_slug: published_post_template.slug
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+
+    assert {:ok, result} = BDS.Generation.generate_site(project.id, [:core, :single])
+
+    post_path = BDS.Generation.post_output_path(published_post)
+    relative_paths = Enum.map(result.generated_files, & &1.relative_path)
+
+    assert "index.html" in relative_paths
+    assert post_path in relative_paths
+
+    index_html = File.read!(Path.join([temp_dir, "html", "index.html"]))
+    assert index_html =~ "list-template"
+    assert index_html =~ "Rendered Post"
+
+    post_html = File.read!(Path.join([temp_dir, "html", post_path]))
+    assert post_html =~ "post-template"
+    assert post_html =~ "Rendered body"
+  end
+
+  test "generation renders copied starter templates with partials, i18n, and markdown", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _menu} =
+             BDS.Menu.update_menu(project.id, [
+               %{kind: :page, label: "Notes", slug: "notes"}
+             ])
+
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en", "de"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Starter Rendered Post",
+               content: "**Rendered** body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["Elixir"]
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, _tags} = BDS.Tags.sync_tags_from_posts(project.id)
+
+    assert {:ok, result} = BDS.Generation.generate_site(project.id, [:core, :single])
+
+    post_path = BDS.Generation.post_output_path(published_post)
+    relative_paths = Enum.map(result.generated_files, & &1.relative_path)
+
+    assert "index.html" in relative_paths
+    assert post_path in relative_paths
+
+    index_html = File.read!(Path.join([temp_dir, "html", "index.html"]))
+    assert index_html =~ ~s(<nav class="blog-menu">)
+    assert index_html =~ ~s(/assets/pico.min.css)
+    assert index_html =~ "Starter Rendered Post"
+
+    post_html = File.read!(Path.join([temp_dir, "html", post_path]))
+    assert post_html =~ ~s(data-template="single-post")
+    assert post_html =~ ~s(<strong>Rendered</strong> body)
+    assert post_html =~ "Taxonomy"
+    assert post_html =~ "Language"
+  end
+
   test "single generation writes canonical post pages and language-prefixed translation pages", %{project: project, temp_dir: temp_dir} do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
@@ -125,5 +230,54 @@ defmodule BDS.GenerationTest do
     assert File.read!(Path.join([temp_dir, "html", post_path])) =~ "Hello generated world"
     assert File.read!(Path.join([temp_dir, "html", translation_path])) =~ "Hallo generierte Welt"
     assert File.read!(Path.join([temp_dir, "html", post_path])) =~ ~s(data-pagefind-body)
+  end
+
+  test "archive generation writes paginated category, tag, and date pages", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en", "de"],
+               max_posts_per_page: 2
+             })
+
+    for index <- 1..3 do
+      assert {:ok, post} =
+               Posts.create_post(%{
+                 project_id: project.id,
+                 title: "Archive #{index}",
+                 content: "Archive body #{index}",
+                 language: "en",
+                 categories: ["notes"],
+                 tags: ["Elixir"]
+               })
+
+      created_at = DateTime.to_unix(~U[2026-04-15 12:00:00Z]) + index
+      Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^post.id), set: [created_at: created_at, updated_at: created_at])
+      assert {:ok, _published} = Posts.publish_post(post.id)
+    end
+
+    assert {:ok, _tags} = BDS.Tags.sync_tags_from_posts(project.id)
+
+    assert {:ok, result} = BDS.Generation.generate_site(project.id, [:category, :tag, :date])
+
+    expected_paths = [
+      "category/notes/index.html",
+      "category/notes/page/2/index.html",
+      "tag/elixir/index.html",
+      "2026/index.html",
+      "2026/04/index.html",
+      "de/category/notes/index.html",
+      "de/tag/elixir/index.html",
+      "de/2026/index.html",
+      "de/2026/04/index.html"
+    ]
+
+    assert expected_paths -- Enum.map(result.generated_files, & &1.relative_path) == []
+
+    assert File.read!(Path.join([temp_dir, "html", "category", "notes", "index.html"])) =~ "Archive 1"
+    assert File.read!(Path.join([temp_dir, "html", "category", "notes", "page", "2", "index.html"])) =~ "Archive 3"
+    assert File.read!(Path.join([temp_dir, "html", "tag", "elixir", "index.html"])) =~ "Elixir"
+    assert File.read!(Path.join([temp_dir, "html", "2026", "04", "index.html"])) =~ "2026-04"
   end
 end

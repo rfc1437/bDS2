@@ -3,8 +3,14 @@ defmodule BDS.PostsTest do
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
-    {:ok, project} = BDS.Projects.create_project(%{name: "Publishing"})
-    %{project: project}
+
+    temp_dir = Path.join(System.tmp_dir!(), "bds-posts-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    {:ok, project} = BDS.Projects.create_project(%{name: "Publishing", data_path: temp_dir})
+    %{project: project, temp_dir: temp_dir}
   end
 
   test "create_post slugifies titles, stores list fields, and defaults draft fields", %{project: project} do
@@ -42,7 +48,7 @@ defmodule BDS.PostsTest do
     assert duplicate_slug_post.categories == []
   end
 
-  test "create_post falls back to untitled and keeps slug uniqueness scoped to a project", %{project: project} do
+  test "create_post falls back to untitled and keeps slug uniqueness scoped to a project", %{project: project, temp_dir: temp_dir} do
     assert {:ok, first} = BDS.Posts.create_post(%{project_id: project.id, title: nil})
     assert first.title == ""
     assert first.slug == "untitled"
@@ -50,7 +56,10 @@ defmodule BDS.PostsTest do
     assert {:ok, second} = BDS.Posts.create_post(%{project_id: project.id, title: nil})
     assert second.slug == "untitled-2"
 
-    assert {:ok, other_project} = BDS.Projects.create_project(%{name: "Elsewhere"})
+    other_temp_dir = Path.join(temp_dir, "elsewhere")
+    File.mkdir_p!(other_temp_dir)
+
+    assert {:ok, other_project} = BDS.Projects.create_project(%{name: "Elsewhere", data_path: other_temp_dir})
     assert {:ok, other_post} = BDS.Posts.create_post(%{project_id: other_project.id, title: nil})
     assert other_post.slug == "untitled"
   end
