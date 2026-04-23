@@ -6,7 +6,10 @@ defmodule BDS.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      BDS.Repo
+      BDS.Repo,
+      BDS.Scripting.JobStore,
+      {Task.Supervisor, name: BDS.Scripting.TaskSupervisor},
+      BDS.Scripting.JobSupervisor
     ]
 
     opts = [strategy: :one_for_one, name: BDS.Supervisor]

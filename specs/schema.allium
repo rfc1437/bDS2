@@ -151,7 +151,7 @@ entity Script {
     slug: String            -- URL-safe identifier
     title: String
     kind: macro | utility | transform
-    entrypoint: String      -- Default: "render" for macros
+    entrypoint: String      -- Default: "render" for macros, "main" otherwise
     enabled: Boolean
     version: Integer        -- Incremented on each update
     file_path: String       -- scripts/{slug}.{extension}

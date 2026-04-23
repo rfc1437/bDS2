@@ -30,7 +30,9 @@ The reason is host fit, not language fashion: Lua has a better embedding story f
 
 - Lua script files as the persisted user script format.
 - A BEAM-hosted execution boundary with explicit host capabilities instead of unrestricted runtime access.
-- Bounded script execution for user-authored code.
+- Bounded but long-running script execution for user-authored code, with explicit progress reporting through host APIs.
+
+The initial runtime baseline in this repository uses a dedicated Elixir scripting boundary with a Luerl-backed Lua adapter. The goal is to keep scripting integration native to the BEAM while making sandboxing and host capability exposure explicit at the application boundary.
 
 This keeps the scripting surface lightweight and aligned with the Elixir host application. Python remains a possible integration boundary for specialized tasks, but it is no longer the default scripting model for the rewrite.
 

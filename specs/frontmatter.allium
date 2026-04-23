@@ -202,7 +202,7 @@ value ScriptFrontmatter {
     slug: String
     title: String
     kind: macro | utility | transform
-    entrypoint: String      -- Named Lua function used when invoking the script
+    entrypoint: String      -- Default: "render" for macros, "main" otherwise
     enabled: Boolean
     version: Integer
     created_at: Timestamp

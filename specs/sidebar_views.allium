@@ -338,7 +338,7 @@ surface ScriptListItemEntry {
 
     @guarantee CreateDefaults
         -- New scripts default to: kind=utility, content='print("new script")',
-        -- entrypoint='render', enabled=true.
+        -- entrypoint='main', enabled=true.
 
     @guarantee LiveRefresh
         -- Item list refreshes on scripts-changed event.
