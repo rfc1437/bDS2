@@ -3,6 +3,8 @@ defmodule BDS.Tags do
 
   import Ecto.Query
 
+  alias BDS.Posts
+  alias BDS.Posts.Post
   alias BDS.Projects
   alias BDS.Repo
   alias BDS.Tags.Tag
@@ -40,6 +42,100 @@ defmodule BDS.Tags do
     Repo.all(from tag in Tag, where: tag.project_id == ^project_id, order_by: [asc: tag.name])
   end
 
+  def sync_tags_json(project_id) do
+    write_tags_json(project_id)
+    :ok
+  end
+
+  def update_tag(tag_id, attrs) do
+    case Repo.get(Tag, tag_id) do
+      nil ->
+        {:error, :not_found}
+
+      tag ->
+        updates = %{
+          color: attr(attrs, :color),
+          post_template_slug: attr(attrs, :post_template_slug),
+          updated_at: System.system_time(:second)
+        }
+
+        tag
+        |> Tag.changeset(updates)
+        |> Repo.update()
+        |> case do
+          {:ok, updated_tag} ->
+            write_tags_json(updated_tag.project_id)
+            {:ok, updated_tag}
+
+          error ->
+            error
+        end
+    end
+  end
+
+  def rename_tag(tag_id, new_name) do
+    case Repo.get(Tag, tag_id) do
+      nil ->
+        {:error, :not_found}
+
+      tag ->
+        normalized_name = String.trim(new_name)
+
+        with :ok <- validate_rename_target(tag.project_id, tag.id, normalized_name) do
+          old_name = tag.name
+
+          Repo.transaction(fn ->
+            affected_posts = posts_with_tag(tag.project_id, old_name)
+
+            Enum.each(affected_posts, fn post ->
+              updated_tags = replace_tag(post.tags || [], old_name, normalized_name)
+              update_post_tags(post, updated_tags)
+            end)
+
+            updated_tag =
+              tag
+              |> Tag.changeset(%{name: normalized_name, updated_at: System.system_time(:second)})
+              |> Repo.update!()
+
+            write_tags_json(tag.project_id)
+            updated_tag
+          end)
+          |> case do
+            {:ok, updated_tag} -> {:ok, updated_tag}
+            {:error, reason} -> {:error, reason}
+          end
+        end
+    end
+  end
+
+  def merge_tags(source_tag_ids, target_tag_id) do
+    case Repo.get(Tag, target_tag_id) do
+      nil ->
+        {:error, :not_found}
+
+      target_tag ->
+        source_tags =
+          Repo.all(from tag in Tag, where: tag.id in ^source_tag_ids and tag.project_id == ^target_tag.project_id)
+
+        Repo.transaction(fn ->
+          source_names = Enum.map(source_tags, & &1.name)
+
+          posts_with_any_tag(target_tag.project_id, source_names)
+          |> Enum.each(fn post ->
+            updated_tags = merge_post_tags(post.tags || [], source_names, target_tag.name)
+            update_post_tags(post, updated_tags)
+          end)
+
+          Enum.each(source_tags, &Repo.delete!/1)
+          write_tags_json(target_tag.project_id)
+        end)
+        |> case do
+          {:ok, _} -> {:ok, :merged}
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
   defp write_tags_json(project_id) do
     project = Projects.get_project!(project_id)
     path = Path.join([Projects.project_data_dir(project), "meta", "tags.json"])
@@ -69,6 +165,51 @@ defmodule BDS.Tags do
     else
       :ok
     end
+  end
+
+  defp validate_rename_target(project_id, tag_id, name) do
+    if Repo.exists?(from tag in Tag, where: tag.project_id == ^project_id and tag.id != ^tag_id and fragment("lower(?)", tag.name) == ^String.downcase(name)) do
+      {:error,
+       %Tag{}
+       |> Tag.changeset(%{project_id: project_id, name: name, id: tag_id, created_at: 0, updated_at: 0})
+       |> Ecto.Changeset.add_error(:name, "has already been taken")}
+    else
+      :ok
+    end
+  end
+
+  defp posts_with_tag(project_id, tag_name) do
+    Repo.all(from post in Post, where: post.project_id == ^project_id)
+    |> Enum.filter(fn post -> tag_name in (post.tags || []) end)
+  end
+
+  defp posts_with_any_tag(project_id, tag_names) do
+    Repo.all(from post in Post, where: post.project_id == ^project_id)
+    |> Enum.filter(fn post -> Enum.any?(post.tags || [], &(&1 in tag_names)) end)
+  end
+
+  defp replace_tag(tags, old_name, new_name) do
+    tags
+    |> Enum.map(fn tag -> if tag == old_name, do: new_name, else: tag end)
+    |> Enum.uniq()
+  end
+
+  defp merge_post_tags(tags, source_names, target_name) do
+    retained_tags = Enum.reject(tags, &(&1 in source_names))
+
+    if target_name in retained_tags do
+      retained_tags
+    else
+      retained_tags ++ [target_name]
+    end
+  end
+
+  defp update_post_tags(post, updated_tags) do
+    post
+    |> Post.changeset(%{tags: updated_tags, updated_at: System.system_time(:second)})
+    |> Repo.update!()
+
+    Posts.rewrite_published_post(post.id)
   end
 
   defp maybe_put(map, _key, nil), do: map

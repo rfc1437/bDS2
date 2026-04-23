@@ -3,6 +3,7 @@ defmodule BDS.Posts do
 
   import Ecto.Query
 
+  alias BDS.Frontmatter
   alias BDS.Posts.Post
   alias BDS.Projects
   alias BDS.Repo
@@ -76,9 +77,10 @@ defmodule BDS.Posts do
         published_at = post.published_at || System.system_time(:second)
         relative_path = build_post_relative_path(post.slug, post.created_at)
         full_path = Path.join(Projects.project_data_dir(project), relative_path)
+        updated_at = System.system_time(:second)
 
         :ok = File.mkdir_p(Path.dirname(full_path))
-        :ok = File.write(full_path, serialize_post_file(post, published_at))
+        :ok = File.write(full_path, serialize_post_file(%{post | updated_at: updated_at}, published_at))
 
         post
         |> Post.changeset(%{
@@ -86,10 +88,26 @@ defmodule BDS.Posts do
           published_at: published_at,
           file_path: relative_path,
           content: nil,
-          updated_at: System.system_time(:second)
+          updated_at: updated_at
         })
         |> Repo.update()
     end
+  end
+
+  def get_post!(post_id), do: Repo.get!(Post, post_id)
+
+  def rewrite_published_post(post_id) do
+    post = Repo.get!(Post, post_id)
+
+    if post.status == :published and post.file_path not in [nil, ""] do
+      project = Projects.get_project!(post.project_id)
+      full_path = Path.join(Projects.project_data_dir(project), post.file_path)
+      body = published_post_body(post, full_path)
+      :ok = File.mkdir_p(Path.dirname(full_path))
+      :ok = File.write(full_path, serialize_post_file(%{post | content: body}, post.published_at || System.system_time(:second)))
+    end
+
+    :ok
   end
 
   defp normalize_updates(attrs, _post) do
@@ -197,40 +215,41 @@ defmodule BDS.Posts do
   end
 
   defp serialize_post_file(post, published_at) do
-    frontmatter_lines = [
-      "id: #{post.id}",
-      "title: #{post.title}",
-      "slug: #{post.slug}",
-      maybe_line("excerpt", post.excerpt),
-      "status: published",
-      maybe_line("author", post.author),
-      maybe_line("language", post.language),
-      maybe_boolean_line("do_not_translate", post.do_not_translate),
-      maybe_line("template_slug", post.template_slug),
-      "created_at: #{post.created_at}",
-      "updated_at: #{post.updated_at}",
-      "published_at: #{published_at}",
-      list_lines("tags", post.tags),
-      list_lines("categories", post.categories)
-    ]
-    |> List.flatten()
-    |> Enum.reject(&is_nil/1)
-    |> Enum.join("\n")
-
-    ["---", frontmatter_lines, "---", post.content || "", ""]
-    |> Enum.join("\n")
+    Frontmatter.serialize_document(
+      [
+        {:id, post.id},
+        {:title, post.title},
+        {:slug, post.slug},
+        {:excerpt, post.excerpt},
+        {:status, :published},
+        {:author, post.author},
+        {:language, post.language},
+        {:do_not_translate, post.do_not_translate},
+        {:template_slug, post.template_slug},
+        {:created_at, post.created_at},
+        {:updated_at, post.updated_at},
+        {:published_at, published_at},
+        {:tags, post.tags || []},
+        {:categories, post.categories || []}
+      ],
+      post.content || ""
+    )
   end
 
-  defp list_lines(label, items) do
-    ["#{label}:" | Enum.map(items || [], &"  - #{&1}")]
+  defp published_post_body(%Post{content: content}, _full_path) when is_binary(content), do: content
+
+  defp published_post_body(_post, full_path) do
+    case File.read(full_path) do
+      {:ok, contents} ->
+        case String.split(contents, "\n---\n", parts: 2) do
+          [_frontmatter, body] -> String.trim_trailing(body, "\n")
+          _parts -> ""
+        end
+
+      {:error, _reason} ->
+        ""
+    end
   end
-
-  defp maybe_line(_label, nil), do: nil
-  defp maybe_line(_label, ""), do: nil
-  defp maybe_line(label, value), do: "#{label}: #{value}"
-
-  defp maybe_boolean_line(_label, false), do: nil
-  defp maybe_boolean_line(label, true), do: "#{label}: true"
 
   defp has_attr?(attrs, key) do
     Map.has_key?(attrs, key) or Map.has_key?(attrs, Atom.to_string(key))

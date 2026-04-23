@@ -1,10 +1,19 @@
 defmodule BDS.TemplatesTest do
   use ExUnit.Case, async: false
+  import Ecto.Query
+
+  alias BDS.Posts.Post
+  alias BDS.Repo
+  alias BDS.Tags.Tag
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
-    {:ok, project} = BDS.Projects.create_project(%{name: "Templates"})
-    %{project: project}
+    temp_dir = Path.join(System.tmp_dir!(), "bds-templates-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    {:ok, project} = BDS.Projects.create_project(%{name: "Templates", data_path: temp_dir})
+    %{project: project, temp_dir: temp_dir}
   end
 
   test "create_template creates a draft template with slug deduplication", %{project: project} do
@@ -27,5 +36,110 @@ defmodule BDS.TemplatesTest do
              BDS.Templates.create_template(%{project_id: project.id, title: "Article View", kind: :post, content: "x"})
 
     assert duplicate.slug == "article-view-2"
+  end
+
+  test "publish_template writes a liquid file with frontmatter and clears draft content", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Landing Page",
+               kind: :list,
+               content: "<section>{{ page_title }}</section>"
+             })
+
+    assert {:ok, published} = BDS.Templates.publish_template(template.id)
+
+    assert published.status == :published
+    assert published.content == nil
+    assert published.file_path == "templates/landing-page.liquid"
+
+    full_path = Path.join(temp_dir, published.file_path)
+    assert File.exists?(full_path)
+
+    contents = File.read!(full_path)
+    assert contents =~ "---\nid: #{published.id}\n"
+    assert contents =~ "slug: landing-page\n"
+    assert contents =~ "title: Landing Page\n"
+    assert contents =~ "kind: list\n"
+    assert contents =~ "enabled: true\n"
+    assert contents =~ "version: 1\n"
+    assert contents =~ "created_at: #{published.created_at}\n"
+    assert contents =~ "updated_at: #{published.updated_at}\n"
+    assert contents =~ "\n---\n<section>{{ page_title }}</section>\n"
+  end
+
+  test "update_template bumps version and reopens a published template when content changes", %{project: project} do
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Snippet",
+               kind: :partial,
+               content: "<span>v1</span>"
+             })
+
+    assert {:ok, published} = BDS.Templates.publish_template(template.id)
+    assert published.status == :published
+
+    assert {:ok, updated} =
+             BDS.Templates.update_template(template.id, %{
+               content: "<span>v2</span>",
+               enabled: false
+             })
+
+    assert updated.version == 2
+    assert updated.status == :draft
+    assert updated.enabled == false
+    assert updated.file_path == "templates/snippet.liquid"
+    assert updated.content == "<span>v2</span>"
+    assert updated.updated_at >= published.updated_at
+  end
+
+  test "delete_template refuses referenced templates unless forced, then clears references and deletes the file", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Article View",
+               kind: :post,
+               content: "<article>{{ content }}</article>"
+             })
+
+    assert {:ok, published} = BDS.Templates.publish_template(template.id)
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Uses Template",
+               content: "Body",
+               template_slug: published.slug
+             })
+
+    assert {:ok, _published_post} = BDS.Posts.publish_post(post.id)
+
+    assert {:ok, _tag} =
+             BDS.Tags.create_tag(%{
+               project_id: project.id,
+               name: "Feature",
+               post_template_slug: published.slug
+             })
+
+    assert {:error, {:has_references, %{posts: 1, tags: 1}}} = BDS.Templates.delete_template(published.id)
+
+    assert {:ok, :deleted} = BDS.Templates.delete_template(published.id, force: true)
+
+    reloaded_post = Repo.get(Post, hd(Repo.all(from p in Post, select: p.id)))
+    reloaded_tag = Repo.get(Tag, hd(Repo.all(from t in Tag, select: t.id)))
+
+    assert reloaded_post.template_slug == nil
+    assert reloaded_tag.post_template_slug == nil
+
+    refute File.exists?(Path.join(temp_dir, published.file_path))
+
+    post_path = Path.join(temp_dir, reloaded_post.file_path)
+    post_contents = File.read!(post_path)
+    refute post_contents =~ "template_slug:"
+    assert post_contents =~ "\n---\nBody\n"
+
+    tags_path = Path.join([temp_dir, "meta", "tags.json"])
+    assert %{"tags" => [%{"name" => "Feature"}]} = Jason.decode!(File.read!(tags_path))
   end
 end
