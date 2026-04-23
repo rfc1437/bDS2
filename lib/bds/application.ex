@@ -7,6 +7,8 @@ defmodule BDS.Application do
   def start(_type, _args) do
     children = [
       BDS.Repo,
+      BDS.Tasks,
+      {Task.Supervisor, name: BDS.Tasks.TaskSupervisor},
       BDS.Scripting.JobStore,
       {Task.Supervisor, name: BDS.Scripting.TaskSupervisor},
       BDS.Scripting.JobSupervisor
