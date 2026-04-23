@@ -82,28 +82,43 @@ defmodule BDS.MediaTest do
 
     assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
+    assert {:ok, _translation} =
+             BDS.Media.upsert_media_translation(media.id, "de", %{
+               title: "Titel",
+               alt: "Alt",
+               caption: "Beschriftung"
+             })
+
+    thumbnail_paths = BDS.Media.thumbnail_paths(media)
+
     assert {:ok, :deleted} = BDS.Media.delete_media(media.id)
     assert Repo.get(BDS.Media.Media, media.id) == nil
+    assert Repo.all(BDS.Media.Translation) == []
     refute File.exists?(Path.join(temp_dir, media.file_path))
     refute File.exists?(Path.join(temp_dir, media.sidecar_path))
+    refute File.exists?(Path.join(temp_dir, media.file_path <> ".de.meta"))
+
+    Enum.each(Map.values(thumbnail_paths), fn path ->
+      refute File.exists?(Path.join(temp_dir, path))
+    end)
   end
 
   test "rebuild_media_from_files recreates media rows from sidecars", %{project: project, temp_dir: temp_dir} do
     media_dir = Path.join([temp_dir, "media", "2026", "04"])
     File.mkdir_p!(media_dir)
 
-    binary_path = Path.join(media_dir, "asset.txt")
+    binary_path = Path.join(media_dir, "asset.jpg")
     sidecar_path = binary_path <> ".meta"
 
-    File.write!(binary_path, "hello media")
+    File.write!(binary_path, "fake-jpeg")
 
     File.write!(
       sidecar_path,
       [
         "id: media-from-file",
-        "original_name: original.txt",
-        "mime_type: text/plain",
-        "size: 11",
+        "original_name: original.jpg",
+        "mime_type: image/jpeg",
+        "size: 9",
         "width: 0",
         "height: 0",
         "title: Recovered",
@@ -120,23 +135,92 @@ defmodule BDS.MediaTest do
       |> Enum.join("\n")
     )
 
+    File.write!(
+      binary_path <> ".de.meta",
+      [
+        "translation_for: media-from-file",
+        "language: de",
+        "title: Titel",
+        "alt: Alt text",
+        "caption: Bildunterschrift",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
     assert {:ok, media_items} = BDS.Media.rebuild_media_from_files(project.id)
     assert length(media_items) == 1
 
     [media] = media_items
     assert media.id == "media-from-file"
     assert media.project_id == project.id
-    assert media.filename == "asset.txt"
-    assert media.original_name == "original.txt"
-    assert media.mime_type == "text/plain"
-    assert media.size == 11
+    assert media.filename == "asset.jpg"
+    assert media.original_name == "original.jpg"
+    assert media.mime_type == "image/jpeg"
+    assert media.size == 9
     assert media.title == "Recovered"
     assert media.alt == "Recovered alt"
     assert media.caption == "Recovered caption"
     assert media.author == "Writer"
     assert media.language == "en"
     assert media.tags == ["alpha"]
-    assert media.file_path == "media/2026/04/asset.txt"
-    assert media.sidecar_path == "media/2026/04/asset.txt.meta"
+    assert media.file_path == "media/2026/04/asset.jpg"
+    assert media.sidecar_path == "media/2026/04/asset.jpg.meta"
+
+    [translation] = Repo.all(BDS.Media.Translation)
+    assert translation.translation_for == "media-from-file"
+    assert translation.language == "de"
+    assert translation.title == "Titel"
+    assert translation.alt == "Alt text"
+    assert translation.caption == "Bildunterschrift"
+
+    thumbnail_paths = BDS.Media.thumbnail_paths(media)
+
+    Enum.each(Map.values(thumbnail_paths), fn path ->
+      assert File.exists?(Path.join(temp_dir, path))
+    end)
+  end
+
+  test "import_media generates the four thumbnail files in bucketed thumbnail paths", %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "sample.jpg")
+    File.write!(source_path, "fake-jpeg")
+
+    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    thumbnail_paths = BDS.Media.thumbnail_paths(media)
+    assert thumbnail_paths.small == "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-small.webp"
+    assert thumbnail_paths.medium == "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-medium.webp"
+    assert thumbnail_paths.large == "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-large.webp"
+    assert thumbnail_paths.ai == "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-ai.jpg"
+
+    Enum.each(Map.values(thumbnail_paths), fn path ->
+      assert File.exists?(Path.join(temp_dir, path))
+    end)
+  end
+
+  test "upsert_media_translation persists the row and writes a translated sidecar next to the binary", %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "sample.txt")
+    File.write!(source_path, "hello media")
+
+    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    assert {:ok, translation} =
+             BDS.Media.upsert_media_translation(media.id, "de", %{
+               title: "Titel",
+               alt: "Alt text",
+               caption: "Bildunterschrift"
+             })
+
+    assert translation.translation_for == media.id
+    assert translation.language == "de"
+    assert translation.title == "Titel"
+
+    translated_sidecar_path = Path.join(temp_dir, media.file_path <> ".de.meta")
+    contents = File.read!(translated_sidecar_path)
+    assert contents =~ "translation_for: #{media.id}\n"
+    assert contents =~ "language: de\n"
+    assert contents =~ "title: Titel\n"
+    assert contents =~ "alt: Alt text\n"
+    assert contents =~ "caption: Bildunterschrift\n"
   end
 end

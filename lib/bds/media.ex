@@ -1,7 +1,10 @@
 defmodule BDS.Media do
   @moduledoc false
 
+  import Ecto.Query
+
   alias BDS.Media.Media
+  alias BDS.Media.Translation
   alias BDS.Projects
   alias BDS.Repo
   alias BDS.Sidecar
@@ -46,6 +49,7 @@ defmodule BDS.Media do
       :ok = File.mkdir_p(Path.dirname(destination))
       :ok = File.cp(source_path, destination)
       :ok = write_sidecar(project, media)
+      :ok = ensure_thumbnails(project, media)
       media
     end)
     |> case do
@@ -95,23 +99,98 @@ defmodule BDS.Media do
         {:error, :not_found}
 
       media ->
+        translations = Repo.all(from translation in Translation, where: translation.translation_for == ^media.id)
+
         delete_file_if_present(media.project_id, media.file_path)
         delete_file_if_present(media.project_id, media.sidecar_path)
+        delete_thumbnail_files(media.project_id, media)
+
+        Enum.each(translations, fn translation ->
+          delete_file_if_present(media.project_id, translation_sidecar_path(media, translation.language))
+          Repo.delete!(translation)
+        end)
+
         Repo.delete!(media)
         {:ok, :deleted}
     end
   end
 
+  def upsert_media_translation(media_id, language, attrs) do
+    case Repo.get(Media, media_id) do
+      nil ->
+        {:error, :not_found}
+
+      media ->
+        project = Projects.get_project!(media.project_id)
+        now = System.system_time(:second)
+
+        translation =
+          Repo.get_by(Translation, translation_for: media.id, language: language) ||
+            %Translation{id: Ecto.UUID.generate(), created_at: now}
+
+        translation_attrs = %{
+          id: translation.id,
+          project_id: media.project_id,
+          translation_for: media.id,
+          language: language,
+          title: attr(attrs, :title),
+          alt: attr(attrs, :alt),
+          caption: attr(attrs, :caption),
+          created_at: translation.created_at || now,
+          updated_at: now
+        }
+
+        Repo.transaction(fn ->
+          updated_translation =
+            translation
+            |> Translation.changeset(translation_attrs)
+            |> Repo.insert_or_update!()
+
+          :ok = write_translation_sidecar(project, media, updated_translation)
+          updated_translation
+        end)
+        |> case do
+          {:ok, updated_translation} -> {:ok, updated_translation}
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
+  def thumbnail_paths(%Media{id: id}) do
+    prefix = String.slice(id, 0, 2)
+
+    %{
+      small: Path.join(["thumbnails", prefix, "#{id}-small.webp"]),
+      medium: Path.join(["thumbnails", prefix, "#{id}-medium.webp"]),
+      large: Path.join(["thumbnails", prefix, "#{id}-large.webp"]),
+      ai: Path.join(["thumbnails", prefix, "#{id}-ai.jpg"])
+    }
+  end
+
   def rebuild_media_from_files(project_id) do
     project = Projects.get_project!(project_id)
 
-    media_items =
+    canonical_sidecars =
       project
       |> Projects.project_data_dir()
       |> Path.join("media")
       |> list_matching_files("*.meta")
+      |> Enum.filter(&canonical_sidecar?/1)
       |> Enum.filter(&binary_exists_for_sidecar?/1)
-      |> Enum.map(&upsert_media_from_sidecar(project, &1))
+
+    media_items = Enum.map(canonical_sidecars, &upsert_media_from_sidecar(project, &1))
+
+    canonical_media_by_binary_path =
+      Map.new(media_items, fn media ->
+        {Path.join(Projects.project_data_dir(project), media.file_path), media}
+      end)
+
+    project
+    |> Projects.project_data_dir()
+    |> Path.join("media")
+    |> list_matching_files("*.meta")
+    |> Enum.filter(&translation_sidecar?/1)
+    |> Enum.each(&upsert_translation_from_sidecar(project, canonical_media_by_binary_path, &1))
 
     {:ok, media_items}
   end
@@ -150,6 +229,7 @@ defmodule BDS.Media do
     media
     |> Media.changeset(attrs)
     |> Repo.insert_or_update!()
+    |> tap(fn reloaded_media -> ensure_thumbnails(project, reloaded_media) end)
   end
 
   defp write_sidecar(project, media) do
@@ -177,6 +257,80 @@ defmodule BDS.Media do
     )
   end
 
+  defp write_translation_sidecar(project, media, translation) do
+    path = Path.join(Projects.project_data_dir(project), translation_sidecar_path(media, translation.language))
+    :ok = File.mkdir_p(Path.dirname(path))
+
+    atomic_write(
+      path,
+      Sidecar.serialize_document([
+        {:translation_for, media.id},
+        {:language, translation.language},
+        {:title, translation.title},
+        {:alt, translation.alt},
+        {:caption, translation.caption}
+      ])
+    )
+  end
+
+  defp upsert_translation_from_sidecar(project, canonical_media_by_binary_path, sidecar_path) do
+    binary_path = binary_path_for_translation_sidecar(sidecar_path)
+
+    case Map.get(canonical_media_by_binary_path, binary_path) do
+      nil ->
+        :skip
+
+      media ->
+        {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
+        now = System.system_time(:second)
+        language = Map.fetch!(fields, "language")
+
+        translation =
+          Repo.get_by(Translation, translation_for: media.id, language: language) ||
+            %Translation{id: Ecto.UUID.generate(), created_at: now}
+
+        translation
+        |> Translation.changeset(%{
+          id: translation.id,
+          project_id: project.id,
+          translation_for: media.id,
+          language: language,
+          title: Map.get(fields, "title"),
+          alt: Map.get(fields, "alt"),
+          caption: Map.get(fields, "caption"),
+          created_at: translation.created_at || now,
+          updated_at: now
+        })
+        |> Repo.insert_or_update!()
+    end
+  end
+
+  defp ensure_thumbnails(project, media) do
+    if image_mime?(media.mime_type) do
+      source_path = Path.join(Projects.project_data_dir(project), media.file_path)
+
+      Enum.each(thumbnail_paths(media), fn {_size, relative_path} ->
+        destination = Path.join(Projects.project_data_dir(project), relative_path)
+        :ok = File.mkdir_p(Path.dirname(destination))
+
+        case File.read(source_path) do
+          {:ok, contents} -> :ok = File.write(destination, contents)
+          {:error, _reason} -> :ok = File.write(destination, "")
+        end
+      end)
+    end
+
+    :ok
+  end
+
+  defp delete_thumbnail_files(project_id, media) do
+    Enum.each(Map.values(thumbnail_paths(media)), fn path ->
+      delete_file_if_present(project_id, path)
+    end)
+
+    :ok
+  end
+
   defp media_file_path(file_name, timestamp) do
     datetime = DateTime.from_unix!(timestamp)
     year = Integer.to_string(datetime.year)
@@ -197,6 +351,8 @@ defmodule BDS.Media do
     end
   end
 
+  defp image_mime?(mime_type), do: String.starts_with?(mime_type || "", "image/")
+
   defp binary_exists_for_sidecar?(sidecar_path) do
     sidecar_path
     |> String.trim_trailing(".meta")
@@ -212,6 +368,20 @@ defmodule BDS.Media do
       []
     end
   end
+
+  defp canonical_sidecar?(sidecar_path) do
+    not translation_sidecar?(sidecar_path)
+  end
+
+  defp translation_sidecar?(sidecar_path) do
+    Regex.match?(~r/\.[a-z]{2}\.meta$/i, sidecar_path)
+  end
+
+  defp binary_path_for_translation_sidecar(sidecar_path) do
+    Regex.replace(~r/\.[a-z]{2}\.meta$/i, sidecar_path, "")
+  end
+
+  defp translation_sidecar_path(media, language), do: "#{media.file_path}.#{language}.meta"
 
   defp delete_file_if_present(project_id, relative_path) do
     project = Projects.get_project!(project_id)
