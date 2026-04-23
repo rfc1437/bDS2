@@ -4,6 +4,7 @@ defmodule BDS.Rendering do
   import Ecto.Query
 
   alias BDS.Frontmatter
+  alias BDS.Media.Media, as: MediaAsset
   alias BDS.Rendering.FileSystem
   alias BDS.Menu
   alias BDS.Metadata
@@ -26,6 +27,13 @@ defmodule BDS.Rendering do
   def render_list_page(project_id, assigns) when is_binary(project_id) and is_map(assigns) do
     with {:ok, template_source} <- load_template_source(project_id, :list, nil),
          {:ok, rendered} <- render_template(project_id, template_source, list_assigns(project_id, assigns)) do
+      {:ok, rendered}
+    end
+  end
+
+  def render_not_found_page(project_id, assigns \\ %{}) when is_binary(project_id) and is_map(assigns) do
+    with {:ok, template_source} <- load_template_source(project_id, :not_found, nil),
+         {:ok, rendered} <- render_template(project_id, template_source, not_found_assigns(project_id, assigns)) do
       {:ok, rendered}
     end
   end
@@ -119,7 +127,7 @@ defmodule BDS.Rendering do
       tag_color_by_name: tag_color_by_name(project_id),
       backlinks: [],
       canonical_post_path_by_slug: canonical_post_path_by_slug(project_id, main_language),
-      canonical_media_path_by_source_path: %{},
+      canonical_media_path_by_source_path: canonical_media_path_by_source_path(project_id),
       post_data_json_by_id: post_data_json(assigns),
       post: %{
         id: Map.get(assigns, :id, Map.get(assigns, "id")),
@@ -164,7 +172,7 @@ defmodule BDS.Rendering do
       prev_page_href: "",
       next_page_href: "",
       canonical_post_path_by_slug: canonical_post_path_by_slug(project_id, main_language),
-      canonical_media_path_by_source_path: %{},
+      canonical_media_path_by_source_path: canonical_media_path_by_source_path(project_id),
       post_data_json_by_id: Enum.into(posts, %{}, fn post -> {post.id, Jason.encode!(Map.take(post, [:id, :slug, :title, :content]))} end),
       day_blocks: [
         %{
@@ -174,6 +182,25 @@ defmodule BDS.Rendering do
           posts: posts
         }
       ]
+    }
+  end
+
+  defp not_found_assigns(project_id, assigns) do
+    metadata = project_metadata(project_id)
+    language = Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
+    main_language = metadata.main_language || language
+
+    %{
+      page_title: Map.get(assigns, :page_title, Map.get(assigns, "page_title", "404 Not Found")),
+      language: language,
+      language_prefix: Map.get(assigns, :language_prefix, Map.get(assigns, "language_prefix", language_prefix(language, main_language))),
+      pico_stylesheet_href: nil,
+      html_theme_attribute: html_theme_attribute(metadata.pico_theme),
+      blog_languages: blog_languages(metadata, language),
+      menu_items: menu_items(project_id),
+      alternate_links: [],
+      not_found_message: Map.get(assigns, :not_found_message, Map.get(assigns, "not_found_message")),
+      not_found_back_label: Map.get(assigns, :not_found_back_label, Map.get(assigns, "not_found_back_label"))
     }
   end
 
@@ -277,6 +304,23 @@ defmodule BDS.Rendering do
         nil -> acc
         post -> Map.put(acc, post.slug, post_path(post, translation.language, main_language))
       end
+    end)
+  end
+
+  defp canonical_media_path_by_source_path(project_id) do
+    Repo.all(from media in MediaAsset, where: media.project_id == ^project_id)
+    |> Enum.reduce(%{}, fn media, acc ->
+      datetime = DateTime.from_unix!(media.created_at)
+      source_key =
+        Path.join([
+          "media",
+          Integer.to_string(datetime.year),
+          String.pad_leading(Integer.to_string(datetime.month), 2, "0"),
+          media.original_name
+        ])
+        |> String.downcase()
+
+      Map.put(acc, source_key, "/" <> media.file_path)
     end)
   end
 

@@ -146,7 +146,11 @@ defmodule BDS.Preview do
 
       case full_path do
         {:error, :not_found} -> {:error, :not_found}
-        resolved_path -> read_response(resolved_path)
+        resolved_path ->
+          case read_response(resolved_path) do
+            {:error, :not_found} -> render_not_found_response(server.project_id)
+            other -> other
+          end
       end
     end
   end
@@ -263,8 +267,22 @@ defmodule BDS.Preview do
   end
 
   defp http_ok_response(response) do
+    status = Map.get(response, :status, 200)
+
+    reason =
+      case status do
+        200 -> "OK"
+        404 -> "Not Found"
+        503 -> "Service Unavailable"
+        _other -> "OK"
+      end
+
     [
-      "HTTP/1.1 200 OK\r\n",
+      "HTTP/1.1 ",
+      Integer.to_string(status),
+      " ",
+      reason,
+      "\r\n",
       "content-type: ",
       response.content_type,
       "; charset=utf-8\r\n",
@@ -336,10 +354,20 @@ defmodule BDS.Preview do
 
   defp read_response(path) do
     case File.read(path) do
-      {:ok, body} -> {:ok, %{body: body, content_type: content_type(path)}}
+      {:ok, body} -> {:ok, %{status: 200, body: body, content_type: content_type(path)}}
       {:error, :enoent} -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp render_not_found_response(project_id) do
+    body =
+      case Rendering.render_not_found_page(project_id, %{}) do
+        {:ok, rendered} -> rendered
+        {:error, _reason} -> "Not Found"
+      end
+
+    {:ok, %{status: 404, content_type: "text/html", body: body}}
   end
 
   defp content_type(path) do

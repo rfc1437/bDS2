@@ -260,6 +260,7 @@ defmodule BDS.Generation do
 
     [
       {"index.html", render_list_output(plan, language, plan.project_name, main_posts, %{kind: "core"}, fn -> render_home(plan, language) end)},
+      {"404.html", render_not_found_output(plan, language)},
       {"feed.xml", render_feed(plan, language, published_posts)},
       {"atom.xml", render_atom(plan, language, published_posts)},
       {"calendar.json", render_calendar(published_posts)}
@@ -270,6 +271,7 @@ defmodule BDS.Generation do
 
         [
           {Path.join(localized_language, "index.html"), render_list_output(plan, localized_language, plan.project_name, localized_posts, %{kind: "core"}, fn -> render_home(plan, localized_language) end)},
+          {Path.join(localized_language, "404.html"), render_not_found_output(plan, localized_language)},
           {Path.join(localized_language, "feed.xml"), render_feed(plan, localized_language, published_posts)},
           {Path.join(localized_language, "atom.xml"), render_atom(plan, localized_language, published_posts)}
         ]
@@ -566,6 +568,16 @@ defmodule BDS.Generation do
 
   defp render_list_output(_plan, _language, _page_title, _posts, _archive_context, fallback), do: fallback.()
 
+  defp render_not_found_output(%{project_id: project_id, language: main_language}, language)
+       when is_binary(project_id) do
+    case Rendering.render_not_found_page(project_id, %{language: language, language_prefix: language_prefix(language, main_language)}) do
+      {:ok, rendered} -> rendered
+      {:error, _reason} -> render_not_found_page(language)
+    end
+  end
+
+  defp render_not_found_output(_plan, language), do: render_not_found_page(language)
+
   defp language_prefix(language, main_language) when language == main_language, do: ""
   defp language_prefix(nil, _main_language), do: ""
   defp language_prefix(language, _main_language), do: "/#{language}"
@@ -576,6 +588,15 @@ defmodule BDS.Generation do
     cleaned = relative_path |> String.trim_leading("/") |> String.trim_trailing("index.html")
     suffix = if cleaned == "", do: "/", else: "/" <> cleaned
     String.trim_trailing(base_url, "/") <> suffix
+  end
+
+  defp render_not_found_page(language) do
+    [
+      "<html><body data-language=\"",
+      to_string(language),
+      "\"><section data-template=\"not-found\"><h1>404</h1><p>Not Found</p></section></body></html>"
+    ]
+    |> IO.iodata_to_binary()
   end
 
   defp xml_escape(value) do

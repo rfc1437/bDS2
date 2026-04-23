@@ -3,6 +3,7 @@ defmodule BDS.GenerationTest do
 
   import Ecto.Query
 
+  alias BDS.Media
   alias BDS.Metadata
   alias BDS.Posts
   alias BDS.Repo
@@ -75,11 +76,13 @@ defmodule BDS.GenerationTest do
     assert result.sections == [:core]
 
     expected_paths = [
+      "404.html",
       "index.html",
       "sitemap.xml",
       "feed.xml",
       "atom.xml",
       "calendar.json",
+      "de/404.html",
       "de/index.html",
       "de/feed.xml",
       "de/atom.xml"
@@ -194,6 +197,69 @@ defmodule BDS.GenerationTest do
     assert post_html =~ ~s(<strong>Rendered</strong> body)
     assert post_html =~ "Taxonomy"
     assert post_html =~ "Language"
+  end
+
+  test "generation expands starter-template markdown macros, rewrites canonical post links, media links, and emits not-found page", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    source_path = Path.join(temp_dir, "sample.txt")
+    File.write!(source_path, "media body")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Sample"
+             })
+
+    assert {:ok, linked_post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Linked Post",
+               content: "Linked body",
+               language: "en"
+             })
+
+    assert {:ok, published_linked_post} = Posts.publish_post(linked_post.id)
+
+    media_source_reference = "/" <> Path.join(Path.dirname(media.file_path), media.original_name)
+    canonical_post_href = "/" <> String.trim_trailing(BDS.Generation.post_output_path(published_linked_post), "index.html")
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Rendered Post",
+               content:
+                 [
+                   "[Read linked post](/posts/linked-post)",
+                   "",
+                   "![Asset](#{media_source_reference})",
+                   "",
+                   "[[youtube id=dQw4w9WgXcQ]]"
+                 ]
+                 |> Enum.join("\n"),
+               language: "en"
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+
+    assert {:ok, result} = BDS.Generation.generate_site(project.id, [:core, :single])
+
+    assert "404.html" in Enum.map(result.generated_files, & &1.relative_path)
+
+    post_html = File.read!(Path.join([temp_dir, "html", BDS.Generation.post_output_path(published_post)]))
+    assert post_html =~ ~s(src="https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0")
+    assert post_html =~ ~s(href="#{canonical_post_href}")
+    assert post_html =~ ~s(src="/#{media.file_path}")
+
+    not_found_html = File.read!(Path.join([temp_dir, "html", "404.html"]))
+    assert not_found_html =~ ~s(data-template="not-found")
+    assert not_found_html =~ "Back to preview home"
   end
 
   test "single generation writes canonical post pages and language-prefixed translation pages", %{project: project, temp_dir: temp_dir} do

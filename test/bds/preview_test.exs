@@ -2,6 +2,7 @@ defmodule BDS.PreviewTest do
   use ExUnit.Case, async: false
 
   alias BDS.Generation
+  alias BDS.Media
   alias BDS.Metadata
   alias BDS.Posts
 
@@ -121,6 +122,77 @@ defmodule BDS.PreviewTest do
     assert draft_html =~ ~s(data-template="single-post")
     assert draft_html =~ ~s(<strong>Draft</strong> preview body)
     assert draft_html =~ "Language"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "preview renders not-found template for missing routes and rewrites markdown macros and canonical URLs", %{project: project, temp_dir: temp_dir} do
+    :inets.start()
+
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    source_path = Path.join(temp_dir, "sample.txt")
+    File.write!(source_path, "media body")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Sample"
+             })
+
+    assert {:ok, linked_post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Linked Post",
+               content: "Linked body",
+               language: "en"
+             })
+
+    assert {:ok, published_linked_post} = Posts.publish_post(linked_post.id)
+
+    media_source_reference = "/" <> Path.join(Path.dirname(media.file_path), media.original_name)
+    canonical_post_href = "/" <> String.trim_trailing(BDS.Generation.post_output_path(published_linked_post), "index.html")
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Draft Post",
+               content:
+                 [
+                   "[Read linked post](/posts/linked-post)",
+                   "",
+                   "![Asset](#{media_source_reference})",
+                   "",
+                   "[[youtube id=dQw4w9WgXcQ]]"
+                 ]
+                 |> Enum.join("\n"),
+               language: "en"
+             })
+
+    assert {:ok, server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: draft_html, content_type: "text/html"}} =
+             BDS.Preview.preview_draft(project.id, "/draft/draft-post", post.id)
+
+    assert draft_html =~ ~s(src="https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0")
+    assert draft_html =~ ~s(href="#{canonical_post_href}")
+    assert draft_html =~ ~s(src="/#{media.file_path}")
+
+    assert {:ok, %{body: missing_body, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/missing-page")
+
+    assert missing_body =~ ~s(data-template="not-found")
+
+    assert {:ok, {{_version, 404, _reason}, _headers, body}} =
+             :httpc.request(:get, {to_charlist("http://#{server.host}:#{server.port}/missing-page"), []}, [], body_format: :binary)
+
+    assert body =~ ~s(data-template="not-found")
 
     assert :ok = BDS.Preview.stop_preview(project.id)
   end
