@@ -47,6 +47,52 @@ defmodule BDS.Tags do
     :ok
   end
 
+  def sync_tags_from_posts(project_id) do
+    Repo.transaction(fn ->
+      existing_names =
+        project_id
+        |> list_tags()
+        |> Enum.map(&String.downcase(&1.name))
+        |> MapSet.new()
+
+      missing_names =
+        project_id
+        |> post_tag_names()
+        |> Enum.reduce({existing_names, []}, fn tag_name, {seen_names, acc} ->
+          normalized = String.downcase(tag_name)
+
+          if MapSet.member?(seen_names, normalized) do
+            {seen_names, acc}
+          else
+            {MapSet.put(seen_names, normalized), [tag_name | acc]}
+          end
+        end)
+        |> elem(1)
+        |> Enum.reverse()
+
+      now = System.system_time(:second)
+
+      Enum.each(missing_names, fn name ->
+        %Tag{}
+        |> Tag.changeset(%{
+          id: Ecto.UUID.generate(),
+          project_id: project_id,
+          name: name,
+          created_at: now,
+          updated_at: now
+        })
+        |> Repo.insert!()
+      end)
+
+      write_tags_json(project_id)
+      list_tags(project_id)
+    end)
+    |> case do
+      {:ok, tags} -> {:ok, tags}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   def update_tag(tag_id, attrs) do
     case Repo.get(Tag, tag_id) do
       nil ->
@@ -210,6 +256,16 @@ defmodule BDS.Tags do
   defp posts_with_any_tag(project_id, tag_names) do
     Repo.all(from post in Post, where: post.project_id == ^project_id)
     |> Enum.filter(fn post -> Enum.any?(post.tags || [], &(&1 in tag_names)) end)
+  end
+
+  defp post_tag_names(project_id) do
+    Repo.all(from post in Post, where: post.project_id == ^project_id)
+    |> Enum.flat_map(fn post ->
+      post.tags
+      |> Kernel.||([])
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+    end)
   end
 
   defp replace_tag(tags, old_name, new_name) do

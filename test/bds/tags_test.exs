@@ -145,6 +145,50 @@ defmodule BDS.TagsTest do
     assert %{"tags" => [%{"name" => "Beta"}]} = Jason.decode!(File.read!(tags_path))
   end
 
+  test "sync_tags_from_posts creates missing tags from post tag arrays and refreshes tags.json", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, existing} =
+             BDS.Tags.create_tag(%{
+               project_id: project.id,
+               name: "Existing",
+               color: "#112233",
+               post_template_slug: "feature-view"
+             })
+
+    assert {:ok, _post_a} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "First",
+               content: "Body",
+               tags: ["Existing", "Missing", "Missing"]
+             })
+
+    assert {:ok, _post_b} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Second",
+               content: "Body",
+               tags: ["Another", "Missing"]
+             })
+
+    assert {:ok, synced_tags} = BDS.Tags.sync_tags_from_posts(project.id)
+
+    assert Enum.map(synced_tags, & &1.name) == ["Another", "Existing", "Missing"]
+
+    reloaded_existing = Repo.get!(BDS.Tags.Tag, existing.id)
+    assert reloaded_existing.color == "#112233"
+    assert reloaded_existing.post_template_slug == "feature-view"
+
+    tags_path = Path.join([temp_dir, "meta", "tags.json"])
+
+    assert %{
+             "tags" => [
+               %{"name" => "Another"},
+               %{"name" => "Existing", "color" => "#112233", "post_template_slug" => "feature-view"},
+               %{"name" => "Missing"}
+             ]
+           } = Jason.decode!(File.read!(tags_path))
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->
