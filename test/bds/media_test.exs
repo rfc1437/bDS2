@@ -110,7 +110,7 @@ defmodule BDS.MediaTest do
     binary_path = Path.join(media_dir, "asset.jpg")
     sidecar_path = binary_path <> ".meta"
 
-    File.write!(binary_path, "fake-jpeg")
+    File.write!(binary_path, tiny_jpeg_binary())
 
     File.write!(
       sidecar_path,
@@ -118,9 +118,9 @@ defmodule BDS.MediaTest do
         "id: media-from-file",
         "original_name: original.jpg",
         "mime_type: image/jpeg",
-        "size: 9",
-        "width: 0",
-        "height: 0",
+        "size: #{byte_size(tiny_jpeg_binary())}",
+        "width: 3",
+        "height: 2",
         "title: Recovered",
         "alt: Recovered alt",
         "caption: Recovered caption",
@@ -157,7 +157,7 @@ defmodule BDS.MediaTest do
     assert media.filename == "asset.jpg"
     assert media.original_name == "original.jpg"
     assert media.mime_type == "image/jpeg"
-    assert media.size == 9
+    assert media.size == byte_size(tiny_jpeg_binary())
     assert media.title == "Recovered"
     assert media.alt == "Recovered alt"
     assert media.caption == "Recovered caption"
@@ -183,7 +183,7 @@ defmodule BDS.MediaTest do
 
   test "import_media generates the four thumbnail files in bucketed thumbnail paths", %{project: project, temp_dir: temp_dir} do
     source_path = Path.join(temp_dir, "sample.jpg")
-    File.write!(source_path, "fake-jpeg")
+    File.write!(source_path, tiny_jpeg_binary())
 
     assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
@@ -195,6 +195,108 @@ defmodule BDS.MediaTest do
 
     Enum.each(Map.values(thumbnail_paths), fn path ->
       assert File.exists?(Path.join(temp_dir, path))
+    end)
+  end
+
+  test "import_media extracts image dimensions and writes real encoded thumbnails", %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "sample.jpg")
+    File.write!(source_path, tiny_jpeg_binary())
+
+    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    assert media.mime_type == "image/jpeg"
+    assert media.width == 3
+    assert media.height == 2
+
+    thumbnail_paths = BDS.Media.thumbnail_paths(media)
+
+    small = Image.open!(Path.join(temp_dir, thumbnail_paths.small))
+    medium = Image.open!(Path.join(temp_dir, thumbnail_paths.medium))
+    large = Image.open!(Path.join(temp_dir, thumbnail_paths.large))
+    ai = Image.open!(Path.join(temp_dir, thumbnail_paths.ai))
+
+    assert Image.width(small) == 3
+    assert Image.height(small) == 2
+    assert Image.width(medium) == 3
+    assert Image.height(medium) == 2
+    assert Image.width(large) == 3
+    assert Image.height(large) == 2
+    assert Image.width(ai) == 448
+    assert Image.height(ai) == 448
+
+    assert Path.extname(thumbnail_paths.small) == ".webp"
+    assert Path.extname(thumbnail_paths.medium) == ".webp"
+    assert Path.extname(thumbnail_paths.large) == ".webp"
+    assert Path.extname(thumbnail_paths.ai) == ".jpg"
+  end
+
+  test "import_media keeps raw header dimensions but autorotates thumbnails from EXIF orientation", %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "rotated.jpg")
+    write_oriented_jpeg!(source_path, 6)
+
+    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    assert media.width == 2
+    assert media.height == 3
+
+    thumbnail_path = Path.join(temp_dir, BDS.Media.thumbnail_paths(media).small)
+    actual_thumbnail = Image.open!(thumbnail_path)
+    expected_thumbnail = expected_small_thumbnail(source_path)
+
+    assert Image.width(actual_thumbnail) == 3
+    assert Image.height(actual_thumbnail) == 2
+    assert_images_match!(actual_thumbnail, expected_thumbnail)
+  end
+
+  test "regenerate_thumbnails recreates thumbnail files for an existing image media item", %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "sample.jpg")
+    File.write!(source_path, tiny_jpeg_binary())
+
+    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    thumbnail_paths = BDS.Media.thumbnail_paths(media)
+    File.rm!(Path.join(temp_dir, thumbnail_paths.small))
+    File.rm!(Path.join(temp_dir, thumbnail_paths.medium))
+
+    assert {:ok, regenerated} = BDS.Media.regenerate_thumbnails(media.id)
+    assert regenerated.id == media.id
+
+    Enum.each(Map.values(thumbnail_paths), fn path ->
+      assert File.exists?(Path.join(temp_dir, path))
+    end)
+  end
+
+  test "import_media generates thumbnails for png and webp sources", %{project: project, temp_dir: temp_dir} do
+    Enum.each([{ ".png", "image/png"}, {".webp", "image/webp"}], fn {extension, mime_type} ->
+      source_path = Path.join(temp_dir, "sample#{extension}")
+      File.write!(source_path, sample_image_binary(extension))
+
+      assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+      assert media.mime_type == mime_type
+      assert media.width == 2
+      assert media.height == 3
+
+      Enum.each(Map.values(BDS.Media.thumbnail_paths(media)), fn path ->
+        assert File.exists?(Path.join(temp_dir, path))
+      end)
+    end)
+  end
+
+  test "import_media detects supported TIFF, BMP, HEIC, and HEIF extensions", %{project: project, temp_dir: temp_dir} do
+    Enum.each([
+      {"asset.tif", "image/tiff"},
+      {"asset.tiff", "image/tiff"},
+      {"asset.bmp", "image/bmp"},
+      {"asset.heic", "image/heic"},
+      {"asset.heif", "image/heif"}
+    ], fn {file_name, mime_type} ->
+      source_path = Path.join(temp_dir, file_name)
+      File.write!(source_path, "placeholder")
+
+      assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+      assert media.mime_type == mime_type
+      assert media.width == nil
+      assert media.height == nil
     end)
   end
 
@@ -222,5 +324,56 @@ defmodule BDS.MediaTest do
     assert contents =~ "title: Titel\n"
     assert contents =~ "alt: Alt text\n"
     assert contents =~ "caption: Bildunterschrift\n"
+  end
+
+  defp tiny_jpeg_binary do
+    Image.new!(3, 2, color: [255, 0, 0])
+    |> Image.write!(:memory, suffix: ".jpg", quality: 85)
+  end
+
+  defp sample_image_binary(extension) do
+    sample_svg_binary()
+    |> Image.from_svg!()
+    |> Image.write!(:memory, suffix: extension, quality: 85)
+  end
+
+  defp sample_svg_binary do
+    """
+    <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2\" height=\"3\">
+      <rect width=\"1\" height=\"1\" x=\"0\" y=\"0\" fill=\"#ff0000\"/>
+      <rect width=\"1\" height=\"1\" x=\"1\" y=\"0\" fill=\"#00ff00\"/>
+      <rect width=\"1\" height=\"1\" x=\"0\" y=\"1\" fill=\"#0000ff\"/>
+      <rect width=\"1\" height=\"1\" x=\"1\" y=\"1\" fill=\"#ffff00\"/>
+      <rect width=\"1\" height=\"1\" x=\"0\" y=\"2\" fill=\"#00ffff\"/>
+      <rect width=\"1\" height=\"1\" x=\"1\" y=\"2\" fill=\"#ff00ff\"/>
+    </svg>
+    """
+  end
+
+  defp write_oriented_jpeg!(path, orientation) do
+    image = sample_image_binary(".jpg") |> Image.open!()
+
+    {:ok, oriented_image} =
+      Vix.Vips.Image.mutate(image, fn mutable_image ->
+        :ok = Vix.Vips.MutableImage.update(mutable_image, "orientation", orientation)
+      end)
+
+    Image.write!(oriented_image, path, quality: 85)
+  end
+
+  defp expected_small_thumbnail(source_path) do
+    source_path
+    |> Image.open!()
+    |> Image.autorotate!()
+    |> Image.thumbnail!("150x150", fit: :contain, resize: :down, autorotate: false)
+    |> Image.write!(:memory, suffix: ".webp", quality: 80, strip_metadata: true)
+    |> Image.open!()
+  end
+
+  defp assert_images_match!(left, right) do
+    assert Image.shape(left) == Image.shape(right)
+
+    assert {:ok, score, _difference_image} = Image.compare(left, right)
+    assert score <= 0.0
   end
 end

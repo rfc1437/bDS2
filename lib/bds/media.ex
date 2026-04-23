@@ -13,6 +13,8 @@ defmodule BDS.Media do
     project = Projects.get_project!(attr(attrs, :project_id))
     source_path = attr(attrs, :source_path)
     original_name = Path.basename(source_path)
+    mime_type = detect_mime(original_name)
+    {width, height} = image_dimensions(source_path, mime_type)
     now = System.system_time(:second)
     file_name = Ecto.UUID.generate() <> Path.extname(original_name)
     file_path = media_file_path(file_name, now)
@@ -28,10 +30,10 @@ defmodule BDS.Media do
           project_id: project.id,
           filename: file_name,
           original_name: original_name,
-          mime_type: detect_mime(original_name),
+          mime_type: mime_type,
           size: stat.size,
-          width: attr(attrs, :width),
-          height: attr(attrs, :height),
+          width: attr(attrs, :width) || width,
+          height: attr(attrs, :height) || height,
           title: attr(attrs, :title),
           alt: attr(attrs, :alt),
           caption: attr(attrs, :caption),
@@ -165,6 +167,18 @@ defmodule BDS.Media do
       large: Path.join(["thumbnails", prefix, "#{id}-large.webp"]),
       ai: Path.join(["thumbnails", prefix, "#{id}-ai.jpg"])
     }
+  end
+
+  def regenerate_thumbnails(media_id) do
+    case Repo.get(Media, media_id) do
+      nil ->
+        {:error, :not_found}
+
+      media ->
+        project = Projects.get_project!(media.project_id)
+        :ok = ensure_thumbnails(project, media)
+        {:ok, media}
+    end
   end
 
   def rebuild_media_from_files(project_id) do
@@ -309,17 +323,56 @@ defmodule BDS.Media do
     if image_mime?(media.mime_type) do
       source_path = Path.join(Projects.project_data_dir(project), media.file_path)
 
-      Enum.each(thumbnail_paths(media), fn {_size, relative_path} ->
-        destination = Path.join(Projects.project_data_dir(project), relative_path)
-        :ok = File.mkdir_p(Path.dirname(destination))
+      case Image.open(source_path) do
+        {:ok, image} ->
+          image
+          |> Image.autorotate!()
+          |> write_all_thumbnails(project, media)
 
-        case File.read(source_path) do
-          {:ok, contents} -> :ok = File.write(destination, contents)
-          {:error, _reason} -> :ok = File.write(destination, "")
-        end
-      end)
+        {:error, _reason} ->
+          :ok
+      end
     end
 
+    :ok
+  end
+
+  defp write_all_thumbnails(image, project, media) do
+    thumbnail_paths(media)
+    |> Enum.each(fn {size, relative_path} ->
+      destination = Path.join(Projects.project_data_dir(project), relative_path)
+      :ok = File.mkdir_p(Path.dirname(destination))
+
+      image
+      |> render_thumbnail(size)
+      |> write_thumbnail(destination, size)
+    end)
+
+    :ok
+  end
+
+  defp render_thumbnail(image, :small), do: bounded_thumbnail(image, 150, 150)
+  defp render_thumbnail(image, :medium), do: bounded_thumbnail(image, 400, 400)
+  defp render_thumbnail(image, :large), do: bounded_thumbnail(image, 800, 800)
+
+  defp render_thumbnail(image, :ai) do
+    image
+    |> Image.thumbnail!("448x448", fit: :contain, resize: :both, autorotate: false)
+    |> Image.embed!(448, 448, x: :center, y: :center, background_color: :black)
+  end
+
+  defp bounded_thumbnail(image, width, height) do
+    Image.thumbnail!(image, "#{width}x#{height}", fit: :contain, resize: :down, autorotate: false)
+  end
+
+  defp write_thumbnail(image, destination, :ai) do
+    flattened = Image.flatten!(image, background_color: :black)
+    Image.write!(flattened, destination, quality: 85, strip_metadata: true)
+    :ok
+  end
+
+  defp write_thumbnail(image, destination, _size) do
+    Image.write!(image, destination, quality: 80, strip_metadata: true)
     :ok
   end
 
@@ -347,7 +400,23 @@ defmodule BDS.Media do
       ".png" -> "image/png"
       ".gif" -> "image/gif"
       ".webp" -> "image/webp"
+      ".tif" -> "image/tiff"
+      ".tiff" -> "image/tiff"
+      ".bmp" -> "image/bmp"
+      ".heic" -> "image/heic"
+      ".heif" -> "image/heif"
       _ -> "application/octet-stream"
+    end
+  end
+
+  defp image_dimensions(source_path, mime_type) do
+    if image_mime?(mime_type) do
+      case Image.open(source_path) do
+        {:ok, image} -> {Image.width(image), Image.height(image)}
+        {:error, _reason} -> {nil, nil}
+      end
+    else
+      {nil, nil}
     end
   end
 
