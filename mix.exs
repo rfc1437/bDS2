@@ -23,7 +23,8 @@ defmodule BDS.MixProject do
     [
       {:ecto_sql, "~> 3.13"},
       {:ecto_sqlite3, "~> 0.21"},
-      {:luerl, "~> 1.5"}
+      {:luerl, "~> 1.5"},
+      {:jason, "~> 1.4"}
     ]
   end
 
