@@ -5,16 +5,17 @@ defmodule BDS.Rendering do
 
   alias BDS.Frontmatter
   alias BDS.Media.Media, as: MediaAsset
-  alias BDS.Rendering.FileSystem
   alias BDS.Menu
   alias BDS.Metadata
+  alias BDS.PostLinks
   alias BDS.Projects
-  alias BDS.Rendering.Filters
   alias BDS.I18n
+  alias BDS.Rendering.FileSystem
+  alias BDS.Rendering.Filters
   alias BDS.Repo
-  alias BDS.Tags.Tag
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
+  alias BDS.Tags.Tag
   alias BDS.Templates.Template
 
   def render_post_page(project_id, template_slug, assigns)
@@ -119,10 +120,14 @@ defmodule BDS.Rendering do
 
     main_language = metadata.main_language || language
     post_record = load_post_record(assigns)
+    canonical_post = canonical_post_record(post_record)
+    post_id = canonical_post_id(post_record, assigns)
     post_categories = Map.get(post_record || %{}, :categories, []) || []
     post_tags = Map.get(post_record || %{}, :tags, []) || []
     canonical_post_paths = canonical_post_path_by_slug(project_id, main_language)
     canonical_media_paths = canonical_media_path_by_source_path(project_id)
+    incoming_links = link_contexts(project_id, post_id, :incoming, main_language)
+    outgoing_links = link_contexts(project_id, post_id, :outgoing, main_language)
 
     %{
       language: language,
@@ -141,18 +146,18 @@ defmodule BDS.Rendering do
       pico_stylesheet_href: default_pico_stylesheet_href(),
       html_theme_attribute: html_theme_attribute(metadata.pico_theme),
       blog_languages: blog_languages(metadata, language),
-      alternate_links: [],
+      alternate_links: alternate_links(canonical_post, project_id, main_language),
       menu_items: menu_items(project_id),
       calendar_initial_year: calendar_initial_year(post_record),
       calendar_initial_month: calendar_initial_month(post_record),
       post_categories: post_categories,
       post_tags: post_tags,
       tag_color_by_name: tag_color_by_name(project_id),
-      backlinks: [],
+      backlinks: backlinks(incoming_links),
       canonical_post_path_by_slug: canonical_post_paths,
       canonical_media_path_by_source_path: canonical_media_paths,
       post_data_json_by_id: post_data_json(assigns, post_record),
-      post: build_post_context(assigns, post_record)
+      post: build_post_context(assigns, post_record, incoming_links, outgoing_links)
     }
   end
 
@@ -171,6 +176,10 @@ defmodule BDS.Rendering do
 
     canonical_post_paths = canonical_post_path_by_slug(project_id, main_language)
     canonical_media_paths = canonical_media_path_by_source_path(project_id)
+    day_blocks = build_day_blocks(posts)
+    min_date = min_date(posts)
+    max_date = max_date(posts)
+    normalized_archive_context = normalize_archive_context(archive_context)
 
     %{
       language: language,
@@ -189,10 +198,10 @@ defmodule BDS.Rendering do
       menu_items: menu_items(project_id),
       calendar_initial_year: calendar_initial_year_from_posts(posts),
       calendar_initial_month: calendar_initial_month_from_posts(posts),
-      archive_context: normalize_archive_context(archive_context),
-      show_archive_range_heading: false,
-      min_date: nil,
-      max_date: nil,
+      archive_context: normalized_archive_context,
+      show_archive_range_heading: show_archive_range_heading?(normalized_archive_context, day_blocks),
+      min_date: min_date,
+      max_date: max_date,
       is_list_page: true,
       is_first_page: pagination.current_page <= 1,
       is_last_page: pagination.current_page >= pagination.total_pages,
@@ -208,14 +217,7 @@ defmodule BDS.Rendering do
       canonical_media_path_by_source_path: canonical_media_paths,
       post_data_json_by_id:
         Enum.into(posts, %{}, fn post -> {post.id, post_data_json_value(post)} end),
-      day_blocks: [
-        %{
-          date_label: "",
-          show_date_marker: false,
-          show_separator: false,
-          posts: posts
-        }
-      ]
+      day_blocks: day_blocks
     }
   end
 
@@ -332,12 +334,23 @@ defmodule BDS.Rendering do
     end
   end
 
+  defp canonical_post_record(%Translation{translation_for: post_id}), do: Repo.get(Post, post_id)
+  defp canonical_post_record(%Post{} = post), do: post
+  defp canonical_post_record(_other), do: nil
+
+  defp canonical_post_id(%Translation{translation_for: post_id}, _assigns), do: post_id
+  defp canonical_post_id(%Post{id: post_id}, _assigns), do: post_id
+  defp canonical_post_id(_post_record, assigns), do: Map.get(assigns, :id, Map.get(assigns, "id"))
+
   defp post_data_json(assigns, post_record) do
     id = Map.get(assigns, :id, Map.get(assigns, "id"))
 
     if is_binary(id) do
+      incoming_links = link_contexts(Map.get(post_record || %{}, :project_id), canonical_post_id(post_record, assigns), :incoming, Map.get(post_record || %{}, :language))
+      outgoing_links = link_contexts(Map.get(post_record || %{}, :project_id), canonical_post_id(post_record, assigns), :outgoing, Map.get(post_record || %{}, :language))
+
       %{
-        id => post_data_json_value(build_post_context(assigns, post_record))
+        id => post_data_json_value(build_post_context(assigns, post_record, incoming_links, outgoing_links))
       }
     else
       %{}
@@ -387,6 +400,58 @@ defmodule BDS.Rendering do
     end)
   end
 
+  defp alternate_links(nil, _project_id, _main_language), do: []
+
+  defp alternate_links(%Post{} = post, project_id, main_language) do
+    translations =
+      Repo.all(
+        from translation in Translation,
+          where:
+            translation.project_id == ^project_id and
+              translation.translation_for == ^post.id and
+              translation.status == :published,
+          order_by: [asc: translation.language]
+      )
+
+    [%{href: post_path(post, nil), hreflang: normalize_language(post.language, main_language)}] ++
+      Enum.map(translations, fn translation ->
+        %{href: post_path(post, translation.language, main_language), hreflang: translation.language}
+      end)
+  end
+
+  defp backlinks(incoming_links) do
+    Enum.map(incoming_links, fn link ->
+      %{path: link.href, display_slug: link.display_slug, title: link.title}
+    end)
+  end
+
+  defp link_contexts(_project_id, nil, _direction, _main_language), do: []
+
+  defp link_contexts(project_id, post_id, :incoming, main_language) do
+    PostLinks.list_incoming_links(post_id)
+    |> Enum.map(&link_context(project_id, &1, :incoming, main_language))
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp link_contexts(project_id, post_id, :outgoing, main_language) do
+    PostLinks.list_outgoing_links(post_id)
+    |> Enum.map(&link_context(project_id, &1, :outgoing, main_language))
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp link_context(_project_id, link, direction, main_language) do
+    linked_post_id =
+      case direction do
+        :incoming -> link.source_post_id
+        :outgoing -> link.target_post_id
+      end
+
+    case Repo.get(Post, linked_post_id) do
+      nil -> nil
+      linked_post -> %{href: post_path(linked_post, nil), title: linked_post.title, display_slug: linked_post.slug, language: normalize_language(linked_post.language, main_language)}
+    end
+  end
+
   defp canonical_media_path_by_source_path(project_id) do
     Repo.all(from media in MediaAsset, where: media.project_id == ^project_id)
     |> Enum.reduce(%{}, fn media, acc ->
@@ -407,7 +472,7 @@ defmodule BDS.Rendering do
 
   defp post_path(post, language_prefix)
        when is_binary(language_prefix) and language_prefix != "" do
-    Path.join([String.trim_leading(language_prefix, "/"), post_path(post, nil)])
+    language_prefix <> post_path(post, nil)
   end
 
   defp post_path(post, nil) do
@@ -444,20 +509,26 @@ defmodule BDS.Rendering do
           ),
         excerpt:
           Map.get(post, :excerpt, Map.get(post, "excerpt", Map.get(post_record || %{}, :excerpt))),
-        author: Map.get(post_record || %{}, :author),
+        author: Map.get(post, :author, Map.get(post, "author", Map.get(post_record || %{}, :author))),
         language:
           Map.get(
             post,
             :language,
             Map.get(post, "language", Map.get(post_record || %{}, :language))
           ),
-        published_at: Map.get(post_record || %{}, :published_at),
-        created_at: Map.get(post_record || %{}, :created_at),
-        updated_at: Map.get(post_record || %{}, :updated_at),
-        tags: Map.get(post_record || %{}, :tags, []) || [],
-        categories: Map.get(post_record || %{}, :categories, []) || [],
-        template_slug: Map.get(post_record || %{}, :template_slug),
-        do_not_translate: Map.get(post_record || %{}, :do_not_translate, false),
+        published_at:
+          Map.get(post, :published_at, Map.get(post, "published_at", Map.get(post_record || %{}, :published_at))),
+        created_at:
+          Map.get(post, :created_at, Map.get(post, "created_at", Map.get(post_record || %{}, :created_at))),
+        updated_at:
+          Map.get(post, :updated_at, Map.get(post, "updated_at", Map.get(post_record || %{}, :updated_at))),
+        tags: Map.get(post, :tags, Map.get(post, "tags", Map.get(post_record || %{}, :tags, []))) || [],
+        categories:
+          Map.get(post, :categories, Map.get(post, "categories", Map.get(post_record || %{}, :categories, []))) || [],
+        template_slug:
+          Map.get(post, :template_slug, Map.get(post, "template_slug", Map.get(post_record || %{}, :template_slug))),
+        do_not_translate:
+          Map.get(post, :do_not_translate, Map.get(post, "do_not_translate", Map.get(post_record || %{}, :do_not_translate, false))),
         href: Map.get(post, :href, Map.get(post, "href")),
         show_title: true,
         linked_media: [],
@@ -467,7 +538,7 @@ defmodule BDS.Rendering do
     end)
   end
 
-  defp build_post_context(assigns, post_record) do
+  defp build_post_context(assigns, post_record, incoming_links, outgoing_links) do
     %{
       id: Map.get(assigns, :id, Map.get(assigns, "id")),
       slug: Map.get(assigns, :slug, Map.get(assigns, "slug")),
@@ -500,8 +571,8 @@ defmodule BDS.Rendering do
         ),
       do_not_translate: Map.get(post_record || %{}, :do_not_translate, false),
       linked_media: [],
-      outgoing_links: [],
-      incoming_links: []
+      outgoing_links: outgoing_links,
+      incoming_links: incoming_links
     }
   end
 
@@ -544,7 +615,56 @@ defmodule BDS.Rendering do
   end
 
   defp normalize_archive_context(nil), do: nil
-  defp normalize_archive_context(%{} = archive_context), do: archive_context
+
+  defp normalize_archive_context(%{} = archive_context) do
+    %{
+      kind: Map.get(archive_context, :kind, Map.get(archive_context, "kind")),
+      name: Map.get(archive_context, :name, Map.get(archive_context, "name")),
+      month: Map.get(archive_context, :month, Map.get(archive_context, "month")),
+      year: Map.get(archive_context, :year, Map.get(archive_context, "year")),
+      day: Map.get(archive_context, :day, Map.get(archive_context, "day"))
+    }
+  end
+
+  defp build_day_blocks(posts) do
+    grouped_blocks =
+      posts
+      |> Enum.filter(&is_integer(Map.get(&1, :created_at)))
+      |> Enum.group_by(&DateTime.from_unix!(Map.get(&1, :created_at)) |> DateTime.to_date() |> Date.to_iso8601())
+      |> Enum.sort_by(fn {label, _posts} -> label end)
+
+    grouped_blocks
+    |> Enum.with_index()
+    |> Enum.map(fn {{date_label, grouped_posts}, index} ->
+      %{
+        date_label: date_label,
+        show_date_marker: true,
+        show_separator: index < length(grouped_blocks) - 1,
+        posts: Enum.sort_by(grouped_posts, &Map.get(&1, :created_at))
+      }
+    end)
+    |> case do
+      [] -> [%{date_label: "", show_date_marker: false, show_separator: false, posts: posts}]
+      blocks -> blocks
+    end
+  end
+
+  defp min_date(posts) do
+    posts
+    |> Enum.map(&Map.get(&1, :created_at))
+    |> Enum.filter(&is_integer/1)
+    |> Enum.min(fn -> nil end)
+  end
+
+  defp max_date(posts) do
+    posts
+    |> Enum.map(&Map.get(&1, :created_at))
+    |> Enum.filter(&is_integer/1)
+    |> Enum.max(fn -> nil end)
+  end
+
+  defp show_archive_range_heading?(%{kind: "date"}, _day_blocks), do: true
+  defp show_archive_range_heading?(_archive_context, _day_blocks), do: false
 
   defp html_theme_attribute(nil), do: nil
   defp html_theme_attribute(""), do: nil
@@ -574,4 +694,15 @@ defmodule BDS.Rendering do
   defp language_prefix(language, main_language) when language == main_language, do: ""
   defp language_prefix(nil, _main_language), do: ""
   defp language_prefix(language, _main_language), do: "/#{language}"
+
+  defp normalize_language(nil, fallback), do: fallback
+  defp normalize_language("", fallback), do: fallback
+
+  defp normalize_language(language, _fallback) do
+    language
+    |> to_string()
+    |> String.downcase()
+    |> String.split("-", parts: 2)
+    |> hd()
+  end
 end

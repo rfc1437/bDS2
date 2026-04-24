@@ -4,7 +4,9 @@ defmodule BDS.Posts do
   import Ecto.Query
 
   alias BDS.Frontmatter
+  alias BDS.Embeddings
   alias BDS.Metadata
+  alias BDS.PostLinks
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
   alias BDS.Projects
@@ -47,6 +49,7 @@ defmodule BDS.Posts do
     |> Repo.insert()
     |> case do
       {:ok, post} ->
+        :ok = Embeddings.sync_post(post)
         :ok = Search.sync_post(post)
         {:ok, post}
 
@@ -75,6 +78,8 @@ defmodule BDS.Posts do
           |> Repo.update()
           |> case do
             {:ok, updated_post} ->
+              :ok = Embeddings.sync_post(updated_post)
+              :ok = PostLinks.sync_post_links(updated_post)
               :ok = Search.sync_post(updated_post)
               {:ok, updated_post}
 
@@ -119,7 +124,9 @@ defmodule BDS.Posts do
         |> Repo.update()
         |> case do
           {:ok, updated_post} ->
+            :ok = Embeddings.sync_post(updated_post)
             :ok = publish_post_translations(updated_post)
+            :ok = PostLinks.sync_post_links(updated_post)
             :ok = Search.sync_post(updated_post)
             {:ok, updated_post}
 
@@ -149,6 +156,8 @@ defmodule BDS.Posts do
 
       %Post{} = post ->
         delete_post_file(post)
+        :ok = Embeddings.remove_post(post.id)
+        :ok = PostLinks.delete_post_links(post.id)
         Repo.delete!(post)
         :ok = Search.delete_post(post.id)
         {:ok, :deleted}
