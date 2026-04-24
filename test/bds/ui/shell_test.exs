@@ -212,15 +212,18 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "return [\"tasks\", \"output\", \"git_log\", state.session.panel.active_tab].filter(uniqueValue);"
   end
 
-  test "static shell bundle renders a left-side project field with selection and create affordances" do
+  test "static shell bundle renders a left-side project field with selection, existing-folder import, and create affordances" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
     js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
 
     assert js =~ "project-selector-trigger"
     assert js =~ "project-dropdown"
     assert js =~ "create-project-btn"
+    assert js =~ "existing-project-btn"
+    assert js =~ "/api/project-folder"
     assert js =~ "fetchProjects"
     assert js =~ "createProject"
+    assert js =~ "importExistingProject"
     assert js =~ "selectProject"
     assert js =~ "toggleProjectMenu"
     assert js =~ "closeProjectMenu"
@@ -228,6 +231,7 @@ defmodule BDS.UI.ShellTest do
     assert css =~ ".project-selector-trigger"
     assert css =~ ".project-dropdown"
     assert css =~ ".create-project-btn"
+    assert css =~ ".existing-project-btn"
   end
 
   test "static shell bundle uses translation catalogs for visible shell chrome" do

@@ -483,6 +483,12 @@ function bindEvents() {
     };
   });
 
+  root.querySelectorAll("[data-project-import]").forEach((button) => {
+    button.onclick = () => {
+      void importExistingProject();
+    };
+  });
+
   root.querySelectorAll("[data-command='set-ui-language']").forEach((select) => {
     select.onchange = (event) => {
       setUiLanguage(event.target.value);
@@ -677,8 +683,42 @@ async function fetchProjects() {
   }
 }
 
-async function createProject() {
-  const name = window.prompt(t("New project name"), t("New Project"));
+async function chooseProjectFolder() {
+  try {
+    const response = await fetch("/api/project-folder", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt: t("Select existing blog folder") }),
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok || payload.status === "error") {
+      appendOutputEntry(t("Open Existing Blog"), payload.error?.message || t("Command failed with HTTP %{status}", { status: response.status }));
+      setPanelTab("output");
+      render();
+      return null;
+    }
+
+    if (payload.status === "cancel") {
+      return null;
+    }
+
+    return payload;
+  } catch (error) {
+    appendOutputEntry(t("Open Existing Blog"), error?.message || String(error));
+    setPanelTab("output");
+    render();
+    return null;
+  }
+}
+
+async function createProject(options = {}) {
+  const suggestedName = options.name ? String(options.name).trim() : "";
+  const name = suggestedName || window.prompt(t("New project name"), t("New Project"));
   if (!name || !name.trim()) {
     return;
   }
@@ -692,7 +732,11 @@ async function createProject() {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ name: name.trim() }),
+      body: JSON.stringify({
+        name: name.trim(),
+        description: options.description,
+        data_path: options.dataPath,
+      }),
     });
 
     const payload = await response.json();
@@ -712,6 +756,27 @@ async function createProject() {
     setPanelTab("output");
     render();
   }
+}
+
+async function importExistingProject() {
+  closeProjectMenu();
+
+  const selection = await chooseProjectFolder();
+
+  if (!selection) {
+    return;
+  }
+
+  if (selection.existing_project_id) {
+    await selectProject(selection.existing_project_id);
+    return;
+  }
+
+  await createProject({
+    name: selection.name,
+    description: selection.description,
+    dataPath: selection.path,
+  });
 }
 
 async function selectProject(projectId) {
@@ -1408,6 +1473,12 @@ function renderProjectDropdown() {
         ${state.projects.projects.map((project) => renderProjectItem(project)).join("")}
       </div>
       <div class="project-dropdown-footer">
+        <button class="existing-project-btn" data-project-import type="button">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M1.75 3A1.75 1.75 0 013.5 1.25h3.92c.46 0 .9.18 1.22.5l1.1 1.1c.09.1.22.15.35.15h2.41A1.75 1.75 0 0114.25 4.75v6.5A1.75 1.75 0 0112.5 13h-9A1.75 1.75 0 011.75 11.25v-8.5zm1.75-.25a.75.75 0 00-.75.75v8.5c0 .41.34.75.75.75h9c.41 0 .75-.34.75-.75v-6.5a.75.75 0 00-.75-.75h-2.41a1.7 1.7 0 01-1.06-.44l-1.1-1.1a.74.74 0 00-.52-.21H3.5z"></path>
+          </svg>
+          ${escapeHtml(t("Open Existing Blog"))}
+        </button>
         <button class="create-project-btn" data-project-create type="button">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
             <path d="M14 7v1H8v6H7V8H1V7h6V1h1v6h6z"></path>

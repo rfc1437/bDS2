@@ -919,9 +919,12 @@ button {
 .project-dropdown-footer {
   padding: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: grid;
+  gap: 6px;
 }
 
-.create-project-btn {
+.create-project-btn,
+.existing-project-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -936,7 +939,8 @@ button {
   cursor: pointer;
 }
 
-.create-project-btn:hover {
+.create-project-btn:hover,
+.existing-project-btn:hover {
   background-color: rgba(255, 255, 255, 0.18);
 }
 

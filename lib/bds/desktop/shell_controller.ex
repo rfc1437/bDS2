@@ -28,6 +28,16 @@ defmodule BDS.Desktop.ShellController do
     end
   end
 
+  def choose_project_folder_json(payload \\ %{}) when is_map(payload) do
+    prompt = Map.get(payload, "prompt") || Map.get(payload, :prompt) || "Select existing blog folder"
+
+    case folder_picker().choose_directory(prompt) do
+      {:ok, path} -> Jason.encode!(project_folder_payload(path))
+      :cancel -> Jason.encode!(%{status: "cancel"})
+      {:error, error} -> Jason.encode!(%{status: "error", error: normalize_error(error)})
+    end
+  end
+
   def command_json(payload) when is_map(payload) do
     action = Map.get(payload, "action") || Map.get(payload, :action)
     params = Map.get(payload, "params") || Map.get(payload, :params) || %{}
@@ -47,6 +57,7 @@ defmodule BDS.Desktop.ShellController do
         {:create,
          %{
            name: String.trim(Map.get(payload, "name") || Map.get(payload, :name)),
+           description: blank_to_nil(Map.get(payload, "description") || Map.get(payload, :description)),
            data_path: blank_to_nil(Map.get(payload, "data_path") || Map.get(payload, :data_path))
          }}
 
@@ -82,6 +93,45 @@ defmodule BDS.Desktop.ShellController do
 
   defp project_response(project) do
     %{id: project.id, name: project.name, slug: project.slug, data_path: project.data_path, is_active: project.is_active}
+  end
+
+  defp project_folder_payload(path) do
+    normalized_path = Path.expand(path)
+    project_metadata = read_project_metadata(normalized_path)
+    existing_project = find_project_by_data_path(normalized_path)
+
+    %{
+      status: "ok",
+      path: normalized_path,
+      name: Map.get(project_metadata, "name") || Path.basename(normalized_path),
+      description: Map.get(project_metadata, "description"),
+      existing_project_id: existing_project && existing_project.id
+    }
+  end
+
+  defp read_project_metadata(path) do
+    project_json_path = Path.join([path, "meta", "project.json"])
+
+    case File.read(project_json_path) do
+      {:ok, contents} -> Jason.decode!(contents)
+      {:error, :enoent} -> %{}
+    end
+  end
+
+  defp find_project_by_data_path(path) do
+    normalized_path = Path.expand(path)
+
+    BDS.Projects.list_projects()
+    |> Enum.find(fn project ->
+      case project.data_path do
+        value when is_binary(value) -> Path.expand(value) == normalized_path
+        _other -> false
+      end
+    end)
+  end
+
+  defp folder_picker do
+    Application.get_env(:bds, :desktop, [])[:folder_picker] || BDS.Desktop.FolderPicker
   end
 
   defp default_project_snapshot do

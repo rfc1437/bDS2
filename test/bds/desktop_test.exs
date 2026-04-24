@@ -3,6 +3,10 @@ defmodule BDS.DesktopTest do
 
   import Plug.Test
 
+  defmodule TestFolderPicker do
+    def choose_directory(_prompt), do: Process.get(:test_folder_picker_response, :cancel)
+  end
+
   test "desktop configuration no longer uses a pending adapter" do
     assert Application.get_env(:bds, BDS.Application)[:desktop_adapter] == :desktop
   end
@@ -172,34 +176,72 @@ defmodule BDS.DesktopTest do
     assert after_internal_dirs == before_internal_dirs
   end
 
-    test "desktop router executes shell commands through the JSON api" do
-      :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
-      :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), Process.whereis(BDS.Preview))
+  test "desktop router lets the shell choose an existing project folder and reuses matching projects" do
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
-      temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-router-#{System.unique_integer([:positive])}")
-      File.mkdir_p!(temp_dir)
+    temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-existing-project-#{System.unique_integer([:positive])}")
+    meta_dir = Path.join(temp_dir, "meta")
+    File.mkdir_p!(meta_dir)
 
-      on_exit(fn ->
-        File.rm_rf(temp_dir)
-        _ = BDS.Preview.stop_preview("default")
-      end)
+    File.write!(
+      Path.join(meta_dir, "project.json"),
+      Jason.encode!(%{"name" => "Existing Blog", "description" => "Imported from disk"})
+    )
 
-      {:ok, project} = BDS.Projects.create_project(%{name: "Desktop Router", data_path: temp_dir})
-      {:ok, _project} = BDS.Projects.set_active_project(project.id)
+    {:ok, project} = BDS.Projects.create_project(%{name: "Existing Blog", data_path: temp_dir})
 
-      conn =
-        conn(:post, "/api/commands?k=#{Desktop.Auth.login_key()}", Jason.encode!(%{"action" => "open_in_browser"}))
-        |> Plug.Conn.put_req_header("content-type", "application/json")
+    previous_desktop = Application.get_env(:bds, :desktop, [])
+    Application.put_env(:bds, :desktop, Keyword.put(previous_desktop, :folder_picker, TestFolderPicker))
+    Process.put(:test_folder_picker_response, {:ok, temp_dir})
 
-      conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+    on_exit(fn ->
+      Application.put_env(:bds, :desktop, previous_desktop)
+      Process.delete(:test_folder_picker_response)
+      File.rm_rf(temp_dir)
+    end)
 
-      assert conn.status == 200
-      assert Plug.Conn.get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
+    conn = conn(:post, "/api/project-folder?k=#{Desktop.Auth.login_key()}")
+    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
 
-      payload = Jason.decode!(conn.resp_body)
+    assert conn.status == 200
 
-      assert payload["result"]["kind"] == "open_url"
-      assert payload["result"]["project_id"] == project.id
-      assert payload["result"]["url"] == "http://127.0.0.1:4123/"
-    end
+    payload = Jason.decode!(conn.resp_body)
+
+    assert payload["status"] == "ok"
+    assert payload["path"] == temp_dir
+    assert payload["name"] == "Existing Blog"
+    assert payload["description"] == "Imported from disk"
+    assert payload["existing_project_id"] == project.id
+  end
+
+  test "desktop router executes shell commands through the JSON api" do
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+    :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), Process.whereis(BDS.Preview))
+
+    temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-router-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+
+    on_exit(fn ->
+      File.rm_rf(temp_dir)
+      _ = BDS.Preview.stop_preview("default")
+    end)
+
+    {:ok, project} = BDS.Projects.create_project(%{name: "Desktop Router", data_path: temp_dir})
+    {:ok, _project} = BDS.Projects.set_active_project(project.id)
+
+    conn =
+      conn(:post, "/api/commands?k=#{Desktop.Auth.login_key()}", Jason.encode!(%{"action" => "open_in_browser"}))
+      |> Plug.Conn.put_req_header("content-type", "application/json")
+
+    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+
+    assert conn.status == 200
+    assert Plug.Conn.get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
+
+    payload = Jason.decode!(conn.resp_body)
+
+    assert payload["result"]["kind"] == "open_url"
+    assert payload["result"]["project_id"] == project.id
+    assert payload["result"]["url"] == "http://127.0.0.1:4123/"
+  end
 end

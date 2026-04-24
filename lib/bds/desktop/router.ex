@@ -51,6 +51,15 @@ defmodule BDS.Desktop.Router do
     |> Plug.Conn.send_resp(200, BDS.Desktop.ShellController.upsert_project_json(payload))
   end
 
+  post "/api/project-folder" do
+    {:ok, body, conn} = Plug.Conn.read_body(conn)
+    payload = if body == "", do: %{}, else: Jason.decode!(body)
+
+    conn
+    |> Plug.Conn.put_resp_content_type("application/json")
+    |> Plug.Conn.send_resp(200, BDS.Desktop.ShellController.choose_project_folder_json(payload))
+  end
+
   post "/api/commands" do
     {:ok, body, conn} = Plug.Conn.read_body(conn)
     payload = if body == "", do: %{}, else: Jason.decode!(body)
