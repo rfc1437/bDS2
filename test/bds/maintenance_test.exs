@@ -7,7 +7,10 @@ defmodule BDS.MaintenanceTest do
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
-    temp_dir = Path.join(System.tmp_dir!(), "bds-maintenance-#{System.unique_integer([:positive])}")
+
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-maintenance-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
@@ -15,7 +18,10 @@ defmodule BDS.MaintenanceTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "rebuild_from_filesystem dispatches to posts, media, scripts, and templates rebuilders", %{project: project, temp_dir: temp_dir} do
+  test "rebuild_from_filesystem dispatches to posts, media, scripts, and templates rebuilders", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     posts_dir = Path.join([temp_dir, "posts", "2026", "04"])
     File.mkdir_p!(posts_dir)
 
@@ -60,6 +66,7 @@ defmodule BDS.MaintenanceTest do
 
     template_dir = Path.join(temp_dir, "templates")
     File.mkdir_p!(template_dir)
+
     File.write!(
       Path.join(template_dir, "dispatch-view.liquid"),
       [
@@ -81,6 +88,7 @@ defmodule BDS.MaintenanceTest do
 
     script_dir = Path.join(temp_dir, "scripts")
     File.mkdir_p!(script_dir)
+
     File.write!(
       Path.join(script_dir, "dispatch.lua"),
       [
@@ -120,10 +128,14 @@ defmodule BDS.MaintenanceTest do
   end
 
   test "rebuild_from_filesystem rejects unsupported entity types", %{project: project} do
-    assert {:error, :unsupported_entity_type} = BDS.Maintenance.rebuild_from_filesystem(project.id, "unknown")
+    assert {:error, :unsupported_entity_type} =
+             BDS.Maintenance.rebuild_from_filesystem(project.id, "unknown")
   end
 
-  test "metadata_diff reports field differences and orphan files across managed entities", %{project: project, temp_dir: temp_dir} do
+  test "metadata_diff reports field differences and orphan files across managed entities", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     source_path = Path.join(temp_dir, "sample.txt")
     File.write!(source_path, "hello media")
 
@@ -192,6 +204,7 @@ defmodule BDS.MaintenanceTest do
     assert {:ok, published_template} = BDS.Templates.publish_template(template.id)
 
     post_path = Path.join(temp_dir, published_post.file_path)
+
     File.write!(
       post_path,
       [
@@ -205,9 +218,9 @@ defmodule BDS.MaintenanceTest do
         "language: de",
         "do_not_translate: false",
         "template_slug: ",
-        "created_at: #{published_post.created_at}",
-        "updated_at: #{published_post.updated_at}",
-        "published_at: #{published_post.published_at}",
+        "created_at: #{published_post.created_at + 10}",
+        "updated_at: #{published_post.updated_at + 20}",
+        "published_at: #{published_post.published_at + 30}",
         "tags:",
         "  - beta",
         "categories:",
@@ -220,6 +233,7 @@ defmodule BDS.MaintenanceTest do
     )
 
     post_translation_path = Path.join(temp_dir, published_post_translation.file_path)
+
     File.write!(
       post_translation_path,
       [
@@ -241,6 +255,7 @@ defmodule BDS.MaintenanceTest do
     )
 
     media_sidecar_path = Path.join(temp_dir, media.sidecar_path)
+
     File.write!(
       media_sidecar_path,
       [
@@ -262,7 +277,9 @@ defmodule BDS.MaintenanceTest do
       |> Enum.join("\n")
     )
 
-    media_translation_sidecar_path = Path.join(temp_dir, "#{media.file_path}.#{media_translation.language}.meta")
+    media_translation_sidecar_path =
+      Path.join(temp_dir, "#{media.file_path}.#{media_translation.language}.meta")
+
     File.write!(
       media_translation_sidecar_path,
       [
@@ -277,6 +294,7 @@ defmodule BDS.MaintenanceTest do
     )
 
     script_path = Path.join(temp_dir, published_script.file_path)
+
     File.write!(
       script_path,
       [
@@ -298,6 +316,7 @@ defmodule BDS.MaintenanceTest do
     )
 
     template_path = Path.join(temp_dir, published_template.file_path)
+
     File.write!(
       template_path,
       [
@@ -317,50 +336,128 @@ defmodule BDS.MaintenanceTest do
       |> Enum.join("\n")
     )
 
-    File.write!(Path.join([temp_dir, "posts", "2026", "04", "orphan-post.md"]), "---\nid: orphan\ntitle: Orphan\nslug: orphan\nstatus: published\ncreated_at: 1\nupdated_at: 1\npublished_at: 1\ntags:\ncategories:\n---\nBody\n")
-    File.write!(Path.join([temp_dir, "posts", "2026", "04", "orphan-post.es.md"]), "---\nid: orphan-post-translation\ntranslation_for: orphan\nlanguage: es\ntitle: Huerfano\nstatus: published\ncreated_at: 1\nupdated_at: 1\npublished_at: 1\n---\nCuerpo\n")
-    File.write!(Path.join([temp_dir, "media", "2026", "04", "orphan.txt"]), "orphan")
-    File.write!(Path.join([temp_dir, "media", "2026", "04", "orphan.txt.meta"]), "id: orphan-media\noriginal_name: orphan.txt\nmime_type: text/plain\nsize: 6\ncreated_at: 1\nupdated_at: 1\ntags:\n")
-    File.write!(Path.join([temp_dir, "media", "2026", "04", "orphan.txt.es.meta"]), "translation_for: orphan-media\nlanguage: es\ntitle: Huerfano\nalt: Texto\ncaption: Leyenda\n")
-    File.write!(Path.join([temp_dir, "scripts", "orphan.lua"]), "---\nid: orphan-script\nslug: orphan-script\ntitle: Orphan Script\nkind: utility\nentrypoint: main\nenabled: true\nversion: 1\ncreated_at: 1\nupdated_at: 1\n---\nfunction main() return true end\n")
-    File.write!(Path.join([temp_dir, "templates", "orphan-view.liquid"]), "---\nid: orphan-template\nslug: orphan-view\ntitle: Orphan View\nkind: list\nenabled: true\nversion: 1\ncreated_at: 1\nupdated_at: 1\n---\n<section>Orphan</section>\n")
+    File.write!(
+      Path.join([temp_dir, "posts", "2026", "04", "orphan-post.md"]),
+      "---\nid: orphan\ntitle: Orphan\nslug: orphan\nstatus: published\ncreated_at: 1\nupdated_at: 1\npublished_at: 1\ntags:\ncategories:\n---\nBody\n"
+    )
 
-    assert {:ok, %{diff_reports: diff_reports, orphan_reports: orphan_reports}} = BDS.Maintenance.metadata_diff(project.id)
+    File.write!(
+      Path.join([temp_dir, "posts", "2026", "04", "orphan-post.es.md"]),
+      "---\nid: orphan-post-translation\ntranslation_for: orphan\nlanguage: es\ntitle: Huerfano\nstatus: published\ncreated_at: 1\nupdated_at: 1\npublished_at: 1\n---\nCuerpo\n"
+    )
+
+    File.write!(Path.join([temp_dir, "media", "2026", "04", "orphan.txt"]), "orphan")
+
+    File.write!(
+      Path.join([temp_dir, "media", "2026", "04", "orphan.txt.meta"]),
+      "id: orphan-media\noriginal_name: orphan.txt\nmime_type: text/plain\nsize: 6\ncreated_at: 1\nupdated_at: 1\ntags:\n"
+    )
+
+    File.write!(
+      Path.join([temp_dir, "media", "2026", "04", "orphan.txt.es.meta"]),
+      "translation_for: orphan-media\nlanguage: es\ntitle: Huerfano\nalt: Texto\ncaption: Leyenda\n"
+    )
+
+    File.write!(
+      Path.join([temp_dir, "scripts", "orphan.lua"]),
+      "---\nid: orphan-script\nslug: orphan-script\ntitle: Orphan Script\nkind: utility\nentrypoint: main\nenabled: true\nversion: 1\ncreated_at: 1\nupdated_at: 1\n---\nfunction main() return true end\n"
+    )
+
+    File.write!(
+      Path.join([temp_dir, "templates", "orphan-view.liquid"]),
+      "---\nid: orphan-template\nslug: orphan-view\ntitle: Orphan View\nkind: list\nenabled: true\nversion: 1\ncreated_at: 1\nupdated_at: 1\n---\n<section>Orphan</section>\n"
+    )
+
+    assert {:ok, %{diff_reports: diff_reports, orphan_reports: orphan_reports}} =
+             BDS.Maintenance.metadata_diff(project.id)
 
     assert Enum.any?(diff_reports, fn report ->
              report.entity_type == "post" and report.entity_id == published_post.id and
-               Enum.any?(report.differences, &(&1.name == "title" and &1.db_value == "Original Post" and &1.file_value == "Edited Post")) and
-               Enum.any?(report.differences, &(&1.name == "excerpt" and &1.db_value == "Original summary" and &1.file_value == "Edited summary"))
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "title" and &1.db_value == "Original Post" and
+                     &1.file_value == "Edited Post")
+               ) and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "excerpt" and &1.db_value == "Original summary" and
+                     &1.file_value == "Edited summary")
+               ) and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "created_at" and
+                     &1.file_value == Integer.to_string(published_post.created_at + 10))
+               ) and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "updated_at" and
+                     &1.file_value == Integer.to_string(published_post.updated_at + 20))
+               ) and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "published_at" and
+                     &1.file_value == Integer.to_string(published_post.published_at + 30))
+               )
            end)
 
     assert Enum.any?(diff_reports, fn report ->
              report.entity_type == "media" and report.entity_id == media.id and
-               Enum.any?(report.differences, &(&1.name == "title" and &1.file_value == "Edited media title")) and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "title" and &1.file_value == "Edited media title")
+               ) and
                Enum.any?(report.differences, &(&1.name == "language" and &1.file_value == "de"))
            end)
 
     assert Enum.any?(diff_reports, fn report ->
              report.entity_type == "script" and report.entity_id == published_script.id and
-               Enum.any?(report.differences, &(&1.name == "title" and &1.file_value == "Edited Script")) and
-               Enum.any?(report.differences, &(&1.name == "entrypoint" and &1.file_value == "run"))
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "title" and &1.file_value == "Edited Script")
+               ) and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "entrypoint" and &1.file_value == "run")
+               )
            end)
 
     assert Enum.any?(diff_reports, fn report ->
              report.entity_type == "template" and report.entity_id == published_template.id and
-               Enum.any?(report.differences, &(&1.name == "title" and &1.file_value == "Edited Template")) and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "title" and &1.file_value == "Edited Template")
+               ) and
                Enum.any?(report.differences, &(&1.name == "enabled" and &1.file_value == "false"))
            end)
 
     assert Enum.any?(diff_reports, fn report ->
-             report.entity_type == "post_translation" and report.entity_id == published_post_translation.id and
-               Enum.any?(report.differences, &(&1.name == "title" and &1.db_value == "Ursprunglicher Beitrag" and &1.file_value == "Bearbeiteter Beitrag")) and
-               Enum.any?(report.differences, &(&1.name == "excerpt" and &1.db_value == "Zusammenfassung" and &1.file_value == "Bearbeitete Zusammenfassung"))
+             report.entity_type == "post_translation" and
+               report.entity_id == published_post_translation.id and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "title" and &1.db_value == "Ursprunglicher Beitrag" and
+                     &1.file_value == "Bearbeiteter Beitrag")
+               ) and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "excerpt" and &1.db_value == "Zusammenfassung" and
+                     &1.file_value == "Bearbeitete Zusammenfassung")
+               )
            end)
 
     assert Enum.any?(diff_reports, fn report ->
-             report.entity_type == "media_translation" and report.entity_id == media_translation.id and
-               Enum.any?(report.differences, &(&1.name == "title" and &1.db_value == "Ubersetzter Medientitel" and &1.file_value == "Bearbeiteter Medientitel")) and
-               Enum.any?(report.differences, &(&1.name == "alt" and &1.db_value == "Ubersetzter Alt-Text" and &1.file_value == "Bearbeiteter Alt-Text"))
+             report.entity_type == "media_translation" and
+               report.entity_id == media_translation.id and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "title" and &1.db_value == "Ubersetzter Medientitel" and
+                     &1.file_value == "Bearbeiteter Medientitel")
+               ) and
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "alt" and &1.db_value == "Ubersetzter Alt-Text" and
+                     &1.file_value == "Bearbeiteter Alt-Text")
+               )
            end)
 
     orphan_paths = Enum.map(orphan_reports, & &1.file_path)

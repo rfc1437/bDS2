@@ -94,7 +94,11 @@ defmodule BDS.TasksTest do
   end
 
   test "external tasks are registered as running and can report progress and complete" do
-    assert {:ok, task} = BDS.Tasks.register_external_task("preview build", %{group_id: "generation", group_name: "Generation"})
+    assert {:ok, task} =
+             BDS.Tasks.register_external_task("preview build", %{
+               group_id: "generation",
+               group_name: "Generation"
+             })
 
     assert task.status == :running
     assert task.group_id == "generation"
@@ -106,7 +110,9 @@ defmodule BDS.TasksTest do
     assert progressed.status == :running
 
     assert :ok = BDS.Tasks.complete_task(task.id)
-    assert wait_for_task(task.id, &(&1.status == :completed and &1.progress == 1.0)).status == :completed
+
+    assert wait_for_task(task.id, &(&1.status == :completed and &1.progress == 1.0)).status ==
+             :completed
   end
 
   defp receive_started do

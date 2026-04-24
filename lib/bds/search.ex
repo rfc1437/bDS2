@@ -96,8 +96,15 @@ defmodule BDS.Search do
   end
 
   def reindex_project(project_id) do
-    Repo.query!("DELETE FROM posts_fts WHERE post_id IN (SELECT id FROM posts WHERE project_id = ?)", [project_id])
-    Repo.query!("DELETE FROM media_fts WHERE media_id IN (SELECT id FROM media WHERE project_id = ?)", [project_id])
+    Repo.query!(
+      "DELETE FROM posts_fts WHERE post_id IN (SELECT id FROM posts WHERE project_id = ?)",
+      [project_id]
+    )
+
+    Repo.query!(
+      "DELETE FROM media_fts WHERE media_id IN (SELECT id FROM media WHERE project_id = ?)",
+      [project_id]
+    )
 
     Repo.all(from post in Post, where: post.project_id == ^project_id)
     |> Enum.each(&sync_post/1)
@@ -241,7 +248,11 @@ defmodule BDS.Search do
         matches_month?(post, filters.month) and
         matches_from?(post, filters.from) and
         matches_to?(post, filters.to) and
-        matches_missing_translation?(post, filters.missing_translation_language, translation_languages)
+        matches_missing_translation?(
+          post,
+          filters.missing_translation_language,
+          translation_languages
+        )
     end)
   end
 
@@ -270,7 +281,13 @@ defmodule BDS.Search do
   defp matches_to?(post, to_unix), do: post.created_at <= to_unix
 
   defp matches_missing_translation?(_post, nil, _translation_languages), do: true
-  defp matches_missing_translation?(%Post{do_not_translate: true}, _language, _translation_languages), do: false
+
+  defp matches_missing_translation?(
+         %Post{do_not_translate: true},
+         _language,
+         _translation_languages
+       ),
+       do: false
 
   defp matches_missing_translation?(post, language, translation_languages) do
     language not in Map.get(translation_languages, post.id, [])
@@ -286,7 +303,9 @@ defmodule BDS.Search do
       "SELECT translation_for, language FROM post_translations WHERE translation_for IN (#{placeholders})",
       post_ids
     ).rows
-    |> Enum.group_by(fn [post_id, _language] -> post_id end, fn [_post_id, language] -> language end)
+    |> Enum.group_by(fn [post_id, _language] -> post_id end, fn [_post_id, language] ->
+      language
+    end)
   end
 
   defp paginate(items, filters) do
@@ -300,16 +319,27 @@ defmodule BDS.Search do
     post_language = normalize_language(post.language)
 
     title =
-      [stem(post.title, post_language) | Enum.map(translations, &stem(Map.get(&1, "title"), Map.get(&1, "language")))]
+      [
+        stem(post.title, post_language)
+        | Enum.map(translations, &stem(Map.get(&1, "title"), Map.get(&1, "language")))
+      ]
       |> join_text()
 
     excerpt =
-      [stem(post.excerpt, post_language) | Enum.map(translations, &stem(Map.get(&1, "excerpt"), Map.get(&1, "language")))]
+      [
+        stem(post.excerpt, post_language)
+        | Enum.map(translations, &stem(Map.get(&1, "excerpt"), Map.get(&1, "language")))
+      ]
       |> join_text()
 
     content =
-      [stem(post_content(post), post_language) |
-       Enum.map(translations, &stem(translation_content(post.project_id, &1), Map.get(&1, "language")))]
+      [
+        stem(post_content(post), post_language)
+        | Enum.map(
+            translations,
+            &stem(translation_content(post.project_id, &1), Map.get(&1, "language"))
+          )
+      ]
       |> join_text()
 
     tags = stem(Enum.join(post.tags || [], " "), post_language)
@@ -320,15 +350,25 @@ defmodule BDS.Search do
 
   defp media_index_fields(media) do
     translations =
-      Repo.all(from translation in MediaTranslation, where: translation.translation_for == ^media.id)
+      Repo.all(
+        from translation in MediaTranslation, where: translation.translation_for == ^media.id
+      )
 
     media_language = normalize_language(media.language)
 
-    title = [stem(media.title, media_language) | Enum.map(translations, &stem(&1.title, &1.language))] |> join_text()
-    alt = [stem(media.alt, media_language) | Enum.map(translations, &stem(&1.alt, &1.language))] |> join_text()
+    title =
+      [stem(media.title, media_language) | Enum.map(translations, &stem(&1.title, &1.language))]
+      |> join_text()
+
+    alt =
+      [stem(media.alt, media_language) | Enum.map(translations, &stem(&1.alt, &1.language))]
+      |> join_text()
 
     caption =
-      [stem(media.caption, media_language) | Enum.map(translations, &stem(&1.caption, &1.language))]
+      [
+        stem(media.caption, media_language)
+        | Enum.map(translations, &stem(&1.caption, &1.language))
+      ]
       |> join_text()
 
     original_name = stem(media.original_name || "", media_language)
@@ -356,7 +396,8 @@ defmodule BDS.Search do
 
   defp post_content(%Post{content: content}) when is_binary(content), do: content
 
-  defp post_content(%Post{project_id: project_id, file_path: file_path}) when is_binary(file_path) and file_path != "" do
+  defp post_content(%Post{project_id: project_id, file_path: file_path})
+       when is_binary(file_path) and file_path != "" do
     project_id
     |> Projects.get_project!()
     |> Projects.project_data_dir()
@@ -366,9 +407,11 @@ defmodule BDS.Search do
 
   defp post_content(_post), do: ""
 
-  defp translation_content(_project_id, %{"content" => content}) when is_binary(content), do: content
+  defp translation_content(_project_id, %{"content" => content}) when is_binary(content),
+    do: content
 
-  defp translation_content(project_id, %{"status" => "published", "file_path" => file_path}) when is_binary(file_path) and file_path != "" do
+  defp translation_content(project_id, %{"status" => "published", "file_path" => file_path})
+       when is_binary(file_path) and file_path != "" do
     project_id
     |> Projects.get_project!()
     |> Projects.project_data_dir()
@@ -403,7 +446,7 @@ defmodule BDS.Search do
     |> Enum.map_join(" OR ", fn tokens ->
       tokens
       |> Enum.map_join(" AND ", &quoted_term/1)
-      |> then(&"(" <> &1 <> ")")
+      |> then(&("(" <> &1 <> ")"))
     end)
   end
 
@@ -495,7 +538,10 @@ defmodule BDS.Search do
   end
 
   defp normalize_non_negative_integer(nil, default), do: default
-  defp normalize_non_negative_integer(value, _default) when is_integer(value) and value >= 0, do: value
+
+  defp normalize_non_negative_integer(value, _default) when is_integer(value) and value >= 0,
+    do: value
+
   defp normalize_non_negative_integer(value, default), do: normalize_integer(value) || default
 
   defp normalize_timestamp(nil, _position), do: nil
@@ -508,7 +554,8 @@ defmodule BDS.Search do
         {:ok, datetime} = DateTime.new(date, time, "Etc/UTC")
         DateTime.to_unix(datetime)
 
-      {:error, _reason} -> nil
+      {:error, _reason} ->
+        nil
     end
   end
 

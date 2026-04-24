@@ -11,7 +11,8 @@ defmodule BDS.MenuTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "update_menu normalizes Home first, writes meta/menu.opml, and load returns nested items", %{project: project, temp_dir: temp_dir} do
+  test "update_menu normalizes Home first, writes meta/menu.opml, and load returns nested items",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, menu} =
              BDS.Menu.update_menu(project.id, [
                %{kind: :page, label: "About", slug: "about"},
@@ -52,7 +53,10 @@ defmodule BDS.MenuTest do
     assert loaded == menu
   end
 
-  test "sync_menu_from_filesystem loads canonical OPML and preserves a prepended Home entry", %{project: project, temp_dir: temp_dir} do
+  test "sync_menu_from_filesystem loads canonical OPML and preserves a prepended Home entry", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     meta_dir = Path.join(temp_dir, "meta")
     File.mkdir_p!(meta_dir)
 

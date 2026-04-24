@@ -10,7 +10,8 @@ defmodule BDS.Publishing do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
-  def upload_site(project_id, credentials, opts \\ []) when is_binary(project_id) and is_map(credentials) and is_list(opts) do
+  def upload_site(project_id, credentials, opts \\ [])
+      when is_binary(project_id) and is_map(credentials) and is_list(opts) do
     project = Projects.get_project!(project_id)
     normalized_credentials = normalize_credentials(credentials)
     targets = build_upload_targets(Projects.project_data_dir(project), normalized_credentials)
@@ -23,7 +24,7 @@ defmodule BDS.Publishing do
 
   @impl true
   def init(_state) do
-    {:ok, %{jobs: %{}}}
+    {:ok, %{jobs: %{}, scp_uploads: %{}}}
   end
 
   @impl true
@@ -41,15 +42,32 @@ defmodule BDS.Publishing do
     {:reply, :ok, next_state}
   end
 
+  def handle_call({:should_upload_scp_file, upload_key, local_mtime}, _from, state) do
+    should_upload? =
+      case state.scp_uploads[upload_key] do
+        nil -> true
+        recorded_mtime -> local_mtime > recorded_mtime
+      end
+
+    {:reply, should_upload?, state}
+  end
+
+  def handle_call({:mark_uploaded_scp_file, upload_key, local_mtime}, _from, state) do
+    {:reply, :ok, put_in(state, [:scp_uploads, upload_key], local_mtime)}
+  end
+
   def handle_call({:upload_site, project_id, credentials, targets, opts}, _from, state) do
     job_id = "publish-" <> Integer.to_string(System.unique_integer([:positive, :monotonic]))
-    uploader = build_uploader(opts)
+    uploader = build_uploader(Keyword.put_new(opts, :project_id, project_id))
 
     job = %{
       id: job_id,
       project_id: project_id,
       status: :pending,
       task_id: nil,
+      ssh_host: credentials.ssh_host,
+      ssh_user: credentials.ssh_user,
+      ssh_remote_path: credentials.ssh_remote_path,
       ssh_mode: credentials.ssh_mode,
       targets: Enum.map(targets, & &1.kind),
       error: nil,
@@ -58,12 +76,16 @@ defmodule BDS.Publishing do
     }
 
     {:ok, task} =
-      Tasks.submit_task("publish #{project_id}", fn report ->
-        run_upload(job_id, credentials, targets, uploader, report)
-      end, %{
-        group_id: project_id,
-        group_name: "Publishing"
-      })
+      Tasks.submit_task(
+        "publish #{project_id}",
+        fn report ->
+          run_upload(job_id, credentials, targets, uploader, report)
+        end,
+        %{
+          group_id: project_id,
+          group_name: "Publishing"
+        }
+      )
 
     next_job = %{job | task_id: task.id}
     {:reply, {:ok, next_job}, put_in(state, [:jobs, job_id], next_job)}
@@ -104,9 +126,10 @@ defmodule BDS.Publishing do
       nil ->
         runner = Keyword.get(opts, :command_runner, &System.cmd/3)
         ssh_auth_sock = Keyword.get(opts, :ssh_auth_sock, System.get_env("SSH_AUTH_SOCK"))
+        project_id = Keyword.fetch!(opts, :project_id)
 
         fn target, files, credentials ->
-          run_command_upload(target, files, credentials, runner, ssh_auth_sock)
+          run_command_upload(project_id, target, files, credentials, runner, ssh_auth_sock)
         end
 
       uploader ->
@@ -114,22 +137,60 @@ defmodule BDS.Publishing do
     end
   end
 
-  defp run_command_upload(target, _files, %{ssh_mode: :rsync} = credentials, runner, ssh_auth_sock) do
+  defp run_command_upload(
+         _project_id,
+         target,
+         _files,
+         %{ssh_mode: :rsync} = credentials,
+         runner,
+         ssh_auth_sock
+       ) do
     args =
       ["--update", "--compress", "--verbose"] ++
         rsync_excludes(target) ++
-        ["-e", "ssh", ensure_trailing_slash(target.local_dir), remote_dir_spec(credentials, target.remote_dir)]
+        [
+          "-e",
+          "ssh",
+          ensure_trailing_slash(target.local_dir),
+          remote_dir_spec(credentials, target.remote_dir)
+        ]
 
     run_command(runner, "rsync", args, ssh_auth_sock)
   end
 
-  defp run_command_upload(target, files, credentials, runner, ssh_auth_sock) do
+  defp run_command_upload(project_id, target, files, credentials, runner, ssh_auth_sock) do
     Enum.reduce_while(files, :ok, fn relative_path, :ok ->
       local_path = Path.join(target.local_dir, relative_path)
-      remote_path = remote_file_spec(credentials, target.remote_dir, relative_path)
 
-      case run_command(runner, "scp", ["-q", local_path, remote_path], ssh_auth_sock) do
-        :ok -> {:cont, :ok}
+      with {:ok, local_mtime} <- file_mtime(local_path),
+           true <-
+             should_upload_scp_file?(
+               project_id,
+               credentials,
+               target.kind,
+               relative_path,
+               local_mtime
+             ) do
+        remote_path = remote_file_spec(credentials, target.remote_dir, relative_path)
+
+        case run_command(runner, "scp", ["-q", local_path, remote_path], ssh_auth_sock) do
+          :ok ->
+            :ok =
+              mark_uploaded_scp_file(
+                project_id,
+                credentials,
+                target.kind,
+                relative_path,
+                local_mtime
+              )
+
+            {:cont, :ok}
+
+          {:error, reason} ->
+            {:halt, {:error, reason}}
+        end
+      else
+        false -> {:cont, :ok}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
@@ -147,10 +208,49 @@ defmodule BDS.Publishing do
   end
 
   defp command_opts(nil), do: [stderr_to_stdout: true]
-  defp command_opts(ssh_auth_sock), do: [stderr_to_stdout: true, env: [{"SSH_AUTH_SOCK", ssh_auth_sock}]]
 
-  defp normalize_command_error(_command, output, _status) when is_binary(output) and output != "", do: output
-  defp normalize_command_error(command, _output, status), do: "#{command} exited with status #{status}"
+  defp command_opts(ssh_auth_sock),
+    do: [stderr_to_stdout: true, env: [{"SSH_AUTH_SOCK", ssh_auth_sock}]]
+
+  defp normalize_command_error(_command, output, _status) when is_binary(output) and output != "",
+    do: output
+
+  defp normalize_command_error(command, _output, status),
+    do: "#{command} exited with status #{status}"
+
+  defp file_mtime(path) do
+    case File.stat(path, time: :posix) do
+      {:ok, stat} -> {:ok, stat.mtime}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp should_upload_scp_file?(project_id, credentials, target_kind, relative_path, local_mtime) do
+    GenServer.call(
+      __MODULE__,
+      {:should_upload_scp_file,
+       scp_upload_key(project_id, credentials, target_kind, relative_path), local_mtime}
+    )
+  end
+
+  defp mark_uploaded_scp_file(project_id, credentials, target_kind, relative_path, local_mtime) do
+    GenServer.call(
+      __MODULE__,
+      {:mark_uploaded_scp_file,
+       scp_upload_key(project_id, credentials, target_kind, relative_path), local_mtime}
+    )
+  end
+
+  defp scp_upload_key(project_id, credentials, target_kind, relative_path) do
+    {
+      project_id,
+      credentials.ssh_host,
+      credentials.ssh_user,
+      credentials.ssh_remote_path,
+      target_kind,
+      relative_path
+    }
+  end
 
   defp rsync_excludes(%{kind: :media}), do: ["--exclude=*.meta"]
   defp rsync_excludes(_target), do: []
@@ -172,8 +272,16 @@ defmodule BDS.Publishing do
 
     [
       %{kind: :html, local_dir: Path.join(base_dir, "html"), remote_dir: remote_root},
-      %{kind: :thumbnails, local_dir: Path.join(base_dir, "thumbnails"), remote_dir: Path.join(remote_root, "thumbnails")},
-      %{kind: :media, local_dir: Path.join(base_dir, "media"), remote_dir: Path.join(remote_root, "media")}
+      %{
+        kind: :thumbnails,
+        local_dir: Path.join(base_dir, "thumbnails"),
+        remote_dir: Path.join(remote_root, "thumbnails")
+      },
+      %{
+        kind: :media,
+        local_dir: Path.join(base_dir, "media"),
+        remote_dir: Path.join(remote_root, "media")
+      }
     ]
   end
 
@@ -184,7 +292,9 @@ defmodule BDS.Publishing do
       |> Path.wildcard(match_dot: true)
       |> Enum.filter(&File.regular?/1)
       |> Enum.map(&Path.relative_to(&1, target.local_dir))
-      |> Enum.reject(fn relative_path -> target.kind == :media and String.ends_with?(relative_path, ".meta") end)
+      |> Enum.reject(fn relative_path ->
+        target.kind == :media and String.ends_with?(relative_path, ".meta")
+      end)
       |> Enum.sort()
     else
       []

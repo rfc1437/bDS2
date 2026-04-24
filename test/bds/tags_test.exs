@@ -14,8 +14,13 @@ defmodule BDS.TagsTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "create_tag persists the row and rewrites meta/tags.json sorted by name", %{project: project, temp_dir: temp_dir} do
-    assert {:ok, zebra} = BDS.Tags.create_tag(%{project_id: project.id, name: "Zebra", color: "#000000"})
+  test "create_tag persists the row and rewrites meta/tags.json sorted by name", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, zebra} =
+             BDS.Tags.create_tag(%{project_id: project.id, name: "Zebra", color: "#000000"})
+
     assert {:ok, alpha} = BDS.Tags.create_tag(%{project_id: project.id, name: "Alpha"})
 
     assert zebra.name == "Zebra"
@@ -35,7 +40,10 @@ defmodule BDS.TagsTest do
     assert "has already been taken" in errors_on(changeset).name
   end
 
-  test "update_tag rewrites the tag row and meta/tags.json", %{project: project, temp_dir: temp_dir} do
+  test "update_tag rewrites the tag row and meta/tags.json", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, tag} = BDS.Tags.create_tag(%{project_id: project.id, name: "Alpha"})
 
     assert {:ok, updated} =
@@ -51,11 +59,16 @@ defmodule BDS.TagsTest do
 
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
 
-    assert %{"tags" => [%{"name" => "Alpha", "color" => "#112233", "post_template_slug" => "article"}]} =
+    assert %{
+             "tags" => [
+               %{"name" => "Alpha", "color" => "#112233", "post_template_slug" => "article"}
+             ]
+           } =
              Jason.decode!(File.read!(tags_path))
   end
 
-  test "rename_tag updates post tag arrays, rewrites published post files, and refreshes tags.json", %{project: project, temp_dir: temp_dir} do
+  test "rename_tag updates post tag arrays, rewrites published post files, and refreshes tags.json",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, tag} = BDS.Tags.create_tag(%{project_id: project.id, name: "Alpha"})
 
     assert {:ok, post} =
@@ -83,7 +96,8 @@ defmodule BDS.TagsTest do
     assert %{"tags" => [%{"name" => "Beta"}]} = Jason.decode!(File.read!(tags_path))
   end
 
-  test "merge_tags moves source tags onto the target, deduplicates post tags, deletes sources, and refreshes tags.json", %{project: project, temp_dir: temp_dir} do
+  test "merge_tags moves source tags onto the target, deduplicates post tags, deletes sources, and refreshes tags.json",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, source_a} = BDS.Tags.create_tag(%{project_id: project.id, name: "Alpha"})
     assert {:ok, source_b} = BDS.Tags.create_tag(%{project_id: project.id, name: "Beta"})
     assert {:ok, target} = BDS.Tags.create_tag(%{project_id: project.id, name: "Gamma"})
@@ -115,7 +129,8 @@ defmodule BDS.TagsTest do
     assert %{"tags" => [%{"name" => "Gamma"}]} = Jason.decode!(File.read!(tags_path))
   end
 
-  test "delete_tag removes the tag from posts, rewrites published files, deletes the row, and refreshes tags.json", %{project: project, temp_dir: temp_dir} do
+  test "delete_tag removes the tag from posts, rewrites published files, deletes the row, and refreshes tags.json",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, doomed} = BDS.Tags.create_tag(%{project_id: project.id, name: "Alpha"})
     assert {:ok, _other} = BDS.Tags.create_tag(%{project_id: project.id, name: "Beta"})
 
@@ -145,7 +160,8 @@ defmodule BDS.TagsTest do
     assert %{"tags" => [%{"name" => "Beta"}]} = Jason.decode!(File.read!(tags_path))
   end
 
-  test "sync_tags_from_posts creates missing tags from post tag arrays and refreshes tags.json", %{project: project, temp_dir: temp_dir} do
+  test "sync_tags_from_posts creates missing tags from post tag arrays and refreshes tags.json",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, existing} =
              BDS.Tags.create_tag(%{
                project_id: project.id,
@@ -183,7 +199,11 @@ defmodule BDS.TagsTest do
     assert %{
              "tags" => [
                %{"name" => "Another"},
-               %{"name" => "Existing", "color" => "#112233", "post_template_slug" => "feature-view"},
+               %{
+                 "name" => "Existing",
+                 "color" => "#112233",
+                 "post_template_slug" => "feature-view"
+               },
                %{"name" => "Missing"}
              ]
            } = Jason.decode!(File.read!(tags_path))

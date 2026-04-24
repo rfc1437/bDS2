@@ -10,7 +10,10 @@ defmodule BDS.GenerationTest do
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
-    temp_dir = Path.join(System.tmp_dir!(), "bds-generation-#{System.unique_integer([:positive])}")
+
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-generation-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
@@ -18,8 +21,13 @@ defmodule BDS.GenerationTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "write_generated_file writes under html output and skips unchanged content by hash", %{project: project, temp_dir: temp_dir} do
-    assert {:ok, first_write} = BDS.Generation.write_generated_file(project.id, "index.html", "<html>hello</html>")
+  test "write_generated_file writes under html output and skips unchanged content by hash", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, first_write} =
+             BDS.Generation.write_generated_file(project.id, "index.html", "<html>hello</html>")
+
     assert first_write.written? == true
 
     output_path = Path.join([temp_dir, "html", "index.html"])
@@ -29,18 +37,30 @@ defmodule BDS.GenerationTest do
     assert tracked_file.relative_path == "index.html"
     assert tracked_file.content_hash == first_write.content_hash
 
-    assert {:ok, second_write} = BDS.Generation.write_generated_file(project.id, "index.html", "<html>hello</html>")
+    assert {:ok, second_write} =
+             BDS.Generation.write_generated_file(project.id, "index.html", "<html>hello</html>")
+
     assert second_write.written? == false
     assert second_write.content_hash == first_write.content_hash
 
-    assert {:ok, third_write} = BDS.Generation.write_generated_file(project.id, "index.html", "<html>updated</html>")
+    assert {:ok, third_write} =
+             BDS.Generation.write_generated_file(project.id, "index.html", "<html>updated</html>")
+
     assert third_write.written? == true
     assert third_write.content_hash != first_write.content_hash
     assert File.read!(output_path) == "<html>updated</html>"
   end
 
-  test "delete_generated_file removes tracked output and forgets its hash", %{project: project, temp_dir: temp_dir} do
-    assert {:ok, _write} = BDS.Generation.write_generated_file(project.id, "tag/elixir/index.html", "<html>tag</html>")
+  test "delete_generated_file removes tracked output and forgets its hash", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _write} =
+             BDS.Generation.write_generated_file(
+               project.id,
+               "tag/elixir/index.html",
+               "<html>tag</html>"
+             )
 
     output_path = Path.join([temp_dir, "html", "tag", "elixir", "index.html"])
     assert File.exists?(output_path)
@@ -52,7 +72,8 @@ defmodule BDS.GenerationTest do
     assert files == []
   end
 
-  test "plan_generation derives generation settings from project metadata and core generation writes tracked files", %{project: project, temp_dir: temp_dir} do
+  test "plan_generation derives generation settings from project metadata and core generation writes tracked files",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
                public_url: "https://example.com/blog",
@@ -88,7 +109,8 @@ defmodule BDS.GenerationTest do
       "de/atom.xml"
     ]
 
-    assert Enum.sort(Enum.map(result.generated_files, & &1.relative_path)) == Enum.sort(expected_paths)
+    assert Enum.sort(Enum.map(result.generated_files, & &1.relative_path)) ==
+             Enum.sort(expected_paths)
 
     for relative_path <- expected_paths do
       assert File.exists?(Path.join([temp_dir, "html", relative_path]))
@@ -97,7 +119,10 @@ defmodule BDS.GenerationTest do
     assert File.read!(Path.join([temp_dir, "html", "sitemap.xml"])) =~ "https://example.com/blog/"
   end
 
-  test "generation renders published list and post templates for core and single pages", %{project: project, temp_dir: temp_dir} do
+  test "generation renders published list and post templates for core and single pages", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
                public_url: "https://example.com/blog",
@@ -110,7 +135,8 @@ defmodule BDS.GenerationTest do
                project_id: project.id,
                title: "List View",
                kind: :list,
-               content: "<main class=\"list-template\"><h1>{{ page_title }}</h1>{% for post in posts %}<a href=\"{{ post.href }}\">{{ post.title }}</a>{% endfor %}</main>"
+               content:
+                 "<main class=\"list-template\"><h1>{{ page_title }}</h1>{% for post in posts %}<a href=\"{{ post.href }}\">{{ post.title }}</a>{% endfor %}</main>"
              })
 
     assert {:ok, _published_list} = BDS.Templates.publish_template(list_template.id)
@@ -120,7 +146,8 @@ defmodule BDS.GenerationTest do
                project_id: project.id,
                title: "Post View",
                kind: :post,
-               content: "<article class=\"post-template\"><h1>{{ post.title }}</h1><div class=\"body\">{{ post.content }}</div></article>"
+               content:
+                 "<article class=\"post-template\"><h1>{{ post.title }}</h1><div class=\"body\">{{ post.content }}</div></article>"
              })
 
     assert {:ok, published_post_template} = BDS.Templates.publish_template(post_template.id)
@@ -153,7 +180,10 @@ defmodule BDS.GenerationTest do
     assert post_html =~ "Rendered body"
   end
 
-  test "generation renders copied starter templates with partials, i18n, and markdown", %{project: project, temp_dir: temp_dir} do
+  test "generation renders copied starter templates with partials, i18n, and markdown", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, _menu} =
              BDS.Menu.update_menu(project.id, [
                %{kind: :page, label: "Notes", slug: "notes"}
@@ -199,7 +229,8 @@ defmodule BDS.GenerationTest do
     assert post_html =~ "Language"
   end
 
-  test "generation expands starter-template markdown macros, rewrites canonical post links, media links, and emits not-found page", %{project: project, temp_dir: temp_dir} do
+  test "generation expands starter-template markdown macros, rewrites canonical post links, media links, and emits not-found page",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
                public_url: "https://example.com/blog",
@@ -228,7 +259,10 @@ defmodule BDS.GenerationTest do
     assert {:ok, published_linked_post} = Posts.publish_post(linked_post.id)
 
     media_source_reference = "/" <> Path.join(Path.dirname(media.file_path), media.original_name)
-    canonical_post_href = "/" <> String.trim_trailing(BDS.Generation.post_output_path(published_linked_post), "index.html")
+
+    canonical_post_href =
+      "/" <>
+        String.trim_trailing(BDS.Generation.post_output_path(published_linked_post), "index.html")
 
     assert {:ok, post} =
              Posts.create_post(%{
@@ -252,7 +286,9 @@ defmodule BDS.GenerationTest do
 
     assert "404.html" in Enum.map(result.generated_files, & &1.relative_path)
 
-    post_html = File.read!(Path.join([temp_dir, "html", BDS.Generation.post_output_path(published_post)]))
+    post_html =
+      File.read!(Path.join([temp_dir, "html", BDS.Generation.post_output_path(published_post)]))
+
     assert post_html =~ ~s(src="https://www.youtube.com/embed/dQw4w9WgXcQ?rel=0")
     assert post_html =~ ~s(href="#{canonical_post_href}")
     assert post_html =~ ~s(src="/#{media.file_path}")
@@ -262,7 +298,10 @@ defmodule BDS.GenerationTest do
     assert not_found_html =~ "Back to preview home"
   end
 
-  test "single generation writes canonical post pages and language-prefixed translation pages", %{project: project, temp_dir: temp_dir} do
+  test "single generation writes canonical post pages and language-prefixed translation pages", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
                public_url: "https://example.com/blog",
@@ -291,14 +330,18 @@ defmodule BDS.GenerationTest do
     post_path = BDS.Generation.post_output_path(published_post)
     translation_path = BDS.Generation.post_output_path(published_post, "de")
 
-    assert Enum.map(result.generated_files, & &1.relative_path) |> Enum.sort() == Enum.sort([post_path, translation_path])
+    assert Enum.map(result.generated_files, & &1.relative_path) |> Enum.sort() ==
+             Enum.sort([post_path, translation_path])
 
     assert File.read!(Path.join([temp_dir, "html", post_path])) =~ "Hello generated world"
     assert File.read!(Path.join([temp_dir, "html", translation_path])) =~ "Hallo generierte Welt"
     assert File.read!(Path.join([temp_dir, "html", post_path])) =~ ~s(data-pagefind-body)
   end
 
-  test "archive generation writes paginated category, tag, and date pages", %{project: project, temp_dir: temp_dir} do
+  test "archive generation writes paginated category, tag, and date pages", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
                public_url: "https://example.com/blog",
@@ -319,7 +362,11 @@ defmodule BDS.GenerationTest do
                })
 
       created_at = DateTime.to_unix(~U[2026-04-15 12:00:00Z]) + index
-      Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^post.id), set: [created_at: created_at, updated_at: created_at])
+
+      Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^post.id),
+        set: [created_at: created_at, updated_at: created_at]
+      )
+
       assert {:ok, _published} = Posts.publish_post(post.id)
     end
 
@@ -341,8 +388,13 @@ defmodule BDS.GenerationTest do
 
     assert expected_paths -- Enum.map(result.generated_files, & &1.relative_path) == []
 
-    assert File.read!(Path.join([temp_dir, "html", "category", "notes", "index.html"])) =~ "Archive 1"
-    assert File.read!(Path.join([temp_dir, "html", "category", "notes", "page", "2", "index.html"])) =~ "Archive 3"
+    assert File.read!(Path.join([temp_dir, "html", "category", "notes", "index.html"])) =~
+             "Archive 1"
+
+    assert File.read!(
+             Path.join([temp_dir, "html", "category", "notes", "page", "2", "index.html"])
+           ) =~ "Archive 3"
+
     assert File.read!(Path.join([temp_dir, "html", "tag", "elixir", "index.html"])) =~ "Elixir"
     assert File.read!(Path.join([temp_dir, "html", "2026", "04", "index.html"])) =~ "2026-04"
   end

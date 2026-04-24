@@ -64,7 +64,9 @@ defmodule BDS.Scripting do
        opts: batch_job_defaults(opts)}
 
     case DynamicSupervisor.start_child(BDS.Scripting.JobSupervisor, child_spec) do
-      {:ok, _pid} -> {:ok, BDS.Scripting.JobStore.fetch_job!(job_id)}
+      {:ok, _pid} ->
+        {:ok, BDS.Scripting.JobStore.fetch_job!(job_id)}
+
       {:error, reason} ->
         :ok =
           BDS.Scripting.JobStore.update_job(job_id, %{
@@ -91,7 +93,8 @@ defmodule BDS.Scripting do
           _job -> {:error, :not_running}
         end
 
-      pid -> BDS.Scripting.JobRunner.cancel(pid)
+      pid ->
+        BDS.Scripting.JobRunner.cancel(pid)
     end
   end
 

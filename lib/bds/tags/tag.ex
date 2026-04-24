@@ -19,7 +19,9 @@ defmodule BDS.Tags.Tag do
 
   def changeset(tag, attrs) do
     tag
-    |> cast(attrs, [:id, :project_id, :name, :color, :post_template_slug, :created_at, :updated_at],
+    |> cast(
+      attrs,
+      [:id, :project_id, :name, :color, :post_template_slug, :created_at, :updated_at],
       empty_values: [nil]
     )
     |> validate_required([:id, :project_id, :name, :created_at, :updated_at])

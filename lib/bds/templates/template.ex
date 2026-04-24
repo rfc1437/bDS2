@@ -24,10 +24,36 @@ defmodule BDS.Templates.Template do
 
   def changeset(template, attrs) do
     template
-    |> cast(attrs, [:id, :project_id, :slug, :title, :kind, :enabled, :version, :file_path, :status, :content, :created_at, :updated_at],
+    |> cast(
+      attrs,
+      [
+        :id,
+        :project_id,
+        :slug,
+        :title,
+        :kind,
+        :enabled,
+        :version,
+        :file_path,
+        :status,
+        :content,
+        :created_at,
+        :updated_at
+      ],
       empty_values: [nil]
     )
-    |> validate_required([:id, :project_id, :slug, :title, :kind, :enabled, :version, :status, :created_at, :updated_at])
+    |> validate_required([
+      :id,
+      :project_id,
+      :slug,
+      :title,
+      :kind,
+      :enabled,
+      :version,
+      :status,
+      :created_at,
+      :updated_at
+    ])
     |> assoc_constraint(:project)
     |> unique_constraint(:slug, name: :templates_project_slug_idx)
   end

@@ -66,7 +66,8 @@ defmodule BDS.Scripting.Lua do
     end
   end
 
-  defp install_progress_callback(_state, callback), do: {:error, {:invalid_progress_callback, callback}}
+  defp install_progress_callback(_state, callback),
+    do: {:error, {:invalid_progress_callback, callback}}
 
   defp install_capabilities(state, capabilities) when capabilities in [%{}, []], do: {:ok, state}
 
@@ -81,7 +82,8 @@ defmodule BDS.Scripting.Lua do
     end)
   end
 
-  defp install_capabilities(_state, capabilities), do: {:error, {:invalid_capabilities, capabilities}}
+  defp install_capabilities(_state, capabilities),
+    do: {:error, {:invalid_capabilities, capabilities}}
 
   defp normalize_progress_payload(payload) when is_list(payload) do
     if Enum.all?(payload, &match?({key, _value} when is_binary(key) or is_atom(key), &1)) do

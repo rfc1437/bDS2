@@ -1,4 +1,3 @@
 import Config
 
-config :bds, BDS.Repo,
-  pool_size: 5
+config :bds, BDS.Repo, pool_size: 5

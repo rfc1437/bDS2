@@ -13,7 +13,9 @@ defmodule BDS.PostsTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "create_post slugifies titles, stores list fields, and defaults draft fields", %{project: project} do
+  test "create_post slugifies titles, stores list fields, and defaults draft fields", %{
+    project: project
+  } do
     assert {:ok, post} =
              BDS.Posts.create_post(%{
                project_id: project.id,
@@ -48,7 +50,10 @@ defmodule BDS.PostsTest do
     assert duplicate_slug_post.categories == []
   end
 
-  test "create_post falls back to untitled and keeps slug uniqueness scoped to a project", %{project: project, temp_dir: temp_dir} do
+  test "create_post falls back to untitled and keeps slug uniqueness scoped to a project", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, first} = BDS.Posts.create_post(%{project_id: project.id, title: nil})
     assert first.title == ""
     assert first.slug == "untitled"
@@ -59,12 +64,15 @@ defmodule BDS.PostsTest do
     other_temp_dir = Path.join(temp_dir, "elsewhere")
     File.mkdir_p!(other_temp_dir)
 
-    assert {:ok, other_project} = BDS.Projects.create_project(%{name: "Elsewhere", data_path: other_temp_dir})
+    assert {:ok, other_project} =
+             BDS.Projects.create_project(%{name: "Elsewhere", data_path: other_temp_dir})
+
     assert {:ok, other_post} = BDS.Posts.create_post(%{project_id: other_project.id, title: nil})
     assert other_post.slug == "untitled"
   end
 
-  test "update_post rejects slug changes after first publish and reopens published posts when content changes", %{project: project} do
+  test "update_post rejects slug changes after first publish and reopens published posts when content changes",
+       %{project: project} do
     assert {:ok, post} =
              BDS.Posts.create_post(%{
                project_id: project.id,
@@ -97,11 +105,14 @@ defmodule BDS.PostsTest do
   end
 
   test "publish_post writes frontmatter to the project data directory and clears draft content" do
-    temp_dir = Path.join(System.tmp_dir!(), "bds-post-publish-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-publish-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
-    assert {:ok, project} = BDS.Projects.create_project(%{name: "Filesystem", data_path: temp_dir})
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Filesystem", data_path: temp_dir})
 
     assert {:ok, post} =
              BDS.Posts.create_post(%{
@@ -144,7 +155,9 @@ defmodule BDS.PostsTest do
   end
 
   test "delete_post removes the database row and published markdown file when present" do
-    temp_dir = Path.join(System.tmp_dir!(), "bds-post-delete-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-delete-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
@@ -178,11 +191,14 @@ defmodule BDS.PostsTest do
     assert {:ok, archived_draft} = BDS.Posts.archive_post(draft_post.id)
     assert archived_draft.status == :archived
 
-    temp_dir = Path.join(System.tmp_dir!(), "bds-post-archive-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-archive-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
-    assert {:ok, publish_project} = BDS.Projects.create_project(%{name: "Archive Published", data_path: temp_dir})
+    assert {:ok, publish_project} =
+             BDS.Projects.create_project(%{name: "Archive Published", data_path: temp_dir})
 
     assert {:ok, published_post} =
              BDS.Posts.create_post(%{
@@ -200,7 +216,9 @@ defmodule BDS.PostsTest do
   end
 
   test "publish_post republishes archived posts without losing the existing body or original published_at" do
-    temp_dir = Path.join(System.tmp_dir!(), "bds-post-republish-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-republish-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
@@ -227,7 +245,9 @@ defmodule BDS.PostsTest do
   end
 
   test "rebuild_posts_from_files recreates published posts from disk" do
-    temp_dir = Path.join(System.tmp_dir!(), "bds-post-rebuild-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-rebuild-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
@@ -279,9 +299,9 @@ defmodule BDS.PostsTest do
     assert post.language == "en"
     assert post.do_not_translate == true
     assert post.template_slug == "article"
-    assert post.created_at == 1711843200
-    assert post.updated_at == 1711929600
-    assert post.published_at == 1712016000
+    assert post.created_at == 1_711_843_200
+    assert post.updated_at == 1_711_929_600
+    assert post.published_at == 1_712_016_000
     assert post.tags == ["alpha"]
     assert post.categories == ["notes"]
     assert post.file_path == "posts/2026/04/recovered-post.md"

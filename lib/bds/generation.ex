@@ -14,7 +14,8 @@ defmodule BDS.Generation do
 
   @core_sections [:core, :single, :category, :tag, :date]
 
-  def plan_generation(project_id, sections \\ [:core]) when is_binary(project_id) and is_list(sections) do
+  def plan_generation(project_id, sections \\ [:core])
+      when is_binary(project_id) and is_list(sections) do
     project = Projects.get_project!(project_id)
     {:ok, metadata} = Metadata.get_project_metadata(project_id)
     {:ok, generated_files} = list_generated_files(project_id)
@@ -27,14 +28,15 @@ defmodule BDS.Generation do
        language: metadata.main_language,
        blog_languages: normalize_blog_languages(metadata.main_language, metadata.blog_languages),
        max_posts_per_page: metadata.max_posts_per_page,
-      categories: metadata.categories,
+       categories: metadata.categories,
        pico_theme: metadata.pico_theme,
        sections: normalize_sections(sections),
        generated_files: generated_files
      }}
   end
 
-  def generate_site(project_id, sections \\ [:core]) when is_binary(project_id) and is_list(sections) do
+  def generate_site(project_id, sections \\ [:core])
+      when is_binary(project_id) and is_list(sections) do
     with {:ok, plan} <- plan_generation(project_id, sections) do
       outputs = build_outputs(plan)
 
@@ -106,7 +108,8 @@ defmodule BDS.Generation do
      )}
   end
 
-  def delete_generated_file(project_id, relative_path) when is_binary(project_id) and is_binary(relative_path) do
+  def delete_generated_file(project_id, relative_path)
+      when is_binary(project_id) and is_binary(relative_path) do
     project = Projects.get_project!(project_id)
 
     case File.rm(output_path(project, relative_path)) do
@@ -117,7 +120,9 @@ defmodule BDS.Generation do
 
     Repo.delete_all(
       from generated_file in GeneratedFileHash,
-        where: generated_file.project_id == ^project_id and generated_file.relative_path == ^relative_path
+        where:
+          generated_file.project_id == ^project_id and
+            generated_file.relative_path == ^relative_path
     )
 
     :ok
@@ -146,8 +151,10 @@ defmodule BDS.Generation do
       build_archive_outputs(plan, published_posts)
 
     urls =
-      core_outputs ++ single_outputs ++ archive_outputs
-      |> Enum.map(fn {relative_path, _content} -> url_for_output(plan.base_url, relative_path) end)
+      (core_outputs ++ single_outputs ++ archive_outputs)
+      |> Enum.map(fn {relative_path, _content} ->
+        url_for_output(plan.base_url, relative_path)
+      end)
 
     sitemap =
       if :core in plan.sections do
@@ -199,9 +206,42 @@ defmodule BDS.Generation do
       Enum.with_index(paginated_posts, 1)
       |> Enum.flat_map(fn {page_posts, page_number} ->
         Enum.map(languages, fn language ->
+          pagination = %{
+            current_page: page_number,
+            total_pages: length(paginated_posts),
+            total_items: length(posts),
+            items_per_page: max(plan.max_posts_per_page, 1),
+            has_prev_page: page_number > 1,
+            prev_page_href:
+              if(page_number > 1,
+                do:
+                  archive_href(
+                    route_language(plan.language, language),
+                    ["category", category_slug],
+                    page_number - 1
+                  ),
+                else: ""
+              ),
+            has_next_page: page_number < length(paginated_posts),
+            next_page_href:
+              if(page_number < length(paginated_posts),
+                do:
+                  archive_href(
+                    route_language(plan.language, language),
+                    ["category", category_slug],
+                    page_number + 1
+                  ),
+                else: ""
+              )
+          }
+
           {
-            archive_path(route_language(plan.language, language), ["category", category_slug], page_number),
-            render_archive_page(plan, category, page_posts, language, "category")
+            archive_path(
+              route_language(plan.language, language),
+              ["category", category_slug],
+              page_number
+            ),
+            render_archive_page(plan, category, page_posts, language, "category", pagination)
           }
         end)
       end)
@@ -216,11 +256,12 @@ defmodule BDS.Generation do
 
     Enum.flat_map(tag_posts, fn {tag, posts} ->
       tag_slug = Slug.slugify(tag)
+      pagination = pagination_for_posts(posts)
 
       Enum.map(languages, fn language ->
         {
           archive_path(route_language(plan.language, language), ["tag", tag_slug], 1),
-          render_archive_page(plan, tag, posts, language, "tag")
+          render_archive_page(plan, tag, posts, language, "tag", pagination)
         }
       end)
     end)
@@ -232,20 +273,24 @@ defmodule BDS.Generation do
 
     year_outputs =
       Enum.flat_map(years, fn {year, posts} ->
+        pagination = pagination_for_posts(posts)
+
         Enum.map(languages, fn language ->
           {
             archive_path(route_language(plan.language, language), [year], 1),
-            render_date_archive_page(plan, year, posts, language)
+            render_date_archive_page(plan, year, posts, language, pagination)
           }
         end)
       end)
 
     month_outputs =
       Enum.flat_map(months, fn {{year, month}, posts} ->
+        pagination = pagination_for_posts(posts)
+
         Enum.map(languages, fn language ->
           {
             archive_path(route_language(plan.language, language), [year, month], 1),
-            render_date_archive_page(plan, "#{year}-#{month}", posts, language)
+            render_date_archive_page(plan, "#{year}-#{month}", posts, language, pagination)
           }
         end)
       end)
@@ -259,7 +304,16 @@ defmodule BDS.Generation do
     main_posts = build_list_posts(plan.base_url, published_posts, nil)
 
     [
-      {"index.html", render_list_output(plan, language, plan.project_name, main_posts, %{kind: "core"}, fn -> render_home(plan, language) end)},
+      {"index.html",
+       render_list_output(
+         plan,
+         language,
+         plan.project_name,
+         main_posts,
+         %{kind: "core"},
+         pagination_for_posts(main_posts),
+         fn -> render_home(plan, language) end
+       )},
       {"404.html", render_not_found_output(plan, language)},
       {"feed.xml", render_feed(plan, language, published_posts)},
       {"atom.xml", render_atom(plan, language, published_posts)},
@@ -270,10 +324,22 @@ defmodule BDS.Generation do
         localized_posts = build_list_posts(plan.base_url, published_posts, localized_prefix)
 
         [
-          {Path.join(localized_language, "index.html"), render_list_output(plan, localized_language, plan.project_name, localized_posts, %{kind: "core"}, fn -> render_home(plan, localized_language) end)},
-          {Path.join(localized_language, "404.html"), render_not_found_output(plan, localized_language)},
-          {Path.join(localized_language, "feed.xml"), render_feed(plan, localized_language, published_posts)},
-          {Path.join(localized_language, "atom.xml"), render_atom(plan, localized_language, published_posts)}
+          {Path.join(localized_language, "index.html"),
+           render_list_output(
+             plan,
+             localized_language,
+             plan.project_name,
+             localized_posts,
+             %{kind: "core"},
+             pagination_for_posts(localized_posts),
+             fn -> render_home(plan, localized_language) end
+           )},
+          {Path.join(localized_language, "404.html"),
+           render_not_found_output(plan, localized_language)},
+          {Path.join(localized_language, "feed.xml"),
+           render_feed(plan, localized_language, published_posts)},
+          {Path.join(localized_language, "atom.xml"),
+           render_atom(plan, localized_language, published_posts)}
         ]
       end)
   end
@@ -284,9 +350,21 @@ defmodule BDS.Generation do
         body = load_body(project_id, post.file_path, post.content)
 
         {post_output_path(post),
-         render_post_output(project_id, post.template_slug, %{id: post.id, title: post.title, content: body, slug: post.slug, language: post.language, excerpt: post.excerpt}, fn ->
-           render_post_page(post.title, body, post.slug, post.language)
-         end)}
+         render_post_output(
+           project_id,
+           post.template_slug,
+           %{
+             id: post.id,
+             title: post.title,
+             content: body,
+             slug: post.slug,
+             language: post.language,
+             excerpt: post.excerpt
+           },
+           fn ->
+             render_post_page(post.title, body, post.slug, post.language)
+           end
+         )}
       end)
 
     translation_outputs =
@@ -300,9 +378,21 @@ defmodule BDS.Generation do
 
             [
               {post_output_path(post, translation.language),
-               render_post_output(project_id, post.template_slug, %{id: translation.id, title: translation.title, content: body, slug: post.slug, language: translation.language, excerpt: translation.excerpt}, fn ->
-                 render_post_page(translation.title, body, post.slug, translation.language)
-               end)}
+               render_post_output(
+                 project_id,
+                 post.template_slug,
+                 %{
+                   id: translation.id,
+                   title: translation.title,
+                   content: body,
+                   slug: post.slug,
+                   language: translation.language,
+                   excerpt: translation.excerpt
+                 },
+                 fn ->
+                   render_post_page(translation.title, body, post.slug, translation.language)
+                 end
+               )}
             ]
         end
       end)
@@ -434,7 +524,7 @@ defmodule BDS.Generation do
     |> IO.iodata_to_binary()
   end
 
-  defp render_archive_page(plan, title, posts, language, kind) do
+  defp render_archive_page(plan, title, posts, language, kind, pagination) do
     fallback = fn ->
       items =
         posts
@@ -460,14 +550,23 @@ defmodule BDS.Generation do
       language,
       title,
       Enum.map(posts, fn post ->
-        %{title: post.title, href: "#", excerpt: post.excerpt, content: nil}
+        %{
+          id: post.id,
+          slug: post.slug,
+          title: post.title,
+          href: "#",
+          excerpt: post.excerpt,
+          content: nil,
+          language: post.language
+        }
       end),
       %{kind: kind, name: title},
+      pagination,
       fallback
     )
   end
 
-  defp render_date_archive_page(plan, label, posts, language) do
+  defp render_date_archive_page(plan, label, posts, language, pagination) do
     fallback = fn ->
       items =
         posts
@@ -491,21 +590,37 @@ defmodule BDS.Generation do
       language,
       label,
       Enum.map(posts, fn post ->
-        %{title: post.title, href: "#", excerpt: post.excerpt, content: nil}
+        %{
+          id: post.id,
+          slug: post.slug,
+          title: post.title,
+          href: "#",
+          excerpt: post.excerpt,
+          content: nil,
+          language: post.language
+        }
       end),
       %{kind: "date", name: label},
+      pagination,
       fallback
     )
   end
 
-  defp load_body(_project_id, _file_path, inline_content) when is_binary(inline_content), do: inline_content
+  defp load_body(_project_id, _file_path, inline_content) when is_binary(inline_content),
+    do: inline_content
 
   defp load_body(project_id, file_path, _inline_content) do
     case file_path do
-      nil -> ""
-      "" -> ""
+      nil ->
+        ""
+
+      "" ->
+        ""
+
       value ->
-        project_path = Path.expand(value, Projects.project_data_dir(Projects.get_project!(project_id)))
+        project_path =
+          Path.expand(value, Projects.project_data_dir(Projects.get_project!(project_id)))
+
         case File.read(project_path) do
           {:ok, contents} -> parse_frontmatter_body(contents)
           {:error, _reason} -> ""
@@ -529,7 +644,9 @@ defmodule BDS.Generation do
 
   defp month_key(created_at) do
     datetime = DateTime.from_unix!(created_at)
-    {Integer.to_string(datetime.year), Integer.to_string(datetime.month) |> String.pad_leading(2, "0")}
+
+    {Integer.to_string(datetime.year),
+     Integer.to_string(datetime.month) |> String.pad_leading(2, "0")}
   end
 
   defp build_list_posts(base_url, posts, language_prefix) do
@@ -552,25 +669,46 @@ defmodule BDS.Generation do
     end
   end
 
-  defp render_list_output(%{project_id: project_id, language: main_language}, language, page_title, posts, archive_context, fallback)
+  defp render_list_output(
+         %{project_id: project_id, language: main_language},
+         language,
+         page_title,
+         posts,
+         archive_context,
+         pagination,
+         fallback
+       )
        when is_binary(project_id) do
     case Rendering.render_list_page(project_id, %{
            language: language,
            language_prefix: language_prefix(language, main_language),
            page_title: page_title,
            posts: posts,
-           archive_context: archive_context
+           archive_context: archive_context,
+           pagination: pagination
          }) do
       {:ok, rendered} -> rendered
       {:error, _reason} -> fallback.()
     end
   end
 
-  defp render_list_output(_plan, _language, _page_title, _posts, _archive_context, fallback), do: fallback.()
+  defp render_list_output(
+         _plan,
+         _language,
+         _page_title,
+         _posts,
+         _archive_context,
+         _pagination,
+         fallback
+       ),
+       do: fallback.()
 
   defp render_not_found_output(%{project_id: project_id, language: main_language}, language)
        when is_binary(project_id) do
-    case Rendering.render_not_found_page(project_id, %{language: language, language_prefix: language_prefix(language, main_language)}) do
+    case Rendering.render_not_found_page(project_id, %{
+           language: language,
+           language_prefix: language_prefix(language, main_language)
+         }) do
       {:ok, rendered} -> rendered
       {:error, _reason} -> render_not_found_page(language)
     end
@@ -581,6 +719,25 @@ defmodule BDS.Generation do
   defp language_prefix(language, main_language) when language == main_language, do: ""
   defp language_prefix(nil, _main_language), do: ""
   defp language_prefix(language, _main_language), do: "/#{language}"
+
+  defp pagination_for_posts(posts) do
+    %{
+      current_page: 1,
+      total_pages: 1,
+      total_items: length(posts),
+      items_per_page: length(posts),
+      has_prev_page: false,
+      prev_page_href: "",
+      has_next_page: false,
+      next_page_href: ""
+    }
+  end
+
+  defp archive_href(language, segments, page_number) do
+    archive_path(language, segments, page_number)
+    |> String.trim_trailing("index.html")
+    |> then(&("/" <> String.trim_leading(&1, "/")))
+  end
 
   defp url_for_output(nil, relative_path), do: "/" <> String.trim_leading(relative_path, "/")
 

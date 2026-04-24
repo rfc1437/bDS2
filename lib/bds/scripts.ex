@@ -50,11 +50,19 @@ defmodule BDS.Scripts do
         :ok =
           File.write(
             full_path,
-            serialize_script_file(%{script | status: :published, file_path: file_path, updated_at: updated_at}, content)
+            serialize_script_file(
+              %{script | status: :published, file_path: file_path, updated_at: updated_at},
+              content
+            )
           )
 
         script
-        |> Script.changeset(%{status: :published, file_path: file_path, content: nil, updated_at: updated_at})
+        |> Script.changeset(%{
+          status: :published,
+          file_path: file_path,
+          content: nil,
+          updated_at: updated_at
+        })
         |> Repo.update()
     end
   end
@@ -75,16 +83,20 @@ defmodule BDS.Scripts do
         content_changed? = has_attr?(attrs, :content) and attr(attrs, :content) != script.content
         now = System.system_time(:second)
 
-        updates = %{}
-        |> maybe_put(:title, attr(attrs, :title))
-        |> maybe_put(:kind, attr(attrs, :kind))
-        |> maybe_put(:entrypoint, attr(attrs, :entrypoint))
-        |> maybe_put(:enabled, attr(attrs, :enabled))
-        |> maybe_put(:content, attr(attrs, :content))
-        |> Map.put(:slug, next_slug)
-        |> Map.put(:version, script.version + 1)
-        |> Map.put(:updated_at, now)
-        |> maybe_put(:status, if(script.status == :published and content_changed?, do: :draft, else: nil))
+        updates =
+          %{}
+          |> maybe_put(:title, attr(attrs, :title))
+          |> maybe_put(:kind, attr(attrs, :kind))
+          |> maybe_put(:entrypoint, attr(attrs, :entrypoint))
+          |> maybe_put(:enabled, attr(attrs, :enabled))
+          |> maybe_put(:content, attr(attrs, :content))
+          |> Map.put(:slug, next_slug)
+          |> Map.put(:version, script.version + 1)
+          |> Map.put(:updated_at, now)
+          |> maybe_put(
+            :status,
+            if(script.status == :published and content_changed?, do: :draft, else: nil)
+          )
 
         script
         |> Script.changeset(updates)
@@ -141,7 +153,8 @@ defmodule BDS.Scripts do
   end
 
   defp slug_available?(project_id, slug, exclude_id) do
-    query = from script in Script, where: script.project_id == ^project_id and script.slug == ^slug
+    query =
+      from script in Script, where: script.project_id == ^project_id and script.slug == ^slug
 
     scoped_query =
       case exclude_id do

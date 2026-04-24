@@ -8,7 +8,11 @@ defmodule BDS.Media.Translation do
   @foreign_key_type :string
 
   schema "media_translations" do
-    belongs_to :media, BDS.Media.Media, foreign_key: :translation_for, references: :id, type: :string
+    belongs_to :media, BDS.Media.Media,
+      foreign_key: :translation_for,
+      references: :id,
+      type: :string
+
     field :project_id, :string
     field :language, :string
     field :title, :string
@@ -20,10 +24,29 @@ defmodule BDS.Media.Translation do
 
   def changeset(translation, attrs) do
     translation
-    |> cast(attrs, [:id, :project_id, :translation_for, :language, :title, :alt, :caption, :created_at, :updated_at],
+    |> cast(
+      attrs,
+      [
+        :id,
+        :project_id,
+        :translation_for,
+        :language,
+        :title,
+        :alt,
+        :caption,
+        :created_at,
+        :updated_at
+      ],
       empty_values: [nil]
     )
-    |> validate_required([:id, :project_id, :translation_for, :language, :created_at, :updated_at])
+    |> validate_required([
+      :id,
+      :project_id,
+      :translation_for,
+      :language,
+      :created_at,
+      :updated_at
+    ])
     |> foreign_key_constraint(:translation_for)
     |> unique_constraint(:language, name: :media_translations_translation_language_idx)
   end

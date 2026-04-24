@@ -37,7 +37,7 @@ defmodule BDS.Posts do
       categories: attr(attrs, :categories) || [],
       template_slug: attr(attrs, :template_slug),
       language: attr(attrs, :language),
-      do_not_translate: false,
+      do_not_translate: attr(attrs, :do_not_translate) || false,
       published_title: nil,
       published_content: nil,
       published_tags: nil,
@@ -63,6 +63,7 @@ defmodule BDS.Posts do
       post ->
         with :ok <- validate_slug_change(post, attrs) do
           now = System.system_time(:second)
+
           updates =
             attrs
             |> normalize_updates(post)
@@ -100,7 +101,12 @@ defmodule BDS.Posts do
         body = publishable_post_body(post, full_path, project)
 
         :ok = File.mkdir_p(Path.dirname(full_path))
-        :ok = File.write(full_path, serialize_post_file(%{post | updated_at: updated_at, content: body}, published_at))
+
+        :ok =
+          File.write(
+            full_path,
+            serialize_post_file(%{post | updated_at: updated_at, content: body}, published_at)
+          )
 
         post
         |> Post.changeset(%{
@@ -197,16 +203,21 @@ defmodule BDS.Posts do
         {:error,
          post
          |> Post.changeset(%{})
-         |> Ecto.Changeset.add_error(:do_not_translate, "cannot add translations when do_not_translate is true")}
+         |> Ecto.Changeset.add_error(
+           :do_not_translate,
+           "cannot add translations when do_not_translate is true"
+         )}
 
       %Post{} = post ->
         now = System.system_time(:second)
         normalized_language = normalize_language(language)
 
         translation =
-          Repo.get_by(Translation, translation_for: post.id, language: normalized_language) || %Translation{}
+          Repo.get_by(Translation, translation_for: post.id, language: normalized_language) ||
+            %Translation{}
 
-        updates = normalize_translation_updates(post, translation, normalized_language, attrs, now)
+        updates =
+          normalize_translation_updates(post, translation, normalized_language, attrs, now)
 
         translation
         |> Translation.changeset(updates)
@@ -253,7 +264,9 @@ defmodule BDS.Posts do
           where: post.project_id == ^project_id,
           select: {translation.translation_for, translation.language}
       )
-      |> Enum.group_by(fn {post_id, _language} -> post_id end, fn {_post_id, language} -> language end)
+      |> Enum.group_by(fn {post_id, _language} -> post_id end, fn {_post_id, language} ->
+        language
+      end)
 
     required_languages =
       metadata.blog_languages
@@ -268,7 +281,9 @@ defmodule BDS.Posts do
         available = Map.get(translation_languages, post.id, [])
 
         cond do
-          post.do_not_translate -> []
+          post.do_not_translate ->
+            []
+
           true ->
             required_languages
             |> Enum.reject(&(&1 in available))
@@ -299,7 +314,15 @@ defmodule BDS.Posts do
       full_path = Path.join(Projects.project_data_dir(project), post.file_path)
       body = published_post_body(post, full_path)
       :ok = File.mkdir_p(Path.dirname(full_path))
-      :ok = File.write(full_path, serialize_post_file(%{post | content: body}, post.published_at || System.system_time(:second)))
+
+      :ok =
+        File.write(
+          full_path,
+          serialize_post_file(
+            %{post | content: body},
+            post.published_at || System.system_time(:second)
+          )
+        )
     end
 
     :ok
@@ -328,7 +351,8 @@ defmodule BDS.Posts do
     |> maybe_put(:published_excerpt, attr(attrs, :published_excerpt))
   end
 
-  defp validate_slug_change(%Post{published_at: published_at} = post, attrs) when not is_nil(published_at) do
+  defp validate_slug_change(%Post{published_at: published_at} = post, attrs)
+       when not is_nil(published_at) do
     case attr(attrs, :slug) do
       nil ->
         :ok
@@ -357,12 +381,25 @@ defmodule BDS.Posts do
   defp maybe_reopen_published_post(updates, _post), do: updates
 
   defp published_content_change?(updates, post) do
-    Enum.any?([:title, :excerpt, :content, :author, :language, :template_slug, :tags, :categories, :do_not_translate], fn field ->
-      case Map.fetch(updates, field) do
-        {:ok, value} -> value != Map.get(post, field)
-        :error -> false
+    Enum.any?(
+      [
+        :title,
+        :excerpt,
+        :content,
+        :author,
+        :language,
+        :template_slug,
+        :tags,
+        :categories,
+        :do_not_translate
+      ],
+      fn field ->
+        case Map.fetch(updates, field) do
+          {:ok, value} -> value != Map.get(post, field)
+          :error -> false
+        end
       end
-    end)
+    )
   end
 
   defp unique_slug(project_id, base_slug) do
@@ -386,7 +423,9 @@ defmodule BDS.Posts do
   end
 
   defp slug_available?(project_id, slug) do
-    not Repo.exists?(from post in Post, where: post.project_id == ^project_id and post.slug == ^slug)
+    not Repo.exists?(
+      from post in Post, where: post.project_id == ^project_id and post.slug == ^slug
+    )
   end
 
   defp maybe_put(map, _key, nil), do: map
@@ -409,7 +448,8 @@ defmodule BDS.Posts do
     Path.join(["posts", year, month, "#{slug}.md"])
   end
 
-  defp publishable_post_body(%Post{content: content}, _full_path, _project) when is_binary(content), do: content
+  defp publishable_post_body(%Post{content: content}, _full_path, _project)
+       when is_binary(content), do: content
 
   defp publishable_post_body(%Post{file_path: file_path} = post, full_path, project) do
     source_path =
@@ -444,7 +484,8 @@ defmodule BDS.Posts do
     )
   end
 
-  defp published_post_body(%Post{content: content}, _full_path) when is_binary(content), do: content
+  defp published_post_body(%Post{content: content}, _full_path) when is_binary(content),
+    do: content
 
   defp published_post_body(_post, full_path) do
     case File.read(full_path) do
@@ -512,7 +553,8 @@ defmodule BDS.Posts do
     end
   end
 
-  defp delete_post_file(%Post{project_id: _project_id, file_path: file_path}) when file_path in [nil, ""], do: :ok
+  defp delete_post_file(%Post{project_id: _project_id, file_path: file_path})
+       when file_path in [nil, ""], do: :ok
 
   defp delete_post_file(%Post{} = post) do
     project = Projects.get_project!(post.project_id)
@@ -532,7 +574,8 @@ defmodule BDS.Posts do
       |> maybe_put(:excerpt, attr(attrs, :excerpt))
       |> maybe_put(:content, attr(attrs, :content))
 
-    reopened? = translation.status == :published and translation_content_change?(translation, updates)
+    reopened? =
+      translation.status == :published and translation_content_change?(translation, updates)
 
     %{
       id: translation.id || Ecto.UUID.generate(),
@@ -580,7 +623,15 @@ defmodule BDS.Posts do
     body = publishable_translation_body(translation, full_path)
 
     :ok = File.mkdir_p(Path.dirname(full_path))
-    :ok = File.write(full_path, serialize_translation_file(%{translation | updated_at: updated_at, content: body}, published_at))
+
+    :ok =
+      File.write(
+        full_path,
+        serialize_translation_file(
+          %{translation | updated_at: updated_at, content: body},
+          published_at
+        )
+      )
 
     translation
     |> Translation.changeset(%{
@@ -619,7 +670,8 @@ defmodule BDS.Posts do
     )
   end
 
-  defp publishable_translation_body(%Translation{content: content}, _full_path) when is_binary(content), do: content
+  defp publishable_translation_body(%Translation{content: content}, _full_path)
+       when is_binary(content), do: content
 
   defp publishable_translation_body(_translation, full_path) do
     case File.read(full_path) do
@@ -634,7 +686,8 @@ defmodule BDS.Posts do
     end
   end
 
-  defp delete_translation_file(%Translation{project_id: _project_id, file_path: file_path}) when file_path in [nil, ""], do: :ok
+  defp delete_translation_file(%Translation{project_id: _project_id, file_path: file_path})
+       when file_path in [nil, ""], do: :ok
 
   defp delete_translation_file(%Translation{} = translation) do
     project = Projects.get_project!(translation.project_id)
@@ -649,7 +702,15 @@ defmodule BDS.Posts do
 
   defp orphan_translation_files(project_id) do
     project = Projects.get_project!(project_id)
-    translation_paths = MapSet.new(Repo.all(from translation in Translation, where: translation.project_id == ^project_id, select: translation.file_path))
+
+    translation_paths =
+      MapSet.new(
+        Repo.all(
+          from translation in Translation,
+            where: translation.project_id == ^project_id,
+            select: translation.file_path
+        )
+      )
 
     project
     |> Projects.project_data_dir()

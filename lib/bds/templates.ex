@@ -50,11 +50,19 @@ defmodule BDS.Templates do
         :ok =
           File.write(
             full_path,
-            serialize_template_file(%{template | status: :published, file_path: file_path, updated_at: updated_at}, content)
+            serialize_template_file(
+              %{template | status: :published, file_path: file_path, updated_at: updated_at},
+              content
+            )
           )
 
         template
-        |> Template.changeset(%{status: :published, file_path: file_path, content: nil, updated_at: updated_at})
+        |> Template.changeset(%{
+          status: :published,
+          file_path: file_path,
+          content: nil,
+          updated_at: updated_at
+        })
         |> Repo.update()
     end
   end
@@ -67,27 +75,41 @@ defmodule BDS.Templates do
       template ->
         next_slug =
           if has_attr?(attrs, :slug) do
-            unique_slug(template.project_id, Slug.slugify(attr(attrs, :slug)), "template", template.id)
+            unique_slug(
+              template.project_id,
+              Slug.slugify(attr(attrs, :slug)),
+              "template",
+              template.id
+            )
           else
             template.slug
           end
 
-        content_changed? = has_attr?(attrs, :content) and attr(attrs, :content) != template.content
+        content_changed? =
+          has_attr?(attrs, :content) and attr(attrs, :content) != template.content
+
         slug_changed? = next_slug != template.slug
         now = System.system_time(:second)
-        next_status = if(template.status == :published and content_changed?, do: :draft, else: template.status)
+
+        next_status =
+          if(template.status == :published and content_changed?,
+            do: :draft,
+            else: template.status
+          )
+
         next_file_path = next_template_file_path(template, next_slug)
 
-        updates = %{}
-        |> maybe_put(:title, attr(attrs, :title))
-        |> maybe_put(:kind, attr(attrs, :kind))
-        |> maybe_put(:enabled, attr(attrs, :enabled))
-        |> maybe_put(:content, attr(attrs, :content))
-        |> Map.put(:file_path, next_file_path)
-        |> Map.put(:slug, next_slug)
-        |> Map.put(:version, template.version + 1)
-        |> Map.put(:updated_at, now)
-        |> Map.put(:status, next_status)
+        updates =
+          %{}
+          |> maybe_put(:title, attr(attrs, :title))
+          |> maybe_put(:kind, attr(attrs, :kind))
+          |> maybe_put(:enabled, attr(attrs, :enabled))
+          |> maybe_put(:content, attr(attrs, :content))
+          |> Map.put(:file_path, next_file_path)
+          |> Map.put(:slug, next_slug)
+          |> Map.put(:version, template.version + 1)
+          |> Map.put(:updated_at, now)
+          |> Map.put(:status, next_status)
 
         Repo.transaction(fn ->
           updated_template =
@@ -172,7 +194,9 @@ defmodule BDS.Templates do
   end
 
   defp slug_available?(project_id, slug, exclude_id) do
-    query = from template in Template, where: template.project_id == ^project_id and template.slug == ^slug
+    query =
+      from template in Template,
+        where: template.project_id == ^project_id and template.slug == ^slug
 
     scoped_query =
       case exclude_id do
@@ -210,11 +234,23 @@ defmodule BDS.Templates do
   end
 
   defp count_referencing_posts(template) do
-    Repo.aggregate(from(post in BDS.Posts.Post, where: post.project_id == ^template.project_id and post.template_slug == ^template.slug), :count, :id)
+    Repo.aggregate(
+      from(post in BDS.Posts.Post,
+        where: post.project_id == ^template.project_id and post.template_slug == ^template.slug
+      ),
+      :count,
+      :id
+    )
   end
 
   defp count_referencing_tags(template) do
-    Repo.aggregate(from(tag in BDS.Tags.Tag, where: tag.project_id == ^template.project_id and tag.post_template_slug == ^template.slug), :count, :id)
+    Repo.aggregate(
+      from(tag in BDS.Tags.Tag,
+        where: tag.project_id == ^template.project_id and tag.post_template_slug == ^template.slug
+      ),
+      :count,
+      :id
+    )
   end
 
   defp clear_template_references(template) do
@@ -227,10 +263,14 @@ defmodule BDS.Templates do
         )
       )
 
-    from(post in BDS.Posts.Post, where: post.project_id == ^template.project_id and post.template_slug == ^template.slug)
+    from(post in BDS.Posts.Post,
+      where: post.project_id == ^template.project_id and post.template_slug == ^template.slug
+    )
     |> Repo.update_all(set: [template_slug: nil, updated_at: now])
 
-    from(tag in BDS.Tags.Tag, where: tag.project_id == ^template.project_id and tag.post_template_slug == ^template.slug)
+    from(tag in BDS.Tags.Tag,
+      where: tag.project_id == ^template.project_id and tag.post_template_slug == ^template.slug
+    )
     |> Repo.update_all(set: [post_template_slug: nil, updated_at: now])
 
     Enum.each(affected_posts, fn post ->
@@ -246,17 +286,23 @@ defmodule BDS.Templates do
     affected_posts =
       Repo.all(
         from(post in BDS.Posts.Post,
-          where: post.project_id == ^original_template.project_id and post.template_slug == ^original_template.slug
+          where:
+            post.project_id == ^original_template.project_id and
+              post.template_slug == ^original_template.slug
         )
       )
 
     from(post in BDS.Posts.Post,
-      where: post.project_id == ^original_template.project_id and post.template_slug == ^original_template.slug
+      where:
+        post.project_id == ^original_template.project_id and
+          post.template_slug == ^original_template.slug
     )
     |> Repo.update_all(set: [template_slug: updated_template.slug, updated_at: updated_at])
 
     from(tag in BDS.Tags.Tag,
-      where: tag.project_id == ^original_template.project_id and tag.post_template_slug == ^original_template.slug
+      where:
+        tag.project_id == ^original_template.project_id and
+          tag.post_template_slug == ^original_template.slug
     )
     |> Repo.update_all(set: [post_template_slug: updated_template.slug, updated_at: updated_at])
 

@@ -25,10 +25,38 @@ defmodule BDS.Scripts.Script do
 
   def changeset(script, attrs) do
     script
-    |> cast(attrs, [:id, :project_id, :slug, :title, :kind, :entrypoint, :enabled, :version, :file_path, :status, :content, :created_at, :updated_at],
+    |> cast(
+      attrs,
+      [
+        :id,
+        :project_id,
+        :slug,
+        :title,
+        :kind,
+        :entrypoint,
+        :enabled,
+        :version,
+        :file_path,
+        :status,
+        :content,
+        :created_at,
+        :updated_at
+      ],
       empty_values: [nil]
     )
-    |> validate_required([:id, :project_id, :slug, :title, :kind, :entrypoint, :enabled, :version, :status, :created_at, :updated_at])
+    |> validate_required([
+      :id,
+      :project_id,
+      :slug,
+      :title,
+      :kind,
+      :entrypoint,
+      :enabled,
+      :version,
+      :status,
+      :created_at,
+      :updated_at
+    ])
     |> assoc_constraint(:project)
     |> unique_constraint(:slug, name: :scripts_project_slug_idx)
   end

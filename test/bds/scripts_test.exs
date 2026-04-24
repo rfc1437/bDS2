@@ -42,7 +42,10 @@ defmodule BDS.ScriptsTest do
     assert macro_script.slug == "render-card"
   end
 
-  test "publish_script writes a lua file with frontmatter and clears draft content", %{project: project, temp_dir: temp_dir} do
+  test "publish_script writes a lua file with frontmatter and clears draft content", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, script} =
              BDS.Scripts.create_script(%{
                project_id: project.id,
@@ -73,7 +76,9 @@ defmodule BDS.ScriptsTest do
     assert contents =~ "\n---\nfunction main() return 'ok' end\n"
   end
 
-  test "update_script bumps version and reopens a published script when content changes", %{project: project} do
+  test "update_script bumps version and reopens a published script when content changes", %{
+    project: project
+  } do
     assert {:ok, script} =
              BDS.Scripts.create_script(%{
                project_id: project.id,
@@ -99,7 +104,10 @@ defmodule BDS.ScriptsTest do
     assert updated.updated_at >= published.updated_at
   end
 
-  test "delete_script removes the published file and database row", %{project: project, temp_dir: temp_dir} do
+  test "delete_script removes the published file and database row", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, script} =
              BDS.Scripts.create_script(%{
                project_id: project.id,
@@ -116,7 +124,10 @@ defmodule BDS.ScriptsTest do
     refute File.exists?(Path.join(temp_dir, published.file_path))
   end
 
-  test "rebuild_scripts_from_files recreates published scripts from disk", %{project: project, temp_dir: temp_dir} do
+  test "rebuild_scripts_from_files recreates published scripts from disk", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     script_dir = Path.join(temp_dir, "scripts")
     File.mkdir_p!(script_dir)
 

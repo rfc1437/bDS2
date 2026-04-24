@@ -16,7 +16,11 @@ defmodule BDS.Preview do
 
   def start_preview(project_id) when is_binary(project_id) do
     project = Projects.get_project!(project_id)
-    GenServer.call(__MODULE__, {:start_preview, project_id, Projects.project_data_dir(project), self()})
+
+    GenServer.call(
+      __MODULE__,
+      {:start_preview, project_id, Projects.project_data_dir(project), self()}
+    )
   end
 
   def stop_preview(project_id) when is_binary(project_id) do
@@ -58,7 +62,15 @@ defmodule BDS.Preview do
     state = stop_current_server(state)
     maybe_allow_repo(owner_pid)
 
-    {:ok, listener} = :gen_tcp.listen(@port, [:binary, packet: :raw, active: false, reuseaddr: true, ip: {127, 0, 0, 1}])
+    {:ok, listener} =
+      :gen_tcp.listen(@port, [
+        :binary,
+        packet: :raw,
+        active: false,
+        reuseaddr: true,
+        ip: {127, 0, 0, 1}
+      ])
+
     acceptor_pid = spawn_link(fn -> accept_loop(listener, project_id) end)
 
     server = %{
@@ -145,7 +157,9 @@ defmodule BDS.Preview do
         end
 
       case full_path do
-        {:error, :not_found} -> {:error, :not_found}
+        {:error, :not_found} ->
+          {:error, :not_found}
+
         resolved_path ->
           case read_response(resolved_path) do
             {:error, :not_found} -> render_not_found_response(server.project_id)
@@ -258,7 +272,11 @@ defmodule BDS.Preview do
     path = uri.path || "/"
     query_params = URI.decode_query(uri.query || "")
 
-    case GenServer.call(__MODULE__, {:http_request, project_id, method, path, query_params}, 5_000) do
+    case GenServer.call(
+           __MODULE__,
+           {:http_request, project_id, method, path, query_params},
+           5_000
+         ) do
       {:ok, response} -> http_ok_response(response)
       {:error, :not_found} -> http_error_response(404)
       {:error, :not_running} -> http_error_response(503)

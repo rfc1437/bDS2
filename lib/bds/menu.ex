@@ -6,7 +6,11 @@ defmodule BDS.Menu do
   alias BDS.Projects
 
   Record.defrecord(:xmlElement, Record.extract(:xmlElement, from_lib: "xmerl/include/xmerl.hrl"))
-  Record.defrecord(:xmlAttribute, Record.extract(:xmlAttribute, from_lib: "xmerl/include/xmerl.hrl"))
+
+  Record.defrecord(
+    :xmlAttribute,
+    Record.extract(:xmlAttribute, from_lib: "xmerl/include/xmerl.hrl")
+  )
 
   @valid_kinds [:page, :submenu, :category_archive, :home]
 
@@ -187,7 +191,7 @@ defmodule BDS.Menu do
     |> String.replace("&", "&amp;")
     |> String.replace("<", "&lt;")
     |> String.replace(">", "&gt;")
-    |> String.replace(~s(") , "&quot;")
+    |> String.replace(~s("), "&quot;")
   end
 
   defp attr(attrs, key) do

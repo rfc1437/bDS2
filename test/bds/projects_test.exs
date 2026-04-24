@@ -18,13 +18,16 @@ defmodule BDS.ProjectsTest do
     %{temp_root: temp_root}
   end
 
-  test "create_project slugifies names, keeps new projects inactive, and deduplicates slugs", %{temp_root: temp_root} do
+  test "create_project slugifies names, keeps new projects inactive, and deduplicates slugs", %{
+    temp_root: temp_root
+  } do
     first_dir = Path.join(temp_root, "first")
     second_dir = Path.join(temp_root, "second")
     File.mkdir_p!(first_dir)
     File.mkdir_p!(second_dir)
 
-    assert {:ok, first} = BDS.Projects.create_project(%{name: "Föö Bär Blog", data_path: first_dir})
+    assert {:ok, first} =
+             BDS.Projects.create_project(%{name: "Föö Bär Blog", data_path: first_dir})
 
     assert first.name == "Föö Bär Blog"
     assert first.slug == "foo-bar-blog"
@@ -33,16 +36,21 @@ defmodule BDS.ProjectsTest do
     assert is_integer(first.created_at)
     assert is_integer(first.updated_at)
 
-    assert {:ok, second} = BDS.Projects.create_project(%{name: "Föö Bär Blog", data_path: second_dir})
+    assert {:ok, second} =
+             BDS.Projects.create_project(%{name: "Föö Bär Blog", data_path: second_dir})
+
     assert second.slug == "foo-bar-blog-2"
     assert second.is_active == false
   end
 
-  test "create_project installs starter templates into the project data directory", %{temp_root: temp_root} do
+  test "create_project installs starter templates into the project data directory", %{
+    temp_root: temp_root
+  } do
     temp_dir = Path.join(temp_root, "starter")
     File.mkdir_p!(temp_dir)
 
-    assert {:ok, project} = BDS.Projects.create_project(%{name: "Starter Blog", data_path: temp_dir})
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Starter Blog", data_path: temp_dir})
 
     assert File.exists?(Path.join([temp_dir, "templates", "single-post.liquid"]))
     assert File.exists?(Path.join([temp_dir, "templates", "post-list.liquid"]))
@@ -52,18 +60,25 @@ defmodule BDS.ProjectsTest do
     assert File.exists?(Path.join([temp_dir, "templates", "macros", "gallery.liquid"]))
 
     starter_slugs =
-      Repo.all(from template in Template, where: template.project_id == ^project.id, select: {template.slug, template.kind})
+      Repo.all(
+        from template in Template,
+          where: template.project_id == ^project.id,
+          select: {template.slug, template.kind}
+      )
 
     assert {"single-post", :post} in starter_slugs
     assert {"post-list", :list} in starter_slugs
     assert {"not-found", :not_found} in starter_slugs
   end
 
-  test "starter template installation is idempotent for existing top-level templates", %{temp_root: temp_root} do
+  test "starter template installation is idempotent for existing top-level templates", %{
+    temp_root: temp_root
+  } do
     temp_dir = Path.join(temp_root, "idempotent-starter")
     File.mkdir_p!(temp_dir)
 
-    assert {:ok, project} = BDS.Projects.create_project(%{name: "Starter Blog", data_path: temp_dir})
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Starter Blog", data_path: temp_dir})
 
     template_path = Path.join([temp_dir, "templates", "single-post.liquid"])
     original_contents = File.read!(template_path)
@@ -75,11 +90,15 @@ defmodule BDS.ProjectsTest do
     reinstalled_contents = File.read!(template_path)
     assert reinstalled_contents == original_contents
 
-    assert {:ok, %{fields: reinstalled_fields}} = BDS.Frontmatter.parse_document(reinstalled_contents)
+    assert {:ok, %{fields: reinstalled_fields}} =
+             BDS.Frontmatter.parse_document(reinstalled_contents)
+
     assert reinstalled_fields["id"] == original_fields["id"]
   end
 
-  test "set_active_project clears the previous active project and activates the target", %{temp_root: temp_root} do
+  test "set_active_project clears the previous active project and activates the target", %{
+    temp_root: temp_root
+  } do
     first_dir = Path.join(temp_root, "active-first")
     second_dir = Path.join(temp_root, "active-second")
     File.mkdir_p!(first_dir)

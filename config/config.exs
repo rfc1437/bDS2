@@ -9,8 +9,7 @@ config :bds, BDS.Repo,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
 
-config :bds, BDS.Application,
-  desktop_adapter: :pending_selection
+config :bds, BDS.Application, desktop_adapter: :pending_selection
 
 config :bds, :scripting,
   runtime: BDS.Scripting.Lua,

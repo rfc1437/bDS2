@@ -13,7 +13,10 @@ defmodule BDS.MediaTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "import_media copies the binary, creates a sidecar, and persists the row", %{project: project, temp_dir: temp_dir} do
+  test "import_media copies the binary, creates a sidecar, and persists the row", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     source_path = Path.join(temp_dir, "sample.txt")
     File.write!(source_path, "hello media")
 
@@ -54,7 +57,8 @@ defmodule BDS.MediaTest do
     source_path = Path.join(temp_dir, "sample.txt")
     File.write!(source_path, "hello media")
 
-    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
     assert {:ok, updated} =
              BDS.Media.update_media(media.id, %{
@@ -76,11 +80,15 @@ defmodule BDS.MediaTest do
     assert sidecar =~ "tags:\n  - beta\n"
   end
 
-  test "delete_media removes the binary, sidecar, and database row", %{project: project, temp_dir: temp_dir} do
+  test "delete_media removes the binary, sidecar, and database row", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     source_path = Path.join(temp_dir, "sample.txt")
     File.write!(source_path, "hello media")
 
-    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
     assert {:ok, _translation} =
              BDS.Media.upsert_media_translation(media.id, "de", %{
@@ -103,7 +111,10 @@ defmodule BDS.MediaTest do
     end)
   end
 
-  test "rebuild_media_from_files recreates media rows from sidecars", %{project: project, temp_dir: temp_dir} do
+  test "rebuild_media_from_files recreates media rows from sidecars", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     media_dir = Path.join([temp_dir, "media", "2026", "04"])
     File.mkdir_p!(media_dir)
 
@@ -181,16 +192,27 @@ defmodule BDS.MediaTest do
     end)
   end
 
-  test "import_media generates the four thumbnail files in bucketed thumbnail paths", %{project: project, temp_dir: temp_dir} do
+  test "import_media generates the four thumbnail files in bucketed thumbnail paths", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     source_path = Path.join(temp_dir, "sample.jpg")
     File.write!(source_path, tiny_jpeg_binary())
 
-    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
     thumbnail_paths = BDS.Media.thumbnail_paths(media)
-    assert thumbnail_paths.small == "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-small.webp"
-    assert thumbnail_paths.medium == "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-medium.webp"
-    assert thumbnail_paths.large == "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-large.webp"
+
+    assert thumbnail_paths.small ==
+             "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-small.webp"
+
+    assert thumbnail_paths.medium ==
+             "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-medium.webp"
+
+    assert thumbnail_paths.large ==
+             "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-large.webp"
+
     assert thumbnail_paths.ai == "thumbnails/#{String.slice(media.id, 0, 2)}/#{media.id}-ai.jpg"
 
     Enum.each(Map.values(thumbnail_paths), fn path ->
@@ -198,11 +220,15 @@ defmodule BDS.MediaTest do
     end)
   end
 
-  test "import_media extracts image dimensions and writes real encoded thumbnails", %{project: project, temp_dir: temp_dir} do
+  test "import_media extracts image dimensions and writes real encoded thumbnails", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     source_path = Path.join(temp_dir, "sample.jpg")
     File.write!(source_path, tiny_jpeg_binary())
 
-    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
     assert media.mime_type == "image/jpeg"
     assert media.width == 3
@@ -230,11 +256,13 @@ defmodule BDS.MediaTest do
     assert Path.extname(thumbnail_paths.ai) == ".jpg"
   end
 
-  test "import_media keeps raw header dimensions but autorotates thumbnails from EXIF orientation", %{project: project, temp_dir: temp_dir} do
+  test "import_media keeps raw header dimensions but autorotates thumbnails from EXIF orientation",
+       %{project: project, temp_dir: temp_dir} do
     source_path = Path.join(temp_dir, "rotated.jpg")
     write_oriented_jpeg!(source_path, 6)
 
-    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
     assert media.width == 2
     assert media.height == 3
@@ -248,11 +276,15 @@ defmodule BDS.MediaTest do
     assert_images_match!(actual_thumbnail, expected_thumbnail)
   end
 
-  test "regenerate_thumbnails recreates thumbnail files for an existing image media item", %{project: project, temp_dir: temp_dir} do
+  test "regenerate_thumbnails recreates thumbnail files for an existing image media item", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     source_path = Path.join(temp_dir, "sample.jpg")
     File.write!(source_path, tiny_jpeg_binary())
 
-    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
     thumbnail_paths = BDS.Media.thumbnail_paths(media)
     File.rm!(Path.join(temp_dir, thumbnail_paths.small))
@@ -266,12 +298,17 @@ defmodule BDS.MediaTest do
     end)
   end
 
-  test "import_media generates thumbnails for png and webp sources", %{project: project, temp_dir: temp_dir} do
-    Enum.each([{ ".png", "image/png"}, {".webp", "image/webp"}], fn {extension, mime_type} ->
+  test "import_media generates thumbnails for png and webp sources", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    Enum.each([{".png", "image/png"}, {".webp", "image/webp"}], fn {extension, mime_type} ->
       source_path = Path.join(temp_dir, "sample#{extension}")
       File.write!(source_path, sample_image_binary(extension))
 
-      assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+      assert {:ok, media} =
+               BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
       assert media.mime_type == mime_type
       assert media.width == 2
       assert media.height == 3
@@ -282,29 +319,39 @@ defmodule BDS.MediaTest do
     end)
   end
 
-  test "import_media detects supported TIFF, BMP, HEIC, and HEIF extensions", %{project: project, temp_dir: temp_dir} do
-    Enum.each([
-      {"asset.tif", "image/tiff"},
-      {"asset.tiff", "image/tiff"},
-      {"asset.bmp", "image/bmp"},
-      {"asset.heic", "image/heic"},
-      {"asset.heif", "image/heif"}
-    ], fn {file_name, mime_type} ->
-      source_path = Path.join(temp_dir, file_name)
-      File.write!(source_path, "placeholder")
+  test "import_media detects supported TIFF, BMP, HEIC, and HEIF extensions", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    Enum.each(
+      [
+        {"asset.tif", "image/tiff"},
+        {"asset.tiff", "image/tiff"},
+        {"asset.bmp", "image/bmp"},
+        {"asset.heic", "image/heic"},
+        {"asset.heif", "image/heif"}
+      ],
+      fn {file_name, mime_type} ->
+        source_path = Path.join(temp_dir, file_name)
+        File.write!(source_path, "placeholder")
 
-      assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
-      assert media.mime_type == mime_type
-      assert media.width == nil
-      assert media.height == nil
-    end)
+        assert {:ok, media} =
+                 BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+        assert media.mime_type == mime_type
+        assert media.width == nil
+        assert media.height == nil
+      end
+    )
   end
 
-  test "upsert_media_translation persists the row and writes a translated sidecar next to the binary", %{project: project, temp_dir: temp_dir} do
+  test "upsert_media_translation persists the row and writes a translated sidecar next to the binary",
+       %{project: project, temp_dir: temp_dir} do
     source_path = Path.join(temp_dir, "sample.txt")
     File.write!(source_path, "hello media")
 
-    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
     assert {:ok, translation} =
              BDS.Media.upsert_media_translation(media.id, "de", %{

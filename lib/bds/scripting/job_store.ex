@@ -50,10 +50,11 @@ defmodule BDS.Scripting.JobStore do
   end
 
   def handle_call({:update_job, job_id, attrs}, _from, state) do
-    next_state = update_in(state, [:jobs, job_id], fn
-      nil -> nil
-      job -> Map.merge(job, attrs)
-    end)
+    next_state =
+      update_in(state, [:jobs, job_id], fn
+        nil -> nil
+        job -> Map.merge(job, attrs)
+      end)
 
     {:reply, :ok, next_state}
   end

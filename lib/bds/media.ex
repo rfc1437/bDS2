@@ -68,16 +68,17 @@ defmodule BDS.Media do
         {:error, :not_found}
 
       media ->
-        updates = %{}
-        |> maybe_put(:title, attr(attrs, :title))
-        |> maybe_put(:alt, attr(attrs, :alt))
-        |> maybe_put(:caption, attr(attrs, :caption))
-        |> maybe_put(:author, attr(attrs, :author))
-        |> maybe_put(:language, attr(attrs, :language))
-        |> maybe_put(:tags, attr(attrs, :tags))
-        |> maybe_put(:width, attr(attrs, :width))
-        |> maybe_put(:height, attr(attrs, :height))
-        |> Map.put(:updated_at, System.system_time(:second))
+        updates =
+          %{}
+          |> maybe_put(:title, attr(attrs, :title))
+          |> maybe_put(:alt, attr(attrs, :alt))
+          |> maybe_put(:caption, attr(attrs, :caption))
+          |> maybe_put(:author, attr(attrs, :author))
+          |> maybe_put(:language, attr(attrs, :language))
+          |> maybe_put(:tags, attr(attrs, :tags))
+          |> maybe_put(:width, attr(attrs, :width))
+          |> maybe_put(:height, attr(attrs, :height))
+          |> Map.put(:updated_at, System.system_time(:second))
 
         project = Projects.get_project!(media.project_id)
 
@@ -104,14 +105,21 @@ defmodule BDS.Media do
         {:error, :not_found}
 
       media ->
-        translations = Repo.all(from translation in Translation, where: translation.translation_for == ^media.id)
+        translations =
+          Repo.all(
+            from translation in Translation, where: translation.translation_for == ^media.id
+          )
 
         delete_file_if_present(media.project_id, media.file_path)
         delete_file_if_present(media.project_id, media.sidecar_path)
         delete_thumbnail_files(media.project_id, media)
 
         Enum.each(translations, fn translation ->
-          delete_file_if_present(media.project_id, translation_sidecar_path(media, translation.language))
+          delete_file_if_present(
+            media.project_id,
+            translation_sidecar_path(media, translation.language)
+          )
+
           Repo.delete!(translation)
         end)
 
@@ -243,7 +251,9 @@ defmodule BDS.Media do
       updated_at: Map.get(fields, "updated_at", now)
     }
 
-    media = Repo.get(Media, attrs.id) || Repo.get_by(Media, project_id: project.id, file_path: relative_file_path) || %Media{}
+    media =
+      Repo.get(Media, attrs.id) ||
+        Repo.get_by(Media, project_id: project.id, file_path: relative_file_path) || %Media{}
 
     media
     |> Media.changeset(attrs)
@@ -278,7 +288,12 @@ defmodule BDS.Media do
   end
 
   defp write_translation_sidecar(project, media, translation) do
-    path = Path.join(Projects.project_data_dir(project), translation_sidecar_path(media, translation.language))
+    path =
+      Path.join(
+        Projects.project_data_dir(project),
+        translation_sidecar_path(media, translation.language)
+      )
+
     :ok = File.mkdir_p(Path.dirname(path))
 
     atomic_write(

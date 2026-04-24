@@ -67,7 +67,15 @@ defmodule BDS.Posts.Post do
       ],
       empty_values: [nil]
     )
-    |> validate_required([:id, :project_id, :slug, :status, :created_at, :updated_at, :do_not_translate])
+    |> validate_required([
+      :id,
+      :project_id,
+      :slug,
+      :status,
+      :created_at,
+      :updated_at,
+      :do_not_translate
+    ])
     |> assoc_constraint(:project)
     |> unique_constraint(:slug, name: :posts_project_slug_idx)
   end

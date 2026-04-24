@@ -15,7 +15,16 @@ defmodule BDS.Rendering.Filters do
     end
   end
 
-  def markdown(value, _post_id, _post_data_json_by_id, canonical_post_paths, canonical_media_paths, language, _language_prefix, context) do
+  def markdown(
+        value,
+        _post_id,
+        _post_data_json_by_id,
+        canonical_post_paths,
+        canonical_media_paths,
+        language,
+        _language_prefix,
+        context
+      ) do
     value
     |> to_string()
     |> replace_built_in_macros(language, context)
@@ -24,21 +33,37 @@ defmodule BDS.Rendering.Filters do
   end
 
   defp replace_built_in_macros(content, language, context) do
-    Regex.replace(~r/\[\[(\w+)(?:\s+([^\]]+))?\]\]/, content, fn full_match, macro_name, raw_params ->
+    Regex.replace(~r/\[\[(\w+)(?:\s+([^\]]+))?\]\]/, content, fn full_match,
+                                                                 macro_name,
+                                                                 raw_params ->
       params = parse_macro_params(raw_params)
 
       case String.downcase(macro_name) do
         "youtube" ->
-          render_macro_template("macros/youtube", %{
-            "id" => Map.get(params, "id", ""),
-            "title" => default_macro_title(Map.get(params, "title"), language, "render.video.youtubeTitle")
-          }, context)
+          render_macro_template(
+            "macros/youtube",
+            %{
+              "id" => Map.get(params, "id", ""),
+              "title" =>
+                default_macro_title(
+                  Map.get(params, "title"),
+                  language,
+                  "render.video.youtubeTitle"
+                )
+            },
+            context
+          )
 
         "vimeo" ->
-          render_macro_template("macros/vimeo", %{
-            "id" => Map.get(params, "id", ""),
-            "title" => default_macro_title(Map.get(params, "title"), language, "render.video.vimeoTitle")
-          }, context)
+          render_macro_template(
+            "macros/vimeo",
+            %{
+              "id" => Map.get(params, "id", ""),
+              "title" =>
+                default_macro_title(Map.get(params, "title"), language, "render.video.vimeoTitle")
+            },
+            context
+          )
 
         _other ->
           full_match
@@ -46,8 +71,12 @@ defmodule BDS.Rendering.Filters do
     end)
   end
 
-  defp default_macro_title(nil, language, translation_key), do: I18n.translate(language, translation_key)
-  defp default_macro_title("", language, translation_key), do: I18n.translate(language, translation_key)
+  defp default_macro_title(nil, language, translation_key),
+    do: I18n.translate(language, translation_key)
+
+  defp default_macro_title("", language, translation_key),
+    do: I18n.translate(language, translation_key)
+
   defp default_macro_title(title, _language, _translation_key), do: title
 
   defp parse_macro_params(nil), do: %{}
@@ -63,8 +92,12 @@ defmodule BDS.Rendering.Filters do
 
   defp render_macro_template(template_path, assigns, context) do
     case Map.get(assigns, "id") do
-      "" -> ""
-      nil -> ""
+      "" ->
+        ""
+
+      nil ->
+        ""
+
       _id ->
         template_source = Liquex.FileSystem.read_template_file(context.file_system, template_path)
         template_ast = Liquex.parse!(template_source)
@@ -78,7 +111,10 @@ defmodule BDS.Rendering.Filters do
 
   defp rewrite_rendered_html_urls(html, canonical_post_paths, canonical_media_paths) do
     html
-    |> rewrite_attribute("href", &normalize_post_href(&1, canonical_post_paths, canonical_media_paths))
+    |> rewrite_attribute(
+      "href",
+      &normalize_post_href(&1, canonical_post_paths, canonical_media_paths)
+    )
     |> rewrite_attribute("src", &normalize_media_src(&1, canonical_media_paths))
   end
 
@@ -91,8 +127,12 @@ defmodule BDS.Rendering.Filters do
 
   defp normalize_post_href(raw_href, canonical_post_paths, canonical_media_paths) do
     cond do
-      raw_href == "" -> raw_href
-      external_or_special_url?(raw_href) -> raw_href
+      raw_href == "" ->
+        raw_href
+
+      external_or_special_url?(raw_href) ->
+        raw_href
+
       true ->
         {path_part, suffix} = split_path_suffix(raw_href)
 
@@ -103,7 +143,8 @@ defmodule BDS.Rendering.Filters do
               canonical -> canonical <> suffix
             end
 
-          _other -> raw_href
+          _other ->
+            raw_href
         end
     end
   end
@@ -136,8 +177,12 @@ defmodule BDS.Rendering.Filters do
 
   defp normalize_media_src(raw_src, canonical_media_paths) do
     cond do
-      raw_src == "" -> raw_src
-      external_or_special_url?(raw_src) -> raw_src
+      raw_src == "" ->
+        raw_src
+
+      external_or_special_url?(raw_src) ->
+        raw_src
+
       true ->
         {path_part, suffix} = split_path_suffix(raw_src)
 

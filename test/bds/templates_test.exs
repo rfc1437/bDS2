@@ -33,12 +33,20 @@ defmodule BDS.TemplatesTest do
     assert template.content == "<article>{{ content }}</article>"
 
     assert {:ok, duplicate} =
-             BDS.Templates.create_template(%{project_id: project.id, title: "Article View", kind: :post, content: "x"})
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Article View",
+               kind: :post,
+               content: "x"
+             })
 
     assert duplicate.slug == "article-view-2"
   end
 
-  test "publish_template writes a liquid file with frontmatter and clears draft content", %{project: project, temp_dir: temp_dir} do
+  test "publish_template writes a liquid file with frontmatter and clears draft content", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, template} =
              BDS.Templates.create_template(%{
                project_id: project.id,
@@ -68,7 +76,9 @@ defmodule BDS.TemplatesTest do
     assert contents =~ "\n---\n<section>{{ page_title }}</section>\n"
   end
 
-  test "update_template bumps version and reopens a published template when content changes", %{project: project} do
+  test "update_template bumps version and reopens a published template when content changes", %{
+    project: project
+  } do
     assert {:ok, template} =
              BDS.Templates.create_template(%{
                project_id: project.id,
@@ -94,7 +104,8 @@ defmodule BDS.TemplatesTest do
     assert updated.updated_at >= published.updated_at
   end
 
-  test "delete_template refuses referenced templates unless forced, then clears references and deletes the file", %{project: project, temp_dir: temp_dir} do
+  test "delete_template refuses referenced templates unless forced, then clears references and deletes the file",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, template} =
              BDS.Templates.create_template(%{
                project_id: project.id,
@@ -122,7 +133,8 @@ defmodule BDS.TemplatesTest do
                post_template_slug: published.slug
              })
 
-    assert {:error, {:has_references, %{posts: 1, tags: 1}}} = BDS.Templates.delete_template(published.id)
+    assert {:error, {:has_references, %{posts: 1, tags: 1}}} =
+             BDS.Templates.delete_template(published.id)
 
     assert {:ok, :deleted} = BDS.Templates.delete_template(published.id, force: true)
 
@@ -143,7 +155,8 @@ defmodule BDS.TemplatesTest do
     assert %{"tags" => [%{"name" => "Feature"}]} = Jason.decode!(File.read!(tags_path))
   end
 
-  test "update_template cascades slug changes to posts and tags and renames the published file", %{project: project, temp_dir: temp_dir} do
+  test "update_template cascades slug changes to posts and tags and renames the published file",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, template} =
              BDS.Templates.create_template(%{
                project_id: project.id,
@@ -198,11 +211,15 @@ defmodule BDS.TemplatesTest do
     assert post_contents =~ "\n---\nBody\n"
 
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
+
     assert %{"tags" => [%{"name" => "Feature", "post_template_slug" => "feature-view"}]} =
              Jason.decode!(File.read!(tags_path))
   end
 
-  test "rebuild_templates_from_files recreates published templates from disk", %{project: project, temp_dir: temp_dir} do
+  test "rebuild_templates_from_files recreates published templates from disk", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     template_dir = Path.join(temp_dir, "templates")
     File.mkdir_p!(template_dir)
 

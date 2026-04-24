@@ -17,23 +17,28 @@ defmodule BDS.Rendering do
   alias BDS.Posts.Translation
   alias BDS.Templates.Template
 
-  def render_post_page(project_id, template_slug, assigns) when is_binary(project_id) and is_map(assigns) do
+  def render_post_page(project_id, template_slug, assigns)
+      when is_binary(project_id) and is_map(assigns) do
     with {:ok, template_source} <- load_template_source(project_id, :post, template_slug),
-         {:ok, rendered} <- render_template(project_id, template_source, post_assigns(project_id, assigns)) do
+         {:ok, rendered} <-
+           render_template(project_id, template_source, post_assigns(project_id, assigns)) do
       {:ok, rendered}
     end
   end
 
   def render_list_page(project_id, assigns) when is_binary(project_id) and is_map(assigns) do
     with {:ok, template_source} <- load_template_source(project_id, :list, nil),
-         {:ok, rendered} <- render_template(project_id, template_source, list_assigns(project_id, assigns)) do
+         {:ok, rendered} <-
+           render_template(project_id, template_source, list_assigns(project_id, assigns)) do
       {:ok, rendered}
     end
   end
 
-  def render_not_found_page(project_id, assigns \\ %{}) when is_binary(project_id) and is_map(assigns) do
+  def render_not_found_page(project_id, assigns \\ %{})
+      when is_binary(project_id) and is_map(assigns) do
     with {:ok, template_source} <- load_template_source(project_id, :not_found, nil),
-         {:ok, rendered} <- render_template(project_id, template_source, not_found_assigns(project_id, assigns)) do
+         {:ok, rendered} <-
+           render_template(project_id, template_source, not_found_assigns(project_id, assigns)) do
       {:ok, rendered}
     end
   end
@@ -49,7 +54,8 @@ defmodule BDS.Rendering do
     Repo.one(
       from template in Template,
         where:
-          template.project_id == ^project_id and template.kind == ^kind and template.status == :published and
+          template.project_id == ^project_id and template.kind == ^kind and
+            template.status == :published and
             template.enabled == true and template.slug == ^slug,
         limit: 1
     ) || select_template(project_id, kind, nil)
@@ -59,14 +65,16 @@ defmodule BDS.Rendering do
     Repo.one(
       from template in Template,
         where:
-          template.project_id == ^project_id and template.kind == ^kind and template.status == :published and
+          template.project_id == ^project_id and template.kind == ^kind and
+            template.status == :published and
             template.enabled == true,
         order_by: [asc: template.created_at, asc: template.slug],
         limit: 1
     )
   end
 
-  defp published_template_body(%Template{content: content}) when is_binary(content), do: {:ok, content}
+  defp published_template_body(%Template{content: content}) when is_binary(content),
+    do: {:ok, content}
 
   defp published_template_body(%Template{} = template) do
     project = Projects.get_project!(template.project_id)
@@ -105,17 +113,32 @@ defmodule BDS.Rendering do
 
   defp post_assigns(project_id, assigns) do
     metadata = project_metadata(project_id)
-    language = Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
+
+    language =
+      Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
+
     main_language = metadata.main_language || language
     post_record = load_post_record(assigns)
     post_categories = Map.get(post_record || %{}, :categories, []) || []
     post_tags = Map.get(post_record || %{}, :tags, []) || []
+    canonical_post_paths = canonical_post_path_by_slug(project_id, main_language)
+    canonical_media_paths = canonical_media_path_by_source_path(project_id)
 
     %{
       language: language,
-      language_prefix: Map.get(assigns, :language_prefix, Map.get(assigns, "language_prefix", language_prefix(language, main_language))),
-      page_title: Map.get(assigns, :page_title, Map.get(assigns, "page_title", Map.get(assigns, :title, Map.get(assigns, "title")))),
-      pico_stylesheet_href: nil,
+      language_prefix:
+        Map.get(
+          assigns,
+          :language_prefix,
+          Map.get(assigns, "language_prefix", language_prefix(language, main_language))
+        ),
+      page_title:
+        Map.get(
+          assigns,
+          :page_title,
+          Map.get(assigns, "page_title", Map.get(assigns, :title, Map.get(assigns, "title")))
+        ),
+      pico_stylesheet_href: default_pico_stylesheet_href(),
       html_theme_attribute: html_theme_attribute(metadata.pico_theme),
       blog_languages: blog_languages(metadata, language),
       alternate_links: [],
@@ -126,34 +149,40 @@ defmodule BDS.Rendering do
       post_tags: post_tags,
       tag_color_by_name: tag_color_by_name(project_id),
       backlinks: [],
-      canonical_post_path_by_slug: canonical_post_path_by_slug(project_id, main_language),
-      canonical_media_path_by_source_path: canonical_media_path_by_source_path(project_id),
-      post_data_json_by_id: post_data_json(assigns),
-      post: %{
-        id: Map.get(assigns, :id, Map.get(assigns, "id")),
-        slug: Map.get(assigns, :slug, Map.get(assigns, "slug")),
-        title: Map.get(assigns, :title, Map.get(assigns, "title")),
-        content: Map.get(assigns, :content, Map.get(assigns, "content")),
-        excerpt: Map.get(assigns, :excerpt, Map.get(assigns, "excerpt")),
-        language: Map.get(assigns, :language, Map.get(assigns, "language")),
-        show_title: true
-      }
+      canonical_post_path_by_slug: canonical_post_paths,
+      canonical_media_path_by_source_path: canonical_media_paths,
+      post_data_json_by_id: post_data_json(assigns, post_record),
+      post: build_post_context(assigns, post_record)
     }
   end
 
   defp list_assigns(project_id, assigns) do
     metadata = project_metadata(project_id)
-    language = Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
+
+    language =
+      Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
+
     main_language = metadata.main_language || language
     posts = normalize_list_posts(Map.get(assigns, :posts, Map.get(assigns, "posts", [])))
     archive_context = Map.get(assigns, :archive_context, Map.get(assigns, "archive_context", %{}))
 
+    pagination =
+      normalize_pagination(Map.get(assigns, :pagination, Map.get(assigns, "pagination")), posts)
+
+    canonical_post_paths = canonical_post_path_by_slug(project_id, main_language)
+    canonical_media_paths = canonical_media_path_by_source_path(project_id)
+
     %{
       language: language,
-      language_prefix: Map.get(assigns, :language_prefix, Map.get(assigns, "language_prefix", language_prefix(language, main_language))),
+      language_prefix:
+        Map.get(
+          assigns,
+          :language_prefix,
+          Map.get(assigns, "language_prefix", language_prefix(language, main_language))
+        ),
       page_title: Map.get(assigns, :page_title, Map.get(assigns, "page_title")),
       posts: posts,
-      pico_stylesheet_href: nil,
+      pico_stylesheet_href: default_pico_stylesheet_href(),
       html_theme_attribute: html_theme_attribute(metadata.pico_theme),
       blog_languages: blog_languages(metadata, language),
       alternate_links: [],
@@ -165,15 +194,20 @@ defmodule BDS.Rendering do
       min_date: nil,
       max_date: nil,
       is_list_page: true,
-      is_first_page: true,
-      is_last_page: true,
-      has_prev_page: false,
-      has_next_page: false,
-      prev_page_href: "",
-      next_page_href: "",
-      canonical_post_path_by_slug: canonical_post_path_by_slug(project_id, main_language),
-      canonical_media_path_by_source_path: canonical_media_path_by_source_path(project_id),
-      post_data_json_by_id: Enum.into(posts, %{}, fn post -> {post.id, Jason.encode!(Map.take(post, [:id, :slug, :title, :content]))} end),
+      is_first_page: pagination.current_page <= 1,
+      is_last_page: pagination.current_page >= pagination.total_pages,
+      has_prev_page: pagination.has_prev_page,
+      has_next_page: pagination.has_next_page,
+      prev_page_href: pagination.prev_page_href,
+      next_page_href: pagination.next_page_href,
+      current_page: pagination.current_page,
+      total_pages: pagination.total_pages,
+      total_items: pagination.total_items,
+      items_per_page: pagination.items_per_page,
+      canonical_post_path_by_slug: canonical_post_paths,
+      canonical_media_path_by_source_path: canonical_media_paths,
+      post_data_json_by_id:
+        Enum.into(posts, %{}, fn post -> {post.id, post_data_json_value(post)} end),
       day_blocks: [
         %{
           date_label: "",
@@ -187,20 +221,46 @@ defmodule BDS.Rendering do
 
   defp not_found_assigns(project_id, assigns) do
     metadata = project_metadata(project_id)
-    language = Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
+
+    language =
+      Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
+
     main_language = metadata.main_language || language
 
     %{
-      page_title: Map.get(assigns, :page_title, Map.get(assigns, "page_title", "404 Not Found")),
+      page_title: Map.get(assigns, :page_title, Map.get(assigns, "page_title", "404")),
       language: language,
-      language_prefix: Map.get(assigns, :language_prefix, Map.get(assigns, "language_prefix", language_prefix(language, main_language))),
-      pico_stylesheet_href: nil,
+      language_prefix:
+        Map.get(
+          assigns,
+          :language_prefix,
+          Map.get(assigns, "language_prefix", language_prefix(language, main_language))
+        ),
+      pico_stylesheet_href: default_pico_stylesheet_href(),
       html_theme_attribute: html_theme_attribute(metadata.pico_theme),
       blog_languages: blog_languages(metadata, language),
       menu_items: menu_items(project_id),
       alternate_links: [],
-      not_found_message: Map.get(assigns, :not_found_message, Map.get(assigns, "not_found_message")),
-      not_found_back_label: Map.get(assigns, :not_found_back_label, Map.get(assigns, "not_found_back_label"))
+      not_found_message:
+        Map.get(
+          assigns,
+          :not_found_message,
+          Map.get(
+            assigns,
+            "not_found_message",
+            I18n.translate(language, "render.notFound.message")
+          )
+        ),
+      not_found_back_label:
+        Map.get(
+          assigns,
+          :not_found_back_label,
+          Map.get(
+            assigns,
+            "not_found_back_label",
+            I18n.translate(language, "render.notFound.back")
+          )
+        )
     }
   end
 
@@ -232,8 +292,13 @@ defmodule BDS.Rendering do
   end
 
   defp menu_item_href(%{kind: :home}), do: "/"
-  defp menu_item_href(%{kind: :page, slug: slug}) when is_binary(slug) and slug != "", do: "/#{slug}/"
-  defp menu_item_href(%{kind: :category_archive, slug: slug}) when is_binary(slug) and slug != "", do: "/category/#{URI.encode(slug)}/"
+
+  defp menu_item_href(%{kind: :page, slug: slug}) when is_binary(slug) and slug != "",
+    do: "/#{slug}/"
+
+  defp menu_item_href(%{kind: :category_archive, slug: slug}) when is_binary(slug) and slug != "",
+    do: "/category/#{URI.encode(slug)}/"
+
   defp menu_item_href(%{kind: :submenu}), do: "#"
   defp menu_item_href(_item), do: "#"
 
@@ -243,11 +308,13 @@ defmodule BDS.Rendering do
     |> Enum.uniq()
     |> Enum.map(fn language ->
       normalized = I18n.normalize_language(language)
+      href_prefix = language_prefix(normalized, metadata.main_language || current_language)
 
       %{
         code: normalized,
         flag: I18n.flag(normalized),
-        href_prefix: language_prefix(normalized, metadata.main_language || current_language),
+        href: href_for_language(href_prefix),
+        href_prefix: href_prefix,
         is_current: normalized == I18n.normalize_language(current_language)
       }
     end)
@@ -265,26 +332,39 @@ defmodule BDS.Rendering do
     end
   end
 
-  defp post_data_json(assigns) do
+  defp post_data_json(assigns, post_record) do
     id = Map.get(assigns, :id, Map.get(assigns, "id"))
 
     if is_binary(id) do
       %{
-        id =>
-          Jason.encode!(%{
-            id: id,
-            slug: Map.get(assigns, :slug, Map.get(assigns, "slug")),
-            title: Map.get(assigns, :title, Map.get(assigns, "title")),
-            content: Map.get(assigns, :content, Map.get(assigns, "content"))
-          })
+        id => post_data_json_value(build_post_context(assigns, post_record))
       }
     else
       %{}
     end
   end
 
+  defp post_data_json_value(post_context) do
+    Jason.encode!(%{
+      id: Map.get(post_context, :id),
+      title: Map.get(post_context, :title),
+      slug: Map.get(post_context, :slug),
+      excerpt: Map.get(post_context, :excerpt),
+      author: Map.get(post_context, :author),
+      language: Map.get(post_context, :language),
+      published_at: Map.get(post_context, :published_at),
+      created_at: Map.get(post_context, :created_at),
+      updated_at: Map.get(post_context, :updated_at),
+      tags: Map.get(post_context, :tags, []),
+      categories: Map.get(post_context, :categories, [])
+    })
+  end
+
   defp canonical_post_path_by_slug(project_id, main_language) do
-    posts = Repo.all(from post in Post, where: post.project_id == ^project_id and post.status == :published)
+    posts =
+      Repo.all(
+        from post in Post, where: post.project_id == ^project_id and post.status == :published
+      )
 
     translations =
       Repo.all(
@@ -311,6 +391,7 @@ defmodule BDS.Rendering do
     Repo.all(from media in MediaAsset, where: media.project_id == ^project_id)
     |> Enum.reduce(%{}, fn media, acc ->
       datetime = DateTime.from_unix!(media.created_at)
+
       source_key =
         Path.join([
           "media",
@@ -324,7 +405,8 @@ defmodule BDS.Rendering do
     end)
   end
 
-  defp post_path(post, language_prefix) when is_binary(language_prefix) and language_prefix != "" do
+  defp post_path(post, language_prefix)
+       when is_binary(language_prefix) and language_prefix != "" do
     Path.join([String.trim_leading(language_prefix, "/"), post_path(post, nil)])
   end
 
@@ -338,7 +420,7 @@ defmodule BDS.Rendering do
       post.slug,
       "index.html"
     ])
-    |> then(&"/" <> String.trim_trailing(&1, "index.html"))
+    |> then(&("/" <> String.trim_trailing(&1, "index.html")))
   end
 
   defp post_path(post, language, main_language) do
@@ -348,14 +430,117 @@ defmodule BDS.Rendering do
 
   defp normalize_list_posts(posts) do
     Enum.map(posts, fn post ->
+      post_record = load_post_record(post)
+
       %{
         id: Map.get(post, :id, Map.get(post, "id")),
         slug: Map.get(post, :slug, Map.get(post, "slug")),
         title: Map.get(post, :title, Map.get(post, "title")),
-        content: Map.get(post, :content, Map.get(post, "content", Map.get(post, :excerpt, Map.get(post, "excerpt", "")))),
-        show_title: true
+        content:
+          Map.get(
+            post,
+            :content,
+            Map.get(post, "content", Map.get(post, :excerpt, Map.get(post, "excerpt", "")))
+          ),
+        excerpt:
+          Map.get(post, :excerpt, Map.get(post, "excerpt", Map.get(post_record || %{}, :excerpt))),
+        author: Map.get(post_record || %{}, :author),
+        language:
+          Map.get(
+            post,
+            :language,
+            Map.get(post, "language", Map.get(post_record || %{}, :language))
+          ),
+        published_at: Map.get(post_record || %{}, :published_at),
+        created_at: Map.get(post_record || %{}, :created_at),
+        updated_at: Map.get(post_record || %{}, :updated_at),
+        tags: Map.get(post_record || %{}, :tags, []) || [],
+        categories: Map.get(post_record || %{}, :categories, []) || [],
+        template_slug: Map.get(post_record || %{}, :template_slug),
+        do_not_translate: Map.get(post_record || %{}, :do_not_translate, false),
+        href: Map.get(post, :href, Map.get(post, "href")),
+        show_title: true,
+        linked_media: [],
+        outgoing_links: [],
+        incoming_links: []
       }
     end)
+  end
+
+  defp build_post_context(assigns, post_record) do
+    %{
+      id: Map.get(assigns, :id, Map.get(assigns, "id")),
+      slug: Map.get(assigns, :slug, Map.get(assigns, "slug")),
+      title: Map.get(assigns, :title, Map.get(assigns, "title")),
+      content: Map.get(assigns, :content, Map.get(assigns, "content")),
+      excerpt:
+        Map.get(
+          assigns,
+          :excerpt,
+          Map.get(assigns, "excerpt", Map.get(post_record || %{}, :excerpt))
+        ),
+      author: Map.get(post_record || %{}, :author),
+      language:
+        Map.get(
+          assigns,
+          :language,
+          Map.get(assigns, "language", Map.get(post_record || %{}, :language))
+        ),
+      show_title: true,
+      published_at: Map.get(post_record || %{}, :published_at),
+      created_at: Map.get(post_record || %{}, :created_at),
+      updated_at: Map.get(post_record || %{}, :updated_at),
+      tags: Map.get(post_record || %{}, :tags, []) || [],
+      categories: Map.get(post_record || %{}, :categories, []) || [],
+      template_slug:
+        Map.get(
+          post_record || %{},
+          :template_slug,
+          Map.get(assigns, :template_slug, Map.get(assigns, "template_slug"))
+        ),
+      do_not_translate: Map.get(post_record || %{}, :do_not_translate, false),
+      linked_media: [],
+      outgoing_links: [],
+      incoming_links: []
+    }
+  end
+
+  defp normalize_pagination(nil, posts) do
+    total_items = length(posts)
+
+    %{
+      current_page: 1,
+      total_pages: 1,
+      total_items: total_items,
+      items_per_page: total_items,
+      has_prev_page: false,
+      prev_page_href: "",
+      has_next_page: false,
+      next_page_href: ""
+    }
+  end
+
+  defp normalize_pagination(%{} = pagination, posts) do
+    total_items =
+      Map.get(pagination, :total_items, Map.get(pagination, "total_items", length(posts)))
+
+    items_per_page =
+      Map.get(pagination, :items_per_page, Map.get(pagination, "items_per_page", total_items))
+
+    %{
+      current_page: Map.get(pagination, :current_page, Map.get(pagination, "current_page", 1)),
+      total_pages: Map.get(pagination, :total_pages, Map.get(pagination, "total_pages", 1)),
+      total_items: total_items,
+      items_per_page: items_per_page,
+      has_prev_page:
+        Map.get(pagination, :has_prev_page, Map.get(pagination, "has_prev_page", false)),
+      prev_page_href:
+        Map.get(pagination, :prev_page_href, Map.get(pagination, "prev_page_href", "")),
+      has_next_page:
+        Map.get(pagination, :has_next_page, Map.get(pagination, "has_next_page", false)),
+      next_page_href:
+        Map.get(pagination, :next_page_href, Map.get(pagination, "next_page_href", ""))
+    }
   end
 
   defp normalize_archive_context(nil), do: nil
@@ -365,10 +550,19 @@ defmodule BDS.Rendering do
   defp html_theme_attribute(""), do: nil
   defp html_theme_attribute(theme), do: ~s(data-theme="#{theme}")
 
-  defp calendar_initial_year(%{created_at: created_at}) when is_integer(created_at), do: DateTime.from_unix!(created_at).year
+  defp default_pico_stylesheet_href, do: "/assets/pico.min.css"
+
+  defp href_for_language(""), do: "/"
+  defp href_for_language(prefix), do: prefix <> "/"
+
+  defp calendar_initial_year(%{created_at: created_at}) when is_integer(created_at),
+    do: DateTime.from_unix!(created_at).year
+
   defp calendar_initial_year(_post), do: nil
 
-  defp calendar_initial_month(%{created_at: created_at}) when is_integer(created_at), do: DateTime.from_unix!(created_at).month
+  defp calendar_initial_month(%{created_at: created_at}) when is_integer(created_at),
+    do: DateTime.from_unix!(created_at).month
+
   defp calendar_initial_month(_post), do: nil
 
   defp calendar_initial_year_from_posts([post | _rest]), do: calendar_initial_year(post)

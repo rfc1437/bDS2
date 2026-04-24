@@ -101,7 +101,10 @@ defmodule BDS.Projects do
         |> Multi.update_all(:clear_previous, from(p in Project, where: p.is_active == true),
           set: [is_active: false, updated_at: now]
         )
-        |> Multi.update(:activate, Project.changeset(project, %{is_active: true, updated_at: now}))
+        |> Multi.update(
+          :activate,
+          Project.changeset(project, %{is_active: true, updated_at: now})
+        )
         |> Repo.transaction()
         |> case do
           {:ok, %{activate: active_project}} -> {:ok, active_project}

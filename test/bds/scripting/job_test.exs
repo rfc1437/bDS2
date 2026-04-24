@@ -58,7 +58,13 @@ defmodule BDS.Scripting.JobTest do
     assert {:ok, job} = BDS.Scripting.start_job("irrelevant", "main")
     assert job.status in [:queued, :running]
 
-    running_job = wait_for_job(job.id, &(&1.status == :running and &1.progress == %{"phase" => "started", "current" => 1, "total" => 2}))
+    running_job =
+      wait_for_job(
+        job.id,
+        &(&1.status == :running and
+            &1.progress == %{"phase" => "started", "current" => 1, "total" => 2})
+      )
+
     assert running_job.started_at != nil
 
     completed_job = wait_for_job(job.id, &(&1.status == :completed))

@@ -58,7 +58,18 @@ defmodule BDS.Media.Media do
       ],
       empty_values: [nil]
     )
-    |> validate_required([:id, :project_id, :filename, :original_name, :mime_type, :size, :file_path, :sidecar_path, :created_at, :updated_at])
+    |> validate_required([
+      :id,
+      :project_id,
+      :filename,
+      :original_name,
+      :mime_type,
+      :size,
+      :file_path,
+      :sidecar_path,
+      :created_at,
+      :updated_at
+    ])
     |> assoc_constraint(:project)
   end
 end

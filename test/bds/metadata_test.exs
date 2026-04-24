@@ -11,7 +11,10 @@ defmodule BDS.MetadataTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "update_project_metadata writes meta/project.json and load returns the saved values", %{project: project, temp_dir: temp_dir} do
+  test "update_project_metadata writes meta/project.json and load returns the saved values", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{
                name: "Renamed Blog",
@@ -51,7 +54,8 @@ defmodule BDS.MetadataTest do
     assert loaded.blog_languages == ["de", "fr"]
   end
 
-  test "category and publishing updates write their meta files and sync_project_metadata_from_filesystem loads them", %{project: project, temp_dir: temp_dir} do
+  test "category and publishing updates write their meta files and sync_project_metadata_from_filesystem loads them",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, _metadata} = BDS.Metadata.add_category(project.id, "news")
 
     assert {:ok, _metadata} =

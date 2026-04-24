@@ -13,7 +13,8 @@ defmodule BDS.SearchTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "search_posts indexes writes, supports filters and pagination, and removes deleted posts", %{project: project} do
+  test "search_posts indexes writes, supports filters and pagination, and removes deleted posts",
+       %{project: project} do
     assert {:ok, draft_post} =
              BDS.Posts.create_post(%{
                project_id: project.id,
@@ -54,14 +55,25 @@ defmodule BDS.SearchTest do
     assert results.limit == 50
     assert Enum.map(results.posts, & &1.id) == [draft_post.id]
 
-    assert {:ok, tag_results} = BDS.Search.search_posts(project.id, "galaxy", %{tags: ["space"], categories: ["astronomy"]})
-    assert tag_results.total == 2
-    assert Enum.sort(Enum.map(tag_results.posts, & &1.id)) == Enum.sort([draft_post.id, published_post.id])
+    assert {:ok, tag_results} =
+             BDS.Search.search_posts(project.id, "galaxy", %{
+               tags: ["space"],
+               categories: ["astronomy"]
+             })
 
-    assert {:ok, language_results} = BDS.Search.search_posts(project.id, "galaxy", %{language: "de"})
+    assert tag_results.total == 2
+
+    assert Enum.sort(Enum.map(tag_results.posts, & &1.id)) ==
+             Enum.sort([draft_post.id, published_post.id])
+
+    assert {:ok, language_results} =
+             BDS.Search.search_posts(project.id, "galaxy", %{language: "de"})
+
     assert Enum.map(language_results.posts, & &1.id) == [published_post.id]
 
-    assert {:ok, paged_results} = BDS.Search.search_posts(project.id, "galaxy", %{limit: 1, offset: 1})
+    assert {:ok, paged_results} =
+             BDS.Search.search_posts(project.id, "galaxy", %{limit: 1, offset: 1})
+
     assert paged_results.total == 3
     assert paged_results.offset == 1
     assert paged_results.limit == 1
@@ -120,12 +132,17 @@ defmodule BDS.SearchTest do
     assert Enum.map(results.posts, & &1.id) == [post.id]
 
     assert {:ok, missing_translation_results} =
-             BDS.Search.search_posts(project.id, "Canonical", %{missing_translation_language: "de"})
+             BDS.Search.search_posts(project.id, "Canonical", %{
+               missing_translation_language: "de"
+             })
 
     assert Enum.map(missing_translation_results.posts, & &1.id) == [post.id]
   end
 
-  test "search_media indexes metadata, includes translation text, and removes deleted media", %{project: project, temp_dir: temp_dir} do
+  test "search_media indexes metadata, includes translation text, and removes deleted media", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     source_path = Path.join(temp_dir, "hero.txt")
     File.write!(source_path, "hero")
 
@@ -164,7 +181,10 @@ defmodule BDS.SearchTest do
     assert deleted_results.total == 0
   end
 
-  test "rebuild operations repopulate the search index from filesystem truth", %{project: project, temp_dir: temp_dir} do
+  test "rebuild operations repopulate the search index from filesystem truth", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     posts_dir = Path.join([temp_dir, "posts", "2026", "04"])
     File.mkdir_p!(posts_dir)
 
@@ -225,7 +245,9 @@ defmodule BDS.SearchTest do
     assert Enum.map(media_results.media, & &1.id) == ["search-media-from-file"]
   end
 
-  test "search_posts applies language-aware stemming to indexed and query text", %{project: project} do
+  test "search_posts applies language-aware stemming to indexed and query text", %{
+    project: project
+  } do
     assert {:ok, german_post} =
              BDS.Posts.create_post(%{
                project_id: project.id,

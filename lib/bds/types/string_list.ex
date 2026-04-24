@@ -27,7 +27,8 @@ defmodule BDS.Types.StringList do
           :error
         end
 
-      _ -> :error
+      _ ->
+        :error
     end
   end
 

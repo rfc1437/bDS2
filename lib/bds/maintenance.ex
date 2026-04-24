@@ -53,7 +53,8 @@ defmodule BDS.Maintenance do
   defp post_diff_reports(project_id, project) do
     Repo.all(
       from post in Post,
-        where: post.project_id == ^project_id and not is_nil(post.file_path) and post.file_path != ""
+        where:
+          post.project_id == ^project_id and not is_nil(post.file_path) and post.file_path != ""
     )
     |> Enum.flat_map(fn post ->
       case read_frontmatter_document(project, post.file_path) do
@@ -66,6 +67,9 @@ defmodule BDS.Maintenance do
               diff_field("language", post.language, Map.get(fields, "language")),
               diff_field("status", post.status, Map.get(fields, "status")),
               diff_field("template_slug", post.template_slug, Map.get(fields, "template_slug")),
+              diff_field("created_at", post.created_at, Map.get(fields, "created_at")),
+              diff_field("updated_at", post.updated_at, Map.get(fields, "updated_at")),
+              diff_field("published_at", post.published_at, Map.get(fields, "published_at")),
               diff_field("tags", post.tags, Map.get(fields, "tags", [])),
               diff_field("categories", post.categories, Map.get(fields, "categories", []))
             ]
@@ -86,7 +90,9 @@ defmodule BDS.Maintenance do
   defp media_diff_reports(project_id, project) do
     Repo.all(
       from media in Media,
-        where: media.project_id == ^project_id and not is_nil(media.sidecar_path) and media.sidecar_path != ""
+        where:
+          media.project_id == ^project_id and not is_nil(media.sidecar_path) and
+            media.sidecar_path != ""
     )
     |> Enum.flat_map(fn media ->
       case read_sidecar_document(project, media.sidecar_path) do
@@ -98,6 +104,8 @@ defmodule BDS.Maintenance do
               diff_field("caption", media.caption, Map.get(fields, "caption")),
               diff_field("author", media.author, Map.get(fields, "author")),
               diff_field("language", media.language, Map.get(fields, "language")),
+              diff_field("created_at", media.created_at, Map.get(fields, "created_at")),
+              diff_field("updated_at", media.updated_at, Map.get(fields, "updated_at")),
               diff_field("tags", media.tags, Map.get(fields, "tags", []))
             ]
             |> Enum.reject(&is_nil/1)
@@ -117,7 +125,9 @@ defmodule BDS.Maintenance do
   defp post_translation_diff_reports(project_id, project) do
     Repo.all(
       from translation in PostTranslation,
-        where: translation.project_id == ^project_id and not is_nil(translation.file_path) and translation.file_path != ""
+        where:
+          translation.project_id == ^project_id and not is_nil(translation.file_path) and
+            translation.file_path != ""
     )
     |> Enum.flat_map(fn translation ->
       case read_frontmatter_document(project, translation.file_path) do
@@ -128,14 +138,31 @@ defmodule BDS.Maintenance do
               diff_field("excerpt", translation.excerpt, Map.get(fields, "excerpt")),
               diff_field("language", translation.language, Map.get(fields, "language")),
               diff_field("status", translation.status, Map.get(fields, "status")),
-              diff_field("translation_for", translation.translation_for, Map.get(fields, "translation_for"))
+              diff_field(
+                "translation_for",
+                translation.translation_for,
+                Map.get(fields, "translation_for")
+              ),
+              diff_field("created_at", translation.created_at, Map.get(fields, "created_at")),
+              diff_field("updated_at", translation.updated_at, Map.get(fields, "updated_at")),
+              diff_field(
+                "published_at",
+                translation.published_at,
+                Map.get(fields, "published_at")
+              )
             ]
             |> Enum.reject(&is_nil/1)
 
           if differences == [] do
             []
           else
-            [%{entity_type: "post_translation", entity_id: translation.id, differences: differences}]
+            [
+              %{
+                entity_type: "post_translation",
+                entity_id: translation.id,
+                differences: differences
+              }
+            ]
           end
 
         {:error, _reason} ->
@@ -157,14 +184,24 @@ defmodule BDS.Maintenance do
               diff_field("alt", translation.alt, Map.get(fields, "alt")),
               diff_field("caption", translation.caption, Map.get(fields, "caption")),
               diff_field("language", translation.language, Map.get(fields, "language")),
-              diff_field("translation_for", translation.translation_for, Map.get(fields, "translation_for"))
+              diff_field(
+                "translation_for",
+                translation.translation_for,
+                Map.get(fields, "translation_for")
+              )
             ]
             |> Enum.reject(&is_nil/1)
 
           if differences == [] do
             []
           else
-            [%{entity_type: "media_translation", entity_id: translation.id, differences: differences}]
+            [
+              %{
+                entity_type: "media_translation",
+                entity_id: translation.id,
+                differences: differences
+              }
+            ]
           end
 
         _ ->
@@ -176,7 +213,9 @@ defmodule BDS.Maintenance do
   defp script_diff_reports(project_id, project) do
     Repo.all(
       from script in Script,
-        where: script.project_id == ^project_id and not is_nil(script.file_path) and script.file_path != ""
+        where:
+          script.project_id == ^project_id and not is_nil(script.file_path) and
+            script.file_path != ""
     )
     |> Enum.flat_map(fn script ->
       case read_frontmatter_document(project, script.file_path) do
@@ -185,7 +224,9 @@ defmodule BDS.Maintenance do
             [
               diff_field("title", script.title, Map.get(fields, "title")),
               diff_field("entrypoint", script.entrypoint, Map.get(fields, "entrypoint")),
-              diff_field("enabled", script.enabled, Map.get(fields, "enabled"))
+              diff_field("enabled", script.enabled, Map.get(fields, "enabled")),
+              diff_field("created_at", script.created_at, Map.get(fields, "created_at")),
+              diff_field("updated_at", script.updated_at, Map.get(fields, "updated_at"))
             ]
             |> Enum.reject(&is_nil/1)
 
@@ -204,7 +245,9 @@ defmodule BDS.Maintenance do
   defp template_diff_reports(project_id, project) do
     Repo.all(
       from template in Template,
-        where: template.project_id == ^project_id and not is_nil(template.file_path) and template.file_path != ""
+        where:
+          template.project_id == ^project_id and not is_nil(template.file_path) and
+            template.file_path != ""
     )
     |> Enum.flat_map(fn template ->
       case read_frontmatter_document(project, template.file_path) do
@@ -212,7 +255,9 @@ defmodule BDS.Maintenance do
           differences =
             [
               diff_field("title", template.title, Map.get(fields, "title")),
-              diff_field("enabled", template.enabled, Map.get(fields, "enabled"))
+              diff_field("enabled", template.enabled, Map.get(fields, "enabled")),
+              diff_field("created_at", template.created_at, Map.get(fields, "created_at")),
+              diff_field("updated_at", template.updated_at, Map.get(fields, "updated_at"))
             ]
             |> Enum.reject(&is_nil/1)
 
@@ -229,12 +274,44 @@ defmodule BDS.Maintenance do
   end
 
   defp orphan_reports(project_id, project) do
-    post_paths = MapSet.new(Repo.all(from post in Post, where: post.project_id == ^project_id, select: post.file_path))
-    media_paths = MapSet.new(Repo.all(from media in Media, where: media.project_id == ^project_id, select: media.sidecar_path))
-    post_translation_paths = MapSet.new(Repo.all(from translation in PostTranslation, where: translation.project_id == ^project_id, select: translation.file_path))
+    post_paths =
+      MapSet.new(
+        Repo.all(from post in Post, where: post.project_id == ^project_id, select: post.file_path)
+      )
+
+    media_paths =
+      MapSet.new(
+        Repo.all(
+          from media in Media, where: media.project_id == ^project_id, select: media.sidecar_path
+        )
+      )
+
+    post_translation_paths =
+      MapSet.new(
+        Repo.all(
+          from translation in PostTranslation,
+            where: translation.project_id == ^project_id,
+            select: translation.file_path
+        )
+      )
+
     media_translation_paths = MapSet.new(media_translation_sidecar_paths(project_id))
-    script_paths = MapSet.new(Repo.all(from script in Script, where: script.project_id == ^project_id, select: script.file_path))
-    template_paths = MapSet.new(Repo.all(from template in Template, where: template.project_id == ^project_id, select: template.file_path))
+
+    script_paths =
+      MapSet.new(
+        Repo.all(
+          from script in Script, where: script.project_id == ^project_id, select: script.file_path
+        )
+      )
+
+    template_paths =
+      MapSet.new(
+        Repo.all(
+          from template in Template,
+            where: template.project_id == ^project_id,
+            select: template.file_path
+        )
+      )
 
     post_orphans =
       project
@@ -276,7 +353,9 @@ defmodule BDS.Maintenance do
       |> Enum.map(&Path.relative_to(&1, Projects.project_data_dir(project)))
       |> Enum.reject(&MapSet.member?(template_paths, &1))
 
-    (post_orphans ++ post_translation_orphans ++ media_orphans ++ media_translation_orphans ++ script_orphans ++ template_orphans)
+    (post_orphans ++
+       post_translation_orphans ++
+       media_orphans ++ media_translation_orphans ++ script_orphans ++ template_orphans)
     |> Enum.sort()
     |> Enum.map(&%{file_path: &1})
   end
@@ -297,7 +376,10 @@ defmodule BDS.Maintenance do
   defp stringify_value(value) when is_boolean(value), do: to_string(value)
   defp stringify_value(value) when is_integer(value), do: Integer.to_string(value)
   defp stringify_value(value) when is_binary(value), do: value
-  defp stringify_value(value) when is_list(value), do: Enum.map_join(value, ",", &stringify_value/1)
+
+  defp stringify_value(value) when is_list(value),
+    do: Enum.map_join(value, ",", &stringify_value/1)
+
   defp stringify_value(value), do: to_string(value)
 
   defp read_frontmatter_document(project, relative_path) do
@@ -345,7 +427,11 @@ defmodule BDS.Maintenance do
   end
 
   defp media_translation_sidecar_path(project_id, translation) do
-    case Repo.one(from media in Media, where: media.project_id == ^project_id and media.id == ^translation.translation_for, select: media.file_path) do
+    case Repo.one(
+           from media in Media,
+             where: media.project_id == ^project_id and media.id == ^translation.translation_for,
+             select: media.file_path
+         ) do
       nil -> nil
       file_path -> "#{file_path}.#{translation.language}.meta"
     end

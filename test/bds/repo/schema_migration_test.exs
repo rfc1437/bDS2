@@ -180,7 +180,13 @@ defmodule BDS.Repo.SchemaMigrationTest do
       "ai_model_modalities" => ["provider", "model_id", "direction", "modality"],
       "ai_catalog_meta" => ["key", "value"],
       "embedding_keys" => ["label", "post_id", "project_id", "content_hash", "vector"],
-      "dismissed_duplicate_pairs" => ["id", "project_id", "post_id_a", "post_id_b", "dismissed_at"],
+      "dismissed_duplicate_pairs" => [
+        "id",
+        "project_id",
+        "post_id_a",
+        "post_id_b",
+        "dismissed_at"
+      ],
       "import_definitions" => [
         "id",
         "project_id",
@@ -229,8 +235,16 @@ defmodule BDS.Repo.SchemaMigrationTest do
 
     assert unique_index_columns("tags", "tags_project_name_idx") == ["project_id", "name"]
     assert unique_index_columns("scripts", "scripts_project_slug_idx") == ["project_id", "slug"]
-    assert unique_index_columns("templates", "templates_project_slug_idx") == ["project_id", "slug"]
-    assert unique_index_columns("post_media", "post_media_post_media_idx") == ["post_id", "media_id"]
+
+    assert unique_index_columns("templates", "templates_project_slug_idx") == [
+             "project_id",
+             "slug"
+           ]
+
+    assert unique_index_columns("post_media", "post_media_post_media_idx") == [
+             "post_id",
+             "media_id"
+           ]
 
     assert unique_index_columns(
              "generated_file_hashes",
@@ -345,7 +359,9 @@ defmodule BDS.Repo.SchemaMigrationTest do
   defp unique_index_columns(table, index_name) do
     indexes = query_rows("PRAGMA index_list(#{table})")
 
-    assert Enum.any?(indexes, fn [_seq, name, unique | _rest] -> name == index_name and unique == 1 end),
+    assert Enum.any?(indexes, fn [_seq, name, unique | _rest] ->
+             name == index_name and unique == 1
+           end),
            "expected unique index #{index_name} on #{table}"
 
     query_rows("PRAGMA index_info(#{index_name})")

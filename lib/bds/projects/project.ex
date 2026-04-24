@@ -21,7 +21,9 @@ defmodule BDS.Projects.Project do
 
   def changeset(project, attrs) do
     project
-    |> cast(attrs, [:id, :name, :slug, :description, :data_path, :created_at, :updated_at, :is_active],
+    |> cast(
+      attrs,
+      [:id, :name, :slug, :description, :data_path, :created_at, :updated_at, :is_active],
       empty_values: [nil]
     )
     |> validate_required([:id, :name, :slug, :created_at, :updated_at, :is_active])

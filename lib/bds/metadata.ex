@@ -21,13 +21,28 @@ defmodule BDS.Metadata do
 
     project_metadata =
       state
-      |> Map.take([:name, :description, :public_url, :main_language, :default_author, :max_posts_per_page, :blogmark_category, :pico_theme, :semantic_similarity_enabled, :blog_languages])
+      |> Map.take([
+        :name,
+        :description,
+        :public_url,
+        :main_language,
+        :default_author,
+        :max_posts_per_page,
+        :blogmark_category,
+        :pico_theme,
+        :semantic_similarity_enabled,
+        :blog_languages
+      ])
       |> Map.merge(normalize_project_metadata_attrs(attrs, project))
 
     Repo.transaction(fn ->
       updated_project =
         project
-        |> Project.changeset(%{name: project_metadata.name, description: project_metadata.description, updated_at: now})
+        |> Project.changeset(%{
+          name: project_metadata.name,
+          description: project_metadata.description,
+          updated_at: now
+        })
         |> Repo.update!()
 
       persist_setting(project_id, "project", stringify_project_metadata(project_metadata), now)
@@ -89,8 +104,13 @@ defmodule BDS.Metadata do
     project = Projects.get_project!(project_id)
     now = System.system_time(:second)
 
-    project_metadata_from_files = read_json(project, "project.json") || stringify_project_metadata(default_project_metadata(project))
-    categories_from_files = read_json(project, "categories.json") || %{"categories" => @default_categories}
+    project_metadata_from_files =
+      read_json(project, "project.json") ||
+        stringify_project_metadata(default_project_metadata(project))
+
+    categories_from_files =
+      read_json(project, "categories.json") || %{"categories" => @default_categories}
+
     category_meta_from_files = read_json(project, "category-meta.json") || %{"categories" => %{}}
     publishing_from_files = read_json(project, "publishing.json") || %{"ssh_mode" => "scp"}
 
@@ -125,8 +145,14 @@ defmodule BDS.Metadata do
   end
 
   defp load_state(project) do
-    project_metadata = load_setting(project.id, "project") || stringify_project_metadata(default_project_metadata(project))
-    categories = (load_setting(project.id, "categories") || %{"categories" => @default_categories})["categories"]
+    project_metadata =
+      load_setting(project.id, "project") ||
+        stringify_project_metadata(default_project_metadata(project))
+
+    categories =
+      (load_setting(project.id, "categories") || %{"categories" => @default_categories})[
+        "categories"
+      ]
 
     category_settings =
       (load_setting(project.id, "category_meta") || %{"categories" => %{}})["categories"]
@@ -139,10 +165,12 @@ defmodule BDS.Metadata do
       public_url: Map.get(project_metadata, "public_url"),
       main_language: Map.get(project_metadata, "main_language"),
       default_author: Map.get(project_metadata, "default_author"),
-      max_posts_per_page: Map.get(project_metadata, "max_posts_per_page", @default_max_posts_per_page),
+      max_posts_per_page:
+        Map.get(project_metadata, "max_posts_per_page", @default_max_posts_per_page),
       blogmark_category: Map.get(project_metadata, "blogmark_category"),
       pico_theme: Map.get(project_metadata, "pico_theme"),
-      semantic_similarity_enabled: Map.get(project_metadata, "semantic_similarity_enabled", false),
+      semantic_similarity_enabled:
+        Map.get(project_metadata, "semantic_similarity_enabled", false),
       blog_languages: Map.get(project_metadata, "blog_languages", []),
       categories: categories,
       category_settings: category_settings,
@@ -182,10 +210,13 @@ defmodule BDS.Metadata do
 
   defp normalize_category_settings(settings) do
     %{
-      "render_in_lists" => Map.get(settings, :render_in_lists, Map.get(settings, "render_in_lists", true)),
+      "render_in_lists" =>
+        Map.get(settings, :render_in_lists, Map.get(settings, "render_in_lists", true)),
       "show_title" => Map.get(settings, :show_title, Map.get(settings, "show_title", true)),
-      "post_template_slug" => Map.get(settings, :post_template_slug, Map.get(settings, "post_template_slug")),
-      "list_template_slug" => Map.get(settings, :list_template_slug, Map.get(settings, "list_template_slug"))
+      "post_template_slug" =>
+        Map.get(settings, :post_template_slug, Map.get(settings, "post_template_slug")),
+      "list_template_slug" =>
+        Map.get(settings, :list_template_slug, Map.get(settings, "list_template_slug"))
     }
   end
 
@@ -220,7 +251,8 @@ defmodule BDS.Metadata do
     write_publishing_json(project, state.publishing_preferences)
   end
 
-  defp write_project_json(project, project_json), do: write_json(project, "project.json", project_json)
+  defp write_project_json(project, project_json),
+    do: write_json(project, "project.json", project_json)
 
   defp write_categories_json(project, categories) do
     write_json(project, "categories.json", %{"categories" => Enum.sort(categories)})

@@ -6,7 +6,10 @@ defmodule BDS.PostTranslationsTest do
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
-    temp_dir = Path.join(System.tmp_dir!(), "bds-post-translations-#{System.unique_integer([:positive])}")
+
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-translations-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
@@ -14,7 +17,8 @@ defmodule BDS.PostTranslationsTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "upserted post translations publish with the canonical post, reopen on edit, and delete their file", %{project: project, temp_dir: temp_dir} do
+  test "upserted post translations publish with the canonical post, reopen on edit, and delete their file",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, post} =
              Posts.create_post(%{
                project_id: project.id,
@@ -75,7 +79,8 @@ defmodule BDS.PostTranslationsTest do
     assert {:ok, []} = Posts.list_post_translations(post.id)
   end
 
-  test "validate_translations reports missing languages, orphan translation files, and do-not-translate posts", %{project: project, temp_dir: temp_dir} do
+  test "validate_translations reports missing languages, orphan translation files, and do-not-translate posts",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
                main_language: "en",

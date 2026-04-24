@@ -185,7 +185,10 @@ defmodule BDS.Tags do
 
       target_tag ->
         source_tags =
-          Repo.all(from tag in Tag, where: tag.id in ^source_tag_ids and tag.project_id == ^target_tag.project_id)
+          Repo.all(
+            from tag in Tag,
+              where: tag.id in ^source_tag_ids and tag.project_id == ^target_tag.project_id
+          )
 
         Repo.transaction(fn ->
           source_names = Enum.map(source_tags, & &1.name)
@@ -227,10 +230,21 @@ defmodule BDS.Tags do
   end
 
   defp validate_unique_name(project_id, name) do
-    if Repo.exists?(from tag in Tag, where: tag.project_id == ^project_id and fragment("lower(?)", tag.name) == ^String.downcase(name)) do
+    if Repo.exists?(
+         from tag in Tag,
+           where:
+             tag.project_id == ^project_id and
+               fragment("lower(?)", tag.name) == ^String.downcase(name)
+       ) do
       {:error,
        %Tag{}
-       |> Tag.changeset(%{project_id: project_id, name: name, id: Ecto.UUID.generate(), created_at: 0, updated_at: 0})
+       |> Tag.changeset(%{
+         project_id: project_id,
+         name: name,
+         id: Ecto.UUID.generate(),
+         created_at: 0,
+         updated_at: 0
+       })
        |> Ecto.Changeset.add_error(:name, "has already been taken")}
     else
       :ok
@@ -238,10 +252,21 @@ defmodule BDS.Tags do
   end
 
   defp validate_rename_target(project_id, tag_id, name) do
-    if Repo.exists?(from tag in Tag, where: tag.project_id == ^project_id and tag.id != ^tag_id and fragment("lower(?)", tag.name) == ^String.downcase(name)) do
+    if Repo.exists?(
+         from tag in Tag,
+           where:
+             tag.project_id == ^project_id and tag.id != ^tag_id and
+               fragment("lower(?)", tag.name) == ^String.downcase(name)
+       ) do
       {:error,
        %Tag{}
-       |> Tag.changeset(%{project_id: project_id, name: name, id: tag_id, created_at: 0, updated_at: 0})
+       |> Tag.changeset(%{
+         project_id: project_id,
+         name: name,
+         id: tag_id,
+         created_at: 0,
+         updated_at: 0
+       })
        |> Ecto.Changeset.add_error(:name, "has already been taken")}
     else
       :ok
