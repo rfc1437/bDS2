@@ -84,4 +84,64 @@ defmodule BDS.DesktopTest do
     assert conn.status == 200
     assert conn.resp_body =~ ~s(class="app")
   end
+
+  test "desktop router exposes live task status for shell polling" do
+    assert {:ok, task} =
+             BDS.Tasks.register_external_task("preview build", %{
+               group_id: "generation",
+               group_name: "Generation"
+             })
+
+    on_exit(fn ->
+      _ = BDS.Tasks.complete_task(task.id)
+    end)
+
+    assert :ok = BDS.Tasks.report_progress(task.id, 0.5, "halfway")
+
+    conn = conn(:get, "/api/tasks?k=#{Desktop.Auth.login_key()}")
+    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+
+    assert conn.status == 200
+    assert Plug.Conn.get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
+
+    payload = Jason.decode!(conn.resp_body)
+
+    assert payload["active_count"] >= 1
+    assert payload["running_task_message"] == "preview build: halfway"
+
+    assert Enum.any?(payload["tasks"], fn item ->
+             item["id"] == task.id and item["group_name"] == "Generation" and item["progress"] == 0.5
+           end)
+  end
+
+    test "desktop router executes shell commands through the JSON api" do
+      :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+      :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), Process.whereis(BDS.Preview))
+
+      temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-router-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(temp_dir)
+
+      on_exit(fn ->
+        File.rm_rf(temp_dir)
+        _ = BDS.Preview.stop_preview("default")
+      end)
+
+      {:ok, project} = BDS.Projects.create_project(%{name: "Desktop Router", data_path: temp_dir})
+      {:ok, _project} = BDS.Projects.set_active_project(project.id)
+
+      conn =
+        conn(:post, "/api/commands?k=#{Desktop.Auth.login_key()}", Jason.encode!(%{"action" => "open_in_browser"}))
+        |> Plug.Conn.put_req_header("content-type", "application/json")
+
+      conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+
+      assert conn.status == 200
+      assert Plug.Conn.get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
+
+      payload = Jason.decode!(conn.resp_body)
+
+      assert payload["result"]["kind"] == "open_url"
+      assert payload["result"]["project_id"] == project.id
+      assert payload["result"]["url"] == "http://127.0.0.1:4123/"
+    end
 end

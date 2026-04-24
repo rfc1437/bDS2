@@ -17,6 +17,10 @@ defmodule BDS.Projects do
     Repo.all(from project in Project, order_by: [asc: project.created_at])
   end
 
+  def get_active_project do
+    Repo.one(from project in Project, where: project.is_active == true, limit: 1)
+  end
+
   def get_project(id), do: Repo.get(Project, id)
   def get_project!(id), do: Repo.get!(Project, id)
 

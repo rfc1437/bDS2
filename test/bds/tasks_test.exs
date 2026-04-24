@@ -115,6 +115,39 @@ defmodule BDS.TasksTest do
              :completed
   end
 
+  test "status_snapshot exposes active task details for the desktop shell" do
+    assert {:ok, first} =
+             BDS.Tasks.register_external_task("preview build", %{
+               group_id: "generation",
+               group_name: "Generation"
+             })
+
+    assert {:ok, second} =
+             BDS.Tasks.register_external_task("reindex text", %{
+               group_id: "search",
+               group_name: "Search"
+             })
+
+    on_exit(fn ->
+      _ = BDS.Tasks.complete_task(first.id)
+      _ = BDS.Tasks.complete_task(second.id)
+    end)
+
+    assert :ok = BDS.Tasks.report_progress(first.id, 0.5, "halfway")
+
+    snapshot = BDS.Tasks.status_snapshot()
+
+    assert snapshot.active_count == 2
+    assert snapshot.running_task_overflow == 1
+    assert snapshot.running_task_message == "preview build: halfway"
+
+    assert [%{id: first_id, status: :running, progress: 0.5, group_name: "Generation"}, %{id: second_id, status: :running}] =
+             snapshot.tasks
+
+    assert first_id == first.id
+    assert second_id == second.id
+  end
+
   defp receive_started do
     receive do
       {:started, name, pid} -> {name, pid}

@@ -9,6 +9,10 @@ defmodule BDS.UI.Commands do
 
     cond do
       primary and key == "b" -> MenuBar.execute(state, :toggle_sidebar)
+      primary and key == "j" -> MenuBar.execute(state, :toggle_panel)
+      primary and key == "1" -> MenuBar.execute(state, :view_posts)
+      primary and key == "2" -> MenuBar.execute(state, :view_media)
+      primary and key == "\\" -> MenuBar.execute(state, :toggle_assistant_sidebar)
       primary and key == "w" -> MenuBar.execute(state, :close_tab)
       true -> state
     end

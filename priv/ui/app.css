@@ -5,7 +5,7 @@
   --vscode-panel-background: #1e1e1e;
   --vscode-titleBar-activeBackground: #252526;
   --vscode-titleBar-activeForeground: #cccccc;
-  --vscode-statusBar-background: #007acc;
+  --vscode-statusBar-background: #181818;
   --vscode-statusBar-foreground: #ffffff;
   --vscode-tab-activeBackground: #1e1e1e;
   --vscode-tab-inactiveBackground: #2d2d2d;
@@ -682,6 +682,44 @@ button {
   border-bottom: 1px solid var(--vscode-panel-border);
 }
 
+.output-list,
+.git-log-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.task-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.task-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-descriptionForeground);
+}
+
+.task-status-running {
+  color: var(--vscode-terminal-ansiGreen, var(--vscode-statusBar-foreground));
+}
+
+.task-status-pending {
+  color: var(--vscode-terminal-ansiYellow, var(--vscode-statusBar-foreground));
+}
+
+.panel-empty-state {
+  min-height: 100%;
+  justify-content: center;
+}
+
 .status-bar {
   height: 22px;
   background: var(--vscode-statusBar-background);
@@ -720,6 +758,56 @@ button {
 
 .status-bar-item:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.status-bar-task-button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.status-bar-item.theme-badge {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+
+.status-bar-item.language-badge {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  gap: 4px;
+}
+
+.status-bar-item.offline-badge {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.4;
+  font-size: 13px;
+  padding: 0 4px;
+}
+
+.status-bar-item.offline-badge.active {
+  background-color: rgba(255, 196, 0, 0.28);
+  opacity: 1;
+}
+
+.status-bar-language-select {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+}
+
+.status-bar-language-select:focus {
+  outline: none;
+}
+
+.status-bar-count {
+  font-size: 11px;
+  opacity: 0.85;
 }
 
 .status-bar-item.brand {

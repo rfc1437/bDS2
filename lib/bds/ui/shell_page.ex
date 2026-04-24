@@ -1,6 +1,7 @@
 defmodule BDS.UI.ShellPage do
   @moduledoc false
 
+  alias BDS.I18n
   alias BDS.UI.MenuBar
   alias BDS.UI.Registry
   alias BDS.UI.Session
@@ -49,9 +50,15 @@ defmodule BDS.UI.ShellPage do
 
   defp bootstrap do
     workbench = Workbench.new()
+    task_status = BDS.Tasks.status_snapshot()
+    ui_language = I18n.current_ui_locale()
 
     %{
       title: Application.get_env(:bds, :desktop)[:title] || "Blogging Desktop Server",
+      i18n: %{
+        ui_language: ui_language,
+        supported_ui_languages: Enum.map(I18n.supported_languages(), &Map.take(&1, [:code, :flag]))
+      },
       registry: %{
         sidebar_views: Enum.map(Registry.sidebar_views(), &encode_sidebar_view/1),
         editor_routes: Enum.map(Registry.editor_routes(), &encode_editor_route/1),
@@ -59,21 +66,22 @@ defmodule BDS.UI.ShellPage do
       },
       menu_groups: Enum.map(MenuBar.default_groups(), &encode_menu_group/1),
       session: Session.serialize(workbench),
+      task_status: task_status,
       content: %{
         sidebar: sidebar_content(),
-        dashboard: dashboard_content(),
+        dashboard: dashboard_content(task_status),
         assistant_cards: assistant_cards(),
-        editor_meta: editor_meta()
+        editor_meta: editor_meta(task_status)
       },
       status:
         Workbench.status_bar(workbench,
           post_count: 42,
           media_count: 18,
           theme_badge: "desktop-shell",
-          ui_language: "en",
+          ui_language: ui_language,
           offline_mode: true,
-          running_task_message: "Desktop shell ready",
-          running_task_overflow: 0,
+          running_task_message: task_status.running_task_message,
+          running_task_overflow: task_status.running_task_overflow,
           git_badge_count: 3
         )
     }
@@ -180,14 +188,18 @@ defmodule BDS.UI.ShellPage do
     %{title: title, subtitle: subtitle, sections: [%{title: title, items: items}]}
   end
 
-  defp dashboard_content do
+  defp dashboard_content(task_status) do
     %{
       title: "Dashboard",
       subtitle: "Desktop workbench shell wired through Elixir",
       summary_cards: [
         %{label: "Posts", value: "42", detail: "Across draft, published, and archive"},
         %{label: "Media", value: "18", detail: "Images and documents indexed"},
-        %{label: "Tasks", value: "1", detail: "One background action visible in the status bar"}
+        %{
+          label: "Tasks",
+          value: Integer.to_string(task_status.active_count),
+          detail: task_summary_detail(task_status)
+        }
       ],
       checklist: [
         "Native menu groups mirror the old application shell",
@@ -205,14 +217,26 @@ defmodule BDS.UI.ShellPage do
     ]
   end
 
-  defp editor_meta do
+  defp editor_meta(task_status) do
     %{
       dashboard: [
-        %{label: "Status", value: "Workbench shell ready"},
+        %{label: "Status", value: task_status.running_task_message || "Idle"},
         %{label: "Mode", value: "Offline"},
         %{label: "Main Language", value: "en"}
       ]
     }
+  end
+
+  defp task_summary_detail(%{active_count: 0}), do: "No active background tasks"
+
+  defp task_summary_detail(%{running_count: running, pending_count: pending}) do
+    segments = []
+    segments = if running > 0, do: ["#{running} running" | segments], else: segments
+    segments = if pending > 0, do: ["#{pending} queued" | segments], else: segments
+
+    segments
+    |> Enum.reverse()
+    |> Enum.join(", ")
   end
 
   defp normalize_view_label(:chat, _label), do: "Chat"

@@ -19,6 +19,10 @@ defmodule BDS.Tasks do
     GenServer.call(__MODULE__, {:get_task, task_id})
   end
 
+  def status_snapshot do
+    GenServer.call(__MODULE__, :status_snapshot)
+  end
+
   def cancel_task(task_id) when is_binary(task_id) do
     GenServer.call(__MODULE__, {:cancel_task, task_id})
   end
@@ -65,6 +69,10 @@ defmodule BDS.Tasks do
 
   def handle_call({:get_task, task_id}, _from, state) do
     {:reply, state.tasks[task_id] && public_task(state.tasks[task_id]), state}
+  end
+
+  def handle_call(:status_snapshot, _from, state) do
+    {:reply, build_status_snapshot(state), state}
   end
 
   def handle_call({:cancel_task, task_id}, _from, state) do
@@ -301,6 +309,46 @@ defmodule BDS.Tasks do
   defp public_task(task) do
     Map.drop(task, [:last_reported_at])
   end
+
+  defp build_status_snapshot(state) do
+    tasks = active_tasks(state)
+
+    %{
+      active_count: length(tasks),
+      running_count: Enum.count(tasks, &(&1.status == :running)),
+      pending_count: Enum.count(tasks, &(&1.status == :pending)),
+      running_task_message: running_task_message(tasks),
+      running_task_overflow: running_task_overflow(tasks),
+      tasks: Enum.map(tasks, &public_task/1)
+    }
+  end
+
+  defp active_tasks(state) do
+    state.tasks
+    |> Map.values()
+    |> Enum.filter(&(&1.status in [:running, :pending]))
+    |> Enum.sort_by(&task_sort_key/1)
+  end
+
+  defp task_sort_key(task) do
+    {task_priority(task.status), task.started_at || task.created_at}
+  end
+
+  defp task_priority(:running), do: 0
+  defp task_priority(:pending), do: 1
+
+  defp running_task_message([]), do: nil
+
+  defp running_task_message([task | _rest]) do
+    cond do
+      task.status == :pending -> "Queued: #{task.name}"
+      is_binary(task.message) and task.message != "" -> "#{task.name}: #{task.message}"
+      true -> task.name
+    end
+  end
+
+  defp running_task_overflow([]), do: 0
+  defp running_task_overflow(tasks), do: max(length(tasks) - 1, 0)
 
   defp normalize_result({:ok, _value} = result), do: result
   defp normalize_result({:error, _reason} = result), do: result

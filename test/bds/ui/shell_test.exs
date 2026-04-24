@@ -66,6 +66,15 @@ defmodule BDS.UI.ShellTest do
     state = Commands.handle_shortcut(state, %{meta: true, key: "b"})
     assert state.sidebar_visible == false
 
+    state = Commands.handle_shortcut(state, %{meta: true, key: "j"})
+    assert state.panel.visible == true
+
+    state = Commands.handle_shortcut(state, %{meta: true, key: "1"})
+    assert state.active_view == :posts
+
+    state = Commands.handle_shortcut(state, %{meta: true, key: "2"})
+    assert state.active_view == :media
+
     state = Commands.handle_shortcut(state, %{meta: true, key: "w"})
     assert state.tabs == []
     assert state.editor_route == :dashboard
@@ -99,7 +108,7 @@ defmodule BDS.UI.ShellTest do
     assert html =~ ~s(id="bds-shell-bootstrap")
     assert html =~ ~s(src="/assets/app.js")
     assert html =~ ~s(href="/assets/app.css")
-    assert html =~ ~s(Desktop shell ready)
+    assert html =~ ~s("task_status")
   end
 
   test "static shell bundle exists for direct browser inspection" do
@@ -134,9 +143,51 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "window-titlebar-menu-bar is-hidden"
 
     assert css =~ ".window-titlebar-menu-bar.is-hidden"
+    assert css =~ "--vscode-statusBar-background: #181818"
     assert css =~ ".status-bar-left,"
     assert css =~ "gap: 4px"
     assert css =~ "padding: 0 8px"
     assert css =~ "height: 100%"
+    assert css =~ ".status-bar-language-select"
+    assert css =~ ".status-bar-item.language-badge"
+    assert css =~ ".status-bar-item.offline-badge"
+
+    assert js =~ "renderLanguageOptions"
+    assert js =~ "status-bar-language-select"
+    assert js =~ "setUiLanguage"
+  end
+
+  test "static shell bundle polls live task status and renders a task-backed lower panel" do
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert js =~ "/api/tasks"
+    assert js =~ "/api/commands"
+    assert js =~ "fetchTaskStatus"
+    assert js =~ "executeBackendShellCommand"
+    assert js =~ "applyShellCommandResult"
+    assert js =~ "openTasksPanel"
+    assert js =~ "No background tasks running"
+    assert js =~ "task-list"
+    assert js =~ "output-list"
+    assert js =~ "git-log-list"
+    assert js =~ "data-panel-tab=\"output\""
+    assert js =~ "data-panel-tab=\"git_log\""
+  end
+
+  test "static shell bundle binds base shell hotkeys and menu actions to existing shell functionality" do
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert js =~ "window.addEventListener(\"keydown\""
+    assert js =~ "event.metaKey"
+    assert js =~ "case \"j\""
+    assert js =~ "case \"1\""
+    assert js =~ "case \"2\""
+    assert js =~ "case \"\\\\\""
+    assert js =~ "case \"view_posts\""
+    assert js =~ "case \"view_media\""
+    assert js =~ "executeBackendShellCommand(action)"
+    assert js =~ "case \"metadata_diff\""
+    assert js =~ "case \"regenerate_calendar\""
+    assert js =~ "case \"fill_missing_translations\""
   end
 end

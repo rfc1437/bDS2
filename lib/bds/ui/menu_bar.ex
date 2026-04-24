@@ -82,6 +82,8 @@ defmodule BDS.UI.MenuBar do
   def execute(state, :toggle_sidebar), do: Workbench.toggle_sidebar(state)
   def execute(state, :toggle_panel), do: Workbench.toggle_panel(state)
   def execute(state, :toggle_assistant_sidebar), do: Workbench.toggle_assistant_sidebar(state)
+  def execute(state, :view_posts), do: %{state | active_view: :posts, sidebar_visible: true}
+  def execute(state, :view_media), do: %{state | active_view: :media, sidebar_visible: true}
 
   def execute(state, :close_tab) do
     case state.active_tab do

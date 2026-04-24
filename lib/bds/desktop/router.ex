@@ -30,6 +30,21 @@ defmodule BDS.Desktop.Router do
     Plug.Conn.send_resp(conn, 200, "ok")
   end
 
+  get "/api/tasks" do
+    conn
+    |> Plug.Conn.put_resp_content_type("application/json")
+    |> Plug.Conn.send_resp(200, BDS.Desktop.ShellController.task_status_json())
+  end
+
+  post "/api/commands" do
+    {:ok, body, conn} = Plug.Conn.read_body(conn)
+    payload = if body == "", do: %{}, else: Jason.decode!(body)
+
+    conn
+    |> Plug.Conn.put_resp_content_type("application/json")
+    |> Plug.Conn.send_resp(200, BDS.Desktop.ShellController.command_json(payload))
+  end
+
   match _ do
     Plug.Conn.send_resp(conn, 404, "not found")
   end

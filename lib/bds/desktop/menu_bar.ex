@@ -58,6 +58,20 @@ defmodule BDS.Desktop.MenuBar do
     {:noreply, menu}
   end
 
+  def handle_event("open_in_browser", menu) do
+    case BDS.Desktop.ShellCommands.execute("open_in_browser") do
+      {:ok, %{url: url}} -> OS.launch_default_browser(url)
+      _other -> :ok
+    end
+
+    {:noreply, menu}
+  end
+
+  def handle_event("open_data_folder", menu) do
+    _ = BDS.Desktop.ShellCommands.execute("open_data_folder")
+    {:noreply, menu}
+  end
+
   def handle_event("report_issue", menu) do
     OS.launch_default_browser("https://github.com/rfc1437/bDS/issues")
     {:noreply, menu}

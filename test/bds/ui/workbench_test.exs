@@ -181,8 +181,10 @@ defmodule BDS.UI.WorkbenchTest do
 
     state = MenuBar.execute(state, :toggle_sidebar)
     state = MenuBar.execute(state, :toggle_panel)
+    state = MenuBar.execute(state, :view_media)
 
     assert state.sidebar_visible == true
     assert state.panel.visible == true
+    assert state.active_view == :media
   end
 end

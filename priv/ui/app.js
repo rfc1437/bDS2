@@ -7,14 +7,23 @@ if (!root || !bootstrapNode) {
 
 const SIDEBAR_STORAGE_KEY = "bds-panel-sidebar";
 const ASSISTANT_STORAGE_KEY = "bds-panel-assistant-sidebar";
+const TASK_STATUS_POLL_MS = 1500;
 const bootstrap = JSON.parse(bootstrapNode.textContent);
 const isMac = typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac");
 const state = {
   session: hydrateSession(clone(bootstrap.session)),
+  status: clone(bootstrap.status),
+  taskStatus: normalizeTaskStatus(bootstrap.task_status),
+  outputEntries: [],
+  gitLogEntries: [],
+  uiLanguage: readStoredUiLanguage(bootstrap.i18n?.ui_language || bootstrap.status.right.ui_language),
+  supportedUiLanguages: bootstrap.i18n?.supported_ui_languages || [],
   tabMeta: {},
 };
 
 bindNativeMenuBridge();
+bindGlobalHotkeys();
+scheduleTaskPolling();
 render();
 
 function render() {
@@ -210,6 +219,8 @@ function renderEditor() {
 }
 
 function renderEditorBody(route) {
+  const meta = currentTabMeta();
+
   if (route === "dashboard") {
     const dashboard = bootstrap.content.dashboard;
     return `
@@ -229,6 +240,10 @@ function renderEditorBody(route) {
     `;
   }
 
+  if (meta?.payload) {
+    return renderCommandPayload(route, meta.payload);
+  }
+
   const active = activeItem();
   return `
     <div class="editor-toolbar">
@@ -244,24 +259,108 @@ function renderEditorBody(route) {
 }
 
 function renderPanel() {
-  const tabs = [state.session.panel.active_tab, "output", "git_log"].filter(uniqueValue);
+  const tabs = panelTabs();
 
   root.querySelector(".panel-shell").innerHTML = `
     <div class="panel-header">
       <div class="panel-tabs">
-        ${tabs
-          .map(
-            (tab) => `
-              <button class="panel-tab ${state.session.panel.active_tab === tab ? "active" : ""}" data-panel-tab="${tab}" type="button">${escapeHtml(routeLabel(tab))}</button>
-            `
-          )
-          .join("")}
+        ${tabs.map((tab) => renderPanelTab(tab)).join("")}
       </div>
     </div>
     <div class="panel-content">
+      ${renderPanelBody()}
+    </div>
+  `;
+}
+
+function renderPanelBody() {
+  if (state.session.panel.active_tab === "tasks") {
+    return renderTaskPanelEntries();
+  }
+
+  if (state.session.panel.active_tab === "output") {
+    return renderOutputEntries();
+  }
+
+  if (state.session.panel.active_tab === "git_log") {
+    return renderGitLogEntries();
+  }
+
+  return `
+    <div class="panel-entry">
+      <strong>${escapeHtml(routeLabel(state.session.panel.active_tab))}</strong>
+      <span>The shared lower panel is available for tasks, output, git details, and editor-specific diagnostics.</span>
+    </div>
+  `;
+}
+
+function renderTaskPanelEntries() {
+  if (!state.taskStatus.tasks.length) {
+    return `
+      <div class="panel-entry panel-empty-state">
+        <strong>Tasks</strong>
+        <span>No background tasks running</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="task-list">
+      ${state.taskStatus.tasks.map((task) => renderTaskEntry(task)).join("")}
+    </div>
+  `;
+}
+
+function renderTaskEntry(task) {
+  const progress = typeof task.progress === "number" ? `${Math.round(task.progress * 100)}%` : null;
+  const statusDetail = [task.group_name, progress].filter(Boolean).join(" • ");
+  const message = task.message || statusLabel(task.status);
+
+  return `
+    <div class="panel-entry task-entry">
+      <div class="task-entry-header">
+        <strong>${escapeHtml(task.name)}</strong>
+        <span class="task-status task-status-${escapeHtmlAttribute(task.status)}">${escapeHtml(statusLabel(task.status))}</span>
+      </div>
+      ${statusDetail ? `<span>${escapeHtml(statusDetail)}</span>` : ""}
+      <span>${escapeHtml(message)}</span>
+    </div>
+  `;
+}
+
+function renderOutputEntries() {
+  if (!state.outputEntries.length) {
+    return `
+      <div class="panel-entry panel-empty-state output-list">
+        <strong>Output</strong>
+        <span>No shell output yet</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="output-list">
+      ${state.outputEntries
+        .map(
+          (entry) => `
+            <div class="panel-entry output-item">
+              <strong>${escapeHtml(entry.title)}</strong>
+              <span>${escapeHtml(entry.message)}</span>
+              ${entry.details ? `<pre class="output-item-details">${escapeHtml(entry.details)}</pre>` : ""}
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderGitLogEntries() {
+  return `
+    <div class="git-log-list">
       <div class="panel-entry">
-        <strong>${escapeHtml(routeLabel(state.session.panel.active_tab))}</strong>
-        <span>The shared lower panel is available for tasks, output, git details, and editor-specific diagnostics.</span>
+        <strong>Git Log</strong>
+        <span>Working tree integration is not wired yet in the shell, but the tab is selectable and ready for command output.</span>
       </div>
     </div>
   `;
@@ -288,18 +387,26 @@ function renderAssistant() {
 }
 
 function renderStatusBar() {
-  const status = bootstrap.status;
+  const status = state.status;
+  const taskOverflow = state.taskStatus.running_task_overflow;
+  const taskMessage = state.taskStatus.running_task_message || "Idle";
 
   root.querySelector(".status-bar").innerHTML = `
     <div class="status-bar-left">
-      <span class="status-bar-item">${escapeHtml(status.left.running_task_message || "Idle")}</span>
+      <button class="status-bar-item status-bar-task-button" data-command="open-tasks-panel" type="button">
+        <span>${escapeHtml(taskMessage)}</span>
+        ${taskOverflow > 0 ? `<span class="status-bar-count">+${taskOverflow}</span>` : ""}
+      </button>
     </div>
     <div class="status-bar-right">
       <span class="status-bar-item">${escapeHtml(status.right.post_count)}</span>
       <span class="status-bar-item">${escapeHtml(status.right.media_count)}</span>
-      <span class="status-bar-item">${escapeHtml(status.right.theme_badge)}</span>
-      <span class="status-bar-item">${status.right.offline_mode ? "Offline" : "Online"}</span>
-      <span class="status-bar-item">${escapeHtml(status.right.ui_language.toUpperCase())}</span>
+      <span class="status-bar-item theme-badge">${escapeHtml(status.right.theme_badge)}</span>
+      <button class="status-bar-item offline-badge${status.right.offline_mode ? " active" : ""}" data-command="toggle-offline-mode" type="button" title="Toggle offline mode">✈</button>
+      <label class="status-bar-item language-badge">
+        <span>UI</span>
+        <select class="status-bar-language-select" data-command="set-ui-language">${renderLanguageOptions()}</select>
+      </label>
       <span class="status-bar-item brand">${escapeHtml(status.right.brand)}</span>
     </div>
   `;
@@ -315,17 +422,20 @@ function bindEvents() {
   root.querySelectorAll("[data-command]").forEach((button) => {
     button.onclick = () => {
       const command = button.dataset.command;
-      if (command === "toggle-sidebar") {
-        state.session.sidebar_visible = !state.session.sidebar_visible;
-        persistSessionWidths();
+      if (command === "open-tasks-panel") {
+        openTasksPanel();
       }
-      if (command === "toggle-panel") {
-        state.session.panel.visible = !state.session.panel.visible;
+      if (command === "toggle-offline-mode") {
+        executeShellCommand("toggle_offline_mode");
+        return;
       }
-      if (command === "toggle-assistant") {
-        state.session.assistant_sidebar_visible = !state.session.assistant_sidebar_visible;
-        persistSessionWidths();
-      }
+      executeShellCommand(command.replace(/-/g, "_"));
+    };
+  });
+
+  root.querySelectorAll("[data-command='set-ui-language']").forEach((select) => {
+    select.onchange = (event) => {
+      setUiLanguage(event.target.value);
       render();
     };
   });
@@ -404,67 +514,253 @@ function bindNativeMenuBridge() {
   });
 }
 
+function bindGlobalHotkeys() {
+  if (window.__BDS_KEYBOARD_BOUND__) {
+    return;
+  }
+
+  window.__BDS_KEYBOARD_BOUND__ = true;
+  window.addEventListener("keydown", (event) => {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey) {
+      return;
+    }
+
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+    let command = null;
+
+    switch (key) {
+      case "b":
+        command = "toggle_sidebar";
+        break;
+      case "j":
+        command = "toggle_panel";
+        break;
+      case "1":
+        command = "view_posts";
+        break;
+      case "2":
+        command = "view_media";
+        break;
+      case "\\":
+        command = "toggle_assistant_sidebar";
+        break;
+      case "w":
+        command = "close_tab";
+        break;
+      default:
+        command = null;
+    }
+
+    if (!command) {
+      return;
+    }
+
+    event.preventDefault();
+    executeShellCommand(command);
+  });
+}
+
+function scheduleTaskPolling() {
+  window.setInterval(fetchTaskStatus, TASK_STATUS_POLL_MS);
+  void fetchTaskStatus();
+}
+
+async function fetchTaskStatus() {
+  try {
+    const response = await fetch("/api/tasks", {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const next = normalizeTaskStatus(await response.json());
+
+    if (JSON.stringify(next) === JSON.stringify(state.taskStatus)) {
+      return;
+    }
+
+    state.taskStatus = next;
+    state.status.left.running_task_message = next.running_task_message;
+    state.status.left.running_task_overflow = next.running_task_overflow;
+    render();
+  } catch (_error) {
+    // Keep the shell usable if task polling is temporarily unavailable.
+  }
+}
+
+function openTasksPanel() {
+  state.session.panel.visible = true;
+  state.session.panel.active_tab = "tasks";
+}
+
 function handleNativeMenuAction(action) {
+  executeShellCommand(action);
+}
+
+function executeShellCommand(action) {
   if (!action) {
     return;
   }
 
+  if (executeLocalShellCommand(action)) {
+    render();
+    return;
+  }
+
+  void executeBackendShellCommand(action);
+}
+
+function executeLocalShellCommand(action) {
   switch (action) {
     case "toggle_sidebar":
       state.session.sidebar_visible = !state.session.sidebar_visible;
       persistSessionWidths();
-      break;
+      return true;
     case "toggle_panel":
       state.session.panel.visible = !state.session.panel.visible;
-      break;
+      if (state.session.panel.visible && !state.session.panel.active_tab) {
+        state.session.panel.active_tab = "tasks";
+      }
+      return true;
     case "toggle_assistant_sidebar":
       state.session.assistant_sidebar_visible = !state.session.assistant_sidebar_visible;
       persistSessionWidths();
-      break;
+      return true;
     case "view_posts":
       state.session.active_view = "posts";
       state.session.sidebar_visible = true;
-      break;
+      return true;
     case "view_media":
       state.session.active_view = "media";
       state.session.sidebar_visible = true;
-      break;
+      return true;
     case "close_tab":
       closeActiveTab();
-      break;
+      return true;
     case "edit_preferences":
       openSingletonTab("settings");
-      break;
+      return true;
     case "edit_menu":
       openSingletonTab("menu_editor");
-      break;
-    case "metadata_diff":
-      openSingletonTab("metadata_diff");
-      break;
+      return true;
     case "documentation":
       openSingletonTab("documentation");
-      break;
+      return true;
     case "api_documentation":
       openSingletonTab("api_documentation");
+      return true;
+    case "regenerate_calendar":
+      appendOutputEntry("Regenerate Calendar", "Calendar regeneration is not wired yet, but the base shell now surfaces the command and keeps the Output tab selectable.");
+      setPanelTab("output");
+      return true;
+    case "fill_missing_translations":
+      appendOutputEntry("Fill Missing Translations", "Translation fill is not wired yet, but the command is now routed into Output instead of being ignored.");
+      setPanelTab("output");
+      return true;
+    case "toggle_offline_mode":
+      state.status.right.offline_mode = !state.status.right.offline_mode;
+      return true;
+    default:
+      return false;
+  }
+}
+
+async function executeBackendShellCommand(action) {
+  try {
+    const response = await fetch("/api/commands", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ action }),
+    });
+
+    if (!response.ok) {
+      appendOutputEntry(routeLabel(action), `Command failed with HTTP ${response.status}`);
+      setPanelTab("output");
+      render();
+      return;
+    }
+
+    const payload = await response.json();
+
+    if (payload.status !== "ok") {
+      applyShellCommandError(action, payload.error || { message: "Unknown shell command error" });
+      return;
+    }
+
+    applyShellCommandResult(payload.result);
+  } catch (error) {
+    applyShellCommandError(action, { message: error?.message || String(error) });
+  }
+}
+
+function applyShellCommandResult(result) {
+  if (!result) {
+    return;
+  }
+
+  switch (result.kind) {
+    case "task_queued":
+      appendOutputEntry(result.title, result.message);
+      setPanelTab(result.panel_tab || "tasks");
+      void fetchTaskStatus();
       break;
-    case "validate_site":
-      openSingletonTab("site_validation");
+    case "open_url":
+      appendOutputEntry(result.title, result.url || result.message || "Opened URL");
+      setPanelTab("output");
+
+      if (result.url) {
+        window.open(result.url, "_blank", "noopener");
+      }
+
       break;
-    case "validate_translations":
-      openSingletonTab("translation_validation");
-      break;
-    case "find_duplicates":
-      openSingletonTab("find_duplicates");
+    case "open_editor":
+      openSingletonTab(result.route, {
+        title: result.title,
+        subtitle: result.subtitle,
+        editorMeta: result.editorMeta,
+        payload: result.payload,
+      });
+      return;
+    case "output":
+      appendOutputEntry(result.title, result.message, result.details);
+      setPanelTab(result.panel_tab || "output");
       break;
     default:
-      return;
+      appendOutputEntry(routeLabel(result.action || "output"), result.message || "Command completed");
+      setPanelTab("output");
+      break;
   }
 
   render();
 }
 
-function openSingletonTab(type) {
-  openTab(type, type, routeLabel(type), false);
+function applyShellCommandError(action, error) {
+  appendOutputEntry(routeLabel(action), error?.message || "Command failed");
+  setPanelTab("output");
+  render();
+}
+
+function setPanelTab(tab) {
+  state.session.panel.visible = true;
+  state.session.panel.active_tab = tab;
+}
+
+function appendOutputEntry(title, message, details = "") {
+  state.outputEntries = [{ title, message, details }, ...state.outputEntries].slice(0, 20);
+}
+
+function openSingletonTab(type, meta = {}) {
+  openTab(type, type, meta.title || routeLabel(type), false, meta);
 }
 
 function closeActiveTab() {
@@ -494,7 +790,7 @@ function closeActiveTab() {
   }
 }
 
-function openTab(type, id, title, transient) {
+function openTab(type, id, title, transient, meta = {}) {
   const existingIndex = state.session.tabs.findIndex((tab) => tab.type === type && tab.id === id);
 
   if (existingIndex >= 0) {
@@ -512,9 +808,14 @@ function openTab(type, id, title, transient) {
     state.session.tabs.push({ type, id, is_transient: false });
   }
 
-  state.tabMeta[`${type}:${id}`] = { title };
+  state.tabMeta[`${type}:${id}`] = { title, ...meta };
   state.session.active_tab = { type, id };
   render();
+}
+
+function currentTabMeta() {
+  const tab = currentTabRef();
+  return tab ? state.tabMeta[`${tab.type}:${tab.id}`] : null;
 }
 
 function activeItem() {
@@ -559,15 +860,26 @@ function currentRoute() {
 }
 
 function currentEditorMeta() {
-  return bootstrap.content.editor_meta[currentRoute()] || bootstrap.content.editor_meta.dashboard;
+  const meta = currentTabMeta();
+  return meta?.editorMeta || bootstrap.content.editor_meta[currentRoute()] || bootstrap.content.editor_meta.dashboard;
 }
 
 function editorTitle() {
+  const meta = currentTabMeta();
+  if (meta?.title) {
+    return meta.title;
+  }
+
   const item = activeItem();
   return item?.title || bootstrap.content.dashboard.title;
 }
 
 function editorSubtitle(route) {
+  const meta = currentTabMeta();
+  if (meta?.subtitle) {
+    return meta.subtitle;
+  }
+
   if (route === "dashboard") {
     return bootstrap.content.dashboard.subtitle;
   }
@@ -581,11 +893,152 @@ function routeLabel(route) {
     return "Dashboard";
   }
 
+  if (route === "output") {
+    return "Output";
+  }
+
+  if (route === "git_log") {
+    return "Git Log";
+  }
+
+  if (route === "open_in_browser") {
+    return "Open in Browser";
+  }
+
+  if (route === "open_data_folder") {
+    return "Open Data Folder";
+  }
+
+  if (route === "upload_site") {
+    return "Upload Site";
+  }
+
   return (
     bootstrap.registry.editor_routes.find((item) => item.id === route)?.title ||
     sidebarViews().find((item) => item.id === route)?.label ||
     titleCase(route)
   );
+}
+
+function renderCommandPayload(route, payload) {
+  switch (route) {
+    case "metadata_diff":
+      return `
+        <section class="editor-section">
+          <ul class="editor-list compact">
+            <li><strong>Diffs:</strong> ${escapeHtml(String(payload.summary?.diff_count || 0))}</li>
+            <li><strong>Orphans:</strong> ${escapeHtml(String(payload.summary?.orphan_count || 0))}</li>
+          </ul>
+        </section>
+        <section class="editor-section">
+          <h2>Diff Reports</h2>
+          ${renderKeyedEntries(payload.diff_reports, ["entity_type", "entity_id", "differences"])}
+        </section>
+        <section class="editor-section">
+          <h2>Orphan Reports</h2>
+          ${renderKeyedEntries(payload.orphan_reports, ["entity_type", "path"])}
+        </section>
+      `;
+    case "site_validation":
+      return `
+        <section class="editor-section">
+          <ul class="editor-list compact">
+            <li><strong>Missing:</strong> ${escapeHtml(String(payload.summary?.missing_count || 0))}</li>
+            <li><strong>Extra:</strong> ${escapeHtml(String(payload.summary?.extra_count || 0))}</li>
+            <li><strong>Stale:</strong> ${escapeHtml(String(payload.summary?.stale_count || 0))}</li>
+          </ul>
+        </section>
+        <section class="editor-section">
+          <h2>Missing Pages</h2>
+          ${renderStringList(payload.missing_pages, "No missing pages")}
+        </section>
+        <section class="editor-section">
+          <h2>Extra Pages</h2>
+          ${renderStringList(payload.extra_pages, "No extra pages")}
+        </section>
+        <section class="editor-section">
+          <h2>Stale Pages</h2>
+          ${renderStringList(payload.stale_pages, "No stale pages")}
+        </section>
+      `;
+    case "translation_validation":
+      return `
+        <section class="editor-section">
+          <ul class="editor-list compact">
+            <li><strong>Missing:</strong> ${escapeHtml(String(payload.summary?.missing_count || 0))}</li>
+            <li><strong>Orphan Files:</strong> ${escapeHtml(String(payload.summary?.orphan_count || 0))}</li>
+            <li><strong>Do Not Translate:</strong> ${escapeHtml(String(payload.summary?.do_not_translate_count || 0))}</li>
+          </ul>
+        </section>
+        <section class="editor-section">
+          <h2>Missing Translations</h2>
+          ${renderKeyedEntries(payload.missing, ["post_id", "language"])}
+        </section>
+        <section class="editor-section">
+          <h2>Orphan Files</h2>
+          ${renderStringList(payload.orphan_files, "No orphan translation files")}
+        </section>
+      `;
+    case "find_duplicates":
+      return `
+        <section class="editor-section">
+          <ul class="editor-list compact">
+            <li><strong>Pairs:</strong> ${escapeHtml(String(payload.summary?.pair_count || 0))}</li>
+          </ul>
+        </section>
+        <section class="editor-section">
+          <h2>Duplicate Candidates</h2>
+          ${renderKeyedEntries(payload.pairs, ["title_a", "title_b", "score"])}
+        </section>
+      `;
+    default:
+      return `
+        <section class="editor-section">
+          <pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
+        </section>
+      `;
+  }
+}
+
+function renderStringList(items, emptyMessage) {
+  if (!items || !items.length) {
+    return `<p>${escapeHtml(emptyMessage)}</p>`;
+  }
+
+  return `<ul class="editor-list">${items.map((item) => `<li>${escapeHtml(String(item))}</li>`).join("")}</ul>`;
+}
+
+function renderKeyedEntries(items, keys) {
+  if (!items || !items.length) {
+    return `<p>No items</p>`;
+  }
+
+  return `
+    <div class="panel-entry-list">
+      ${items
+        .map((item) => `
+          <div class="panel-entry">
+            ${keys
+              .filter((key) => item[key] !== undefined)
+              .map((key) => `<span><strong>${escapeHtml(titleCase(key))}:</strong> ${escapeHtml(formatPayloadValue(item[key]))}</span>`)
+              .join("")}
+          </div>
+        `)
+        .join("")}
+    </div>
+  `;
+}
+
+function formatPayloadValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => formatPayloadValue(entry)).join(", ");
+  }
+
+  if (value && typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
 }
 
 function tabIdForItem(item, route) {
@@ -697,6 +1150,68 @@ function activityIcon(id) {
 
 function tabIcon(type) {
   return activityIcon(type === "post" ? "posts" : type);
+}
+
+function normalizeTaskStatus(taskStatus) {
+  return {
+    active_count: taskStatus?.active_count || 0,
+    running_count: taskStatus?.running_count || 0,
+    pending_count: taskStatus?.pending_count || 0,
+    running_task_message: taskStatus?.running_task_message || null,
+    running_task_overflow: taskStatus?.running_task_overflow || 0,
+    tasks: Array.isArray(taskStatus?.tasks) ? taskStatus.tasks : [],
+  };
+}
+
+function panelTabs() {
+  return ["tasks", state.session.panel.active_tab, "output", "git_log"].filter(uniqueValue);
+}
+
+function renderPanelTab(tab) {
+  if (tab === "tasks") {
+    return `<button class="panel-tab ${state.session.panel.active_tab === "tasks" ? "active" : ""}" data-panel-tab="tasks" type="button">Tasks</button>`;
+  }
+
+  if (tab === "output") {
+    return `<button class="panel-tab ${state.session.panel.active_tab === "output" ? "active" : ""}" data-panel-tab="output" type="button">Output</button>`;
+  }
+
+  if (tab === "git_log") {
+    return `<button class="panel-tab ${state.session.panel.active_tab === "git_log" ? "active" : ""}" data-panel-tab="git_log" type="button">Git Log</button>`;
+  }
+
+  return `<button class="panel-tab ${state.session.panel.active_tab === tab ? "active" : ""}" data-panel-tab="${tab}" type="button">${escapeHtml(routeLabel(tab))}</button>`;
+}
+
+function renderLanguageOptions() {
+  return state.supportedUiLanguages
+    .map((language) => {
+      const selected = language.code === state.uiLanguage ? " selected" : "";
+      return `<option value="${escapeHtmlAttribute(language.code)}"${selected}>${escapeHtml(language.code.toUpperCase())}</option>`;
+    })
+    .join("");
+}
+
+function setUiLanguage(nextLanguage) {
+  state.uiLanguage = nextLanguage;
+  state.status.right.ui_language = nextLanguage;
+  localStorage.setItem("bds-ui-language", nextLanguage);
+}
+
+function readStoredUiLanguage(fallback) {
+  const stored = localStorage.getItem("bds-ui-language");
+  return stored || fallback || "en";
+}
+
+function statusLabel(status) {
+  switch (status) {
+    case "running":
+      return "Running";
+    case "pending":
+      return "Queued";
+    default:
+      return titleCase(status || "task");
+  }
 }
 
 function escapeHtml(value) {
