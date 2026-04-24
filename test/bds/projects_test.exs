@@ -134,4 +134,52 @@ defmodule BDS.ProjectsTest do
     assert same_project.id == default_project.id
     assert Repo.aggregate(Project, :count, :id) == 1
   end
+
+  test "delete_project rejects the default and active projects", %{temp_root: temp_root} do
+    Repo.delete_all(Project)
+
+    assert {:ok, default_project} = BDS.Projects.ensure_default_project()
+    assert {:error, :cannot_delete_default_project} = BDS.Projects.delete_project(default_project.id)
+
+    temp_dir = Path.join(temp_root, "active-delete")
+    File.mkdir_p!(temp_dir)
+
+    assert {:ok, project} = BDS.Projects.create_project(%{name: "Delete Me", data_path: temp_dir})
+    assert {:ok, _active_project} = BDS.Projects.set_active_project(project.id)
+
+    assert {:error, :cannot_delete_active_project} = BDS.Projects.delete_project(project.id)
+    project_id = project.id
+    assert %Project{id: ^project_id} = BDS.Projects.get_project(project.id)
+  end
+
+  test "delete_project removes internal project data but preserves external data paths", %{temp_root: temp_root} do
+    assert {:ok, internal_project} = BDS.Projects.create_project(%{name: "Internal Project"})
+
+    internal_dir = BDS.Projects.project_data_dir(internal_project)
+
+    on_exit(fn ->
+      _ = File.rm_rf(internal_dir)
+    end)
+
+    assert File.exists?(Path.join(internal_dir, "templates/single-post.liquid"))
+
+    assert {:ok, deleted_internal_project} = BDS.Projects.delete_project(internal_project.id)
+    assert deleted_internal_project.id == internal_project.id
+    assert BDS.Projects.get_project(internal_project.id) == nil
+    refute File.exists?(internal_dir)
+
+    external_dir = Path.join(temp_root, "external-delete")
+    File.mkdir_p!(external_dir)
+
+    assert {:ok, external_project} =
+             BDS.Projects.create_project(%{name: "External Project", data_path: external_dir})
+
+    marker_path = Path.join(external_dir, "keep.txt")
+    File.write!(marker_path, "preserve me")
+
+    assert {:ok, deleted_external_project} = BDS.Projects.delete_project(external_project.id)
+    assert deleted_external_project.id == external_project.id
+    assert BDS.Projects.get_project(external_project.id) == nil
+    assert File.read!(marker_path) == "preserve me"
+  end
 end

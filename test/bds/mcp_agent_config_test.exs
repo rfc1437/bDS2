@@ -53,6 +53,52 @@ defmodule BDS.MCPAgentConfigTest do
     assert written["mcpServers"]["bDS"] == %{"command" => Path.join(install_root, "mcp/bin/bds-mcp"), "args" => []}
   end
 
+  test "github copilot uninstall removes only the bDS server entry", %{home_dir: home_dir} do
+    config_path = Path.join(home_dir, "Library/Application Support/Code/User/mcp.json")
+
+    File.mkdir_p!(Path.dirname(config_path))
+
+    File.write!(
+      config_path,
+      Jason.encode!(%{
+        "servers" => %{
+          "bDS" => %{"type" => "stdio", "command" => "/tmp/bds-mcp", "args" => []},
+          "other" => %{"type" => "stdio", "command" => "python", "args" => ["server.py"]}
+        },
+        "theme" => "dark"
+      })
+    )
+
+    assert {:ok, result} = AgentConfig.remove_from_config(:github_copilot, home_dir: home_dir)
+
+    written = Jason.decode!(File.read!(result.config_path))
+    assert written["theme"] == "dark"
+    refute Map.has_key?(written["servers"], "bDS")
+    assert written["servers"]["other"] == %{"type" => "stdio", "command" => "python", "args" => ["server.py"]}
+  end
+
+  test "claude code uninstall removes only the bDS server entry", %{home_dir: home_dir} do
+    config_path = Path.join(home_dir, ".claude.json")
+
+    File.write!(
+      config_path,
+      Jason.encode!(%{
+        "mcpServers" => %{
+          "bDS" => %{"command" => "/tmp/bds-mcp", "args" => []},
+          "other" => %{"command" => "python", "args" => ["server.py"]}
+        },
+        "theme" => "dark"
+      })
+    )
+
+    assert {:ok, result} = AgentConfig.remove_from_config(:claude_code, home_dir: home_dir)
+
+    written = Jason.decode!(File.read!(result.config_path))
+    assert written["theme"] == "dark"
+    refute Map.has_key?(written["mcpServers"], "bDS")
+    assert written["mcpServers"]["other"] == %{"command" => "python", "args" => ["server.py"]}
+  end
+
   test "packaged executable path resolves inside the distributable payload" do
     assert AgentConfig.packaged_executable_path("/Applications/bDS2.app/Contents/Resources", :macos) ==
              "/Applications/bDS2.app/Contents/Resources/mcp/bin/bds-mcp"

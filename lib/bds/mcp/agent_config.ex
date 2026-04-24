@@ -18,6 +18,19 @@ defmodule BDS.MCP.AgentConfig do
     {:ok, %{config_path: config_path, server_name: @server_name}}
   end
 
+  def remove_from_config(agent, opts \\ []) when is_atom(agent) and is_list(opts) do
+    home_dir = Keyword.get(opts, :home_dir, System.user_home!())
+    config_path = config_path(agent, home_dir)
+
+    File.mkdir_p!(Path.dirname(config_path))
+
+    config = read_config(config_path)
+    updated = remove_server_entry(agent, config)
+    File.write!(config_path, Jason.encode!(updated, pretty: true))
+
+    {:ok, %{config_path: config_path, server_name: @server_name}}
+  end
+
   def config_path(:claude_code, home_dir), do: Path.join(home_dir, ".claude.json")
   def config_path(:github_copilot, home_dir), do: Path.join([home_dir, "Library", "Application Support", "Code", "User", "mcp.json"])
 
@@ -58,6 +71,24 @@ defmodule BDS.MCP.AgentConfig do
   defp merge_config(:claude_code, config, command, args) do
     servers = Map.get(config, "mcpServers", %{})
     Map.put(config, "mcpServers", Map.put(servers, @server_name, %{"command" => command, "args" => args}))
+  end
+
+  defp remove_server_entry(:github_copilot, config) do
+    servers =
+      config
+      |> Map.get("servers", %{})
+      |> Map.delete(@server_name)
+
+    Map.put(config, "servers", servers)
+  end
+
+  defp remove_server_entry(:claude_code, config) do
+    servers =
+      config
+      |> Map.get("mcpServers", %{})
+      |> Map.delete(@server_name)
+
+    Map.put(config, "mcpServers", servers)
   end
 
   defp current_platform do

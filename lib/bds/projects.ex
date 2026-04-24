@@ -114,6 +114,38 @@ defmodule BDS.Projects do
     end
   end
 
+  def delete_project(project_id) when is_binary(project_id) do
+    case Repo.get(Project, project_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Project{id: @default_project_id} ->
+        {:error, :cannot_delete_default_project}
+
+      %Project{is_active: true} ->
+        {:error, :cannot_delete_active_project}
+
+      %Project{} = project ->
+        internal_dir = if is_nil(project.data_path), do: project_data_dir(project), else: nil
+
+        Repo.transaction(fn ->
+          Repo.delete!(project)
+          project
+        end)
+        |> case do
+          {:ok, deleted_project} ->
+            if is_binary(internal_dir) do
+              _ = File.rm_rf(internal_dir)
+            end
+
+            {:ok, deleted_project}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+    end
+  end
+
   defp unique_slug(base_slug) do
     normalized = if base_slug in [nil, ""], do: "project", else: base_slug
 
