@@ -3,7 +3,7 @@ defmodule BDS.Rendering.Filters do
 
   use Liquex.Filter
 
-  alias BDS.Rendering.I18n
+  alias BDS.I18n
 
   def i18n(value, language, _context) do
     key = value |> to_string() |> String.trim()

@@ -10,7 +10,7 @@ defmodule BDS.Rendering do
   alias BDS.Metadata
   alias BDS.Projects
   alias BDS.Rendering.Filters
-  alias BDS.Rendering.I18n
+  alias BDS.I18n
   alias BDS.Repo
   alias BDS.Tags.Tag
   alias BDS.Posts.Post
