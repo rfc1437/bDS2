@@ -103,10 +103,16 @@ defmodule BDS.GenerationTest do
       "feed.xml",
       "atom.xml",
       "calendar.json",
+      "pagefind/index.json",
+      "pagefind/pagefind-ui.css",
+      "pagefind/pagefind-ui.js",
       "de/404.html",
       "de/index.html",
       "de/feed.xml",
-      "de/atom.xml"
+      "de/atom.xml",
+      "de/pagefind/index.json",
+      "de/pagefind/pagefind-ui.css",
+      "de/pagefind/pagefind-ui.js"
     ]
 
     assert Enum.sort(Enum.map(result.generated_files, & &1.relative_path)) ==
@@ -127,7 +133,7 @@ defmodule BDS.GenerationTest do
              Metadata.update_project_metadata(project.id, %{
                public_url: "https://example.com/blog",
                main_language: "en",
-               blog_languages: ["en"]
+               blog_languages: ["en", "de"]
              })
 
     assert {:ok, list_template} =
@@ -178,6 +184,25 @@ defmodule BDS.GenerationTest do
     post_html = File.read!(Path.join([temp_dir, "html", post_path]))
     assert post_html =~ "post-template"
     assert post_html =~ "Rendered body"
+
+    assert "pagefind/index.json" in relative_paths
+    assert "pagefind/pagefind-ui.js" in relative_paths
+    assert "de/pagefind/index.json" in relative_paths
+
+    pagefind_index =
+      Path.join([temp_dir, "html", "pagefind", "index.json"])
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert pagefind_index["language"] == "en"
+    assert Enum.any?(pagefind_index["pages"], &(&1["url"] == "/#{post_path}"))
+
+    de_pagefind_index =
+      Path.join([temp_dir, "html", "de", "pagefind", "index.json"])
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert de_pagefind_index["language"] == "de"
   end
 
   test "generation renders copied starter templates with partials, i18n, and markdown", %{

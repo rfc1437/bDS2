@@ -2,6 +2,7 @@ defmodule BDS.MCPTest do
   use ExUnit.Case, async: false
 
   alias BDS.Media.Media
+  alias BDS.MCP.ProposalStore
   alias BDS.Repo
   alias BDS.Scripts.Script
   alias BDS.Templates.Template
@@ -166,6 +167,39 @@ defmodule BDS.MCPTest do
              BDS.MCP.call_tool("discard_proposal", %{proposalId: draft_result["proposal_id"]})
 
     assert_raise Ecto.NoResultsError, fn -> BDS.Posts.get_post!(draft_post_id) end
+  end
+
+  test "proposal lifecycle is persisted with pending, accepted, discarded, and expired statuses" do
+    assert {:ok, accepted_result} =
+             BDS.MCP.call_tool("draft_post", %{title: "Accept Me", content: "Body"})
+
+    accepted_id = accepted_result["proposal_id"]
+    assert ProposalStore.get(accepted_id).status == :pending
+
+    assert {:ok, _accepted} = BDS.MCP.call_tool("accept_proposal", %{proposalId: accepted_id})
+
+    accepted_proposal = ProposalStore.get(accepted_id)
+    assert accepted_proposal.status == :accepted
+    assert accepted_proposal.entity_id == accepted_result["post"]["id"]
+
+    assert {:ok, discarded_result} =
+             BDS.MCP.call_tool("draft_post", %{title: "Discard Me Later", content: "Body"})
+
+    discarded_id = discarded_result["proposal_id"]
+    assert {:ok, _discarded} = BDS.MCP.call_tool("discard_proposal", %{proposalId: discarded_id})
+
+    discarded_proposal = ProposalStore.get(discarded_id)
+    assert discarded_proposal.status == :discarded
+
+    expired =
+      ProposalStore.create("draft_post", %{"post_id" => "expired-post"},
+        entity_id: "expired-post",
+        ttl_ms: -1
+      )
+
+    expired_proposals = ProposalStore.cleanup_expired()
+    assert Enum.any?(expired_proposals, &(&1.id == expired.id and &1.status == :expired))
+    assert ProposalStore.get(expired.id).status == :expired
   end
 
   test "resource listing and reads follow old app naming for implemented resources", %{project: project} do

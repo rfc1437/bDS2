@@ -275,11 +275,17 @@ defmodule BDS.SearchTest do
     languages = BDS.Search.list_stemmer_languages()
 
     assert is_list(languages)
+    assert length(languages) == 24
     assert "en" in languages
     assert "de" in languages
     assert "fr" in languages
     assert "it" in languages
     assert "es" in languages
+    assert "ar" in languages
+    assert "ca" in languages
+    assert "el" in languages
+    assert "ga" in languages
+    assert "hi" in languages
     assert Enum.uniq(languages) == languages
   end
 end

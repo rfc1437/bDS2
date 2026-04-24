@@ -197,6 +197,29 @@ defmodule BDS.Repo.SchemaMigrationTest do
         "created_at",
         "updated_at"
       ],
+      "publish_jobs" => [
+        "id",
+        "project_id",
+        "ssh_host",
+        "ssh_user",
+        "ssh_remote_path",
+        "ssh_mode",
+        "status",
+        "task_id",
+        "targets",
+        "error",
+        "inserted_at",
+        "updated_at"
+      ],
+      "mcp_proposals" => [
+        "id",
+        "kind",
+        "status",
+        "entity_id",
+        "data",
+        "created_at",
+        "expires_at"
+      ],
       "db_notifications" => [
         "id",
         "entity_type",
@@ -251,6 +274,12 @@ defmodule BDS.Repo.SchemaMigrationTest do
              "generated_file_hashes_project_path_idx"
            ) == ["project_id", "relative_path"]
 
+    assert unique_index_columns("mcp_proposals", "mcp_proposals_entity_idx") == [
+             "kind",
+             "entity_id",
+             "status"
+           ]
+
     assert unique_index_columns("dismissed_duplicate_pairs", "dismissed_pairs_idx") == [
              "project_id",
              "post_id_a",
@@ -296,6 +325,7 @@ defmodule BDS.Repo.SchemaMigrationTest do
     assert column_metadata("posts", "file_path")[:default] == ""
     assert column_metadata("posts", "do_not_translate")[:default] == "false"
     assert column_metadata("post_media", "sort_order")[:default] == "0"
+    assert column_metadata("publish_jobs", "status")[:default] == "pending"
     assert column_metadata("db_notifications", "from_cli")[:default] == "true"
 
     assert foreign_keys("posts") == [%{from: "project_id", table: "projects", to: "id"}]
@@ -314,6 +344,10 @@ defmodule BDS.Repo.SchemaMigrationTest do
     assert Enum.sort_by(foreign_keys("media_translations"), & &1.from) == [
              %{from: "project_id", table: "projects", to: "id"},
              %{from: "translation_for", table: "media", to: "id"}
+           ]
+
+    assert foreign_keys("publish_jobs") == [
+             %{from: "project_id", table: "projects", to: "id"}
            ]
 
     assert foreign_keys("chat_messages") == [

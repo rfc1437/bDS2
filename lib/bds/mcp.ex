@@ -198,7 +198,10 @@ defmodule BDS.MCP do
 
     with {:ok, post} <- Posts.create_post(attrs) do
       proposal =
-        ProposalStore.create("draft_post", %{"post_id" => post.id}, ttl_ms: @proposal_ttl_app_ms)
+        ProposalStore.create("draft_post", %{"post_id" => post.id},
+          entity_id: post.id,
+          ttl_ms: @proposal_ttl_app_ms
+        )
 
       {:ok, %{"proposal_id" => proposal.id, "post" => sanitize(post)}}
     end
@@ -218,7 +221,10 @@ defmodule BDS.MCP do
              entrypoint: map_get(params, :entrypoint)
            }) do
       proposal =
-        ProposalStore.create("propose_script", %{"script_id" => script.id}, ttl_ms: @proposal_ttl_app_ms)
+        ProposalStore.create("propose_script", %{"script_id" => script.id},
+          entity_id: script.id,
+          ttl_ms: @proposal_ttl_app_ms
+        )
 
       {:ok,
        %{
@@ -248,7 +254,10 @@ defmodule BDS.MCP do
              content: content
            }) do
       proposal =
-        ProposalStore.create("propose_template", %{"template_id" => template.id}, ttl_ms: @proposal_ttl_app_ms)
+        ProposalStore.create("propose_template", %{"template_id" => template.id},
+          entity_id: template.id,
+          ttl_ms: @proposal_ttl_app_ms
+        )
 
       {:ok,
        %{
@@ -282,6 +291,7 @@ defmodule BDS.MCP do
           ProposalStore.create(
             "propose_media_metadata",
             %{"media_id" => media_id, "changes" => changes},
+            entity_id: media_id,
             ttl_ms: @proposal_ttl_app_ms
           )
 
@@ -306,6 +316,7 @@ defmodule BDS.MCP do
           ProposalStore.create(
             "propose_post_metadata",
             %{"post_id" => post_id, "changes" => changes},
+            entity_id: post_id,
             ttl_ms: @proposal_ttl_app_ms
           )
 
@@ -342,7 +353,7 @@ defmodule BDS.MCP do
 
         case result do
           {:ok, value} ->
-            :ok = ProposalStore.remove(proposal_id)
+            _ = ProposalStore.mark_accepted(proposal_id)
             {:ok, %{"success" => true, "message" => "accepted", "result" => sanitize(value)}}
 
           {:error, reason} ->
@@ -367,7 +378,7 @@ defmodule BDS.MCP do
 
         case result do
           {:ok, _value} ->
-            :ok = ProposalStore.remove(proposal_id)
+            _ = ProposalStore.mark_discarded(proposal_id)
             {:ok, %{"success" => true, "message" => "discarded"}}
 
           {:error, reason} ->

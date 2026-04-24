@@ -259,7 +259,14 @@ defmodule BDS.Generation do
         []
       end
 
-    core_outputs ++ single_outputs ++ archive_outputs ++ sitemap
+    pagefind_outputs =
+      if :core in plan.sections do
+        build_pagefind_outputs(plan, core_outputs ++ single_outputs ++ archive_outputs)
+      else
+        []
+      end
+
+    core_outputs ++ single_outputs ++ archive_outputs ++ sitemap ++ pagefind_outputs
   end
 
   defp disk_generated_files(project_id) do
@@ -658,6 +665,57 @@ defmodule BDS.Generation do
   defp render_sitemap(urls) do
     entries = Enum.map_join(urls, "", fn url -> "<url><loc>#{xml_escape(url)}</loc></url>" end)
     "<urlset>#{entries}</urlset>"
+  end
+
+  defp build_pagefind_outputs(plan, html_outputs) do
+    language_outputs =
+      plan.blog_languages
+      |> Enum.uniq()
+      |> Enum.flat_map(fn language ->
+        route_language = route_language(plan.language, language)
+        pages = pagefind_pages_for_language(html_outputs, route_language)
+        prefix = if route_language in [nil, ""], do: ["pagefind"], else: [route_language, "pagefind"]
+
+        [
+          {Path.join(prefix ++ ["index.json"]), Jason.encode!(%{"language" => language, "pages" => pages})},
+          {Path.join(prefix ++ ["pagefind-ui.js"]), pagefind_ui_js(language)},
+          {Path.join(prefix ++ ["pagefind-ui.css"]), pagefind_ui_css()}
+        ]
+      end)
+
+    language_outputs
+  end
+
+  defp pagefind_pages_for_language(html_outputs, route_language) do
+    html_outputs
+    |> Enum.filter(fn {relative_path, _content} ->
+      String.ends_with?(relative_path, ".html") and pagefind_language_match?(relative_path, route_language)
+    end)
+    |> Enum.map(fn {relative_path, content} ->
+      %{
+        "url" => "/" <> relative_path,
+        "text" => pagefind_text(content)
+      }
+    end)
+  end
+
+  defp pagefind_language_match?(relative_path, nil), do: not String.starts_with?(relative_path, ["de/", "fr/", "it/", "es/"])
+  defp pagefind_language_match?(relative_path, ""), do: pagefind_language_match?(relative_path, nil)
+  defp pagefind_language_match?(relative_path, route_language), do: String.starts_with?(relative_path, route_language <> "/")
+
+  defp pagefind_text(content) do
+    content
+    |> String.replace(~r/<[^>]+>/, " ")
+    |> String.replace(~r/\s+/u, " ")
+    |> String.trim()
+  end
+
+  defp pagefind_ui_js(language) do
+    "window.bDSPagefind = { language: #{Jason.encode!(language)} };\n"
+  end
+
+  defp pagefind_ui_css do
+    ".pagefind-ui{display:block;}\n"
   end
 
   defp render_post_page(title, body, slug, language) do

@@ -1,8 +1,11 @@
 defmodule BDS.PublishingTest do
   use ExUnit.Case, async: false
 
+  alias BDS.Repo
+
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+    :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), Process.whereis(BDS.Publishing))
 
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-publishing-#{System.unique_integer([:positive])}")
@@ -277,6 +280,43 @@ defmodule BDS.PublishingTest do
     assert elem(html_upload, 1) == ["-q", html_index, "deploy@example.com:/srv/blog/index.html"]
   end
 
+  test "publish jobs survive a publishing server restart because they are persisted", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    File.mkdir_p!(Path.join([temp_dir, "html"]))
+    File.write!(Path.join([temp_dir, "html", "index.html"]), "<html />")
+
+    credentials = %{
+      ssh_host: "example.com",
+      ssh_user: "deploy",
+      ssh_remote_path: "/srv/blog",
+      ssh_mode: :rsync
+    }
+
+    assert {:ok, job} =
+             BDS.Publishing.upload_site(project.id, credentials, uploader: fn _, _, _ -> :ok end)
+
+    assert wait_for_publish_job(job.id, &(&1.status == :completed)).status == :completed
+
+    persisted_before_restart = Repo.get!(BDS.Publishing.PublishJob, job.id)
+    assert persisted_before_restart.status == :completed
+
+    publishing_pid = Process.whereis(BDS.Publishing)
+    ref = Process.monitor(publishing_pid)
+    :ok = GenServer.stop(BDS.Publishing, :normal)
+    assert_receive {:DOWN, ^ref, :process, ^publishing_pid, _reason}
+
+    restarted_pid = wait_for_process(BDS.Publishing)
+    refute restarted_pid == publishing_pid
+
+    :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), restarted_pid)
+
+    persisted_after_restart = BDS.Publishing.get_job(job.id)
+    assert persisted_after_restart.id == job.id
+    assert persisted_after_restart.status == :completed
+  end
+
   defp collect_command_runs(acc \\ []) do
     receive do
       {:command_run, command, args, _opts} -> collect_command_runs([{command, args} | acc])
@@ -300,5 +340,22 @@ defmodule BDS.PublishingTest do
 
   defp wait_for_publish_job(_job_id, _predicate, 0) do
     flunk("publish job did not reach expected state")
+  end
+
+  defp wait_for_process(name, attempts \\ 100)
+
+  defp wait_for_process(name, attempts) when attempts > 0 do
+    case Process.whereis(name) do
+      nil ->
+        Process.sleep(20)
+        wait_for_process(name, attempts - 1)
+
+      pid ->
+        pid
+    end
+  end
+
+  defp wait_for_process(name, 0) do
+    flunk("process #{inspect(name)} did not restart")
   end
 end

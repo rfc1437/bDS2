@@ -10,6 +10,33 @@ defmodule BDS.Search do
   alias BDS.Projects
   alias BDS.Repo
 
+  @stemmer_languages [
+    "ar",
+    "ca",
+    "da",
+    "de",
+    "el",
+    "en",
+    "es",
+    "eu",
+    "fi",
+    "fr",
+    "ga",
+    "hi",
+    "hu",
+    "hy",
+    "it",
+    "lt",
+    "ne",
+    "nl",
+    "no",
+    "pt",
+    "ro",
+    "ru",
+    "sv",
+    "tr"
+  ]
+
   @stemmer_algorithms %{
     "da" => :danish,
     "nl" => :dutch,
@@ -36,9 +63,7 @@ defmodule BDS.Search do
   ]
 
   def list_stemmer_languages do
-    @stemmer_algorithms
-    |> Map.keys()
-    |> Enum.sort()
+    @stemmer_languages
   end
 
   def detect_language(text) do
@@ -497,7 +522,7 @@ defmodule BDS.Search do
     |> String.downcase()
     |> String.split("-", parts: 2)
     |> hd()
-    |> then(fn code -> if Map.has_key?(@stemmer_algorithms, code), do: code, else: "en" end)
+    |> then(fn code -> if code in @stemmer_languages, do: code, else: "en" end)
   end
 
   defp detect_language_from_hints(text) do

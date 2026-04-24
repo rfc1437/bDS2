@@ -3,7 +3,10 @@ defmodule BDS.Publishing do
 
   use GenServer
 
+  alias BDS.Persistence
+  alias BDS.Publishing.PublishJob
   alias BDS.Projects
+  alias BDS.Repo
   alias BDS.Tasks
 
   def start_link(_opts) do
@@ -24,22 +27,25 @@ defmodule BDS.Publishing do
 
   @impl true
   def init(_state) do
-    {:ok, %{jobs: %{}, scp_uploads: %{}}}
+    {:ok, %{scp_uploads: %{}}}
   end
 
   @impl true
   def handle_call({:get_job, job_id}, _from, state) do
-    {:reply, state.jobs[job_id], state}
+    {:reply, Repo.get(PublishJob, job_id), state}
   end
 
   def handle_call({:update_job, job_id, attrs}, _from, state) do
-    next_state =
-      update_in(state, [:jobs, job_id], fn
-        nil -> nil
-        job -> Map.merge(job, Map.put(attrs, :updated_at, DateTime.utc_now()))
-      end)
+    reply =
+      case Repo.get(PublishJob, job_id) do
+        nil -> :ok
+        job ->
+          attrs = Map.put(attrs, :updated_at, Persistence.now_ms())
+          job |> PublishJob.changeset(attrs) |> Repo.update!()
+          :ok
+      end
 
-    {:reply, :ok, next_state}
+    {:reply, reply, state}
   end
 
   def handle_call({:should_upload_scp_file, upload_key, local_mtime}, _from, state) do
@@ -59,8 +65,9 @@ defmodule BDS.Publishing do
   def handle_call({:upload_site, project_id, credentials, targets, opts}, _from, state) do
     job_id = "publish-" <> Integer.to_string(System.unique_integer([:positive, :monotonic]))
     uploader = build_uploader(Keyword.put_new(opts, :project_id, project_id))
+    now = Persistence.now_ms()
 
-    job = %{
+    job_attrs = %{
       id: job_id,
       project_id: project_id,
       status: :pending,
@@ -69,11 +76,16 @@ defmodule BDS.Publishing do
       ssh_user: credentials.ssh_user,
       ssh_remote_path: credentials.ssh_remote_path,
       ssh_mode: credentials.ssh_mode,
-      targets: Enum.map(targets, & &1.kind),
+      targets: Enum.map(targets, &to_string(&1.kind)),
       error: nil,
-      inserted_at: DateTime.utc_now(),
-      updated_at: DateTime.utc_now()
+      inserted_at: now,
+      updated_at: now
     }
+
+    job =
+      %PublishJob{}
+      |> PublishJob.changeset(job_attrs)
+      |> Repo.insert!()
 
     {:ok, task} =
       Tasks.submit_task(
@@ -87,8 +99,12 @@ defmodule BDS.Publishing do
         }
       )
 
-    next_job = %{job | task_id: task.id}
-    {:reply, {:ok, next_job}, put_in(state, [:jobs, job_id], next_job)}
+    next_job =
+      job
+      |> PublishJob.changeset(%{task_id: task.id, updated_at: Persistence.now_ms()})
+      |> Repo.update!()
+
+    {:reply, {:ok, next_job}, state}
   end
 
   defp run_upload(job_id, credentials, targets, uploader, report) do
