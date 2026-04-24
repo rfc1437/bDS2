@@ -409,7 +409,7 @@ defmodule BDS.Posts do
   end
 
   defp unique_slug(project_id, base_slug) do
-    normalized = if base_slug in [nil, ""], do: "untitled", else: base_slug
+    normalized = if base_slug == "", do: "untitled", else: base_slug
 
     if slug_available?(project_id, normalized) do
       normalized
@@ -486,7 +486,7 @@ defmodule BDS.Posts do
         {:tags, post.tags || []},
         {:categories, post.categories || []}
       ],
-      post.content || ""
+      post.content
     )
   end
 
@@ -671,7 +671,7 @@ defmodule BDS.Posts do
         {:updated_at, translation.updated_at},
         {:published_at, published_at}
       ],
-      translation.content || ""
+      translation.content
     )
   end
 

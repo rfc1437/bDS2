@@ -268,17 +268,13 @@ defmodule BDS.Rendering do
   end
 
   defp project_metadata(project_id) do
-    case Metadata.get_project_metadata(project_id) do
-      {:ok, metadata} -> metadata
-      _other -> %{main_language: "en", blog_languages: [], pico_theme: nil}
-    end
+    {:ok, metadata} = Metadata.get_project_metadata(project_id)
+    metadata
   end
 
   defp menu_items(project_id) do
-    case Menu.get_menu(project_id) do
-      {:ok, %{items: items}} -> Enum.map(items, &to_template_menu_item/1)
-      _other -> []
-    end
+    {:ok, %{items: items}} = Menu.get_menu(project_id)
+    Enum.map(items, &to_template_menu_item/1)
   end
 
   defp to_template_menu_item(item) do

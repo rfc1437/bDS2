@@ -3,7 +3,6 @@ defmodule BDS.Projects do
 
   import Ecto.Query
 
-  alias Ecto.Multi
   alias BDS.Persistence
   alias BDS.Projects.Project
   alias BDS.Repo
@@ -98,18 +97,19 @@ defmodule BDS.Projects do
       project ->
         now = Persistence.now_ms()
 
-        Multi.new()
-        |> Multi.update_all(:clear_previous, from(p in Project, where: p.is_active == true),
-          set: [is_active: false, updated_at: now]
-        )
-        |> Multi.update(
-          :activate,
-          Project.changeset(project, %{is_active: true, updated_at: now})
-        )
-        |> Repo.transaction()
+        Repo.transaction(fn ->
+          Repo.update_all(
+            from(p in Project, where: p.is_active == true),
+            set: [is_active: false, updated_at: now]
+          )
+
+          project
+          |> Project.changeset(%{is_active: true, updated_at: now})
+          |> Repo.update!()
+        end)
         |> case do
-          {:ok, %{activate: active_project}} -> {:ok, active_project}
-          {:error, _step, reason, _changes} -> {:error, reason}
+          {:ok, active_project} -> {:ok, active_project}
+          {:error, reason} -> {:error, reason}
         end
     end
   end

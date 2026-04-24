@@ -289,4 +289,42 @@ defmodule BDS.PreviewTest do
 
     assert :ok = BDS.Preview.stop_preview(project.id)
   end
+
+  test "preview query params can override the rendered theme for generated and draft pages", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"],
+               pico_theme: "blue"
+             })
+
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core])
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Theme Draft",
+               content: "Theme body",
+               language: "en"
+             })
+
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: generated_html, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/?theme=amber&mode=dark")
+
+    assert generated_html =~ ~s(data-theme="amber")
+    assert generated_html =~ ~s(data-mode="dark")
+
+    assert {:ok, %{body: draft_html, content_type: "text/html"}} =
+             BDS.Preview.preview_draft(project.id, "/draft/theme-draft?theme=amber&mode=dark", post.id)
+
+    assert draft_html =~ ~s(data-theme="amber")
+    assert draft_html =~ ~s(data-mode="dark")
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
 end

@@ -258,7 +258,6 @@ defmodule BDS.Embeddings do
       {:ok, suggestions}
     else
       {:error, :not_found} -> {:ok, []}
-      {:disabled, _project_id} -> {:ok, []}
     end
   end
 
@@ -411,7 +410,6 @@ defmodule BDS.Embeddings do
   defp enabled_for_project?(project_id) do
     case Metadata.get_project_metadata(project_id) do
       {:ok, metadata} -> metadata.semantic_similarity_enabled == true
-      _other -> false
     end
   end
 
@@ -453,7 +451,10 @@ defmodule BDS.Embeddings do
     end
   end
 
-  defp compose_embedding_source(title, content), do: "#{title || ""}\n\n#{content || ""}"
+  defp compose_embedding_source(title, content), do: string_or_empty(title) <> "\n\n" <> string_or_empty(content)
+
+  defp string_or_empty(nil), do: ""
+  defp string_or_empty(value) when is_binary(value), do: value
 
   defp post_content_hash(%Post{} = post) do
     body = resolve_post_body(post)

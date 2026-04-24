@@ -8,6 +8,9 @@ defmodule BDS.Scripting.Lua do
 
   @behaviour BDS.Scripting.Runtime
 
+  @type lua_state :: tuple()
+  @type runtime_result :: {:ok, term(), lua_state} | {:error, term()}
+
   @impl true
   def validate(source) when is_binary(source) do
     case :luerl.load(source, :luerl_sandbox.init()) do
@@ -16,9 +19,6 @@ defmodule BDS.Scripting.Lua do
 
       {:error, errors, warnings} ->
         {:error, {:compile_error, %{errors: errors, warnings: warnings}}}
-
-      {:lua_error, error, _state} ->
-        {:error, {:lua_error, error}}
     end
   end
 
@@ -102,6 +102,7 @@ defmodule BDS.Scripting.Lua do
     end
   end
 
+  @spec run_entrypoint(binary(), binary(), lua_state, keyword()) :: runtime_result
   defp run_entrypoint(source, entrypoint, state, opts) do
     script =
       IO.iodata_to_binary([
@@ -110,27 +111,51 @@ defmodule BDS.Scripting.Lua do
         entrypoint,
         "(table.unpack(__bds_args__))\n"
       ])
+      |> String.to_charlist()
 
-    case :luerl_sandbox.run(script, sandbox_flags(opts), state) do
-      {:ok, result, next_state} -> {:ok, result, next_state}
-      {:lua_error, error, _state} -> {:error, {:lua_error, error}}
+    script
+    |> then(&sandbox_run(&1, sandbox_flags(opts), state))
+    |> normalize_sandbox_result()
+  end
+
+  @spec sandbox_run(term(), term(), lua_state) :: term()
+  defp sandbox_run(script, flags, state), do: apply(:luerl_sandbox, :run, [script, flags, state])
+
+  defp normalize_sandbox_result({:ok, result, next_state}), do: {:ok, result, next_state}
+  defp normalize_sandbox_result({:error, {:reductions, count}}), do: {:error, {:reductions_exceeded, count}}
+  defp normalize_sandbox_result({:error, :timeout}), do: {:error, :timeout}
+  defp normalize_sandbox_result({:error, reason}), do: {:error, reason}
+
+  defp normalize_sandbox_result({reply, next_state}) when is_tuple(next_state) do
+    case reply do
+      {:ok, result} -> {:ok, result, next_state}
+      {:ok, result, _reply_state} -> {:ok, result, next_state}
       {:error, {:reductions, count}} -> {:error, {:reductions_exceeded, count}}
       {:error, :timeout} -> {:error, :timeout}
       {:error, reason} -> {:error, reason}
+      other -> {:error, {:unexpected_result, {other, next_state}}}
     end
   end
+
+  defp normalize_sandbox_result(other), do: {:error, {:unexpected_result, other}}
 
   defp sandbox_flags(opts) do
     config = Application.fetch_env!(:bds, :scripting)
 
-    %{
+    [
       max_time: Keyword.get(opts, :timeout, Keyword.fetch!(config, :timeout)),
       max_reductions: Keyword.get(opts, :max_reductions, Keyword.fetch!(config, :max_reductions)),
       spawn_opts: Keyword.get(opts, :spawn_opts, [])
-    }
+    ]
   end
 
-  defp unwrap_result([]), do: nil
-  defp unwrap_result([value]), do: value
+  defp unwrap_result(values) when is_list(values) do
+    case values do
+      [] -> nil
+      [value] -> value
+      _other -> values
+    end
+  end
+
   defp unwrap_result(values), do: values
 end

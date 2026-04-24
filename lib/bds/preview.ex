@@ -28,17 +28,19 @@ defmodule BDS.Preview do
   end
 
   def request(project_id, request_path) when is_binary(project_id) and is_binary(request_path) do
-    GenServer.call(__MODULE__, {:request, project_id, request_path})
+    {path, query_params} = split_request_path(request_path)
+    GenServer.call(__MODULE__, {:request, project_id, path, query_params})
   end
 
   def preview_draft(project_id, request_path, post_id)
       when is_binary(project_id) and is_binary(request_path) and is_binary(post_id) do
     post = Posts.get_post!(post_id)
+    {_path, query_params} = split_request_path(request_path)
 
     GenServer.call(__MODULE__, {
       :preview_draft,
       project_id,
-      request_path,
+      query_params,
       %{
         id: post.id,
         title: post.title,
@@ -97,22 +99,23 @@ defmodule BDS.Preview do
     {:reply, :ok, next_state}
   end
 
-  def handle_call({:request, project_id, request_path}, _from, state) do
+  def handle_call({:request, project_id, request_path, query_params}, _from, state) do
     with :ok <- ensure_running(state.current, project_id),
-         {:ok, response} <- resolve_request(state.current, request_path) do
+         {:ok, response} <- resolve_request(state.current, request_path, query_params) do
       {:reply, {:ok, response}, state}
     else
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
 
-  def handle_call({:preview_draft, project_id, _request_path, post}, _from, state) do
+  def handle_call({:preview_draft, project_id, query_params, post}, _from, state) do
     with :ok <- ensure_running(state.current, project_id) do
       body =
         case Rendering.render_post_page(project_id, Map.get(post, :template_slug), post) do
           {:ok, rendered} -> rendered
           {:error, _reason} -> render_draft(post)
         end
+        |> apply_preview_overrides(query_params)
 
       response = %{
         content_type: "text/html",
@@ -132,13 +135,13 @@ defmodule BDS.Preview do
         case query_params["post_id"] do
           post_id when is_binary(post_id) ->
             if String.starts_with?(request_path, "/draft/") do
-              resolve_draft_request(project_id, post_id)
+              resolve_draft_request(project_id, post_id, query_params)
             else
-              resolve_request(state.current, request_path)
+              resolve_request(state.current, request_path, query_params)
             end
 
           _other ->
-            resolve_request(state.current, request_path)
+            resolve_request(state.current, request_path, query_params)
         end
       end
 
@@ -148,7 +151,7 @@ defmodule BDS.Preview do
   defp ensure_running(%{project_id: project_id, is_running: true}, project_id), do: :ok
   defp ensure_running(_server, _project_id), do: {:error, :not_running}
 
-  defp resolve_request(server, request_path) do
+  defp resolve_request(server, request_path, query_params) do
     with {:ok, relative_path, kind} <- route_request(request_path) do
       full_path =
         case kind do
@@ -162,14 +165,15 @@ defmodule BDS.Preview do
 
         resolved_path ->
           case read_response(resolved_path) do
-            {:error, :not_found} -> render_not_found_response(server.project_id)
+            {:error, :not_found} -> render_not_found_response(server.project_id, query_params)
+            {:ok, response} -> {:ok, apply_response_overrides(response, query_params)}
             other -> other
           end
       end
     end
   end
 
-  defp resolve_draft_request(project_id, post_id) do
+  defp resolve_draft_request(project_id, post_id, query_params) do
     try do
       post = Posts.get_post!(post_id)
 
@@ -190,6 +194,7 @@ defmodule BDS.Preview do
             {:ok, rendered} -> rendered
             {:error, _reason} -> render_draft(payload)
           end
+          |> apply_preview_overrides(query_params)
 
         {:ok, %{content_type: "text/html", body: body}}
       else
@@ -378,15 +383,69 @@ defmodule BDS.Preview do
     end
   end
 
-  defp render_not_found_response(project_id) do
+  defp render_not_found_response(project_id, query_params) do
     body =
-      case Rendering.render_not_found_page(project_id, %{}) do
+      case Rendering.render_not_found_page(project_id, not_found_assigns(query_params)) do
         {:ok, rendered} -> rendered
         {:error, _reason} -> "Not Found"
       end
+      |> apply_preview_overrides(query_params)
 
     {:ok, %{status: 404, content_type: "text/html", body: body}}
   end
+
+  defp split_request_path(request_path) do
+    uri = URI.parse(request_path)
+    {uri.path || "/", URI.decode_query(uri.query || "")}
+  end
+
+  defp apply_response_overrides(%{content_type: content_type, body: body} = response, query_params)
+       when is_binary(content_type) and is_binary(body) do
+    if String.starts_with?(content_type, "text/html") do
+      %{response | body: apply_preview_overrides(body, query_params)}
+    else
+      response
+    end
+  end
+
+  defp apply_preview_overrides(body, query_params) when is_binary(body) and is_map(query_params) do
+    body
+    |> override_html_attribute("data-theme", normalize_override(query_params["theme"]))
+    |> override_html_attribute("data-mode", normalize_override(query_params["mode"]))
+  end
+
+  defp normalize_override(nil), do: nil
+  defp normalize_override(""), do: nil
+  defp normalize_override(value), do: String.trim(value)
+
+  defp override_html_attribute(body, _attribute, nil), do: body
+
+  defp override_html_attribute(body, attribute, value) do
+    case Regex.run(~r/<html\b[^>]*>/, body) do
+      [html_tag] ->
+        replacement =
+          if String.contains?(html_tag, attribute <> "=") do
+            Regex.replace(~r/\s#{attribute}="[^"]*"/, html_tag, ~s( #{attribute}="#{value}"), global: false)
+          else
+            String.replace_suffix(html_tag, ">", ~s( #{attribute}="#{value}">))
+          end
+
+        String.replace(body, html_tag, replacement, global: false)
+
+      _other ->
+        body
+    end
+  end
+
+  defp not_found_assigns(query_params) do
+    %{}
+    |> maybe_put_assign("html_theme_attribute", query_params["theme"], fn value -> ~s(data-theme="#{value}") end)
+    |> maybe_put_assign("html_mode_attribute", query_params["mode"], fn value -> ~s(data-mode="#{value}") end)
+  end
+
+  defp maybe_put_assign(assigns, _key, nil, _mapper), do: assigns
+  defp maybe_put_assign(assigns, _key, "", _mapper), do: assigns
+  defp maybe_put_assign(assigns, key, value, mapper), do: Map.put(assigns, key, mapper.(value))
 
   defp content_type(path) do
     case Path.extname(path) do

@@ -50,6 +50,102 @@ defmodule BDS.Generation do
     end
   end
 
+  def validate_site(project_id, sections \\ @core_sections)
+
+  def validate_site(project_id, sections) when is_binary(project_id) and is_list(sections) do
+    with {:ok, plan} <- plan_generation(project_id, sections) do
+      expected_outputs = build_outputs(plan)
+      expected_paths = MapSet.new(Enum.map(expected_outputs, &elem(&1, 0)))
+      expected_hashes = Map.new(expected_outputs, fn {relative_path, content} -> {relative_path, sha256(content)} end)
+      actual_files = disk_generated_files(project_id)
+      actual_paths = MapSet.new(Map.keys(actual_files))
+
+      missing_pages =
+        expected_paths
+        |> MapSet.difference(actual_paths)
+        |> MapSet.to_list()
+        |> Enum.sort()
+
+      extra_pages =
+        actual_paths
+        |> MapSet.difference(expected_paths)
+        |> MapSet.to_list()
+        |> Enum.sort()
+
+      stale_pages =
+        expected_hashes
+        |> Enum.filter(fn {relative_path, expected_hash} ->
+          case actual_files do
+            %{^relative_path => actual_hash} -> actual_hash != expected_hash
+            _other -> false
+          end
+        end)
+        |> Enum.map(&elem(&1, 0))
+        |> Enum.sort()
+
+      {:ok,
+       %{
+         missing_pages: missing_pages,
+         extra_pages: extra_pages,
+         stale_pages: stale_pages,
+         sections: affected_sections(missing_pages ++ extra_pages ++ stale_pages)
+       }}
+    end
+  end
+
+  def apply_validation(project_id, sections) when is_binary(project_id) and is_list(sections) do
+    with {:ok, plan} <- plan_generation(project_id, sections) do
+      expected_outputs = build_outputs(plan)
+      expected_paths = MapSet.new(Enum.map(expected_outputs, &elem(&1, 0)))
+      actual_files = disk_generated_files(project_id)
+      project = Projects.get_project!(project_id)
+      now = Persistence.now_ms()
+
+      Enum.each(expected_outputs, fn {relative_path, content} ->
+        expected_hash = sha256(content)
+
+        case actual_files do
+          %{^relative_path => ^expected_hash} ->
+            :ok
+
+          _other ->
+            :ok = Persistence.atomic_write(output_path(project, relative_path), content)
+
+            %GeneratedFileHash{}
+            |> GeneratedFileHash.changeset(%{
+              project_id: project_id,
+              relative_path: relative_path,
+              content_hash: expected_hash,
+              updated_at: now
+            })
+            |> Repo.insert!(
+              on_conflict: [set: [content_hash: expected_hash, updated_at: now]],
+              conflict_target: [:project_id, :relative_path]
+            )
+        end
+      end)
+
+      disk_generated_files(project_id)
+      |> Map.keys()
+      |> Enum.filter(fn relative_path ->
+        path_section(relative_path) in plan.sections and not MapSet.member?(expected_paths, relative_path)
+      end)
+      |> Enum.each(fn relative_path ->
+        _ = File.rm(output_path(project, relative_path))
+
+        Repo.delete_all(
+          from generated_file in GeneratedFileHash,
+            where:
+              generated_file.project_id == ^project_id and
+                generated_file.relative_path == ^relative_path
+        )
+      end)
+
+      {:ok, generated_files} = list_generated_files(project_id)
+      {:ok, %{sections: plan.sections, generated_files: generated_files}}
+    end
+  end
+
   def post_output_path(%Post{} = post), do: post_output_path(post, nil)
 
   def post_output_path(%Post{} = post, language) do
@@ -165,6 +261,64 @@ defmodule BDS.Generation do
 
     core_outputs ++ single_outputs ++ archive_outputs ++ sitemap
   end
+
+  defp disk_generated_files(project_id) do
+    project = Projects.get_project!(project_id)
+    html_root = output_path(project, "")
+
+    case File.ls(html_root) do
+      {:ok, _entries} ->
+        html_root
+        |> Path.join("**/*")
+        |> Path.wildcard(match_dot: false)
+        |> Enum.filter(&File.regular?/1)
+        |> Enum.map(fn path ->
+          relative_path = Path.relative_to(path, html_root)
+
+          {relative_path,
+           path
+           |> File.read!()
+           |> sha256()}
+        end)
+        |> Map.new()
+
+      {:error, :enoent} ->
+        %{}
+    end
+  end
+
+  defp affected_sections(paths) do
+    paths
+    |> Enum.map(&path_section/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp path_section(relative_path) do
+    segments = String.split(relative_path, "/", trim: true)
+
+    case strip_language_prefix(segments) do
+      ["404.html"] -> :core
+      ["index.html"] -> :core
+      ["sitemap.xml"] -> :core
+      ["feed.xml"] -> :core
+      ["atom.xml"] -> :core
+      ["calendar.json"] -> :core
+      ["pagefind" | _rest] -> :core
+      [year, month, day, _slug, "index.html"] when byte_size(year) == 4 and byte_size(month) == 2 and byte_size(day) == 2 -> :single
+      ["category" | _rest] -> :category
+      ["tag" | _rest] -> :tag
+      [year, "index.html"] when byte_size(year) == 4 -> :date
+      [year, month, "index.html"] when byte_size(year) == 4 and byte_size(month) == 2 -> :date
+      _other -> :core
+    end
+  end
+
+  defp strip_language_prefix([language | rest]) when language in ["en", "de", "fr", "it", "es"],
+    do: rest
+
+  defp strip_language_prefix(segments), do: segments
 
   defp build_archive_outputs(plan, published_posts) do
     languages = plan.blog_languages
@@ -692,17 +846,6 @@ defmodule BDS.Generation do
     end
   end
 
-  defp render_list_output(
-         _plan,
-         _language,
-         _page_title,
-         _posts,
-         _archive_context,
-         _pagination,
-         fallback
-       ),
-       do: fallback.()
-
   defp render_not_found_output(%{project_id: project_id, language: main_language}, language)
        when is_binary(project_id) do
     case Rendering.render_not_found_page(project_id, %{
@@ -713,8 +856,6 @@ defmodule BDS.Generation do
       {:error, _reason} -> render_not_found_page(language)
     end
   end
-
-  defp render_not_found_output(_plan, language), do: render_not_found_page(language)
 
   defp language_prefix(language, main_language) when language == main_language, do: ""
   defp language_prefix(nil, _main_language), do: ""

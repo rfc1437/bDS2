@@ -132,7 +132,7 @@ defmodule BDS.Scripts do
   defp default_entrypoint(_kind), do: "main"
 
   defp unique_slug(project_id, base_slug, fallback, exclude_id \\ nil) do
-    normalized = if base_slug in [nil, ""], do: fallback, else: base_slug
+    normalized = if base_slug == "", do: fallback, else: base_slug
 
     if slug_available?(project_id, normalized, exclude_id) do
       normalized

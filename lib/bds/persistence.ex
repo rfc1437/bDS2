@@ -76,10 +76,6 @@ defmodule BDS.Persistence do
       {:error, _reason} = error ->
         _ = File.rm(temp_path)
         error
-
-      error ->
-        _ = File.rm(temp_path)
-        error
     end
   end
 end

@@ -398,4 +398,52 @@ defmodule BDS.GenerationTest do
     assert File.read!(Path.join([temp_dir, "html", "tag", "elixir", "index.html"])) =~ "Elixir"
     assert File.read!(Path.join([temp_dir, "html", "2026", "04", "index.html"])) =~ "2026-04"
   end
+
+  test "validate_site reports missing, extra, and stale generated pages and apply_validation repairs them",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Validation Post",
+               content: "Validation body",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core, :single])
+
+    post_path = BDS.Generation.post_output_path(published_post)
+    index_path = Path.join([temp_dir, "html", "index.html"])
+    post_file_path = Path.join([temp_dir, "html", post_path])
+    extra_path = Path.join([temp_dir, "html", "obsolete.html"])
+
+    File.write!(index_path, "<html>tampered</html>")
+    File.rm!(post_file_path)
+    File.write!(extra_path, "<html>obsolete</html>")
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id)
+
+    assert "index.html" in report.stale_pages
+    assert post_path in report.missing_pages
+    assert "obsolete.html" in report.extra_pages
+
+    assert {:ok, repair} = BDS.Generation.apply_validation(project.id, [:core, :single])
+    assert Enum.sort(repair.sections) == [:core, :single]
+
+    assert File.read!(index_path) != "<html>tampered</html>"
+    assert File.exists?(post_file_path)
+    refute File.exists?(extra_path)
+
+    assert {:ok, clean_report} = BDS.Generation.validate_site(project.id, [:core, :single])
+    assert clean_report.missing_pages == []
+    assert clean_report.extra_pages == []
+    assert clean_report.stale_pages == []
+  end
 end

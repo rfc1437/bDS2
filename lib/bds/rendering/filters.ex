@@ -206,7 +206,7 @@ defmodule BDS.Rendering.Filters do
 
   defp split_path_suffix(value) do
     case Regex.run(~r/^([^?#]*)([?#].*)?$/, String.trim(value)) do
-      [_, path_part, suffix] -> {path_part, suffix || ""}
+      [_, path_part, suffix] -> {path_part, suffix}
       [_, path_part] -> {path_part, ""}
       _other -> {value, ""}
     end
