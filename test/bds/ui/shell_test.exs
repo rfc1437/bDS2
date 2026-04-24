@@ -124,4 +124,19 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "activity-bar-top"
     assert js =~ "activity-bar-bottom"
   end
+
+  test "static shell bundle hides the fake titlebar menu on macOS and keeps old status-bar alignment rules" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert js =~ "navigator.platform"
+    assert js =~ "isMac"
+    assert js =~ "window-titlebar-menu-bar is-hidden"
+
+    assert css =~ ".window-titlebar-menu-bar.is-hidden"
+    assert css =~ ".status-bar-left,"
+    assert css =~ "gap: 4px"
+    assert css =~ "padding: 0 8px"
+    assert css =~ "height: 100%"
+  end
 end

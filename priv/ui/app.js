@@ -8,11 +8,13 @@ if (!root || !bootstrapNode) {
 const SIDEBAR_STORAGE_KEY = "bds-panel-sidebar";
 const ASSISTANT_STORAGE_KEY = "bds-panel-assistant-sidebar";
 const bootstrap = JSON.parse(bootstrapNode.textContent);
+const isMac = typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac");
 const state = {
   session: hydrateSession(clone(bootstrap.session)),
   tabMeta: {},
 };
 
+bindNativeMenuBridge();
 render();
 
 function render() {
@@ -32,8 +34,10 @@ function render() {
 }
 
 function renderTitlebar() {
+  const menuBarClass = isMac ? "window-titlebar-menu-bar is-hidden" : "window-titlebar-menu-bar";
+
   root.querySelector(".window-titlebar").innerHTML = `
-    <div class="window-titlebar-menu-bar">
+    <div class="${menuBarClass}">
       ${bootstrap.menu_groups
         .map((group) => `<button class="window-titlebar-menu-button" type="button">${escapeHtml(group.label)}</button>`)
         .join("")}
@@ -330,28 +334,6 @@ function bindEvents() {
     button.onclick = () => {
       const next = button.dataset.activity;
 
-  bindResizeHandle("sidebar", {
-    key: SIDEBAR_STORAGE_KEY,
-    min: 200,
-    max: 500,
-    get: () => state.session.sidebar_width,
-    set: (value) => {
-      state.session.sidebar_width = value;
-      state.session.sidebar_visible = true;
-    },
-  });
-
-  bindResizeHandle("assistant", {
-    key: ASSISTANT_STORAGE_KEY,
-    min: 280,
-    max: 640,
-    get: () => state.session.assistant_sidebar_width,
-    set: (value) => {
-      state.session.assistant_sidebar_width = value;
-      state.session.assistant_sidebar_visible = true;
-    },
-    invert: true,
-  });
       if (state.session.active_view === next && state.session.sidebar_visible) {
         state.session.sidebar_visible = false;
       } else {
@@ -386,6 +368,130 @@ function bindEvents() {
       render();
     };
   });
+
+  bindResizeHandle("sidebar", {
+    key: SIDEBAR_STORAGE_KEY,
+    min: 200,
+    max: 500,
+    get: () => state.session.sidebar_width,
+    set: (value) => {
+      state.session.sidebar_width = value;
+      state.session.sidebar_visible = true;
+    },
+  });
+
+  bindResizeHandle("assistant", {
+    key: ASSISTANT_STORAGE_KEY,
+    min: 280,
+    max: 640,
+    get: () => state.session.assistant_sidebar_width,
+    set: (value) => {
+      state.session.assistant_sidebar_width = value;
+      state.session.assistant_sidebar_visible = true;
+    },
+    invert: true,
+  });
+}
+
+function bindNativeMenuBridge() {
+  if (window.__BDS_NATIVE_MENU_BRIDGE__) {
+    return;
+  }
+
+  window.__BDS_NATIVE_MENU_BRIDGE__ = true;
+  window.addEventListener("bds:native-menu-action", (event) => {
+    handleNativeMenuAction(event.detail?.action);
+  });
+}
+
+function handleNativeMenuAction(action) {
+  if (!action) {
+    return;
+  }
+
+  switch (action) {
+    case "toggle_sidebar":
+      state.session.sidebar_visible = !state.session.sidebar_visible;
+      persistSessionWidths();
+      break;
+    case "toggle_panel":
+      state.session.panel.visible = !state.session.panel.visible;
+      break;
+    case "toggle_assistant_sidebar":
+      state.session.assistant_sidebar_visible = !state.session.assistant_sidebar_visible;
+      persistSessionWidths();
+      break;
+    case "view_posts":
+      state.session.active_view = "posts";
+      state.session.sidebar_visible = true;
+      break;
+    case "view_media":
+      state.session.active_view = "media";
+      state.session.sidebar_visible = true;
+      break;
+    case "close_tab":
+      closeActiveTab();
+      break;
+    case "edit_preferences":
+      openSingletonTab("settings");
+      break;
+    case "edit_menu":
+      openSingletonTab("menu_editor");
+      break;
+    case "metadata_diff":
+      openSingletonTab("metadata_diff");
+      break;
+    case "documentation":
+      openSingletonTab("documentation");
+      break;
+    case "api_documentation":
+      openSingletonTab("api_documentation");
+      break;
+    case "validate_site":
+      openSingletonTab("site_validation");
+      break;
+    case "validate_translations":
+      openSingletonTab("translation_validation");
+      break;
+    case "find_duplicates":
+      openSingletonTab("find_duplicates");
+      break;
+    default:
+      return;
+  }
+
+  render();
+}
+
+function openSingletonTab(type) {
+  openTab(type, type, routeLabel(type), false);
+}
+
+function closeActiveTab() {
+  const active = currentTabRef();
+  if (!active) {
+    return;
+  }
+
+  const index = state.session.tabs.findIndex((tab) => tab.type === active.type && tab.id === active.id);
+  if (index < 0) {
+    return;
+  }
+
+  state.session.tabs.splice(index, 1);
+
+  if (state.session.tabs.length === 0) {
+    state.session.active_tab = null;
+    return;
+  }
+
+  if (index < state.session.tabs.length) {
+    const next = state.session.tabs[index];
+    state.session.active_tab = { type: next.type, id: next.id };
+  } else {
+    const next = state.session.tabs[state.session.tabs.length - 1];
+    state.session.active_tab = { type: next.type, id: next.id };
+  }
 }
 
 function openTab(type, id, title, transient) {

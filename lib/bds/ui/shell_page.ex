@@ -104,7 +104,9 @@ defmodule BDS.UI.ShellPage do
       id: Atom.to_string(group.id),
       label: humanize(group.id),
       items:
-        Enum.map(group.items, fn item ->
+        group.items
+        |> Enum.reject(&Map.get(&1, :separator, false))
+        |> Enum.map(fn item ->
           %{id: Atom.to_string(item.id), label: humanize(item.id)}
         end)
     }

@@ -161,15 +161,23 @@ defmodule BDS.UI.WorkbenchTest do
   test "menu commands expose generic shell controls through a shared command model" do
     state = Workbench.new(sidebar_visible: false, panel_visible: false)
     groups = MenuBar.default_groups(dev_mode?: false)
+    item_ids = fn items ->
+      items
+      |> Enum.reject(&Map.get(&1, :separator, false))
+      |> Enum.map(& &1.id)
+    end
 
-    assert Enum.map(groups, & &1.id) == [:app, :file, :edit, :view, :window, :help]
+    assert Enum.map(groups, & &1.id) == [:file, :edit, :view, :blog, :help]
 
     view_group = Enum.find(groups, &(&1.id == :view))
-    command_ids = Enum.map(view_group.items, & &1.id)
+    command_ids = item_ids.(view_group.items)
 
     assert :toggle_sidebar in command_ids
     assert :toggle_panel in command_ids
     refute :toggle_dev_tools in command_ids
+
+    blog_group = Enum.find(groups, &(&1.id == :blog))
+    assert :metadata_diff in item_ids.(blog_group.items)
 
     state = MenuBar.execute(state, :toggle_sidebar)
     state = MenuBar.execute(state, :toggle_panel)

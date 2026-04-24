@@ -102,6 +102,10 @@ button {
   z-index: 2;
 }
 
+.window-titlebar-menu-bar.is-hidden {
+  display: none;
+}
+
 .window-titlebar-menu-button {
   height: 24px;
   border: none;
@@ -694,8 +698,28 @@ button {
 .status-bar-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.status-bar-left {
+  flex-shrink: 1;
   min-width: 0;
+}
+
+.status-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  height: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.status-bar-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .status-bar-item.brand {

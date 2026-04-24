@@ -35,13 +35,33 @@ defmodule BDS.DesktopTest do
 
   test "desktop menu bar exposes the native menu groups for the shell window" do
     groups = BDS.Desktop.MenuBar.groups(dev_mode?: false)
+    item_ids = fn items ->
+      items
+      |> Enum.reject(&Map.get(&1, :separator, false))
+      |> Enum.map(& &1.id)
+    end
 
-    assert Enum.map(groups, & &1.id) == [:app, :file, :edit, :view, :window, :help]
+    assert Enum.map(groups, & &1.id) == [:file, :edit, :view, :blog, :help]
 
     view_group = Enum.find(groups, &(&1.id == :view))
-    assert :toggle_sidebar in Enum.map(view_group.items, & &1.id)
-    assert :toggle_panel in Enum.map(view_group.items, & &1.id)
-    assert :toggle_assistant_sidebar in Enum.map(view_group.items, & &1.id)
+    assert :toggle_sidebar in item_ids.(view_group.items)
+    assert :toggle_panel in item_ids.(view_group.items)
+    assert :toggle_assistant_sidebar in item_ids.(view_group.items)
+
+    blog_group = Enum.find(groups, &(&1.id == :blog))
+    blog_actions = item_ids.(blog_group.items)
+
+    assert :metadata_diff in blog_actions
+    assert :edit_menu in blog_actions
+    assert :rebuild_database in blog_actions
+    assert :find_duplicates in blog_actions
+    assert :validate_site in blog_actions
+
+    help_group = Enum.find(groups, &(&1.id == :help))
+    help_actions = item_ids.(help_group.items)
+
+    assert :documentation in help_actions
+    assert :api_documentation in help_actions
   end
 
   test "desktop shell html follows the old app frame regions and references bundled assets" do
