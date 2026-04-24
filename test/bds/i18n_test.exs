@@ -46,4 +46,39 @@ defmodule BDS.I18nTest do
   test "supported locales do not silently fall back to english per key" do
     assert BDS.I18n.translate("de", "missing.key") == "missing.key"
   end
+
+  test "supported locale files expose the same translation keys" do
+    catalogs = locale_catalogs()
+    english_keys = catalogs["en"] |> Map.keys() |> Enum.sort()
+
+    for {locale, catalog} <- catalogs, locale != "en" do
+      assert Map.keys(catalog) |> Enum.sort() == english_keys
+    end
+  end
+
+  test "supported non-english locales translate representative keys differently from english" do
+    catalogs = locale_catalogs()
+
+    representative_keys = [
+      "activity.posts",
+      "common.settings",
+      "render.calendar.title",
+      "render.notFound.back",
+      "render.search.ariaLabel"
+    ]
+
+    for locale <- ["de", "fr", "it", "es"], key <- representative_keys do
+      assert Map.fetch!(catalogs, locale)[key] != Map.fetch!(catalogs, "en")[key]
+    end
+  end
+
+  defp locale_catalogs do
+    locale_dir = Application.app_dir(:bds, "priv/i18n/locales")
+
+    Path.wildcard(Path.join(locale_dir, "*.json"))
+    |> Enum.sort()
+    |> Enum.into(%{}, fn path ->
+      {Path.basename(path, ".json"), Jason.decode!(File.read!(path))}
+    end)
+  end
 end
