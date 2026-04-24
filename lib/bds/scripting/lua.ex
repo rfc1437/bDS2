@@ -27,8 +27,8 @@ defmodule BDS.Scripting.Lua do
       when is_binary(source) and is_binary(entrypoint) and is_list(args) and is_list(opts) do
     with {:ok, state} <- initial_state(opts),
          {:ok, state} <- put_args(state, args),
-         {:ok, result, _state} <- run_entrypoint(source, entrypoint, state, opts) do
-      {:ok, unwrap_result(result)}
+         {:ok, result, next_state} <- run_entrypoint(source, entrypoint, state, opts) do
+      {:ok, decode_result(result, next_state)}
     end
   end
 
@@ -72,18 +72,38 @@ defmodule BDS.Scripting.Lua do
   defp install_capabilities(state, capabilities) when capabilities in [%{}, []], do: {:ok, state}
 
   defp install_capabilities(state, capabilities) when is_map(capabilities) do
-    Enum.reduce_while(capabilities, {:ok, state}, fn {name, function}, {:ok, current_state} ->
-      path = ["bds", to_string(name)]
-
-      case :luerl.set_table_keys_dec(path, function, current_state) do
+    Enum.reduce_while(capabilities, {:ok, state}, fn {name, value}, {:ok, current_state} ->
+      case install_capability(["bds", to_string(name)], value, current_state) do
         {:ok, next_state} -> {:cont, {:ok, next_state}}
-        error -> {:halt, {:error, {:capability_install_failed, path, error}}}
+        {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
   end
 
   defp install_capabilities(_state, capabilities),
     do: {:error, {:invalid_capabilities, capabilities}}
+
+  defp install_capability(path, value, state) when is_map(value) do
+    with {:ok, seeded_state} <- set_capability(path, %{}, state) do
+      Enum.reduce_while(value, {:ok, seeded_state}, fn {name, nested_value}, {:ok, current_state} ->
+        case install_capability(path ++ [to_string(name)], nested_value, current_state) do
+          {:ok, next_state} -> {:cont, {:ok, next_state}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+    end
+  end
+
+  defp install_capability(path, value, state) do
+    set_capability(path, value, state)
+  end
+
+  defp set_capability(path, value, state) do
+    case :luerl.set_table_keys_dec(path, value, state) do
+      {:ok, next_state} -> {:ok, next_state}
+      error -> {:error, {:capability_install_failed, path, error}}
+    end
+  end
 
   defp normalize_progress_payload(payload) when is_list(payload) do
     if Enum.all?(payload, &match?({key, _value} when is_binary(key) or is_atom(key), &1)) do
@@ -148,6 +168,28 @@ defmodule BDS.Scripting.Lua do
       spawn_opts: Keyword.get(opts, :spawn_opts, [])
     ]
   end
+
+  defp decode_result(values, state) when is_list(values) do
+    values
+    |> Enum.map(&decode_result(&1, state))
+    |> unwrap_result()
+  end
+
+  defp decode_result(value, state) do
+    value
+    |> :luerl.decode(state)
+    |> normalize_decoded_value()
+  end
+
+  defp normalize_decoded_value(values) when is_list(values) do
+    if Enum.all?(values, &match?({key, _value} when is_binary(key) or is_atom(key), &1)) do
+      Map.new(values, fn {key, value} -> {to_string(key), value} end)
+    else
+      Enum.map(values, &normalize_decoded_value/1)
+    end
+  end
+
+  defp normalize_decoded_value(value), do: value
 
   defp unwrap_result(values) when is_list(values) do
     case values do
