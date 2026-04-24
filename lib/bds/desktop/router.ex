@@ -11,7 +11,7 @@ defmodule BDS.Desktop.Router do
     signing_salt: "desktop-shell"
 
   plug :match
-  plug Desktop.Auth
+  plug :maybe_require_desktop_auth
 
   plug Plug.Static,
     at: "/assets",
@@ -45,5 +45,13 @@ defmodule BDS.Desktop.Router do
   defp desktop_secret_key_base do
     Application.get_env(:bds, :desktop)[:secret_key_base] ||
       raise "missing :desktop secret_key_base configuration"
+  end
+
+  defp maybe_require_desktop_auth(conn, _opts) do
+    if System.get_env("BDS_DESKTOP_AUTOMATION") in ["1", "true", "TRUE"] do
+      conn
+    else
+      Desktop.Auth.call(conn, [])
+    end
   end
 end

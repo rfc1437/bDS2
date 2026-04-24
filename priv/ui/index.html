@@ -1,104 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>bDS Shell</title>
-  <link rel="stylesheet" href="./app.css">
-</head>
-<body>
-  <!doctype html>
-  <html lang="en">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Blogging Desktop Server</title>
-      <link rel="stylesheet" href="/assets/app.css" />
-    </head>
-    <body>
-      <div class="app" id="app">
-        <div class="window-titlebar">
-          <div class="window-titlebar-menu-bar"></div>
-          <div class="window-titlebar-title">Blogging Desktop Server</div>
-          <div class="window-titlebar-actions">
-            <button class="window-titlebar-action-button" data-command="toggle-sidebar" aria-label="Toggle sidebar">
-              <span class="window-titlebar-sidebar-icon"><span class="window-titlebar-sidebar-pane"></span></span>
-            </button>
-            <button class="window-titlebar-action-button" data-command="toggle-panel" aria-label="Toggle panel">
-              <span class="window-titlebar-panel-icon"></span>
-            </button>
-          </div>
-        </div>
-
-        <div class="app-main">
-          <aside class="activity-bar"></aside>
-
-          <section class="sidebar-shell">
-            <div class="sidebar"></div>
-            <div class="resizable-panel-divider sidebar-divider" data-resize="sidebar"></div>
-          </section>
-
-          <main class="app-content">
-            <div class="tab-bar"></div>
-            <div class="editor-shell"></div>
-            <div class="panel-shell"></div>
-          </main>
-
-          <section class="assistant-sidebar-shell">
-            <div class="resizable-panel-divider assistant-divider" data-resize="assistant"></div>
-            <div class="assistant-sidebar"></div>
-          </section>
-        </div>
-
-        <div class="status-bar"></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Blogging Desktop Server</title>
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <div class="app" id="bds-shell-app">
+      <div class="window-titlebar" data-region="title-bar"></div>
+      <div class="app-main">
+        <aside class="activity-bar" data-region="activity-bar"></aside>
+        <section class="sidebar-shell" data-testid="sidebar-shell">
+          <div class="sidebar" data-region="sidebar"></div>
+          <div class="resizable-panel-divider sidebar-divider" data-resize="sidebar" data-role="resize-handle"></div>
+        </section>
+        <main class="app-content" data-region="content">
+          <div class="tab-bar" data-region="tab-bar"></div>
+          <section class="editor-shell" data-region="editor"></section>
+          <section class="panel-shell" data-region="panel"></section>
+        </main>
+        <section class="assistant-sidebar-shell" data-testid="assistant-shell">
+          <div class="resizable-panel-divider assistant-divider" data-resize="assistant" data-role="resize-handle"></div>
+          <aside class="assistant-sidebar" data-region="assistant-sidebar"></aside>
+        </section>
       </div>
+      <footer class="status-bar" data-region="status-bar"></footer>
+    </div>
 
-      <script id="bds-bootstrap" type="application/json">
-        {
-          "menuGroups": [
-            {"id":"app","label":"App","items":[{"id":"about","label":"About"}]},
-            {"id":"file","label":"File","items":[{"id":"new_post","label":"New Post"},{"id":"close_tab","label":"Close Tab"}]},
-            {"id":"edit","label":"Edit","items":[{"id":"undo","label":"Undo"},{"id":"redo","label":"Redo"}]},
-            {"id":"view","label":"View","items":[{"id":"toggle_sidebar","label":"Toggle Sidebar"},{"id":"toggle_panel","label":"Toggle Panel"},{"id":"toggle_assistant_sidebar","label":"Toggle Assistant Sidebar"}]},
-            {"id":"window","label":"Window","items":[{"id":"minimize","label":"Minimize"}]},
-            {"id":"help","label":"Help","items":[{"id":"documentation","label":"Documentation"}]}
+    <script id="bds-shell-bootstrap" type="application/json">
+      {
+        "title": "Blogging Desktop Server",
+        "registry": {
+          "default_sidebar_view": "posts",
+          "sidebar_views": [
+            { "id": "posts", "label": "Posts", "activity_group": "top", "editor_route": "post", "entity_tab": true, "singleton": false },
+            { "id": "media", "label": "Media", "activity_group": "top", "editor_route": "media", "entity_tab": true, "singleton": false },
+            { "id": "settings", "label": "Settings", "activity_group": "bottom", "editor_route": "settings", "entity_tab": false, "singleton": true }
           ],
-          "sidebarViews": [
-            {"id":"posts","label":"Posts","group":"top","items":["welcome.md","launch-plan.md","publishing-notes.md"]},
-            {"id":"pages","label":"Pages","group":"top","items":["about.md","contact.md"]},
-            {"id":"media","label":"Media","group":"top","items":["cover.jpg","launch-banner.png"]},
-            {"id":"scripts","label":"Scripts","group":"top","items":["import_posts.exs","sync_tags.exs"]},
-            {"id":"templates","label":"Templates","group":"top","items":["post.liquid","listing.liquid"]},
-            {"id":"git","label":"Git","group":"bottom","items":["Working tree clean"]},
-            {"id":"settings","label":"Settings","group":"bottom","items":["Project", "Publishing", "AI"]}
-          ],
-          "tabs": [
-            {"id":"dashboard","title":"Dashboard","kind":"dashboard","pinned":true,"dirty":false},
-            {"id":"post:welcome","title":"welcome.md","kind":"post","pinned":true,"dirty":true},
-            {"id":"post:launch","title":"launch-plan.md","kind":"post","pinned":false,"dirty":false}
-          ],
-          "activeTabId": "post:welcome",
-          "activeView": "posts",
-          "sidebarVisible": true,
-          "sidebarWidth": 320,
-          "assistantVisible": true,
-          "assistantWidth": 336,
-          "panelVisible": true,
-          "panelTab": "problems",
-          "statusBar": {
-            "left": [
-              {"id":"branch","label":"main"},
-              {"id":"sync","label":"Filesystem synced"},
-              {"id":"language","label":"EN"}
+          "editor_routes": [
+            { "id": "dashboard", "title": "Dashboard", "singleton": true, "entity_tab": false },
+            { "id": "post", "title": "Post", "singleton": false, "entity_tab": true },
+            { "id": "media", "title": "Media", "singleton": false, "entity_tab": true },
+            { "id": "settings", "title": "Settings", "singleton": true, "entity_tab": false }
+          ]
+        },
+        "menu_groups": [
+          { "id": "app", "label": "App", "items": [{ "id": "about", "label": "About" }] },
+          { "id": "view", "label": "View", "items": [{ "id": "toggle_sidebar", "label": "Toggle Sidebar" }] }
+        ],
+        "session": {
+          "sidebar_visible": true,
+          "sidebar_width": 280,
+          "active_view": "posts",
+          "assistant_sidebar_visible": true,
+          "assistant_sidebar_width": 320,
+          "panel": { "visible": true, "active_tab": "tasks" },
+          "tabs": [],
+          "active_tab": null,
+          "dirty_tabs": []
+        },
+        "content": {
+          "sidebar": {
+            "posts": {
+              "title": "Posts",
+              "subtitle": "Drafts and publishing",
+              "sections": [
+                {
+                  "title": "Drafts",
+                  "items": [
+                    { "id": "post-welcome", "title": "Welcome to bDS2", "meta": "Updated today", "badge": "draft", "route": "post" }
+                  ]
+                }
+              ]
+            },
+            "media": {
+              "title": "Media",
+              "subtitle": "Images and files",
+              "sections": [
+                {
+                  "title": "Media",
+                  "items": [
+                    { "id": "media-hero", "title": "hero-shot.jpg", "meta": "Image asset", "route": "media" }
+                  ]
+                }
+              ]
+            },
+            "settings": {
+              "title": "Settings",
+              "subtitle": "Project preferences",
+              "sections": [
+                {
+                  "title": "Settings",
+                  "items": [
+                    { "id": "settings", "title": "Project", "meta": "Defaults and paths", "route": "settings" }
+                  ]
+                }
+              ]
+            }
+          },
+          "dashboard": {
+            "title": "Dashboard",
+            "subtitle": "Static shell bundle for direct inspection",
+            "summary_cards": [
+              { "label": "Posts", "value": "42", "detail": "Drafts, published, archive" }
             ],
-            "right": [
-              {"id":"project","label":"Starter project"},
-              {"id":"mode","label":"Airplane off"},
-              {"id":"theme","label":"Desktop shell"}
+            "checklist": [
+              "Static bundle is valid HTML",
+              "Shell assets render without duplicated bootstrap code"
+            ]
+          },
+          "assistant_cards": [
+            { "label": "Desktop Runtime", "text": "Static bundle mirrors the desktop shell layout." }
+          ],
+          "editor_meta": {
+            "dashboard": [
+              { "label": "Status", "value": "Ready" }
             ]
           }
+        },
+        "status": {
+          "left": { "running_task_message": "Static preview", "running_task_overflow": 0 },
+          "right": {
+            "post_count": "42 posts",
+            "media_count": "18 media",
+            "theme_badge": "desktop-shell",
+            "offline_mode": true,
+            "ui_language": "en",
+            "brand": "bDS"
+          }
         }
-      </script>
-      <script src="/assets/app.js"></script>
-    </body>
-  </html>
+      }
+    </script>
+    <script src="./app.js"></script>
+  </body>
+</html>

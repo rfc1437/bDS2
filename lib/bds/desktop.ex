@@ -2,7 +2,7 @@ defmodule BDS.Desktop do
   @moduledoc false
 
   def url do
-    Application.get_env(:bds, :desktop)[:port]
+    BDS.Desktop.Server.port()
     |> url()
   end
 

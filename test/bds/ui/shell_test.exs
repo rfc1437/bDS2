@@ -90,15 +90,16 @@ defmodule BDS.UI.ShellTest do
   test "shell page renders the inspectable base app with bootstrap data and shell controls" do
     html = ShellPage.render()
 
-    assert html =~ ~s(<div id="bds-shell-app")
+    assert html =~ ~s(<div class="app" id="bds-shell-app")
     assert html =~ ~s(data-region="activity-bar")
     assert html =~ ~s(data-region="sidebar")
     assert html =~ ~s(data-region="editor")
     assert html =~ ~s(data-region="status-bar")
     assert html =~ ~s(data-role="resize-handle")
     assert html =~ ~s(id="bds-shell-bootstrap")
-    assert html =~ ~s(src="./app.js")
-    assert html =~ ~s(href="./app.css")
+    assert html =~ ~s(src="/assets/app.js")
+    assert html =~ ~s(href="/assets/app.css")
+    assert html =~ ~s(Desktop shell ready)
   end
 
   test "static shell bundle exists for direct browser inspection" do

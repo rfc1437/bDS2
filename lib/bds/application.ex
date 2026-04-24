@@ -5,24 +5,17 @@ defmodule BDS.Application do
 
   def desktop_children(env \\ nil)
 
-  def desktop_children(:test), do: []
+  def desktop_children(:test) do
+    if desktop_automation?() do
+      [{BDS.Desktop.Server, []}]
+    else
+      []
+    end
+  end
 
   def desktop_children(_env) do
     if Application.get_env(:bds, BDS.Application)[:desktop_adapter] == :desktop do
-      [
-        {BDS.Desktop.Server, []},
-        {Desktop.Window,
-         [
-           app: :bds,
-           id: BDS.Desktop.MainWindow,
-           title: Application.get_env(:bds, :desktop)[:title] || "Blogging Desktop Server",
-           size: Application.get_env(:bds, :desktop)[:window_size] || {1440, 900},
-           min_size: Application.get_env(:bds, :desktop)[:window_min_size] || {1100, 700},
-           menubar: BDS.Desktop.MenuBar,
-           icon_menu: BDS.Desktop.Menu,
-           url: &BDS.Desktop.url/0
-         ]}
-      ]
+      [{BDS.Desktop.Server, []} | desktop_window_children()]
     else
       []
     end
@@ -49,5 +42,29 @@ defmodule BDS.Application do
   defp current_env do
     Application.get_env(:bds, :current_env_override) ||
       if(Code.ensure_loaded?(Mix), do: Mix.env(), else: :prod)
+  end
+
+  defp desktop_window_children do
+    if desktop_automation?() do
+      []
+    else
+      [
+        {Desktop.Window,
+         [
+           app: :bds,
+           id: BDS.Desktop.MainWindow,
+           title: Application.get_env(:bds, :desktop)[:title] || "Blogging Desktop Server",
+           size: Application.get_env(:bds, :desktop)[:window_size] || {1440, 900},
+           min_size: Application.get_env(:bds, :desktop)[:window_min_size] || {1100, 700},
+           menubar: BDS.Desktop.MenuBar,
+           icon_menu: BDS.Desktop.Menu,
+           url: &BDS.Desktop.url/0
+         ]}
+      ]
+    end
+  end
+
+  defp desktop_automation? do
+    System.get_env("BDS_DESKTOP_AUTOMATION") in ["1", "true", "TRUE"]
   end
 end

@@ -19,7 +19,10 @@ defmodule BDS.Desktop.Server do
   end
 
   def port do
-    Application.get_env(:bds, :desktop)[:port] || 4010
+    case System.get_env("BDS_DESKTOP_PORT") do
+      value when is_binary(value) -> String.to_integer(value)
+      _other -> Application.get_env(:bds, :desktop)[:port] || 4010
+    end
   end
 
   @impl true

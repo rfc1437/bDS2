@@ -1,0 +1,10 @@
+{
+  "name": "bds-ui-automation",
+  "private": true,
+  "devDependencies": {
+    "playwright": "^1.54.1"
+  },
+  "scripts": {
+    "ui:install": "playwright install chromium"
+  }
+}
