@@ -1,6 +1,7 @@
 {
     "chat.tools.terminal.autoApprove": {
         "mix": true,
-        "allium": true
+        "allium": true,
+        "command": true
     }
 }

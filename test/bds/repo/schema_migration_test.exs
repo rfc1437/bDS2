@@ -148,6 +148,10 @@ defmodule BDS.Repo.SchemaMigrationTest do
         "content",
         "tool_call_id",
         "tool_calls",
+        "token_usage_input",
+        "token_usage_output",
+        "cache_read_tokens",
+        "cache_write_tokens",
         "created_at"
       ],
       "ai_providers" => ["id", "name", "env", "package_ref", "api", "doc", "updated_at"],
