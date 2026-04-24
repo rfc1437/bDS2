@@ -18,6 +18,11 @@ config :bds, :scripting,
   job_timeout: :infinity,
   job_max_reductions: :none
 
+config :bds, :embeddings,
+  backend: BDS.Embeddings.Backends.InApp,
+  model_id: "Xenova/multilingual-e5-small",
+  dimensions: 384
+
 config :logger, :console,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]

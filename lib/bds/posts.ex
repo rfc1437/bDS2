@@ -547,6 +547,7 @@ defmodule BDS.Posts do
     |> Post.changeset(attrs)
     |> Repo.insert_or_update!()
     |> tap(&Search.sync_post/1)
+    |> tap(&Embeddings.sync_post/1)
   end
 
   defp parse_post_status(status) when is_atom(status), do: status

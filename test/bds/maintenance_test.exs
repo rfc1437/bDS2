@@ -1,8 +1,6 @@
 defmodule BDS.MaintenanceTest do
   use ExUnit.Case, async: false
 
-  import Ecto.Query
-
   alias BDS.Repo
 
   setup do
@@ -22,6 +20,9 @@ defmodule BDS.MaintenanceTest do
     project: project,
     temp_dir: temp_dir
   } do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
     posts_dir = Path.join([temp_dir, "posts", "2026", "04"])
     File.mkdir_p!(posts_dir)
 
@@ -111,6 +112,7 @@ defmodule BDS.MaintenanceTest do
 
     assert {:ok, posts} = BDS.Maintenance.rebuild_from_filesystem(project.id, "post")
     assert length(posts) == 1
+    assert Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: "dispatch-post") != nil
 
     assert {:ok, media_items} = BDS.Maintenance.rebuild_from_filesystem(project.id, "media")
     assert length(media_items) == 1

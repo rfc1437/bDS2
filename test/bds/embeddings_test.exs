@@ -1,6 +1,20 @@
 defmodule BDS.EmbeddingsTest do
   use ExUnit.Case, async: false
 
+  defmodule FakeBackend do
+    @behaviour BDS.Embeddings.Backend
+
+    @impl true
+    def model_info do
+      %{model_id: "fake/multilingual-e5-small", dimensions: 384}
+    end
+
+    @impl true
+    def embed(text, opts) do
+      BDS.Embeddings.Backends.InApp.embed(text, opts)
+    end
+  end
+
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
@@ -10,6 +24,18 @@ defmodule BDS.EmbeddingsTest do
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
     {:ok, project} = BDS.Projects.create_project(%{name: "Embeddings", data_path: temp_dir})
+
+    previous_config = Application.get_env(:bds, :embeddings)
+    Application.put_env(:bds, :embeddings, backend: FakeBackend)
+
+    on_exit(fn ->
+      if previous_config == nil do
+        Application.delete_env(:bds, :embeddings)
+      else
+        Application.put_env(:bds, :embeddings, previous_config)
+      end
+    end)
+
     %{project: project}
   end
 
@@ -102,5 +128,26 @@ defmodule BDS.EmbeddingsTest do
     assert {:ok, []} = BDS.Embeddings.find_similar(post.id, 5)
     assert {:ok, []} = BDS.Embeddings.find_duplicates(project.id)
     assert {:ok, %{}} = BDS.Embeddings.compute_similarities(post.id, [post.id])
+  end
+
+  test "embeddings use the configured in-app backend module", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert BDS.Embeddings.model_id() == "fake/multilingual-e5-small"
+    assert BDS.Embeddings.dimensions() == 384
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Configured Backend",
+               content: "semantic runtime through the configured backend",
+               language: "en"
+             })
+
+    assert {:ok, post} = BDS.Posts.publish_post(post.id)
+
+    assert {:ok, indexed} = BDS.Embeddings.index_unindexed(project.id)
+    assert post.id in indexed
   end
 end
