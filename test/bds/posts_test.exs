@@ -151,7 +151,12 @@ defmodule BDS.PostsTest do
     assert file_contents =~ "template_slug: article\n"
     assert file_contents =~ "tags:\n  - alpha\n"
     assert file_contents =~ "categories:\n  - notes\n"
+    assert file_contents =~ ~r/created_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert file_contents =~ ~r/updated_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert file_contents =~ ~r/published_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
     assert file_contents =~ "\n---\nHello from markdown\n"
+
+    refute File.exists?(full_path <> ".tmp")
   end
 
   test "delete_post removes the database row and published markdown file when present" do
@@ -271,9 +276,9 @@ defmodule BDS.PostsTest do
         "language: en",
         "do_not_translate: true",
         "template_slug: article",
-        "created_at: 1711843200",
-        "updated_at: 1711929600",
-        "published_at: 1712016000",
+        "created_at: 2024-03-30T21:20:00.000Z",
+        "updated_at: 2024-03-31T21:20:00.000Z",
+        "published_at: 2024-04-01T21:20:00.000Z",
         "tags:",
         "  - alpha",
         "categories:",
@@ -299,9 +304,9 @@ defmodule BDS.PostsTest do
     assert post.language == "en"
     assert post.do_not_translate == true
     assert post.template_slug == "article"
-    assert post.created_at == 1_711_843_200
-    assert post.updated_at == 1_711_929_600
-    assert post.published_at == 1_712_016_000
+    assert post.created_at == 1_711_833_600_000
+    assert post.updated_at == 1_711_920_000_000
+    assert post.published_at == 1_712_006_400_000
     assert post.tags == ["alpha"]
     assert post.categories == ["notes"]
     assert post.file_path == "posts/2026/04/recovered-post.md"

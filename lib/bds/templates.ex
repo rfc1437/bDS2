@@ -4,6 +4,7 @@ defmodule BDS.Templates do
   import Ecto.Query
 
   alias BDS.Frontmatter
+  alias BDS.Persistence
   alias BDS.Posts
   alias BDS.Projects
   alias BDS.Repo
@@ -12,7 +13,7 @@ defmodule BDS.Templates do
   alias BDS.Templates.Template
 
   def create_template(attrs) do
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
     project_id = attr(attrs, :project_id)
     title = attr(attrs, :title) || ""
 
@@ -42,13 +43,11 @@ defmodule BDS.Templates do
       template ->
         file_path = template_file_path(template.slug)
         full_path = full_file_path(template.project_id, file_path)
-        updated_at = System.system_time(:second)
+        updated_at = Persistence.now_ms()
         content = template.content || ""
 
-        :ok = File.mkdir_p(Path.dirname(full_path))
-
         :ok =
-          File.write(
+          Persistence.atomic_write(
             full_path,
             serialize_template_file(
               %{template | status: :published, file_path: file_path, updated_at: updated_at},
@@ -89,7 +88,7 @@ defmodule BDS.Templates do
           has_attr?(attrs, :content) and attr(attrs, :content) != template.content
 
         slug_changed? = next_slug != template.slug
-        now = System.system_time(:second)
+        now = Persistence.now_ms()
 
         next_status =
           if(template.status == :published and content_changed?,
@@ -254,7 +253,7 @@ defmodule BDS.Templates do
   end
 
   defp clear_template_references(template) do
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
 
     affected_posts =
       Repo.all(
@@ -316,8 +315,7 @@ defmodule BDS.Templates do
   defp rewrite_template_file(original_template, updated_template) do
     body = published_template_body(original_template)
     new_full_path = full_file_path(updated_template.project_id, updated_template.file_path)
-    :ok = File.mkdir_p(Path.dirname(new_full_path))
-    :ok = File.write(new_full_path, serialize_template_file(updated_template, body))
+    :ok = Persistence.atomic_write(new_full_path, serialize_template_file(updated_template, body))
 
     if original_template.file_path != updated_template.file_path do
       _ = delete_file_if_present(original_template.project_id, original_template.file_path)
@@ -345,7 +343,7 @@ defmodule BDS.Templates do
     contents = File.read!(path)
     {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
     relative_path = Path.relative_to(path, Projects.project_data_dir(project))
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
 
     attrs = %{
       id: Map.get(fields, "id") || Ecto.UUID.generate(),

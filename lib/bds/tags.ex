@@ -3,6 +3,7 @@ defmodule BDS.Tags do
 
   import Ecto.Query
 
+  alias BDS.Persistence
   alias BDS.Posts
   alias BDS.Posts.Post
   alias BDS.Projects
@@ -14,7 +15,7 @@ defmodule BDS.Tags do
     name = attr(attrs, :name) |> to_string() |> String.trim()
 
     with :ok <- validate_unique_name(project_id, name) do
-      now = System.system_time(:second)
+      now = Persistence.now_ms()
 
       %Tag{}
       |> Tag.changeset(%{
@@ -70,7 +71,7 @@ defmodule BDS.Tags do
         |> elem(1)
         |> Enum.reverse()
 
-      now = System.system_time(:second)
+      now = Persistence.now_ms()
 
       Enum.each(missing_names, fn name ->
         %Tag{}
@@ -102,7 +103,7 @@ defmodule BDS.Tags do
         updates = %{
           color: attr(attrs, :color),
           post_template_slug: attr(attrs, :post_template_slug),
-          updated_at: System.system_time(:second)
+          updated_at: Persistence.now_ms()
         }
 
         tag
@@ -164,7 +165,7 @@ defmodule BDS.Tags do
 
             updated_tag =
               tag
-              |> Tag.changeset(%{name: normalized_name, updated_at: System.system_time(:second)})
+              |> Tag.changeset(%{name: normalized_name, updated_at: Persistence.now_ms()})
               |> Repo.update!()
 
             write_tags_json(tag.project_id)
@@ -226,7 +227,7 @@ defmodule BDS.Tags do
         end)
     }
 
-    File.write!(path, Jason.encode!(payload))
+    :ok = Persistence.atomic_write(path, Jason.encode!(payload))
   end
 
   defp validate_unique_name(project_id, name) do
@@ -311,7 +312,7 @@ defmodule BDS.Tags do
 
   defp update_post_tags(post, updated_tags) do
     post
-    |> Post.changeset(%{tags: updated_tags, updated_at: System.system_time(:second)})
+    |> Post.changeset(%{tags: updated_tags, updated_at: Persistence.now_ms()})
     |> Repo.update!()
 
     Posts.rewrite_published_post(post.id)

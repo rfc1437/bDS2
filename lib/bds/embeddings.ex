@@ -3,6 +3,7 @@ defmodule BDS.Embeddings do
 
   import Ecto.Query
 
+  alias BDS.Persistence
   alias BDS.Embeddings.DismissedDuplicatePair
   alias BDS.Embeddings.Index
   alias BDS.Embeddings.Key
@@ -317,7 +318,7 @@ defmodule BDS.Embeddings do
           project_id: post_a.project_id,
           post_id_a: sorted_a,
           post_id_b: sorted_b,
-          dismissed_at: System.system_time(:second)
+          dismissed_at: Persistence.now_ms()
         })
         |> Repo.insert_or_update!()
 

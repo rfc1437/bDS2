@@ -51,6 +51,9 @@ defmodule BDS.MediaTest do
     assert sidecar =~ "author: Writer\n"
     assert sidecar =~ "language: en\n"
     assert sidecar =~ "tags:\n  - alpha\n"
+    assert sidecar =~ ~r/created_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert sidecar =~ ~r/updated_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    refute File.exists?(Path.join(temp_dir, media.sidecar_path <> ".tmp"))
   end
 
   test "update_media rewrites the sidecar metadata", %{project: project, temp_dir: temp_dir} do
@@ -137,8 +140,8 @@ defmodule BDS.MediaTest do
         "caption: Recovered caption",
         "author: Writer",
         "language: en",
-        "created_at: 1711843200",
-        "updated_at: 1711929600",
+        "created_at: 2024-03-30T21:20:00.000Z",
+        "updated_at: 2024-03-31T21:20:00.000Z",
         "tags:",
         "  - alpha",
         ""
@@ -175,6 +178,8 @@ defmodule BDS.MediaTest do
     assert media.author == "Writer"
     assert media.language == "en"
     assert media.tags == ["alpha"]
+    assert media.created_at == 1_711_833_600_000
+    assert media.updated_at == 1_711_920_000_000
     assert media.file_path == "media/2026/04/asset.jpg"
     assert media.sidecar_path == "media/2026/04/asset.jpg.meta"
 

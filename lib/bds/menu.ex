@@ -3,6 +3,7 @@ defmodule BDS.Menu do
 
   require Record
 
+  alias BDS.Persistence
   alias BDS.Projects
 
   Record.defrecord(:xmlElement, Record.extract(:xmlElement, from_lib: "xmerl/include/xmerl.hrl"))
@@ -44,14 +45,8 @@ defmodule BDS.Menu do
   end
 
   defp write_menu_file(project, menu) do
-    meta_dir = Path.dirname(menu_path(project))
-    :ok = File.mkdir_p(meta_dir)
-
     path = menu_path(project)
-    temp_path = path <> ".tmp"
-
-    :ok = File.write(temp_path, serialize_opml(menu.items))
-    File.rename(temp_path, path)
+    :ok = Persistence.atomic_write(path, serialize_opml(project, menu.items))
   end
 
   defp menu_path(project) do
@@ -84,7 +79,9 @@ defmodule BDS.Menu do
     end
   end
 
-  defp serialize_opml(items) do
+  defp serialize_opml(project, items) do
+    timestamp = project.updated_at || project.created_at || Persistence.now_ms()
+
     rendered_items =
       items
       |> Enum.map(&render_item(&1, 2))
@@ -93,6 +90,11 @@ defmodule BDS.Menu do
     [
       ~s(<?xml version="1.0" encoding="UTF-8"?>),
       ~s(<opml version="2.0">),
+      ~s(  <head>),
+      ~s(    <title>#{xml_escape(project.name)}</title>),
+      ~s(    <dateCreated>#{Persistence.timestamp_to_iso8601(timestamp)}</dateCreated>),
+      ~s(    <dateModified>#{Persistence.timestamp_to_iso8601(timestamp)}</dateModified>),
+      ~s(  </head>),
       ~s(  <body>),
       rendered_items,
       ~s(  </body>),

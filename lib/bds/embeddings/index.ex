@@ -3,6 +3,7 @@ defmodule BDS.Embeddings.Index do
 
   import Ecto.Query
 
+  alias BDS.Persistence
   alias BDS.Embeddings.Key
   alias BDS.Projects
   alias BDS.Repo
@@ -43,7 +44,7 @@ defmodule BDS.Embeddings.Index do
       "project_id" => project_id,
       "model_id" => model_id,
       "dimensions" => dimensions,
-      "updated_at" => System.system_time(:second),
+      "updated_at" => Persistence.now_ms(),
       "entries" => entries
     }
 
@@ -123,10 +124,7 @@ defmodule BDS.Embeddings.Index do
   end
 
   defp write_snapshot(snapshot_path, payload) do
-    :ok = File.mkdir_p(Path.dirname(snapshot_path))
-    temp_path = snapshot_path <> ".tmp"
-    :ok = File.write(temp_path, Jason.encode!(payload))
-    :ok = File.rename(temp_path, snapshot_path)
+    :ok = Persistence.atomic_write(snapshot_path, Jason.encode!(payload))
     legacy_path = legacy_path(snapshot_path)
 
     if File.exists?(legacy_path) do

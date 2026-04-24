@@ -4,6 +4,7 @@ defmodule BDS.Projects do
   import Ecto.Query
 
   alias Ecto.Multi
+  alias BDS.Persistence
   alias BDS.Projects.Project
   alias BDS.Repo
   alias BDS.StarterTemplates
@@ -26,7 +27,7 @@ defmodule BDS.Projects do
         {:ok, project}
 
       nil ->
-        now = System.system_time(:second)
+        now = Persistence.now_ms()
         is_active = not Repo.exists?(from project in Project, where: project.is_active == true)
 
         Repo.transaction(fn ->
@@ -60,7 +61,7 @@ defmodule BDS.Projects do
   end
 
   def create_project(attrs) do
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
     name = attr(attrs, :name) || ""
     slug = unique_slug(attr(attrs, :slug) || Slug.slugify(name))
 
@@ -95,7 +96,7 @@ defmodule BDS.Projects do
         {:error, :not_found}
 
       project ->
-        now = System.system_time(:second)
+        now = Persistence.now_ms()
 
         Multi.new()
         |> Multi.update_all(:clear_previous, from(p in Project, where: p.is_active == true),

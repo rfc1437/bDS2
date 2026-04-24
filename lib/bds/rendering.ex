@@ -4,6 +4,7 @@ defmodule BDS.Rendering do
   import Ecto.Query
 
   alias BDS.Frontmatter
+  alias BDS.Persistence
   alias BDS.Media.Media, as: MediaAsset
   alias BDS.Menu
   alias BDS.Metadata
@@ -69,7 +70,7 @@ defmodule BDS.Rendering do
           template.project_id == ^project_id and template.kind == ^kind and
             template.status == :published and
             template.enabled == true,
-        order_by: [asc: template.created_at, asc: template.slug],
+        order_by: [desc: template.created_at, desc: template.slug],
         limit: 1
     )
   end
@@ -455,7 +456,7 @@ defmodule BDS.Rendering do
   defp canonical_media_path_by_source_path(project_id) do
     Repo.all(from media in MediaAsset, where: media.project_id == ^project_id)
     |> Enum.reduce(%{}, fn media, acc ->
-      datetime = DateTime.from_unix!(media.created_at)
+      datetime = Persistence.from_unix_ms!(media.created_at)
 
       source_key =
         Path.join([
@@ -476,7 +477,7 @@ defmodule BDS.Rendering do
   end
 
   defp post_path(post, nil) do
-    datetime = DateTime.from_unix!(post.created_at)
+    datetime = Persistence.from_unix_ms!(post.created_at)
 
     Path.join([
       Integer.to_string(datetime.year),
@@ -630,7 +631,7 @@ defmodule BDS.Rendering do
     grouped_blocks =
       posts
       |> Enum.filter(&is_integer(Map.get(&1, :created_at)))
-      |> Enum.group_by(&DateTime.from_unix!(Map.get(&1, :created_at)) |> DateTime.to_date() |> Date.to_iso8601())
+      |> Enum.group_by(&(Map.get(&1, :created_at) |> Persistence.from_unix_ms!() |> DateTime.to_date() |> Date.to_iso8601()))
       |> Enum.sort_by(fn {label, _posts} -> label end)
 
     grouped_blocks
@@ -676,12 +677,12 @@ defmodule BDS.Rendering do
   defp href_for_language(prefix), do: prefix <> "/"
 
   defp calendar_initial_year(%{created_at: created_at}) when is_integer(created_at),
-    do: DateTime.from_unix!(created_at).year
+    do: Persistence.from_unix_ms!(created_at).year
 
   defp calendar_initial_year(_post), do: nil
 
   defp calendar_initial_month(%{created_at: created_at}) when is_integer(created_at),
-    do: DateTime.from_unix!(created_at).month
+    do: Persistence.from_unix_ms!(created_at).month
 
   defp calendar_initial_month(_post), do: nil
 

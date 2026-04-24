@@ -5,6 +5,7 @@ defmodule BDS.Media do
 
   alias BDS.Media.Media
   alias BDS.Media.Translation
+  alias BDS.Persistence
   alias BDS.Projects
   alias BDS.Repo
   alias BDS.Search
@@ -16,7 +17,7 @@ defmodule BDS.Media do
     original_name = Path.basename(source_path)
     mime_type = detect_mime(original_name)
     {width, height} = image_dimensions(source_path, mime_type)
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
     file_name = Ecto.UUID.generate() <> Path.extname(original_name)
     file_path = media_file_path(file_name, now)
     sidecar_path = file_path <> ".meta"
@@ -78,7 +79,7 @@ defmodule BDS.Media do
           |> maybe_put(:tags, attr(attrs, :tags))
           |> maybe_put(:width, attr(attrs, :width))
           |> maybe_put(:height, attr(attrs, :height))
-          |> Map.put(:updated_at, System.system_time(:second))
+          |> Map.put(:updated_at, Persistence.now_ms())
 
         project = Projects.get_project!(media.project_id)
 
@@ -136,7 +137,7 @@ defmodule BDS.Media do
 
       media ->
         project = Projects.get_project!(media.project_id)
-        now = System.system_time(:second)
+        now = Persistence.now_ms()
 
         translation =
           Repo.get_by(Translation, translation_for: media.id, language: language) ||
@@ -227,7 +228,7 @@ defmodule BDS.Media do
     relative_sidecar_path = Path.relative_to(sidecar_path, Projects.project_data_dir(project))
     relative_file_path = String.trim_trailing(relative_sidecar_path, ".meta")
     filename = Path.basename(relative_file_path)
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
 
     attrs = %{
       id: Map.get(fields, "id") || Ecto.UUID.generate(),
@@ -317,7 +318,7 @@ defmodule BDS.Media do
 
       media ->
         {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
-        now = System.system_time(:second)
+        now = Persistence.now_ms()
         language = Map.fetch!(fields, "language")
 
         translation =
@@ -408,7 +409,7 @@ defmodule BDS.Media do
   end
 
   defp media_file_path(file_name, timestamp) do
-    datetime = DateTime.from_unix!(timestamp)
+    datetime = Persistence.from_unix_ms!(timestamp)
     year = Integer.to_string(datetime.year)
     month = datetime.month |> Integer.to_string() |> String.pad_leading(2, "0")
     Path.join(["media", year, month, file_name])
@@ -487,9 +488,7 @@ defmodule BDS.Media do
   end
 
   defp atomic_write(path, contents) do
-    temp_path = path <> ".tmp"
-    :ok = File.write(temp_path, contents)
-    File.rename(temp_path, path)
+    Persistence.atomic_write(path, contents)
   end
 
   defp blank_to_nil(nil), do: nil

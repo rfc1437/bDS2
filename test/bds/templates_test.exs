@@ -71,9 +71,10 @@ defmodule BDS.TemplatesTest do
     assert contents =~ "kind: list\n"
     assert contents =~ "enabled: true\n"
     assert contents =~ "version: 1\n"
-    assert contents =~ "created_at: #{published.created_at}\n"
-    assert contents =~ "updated_at: #{published.updated_at}\n"
+    assert contents =~ ~r/created_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert contents =~ ~r/updated_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
     assert contents =~ "\n---\n<section>{{ page_title }}</section>\n"
+    refute File.exists?(full_path <> ".tmp")
   end
 
   test "update_template bumps version and reopens a published template when content changes", %{
@@ -235,8 +236,8 @@ defmodule BDS.TemplatesTest do
         "kind: list",
         "enabled: true",
         "version: 3",
-        "created_at: 101",
-        "updated_at: 202",
+        "created_at: 1970-01-01T00:00:00.101Z",
+        "updated_at: 1970-01-01T00:00:00.202Z",
         "---",
         "<section>Recovered</section>",
         ""

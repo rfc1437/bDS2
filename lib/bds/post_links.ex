@@ -3,6 +3,7 @@ defmodule BDS.PostLinks do
 
   import Ecto.Query
 
+  alias BDS.Persistence
   alias BDS.Posts.Link
   alias BDS.Posts.Post
   alias BDS.Projects
@@ -22,7 +23,7 @@ defmodule BDS.PostLinks do
     Repo.transaction(fn ->
       Repo.delete_all(from link in Link, where: link.source_post_id == ^post.id)
 
-      now = System.system_time(:second)
+      now = Persistence.now_ms()
 
       Enum.each(links, fn %{target_post_id: target_post_id, link_text: link_text} ->
         %Link{}

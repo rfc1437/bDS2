@@ -5,6 +5,7 @@ defmodule BDS.Search do
 
   alias BDS.Media.Media
   alias BDS.Media.Translation, as: MediaTranslation
+  alias BDS.Persistence
   alias BDS.Posts.Post
   alias BDS.Projects
   alias BDS.Repo
@@ -269,10 +270,10 @@ defmodule BDS.Search do
   defp matches_exact?(value, expected), do: value == expected
 
   defp matches_year?(_post, nil), do: true
-  defp matches_year?(post, year), do: DateTime.from_unix!(post.created_at).year == year
+  defp matches_year?(post, year), do: Persistence.from_unix_ms!(post.created_at).year == year
 
   defp matches_month?(_post, nil), do: true
-  defp matches_month?(post, month), do: DateTime.from_unix!(post.created_at).month == month
+  defp matches_month?(post, month), do: Persistence.from_unix_ms!(post.created_at).month == month
 
   defp matches_from?(_post, nil), do: true
   defp matches_from?(post, from_unix), do: post.created_at >= from_unix
@@ -545,14 +546,14 @@ defmodule BDS.Search do
   defp normalize_non_negative_integer(value, default), do: normalize_integer(value) || default
 
   defp normalize_timestamp(nil, _position), do: nil
-  defp normalize_timestamp(value, _position) when is_integer(value), do: value
+  defp normalize_timestamp(value, _position) when is_integer(value), do: Persistence.normalize_unix_timestamp(value)
 
   defp normalize_timestamp(value, position) when is_binary(value) do
     case Date.from_iso8601(value) do
       {:ok, date} ->
         time = if position == :start, do: ~T[00:00:00], else: ~T[23:59:59]
         {:ok, datetime} = DateTime.new(date, time, "Etc/UTC")
-        DateTime.to_unix(datetime)
+        DateTime.to_unix(datetime, :millisecond)
 
       {:error, _reason} ->
         nil

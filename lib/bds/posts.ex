@@ -6,6 +6,7 @@ defmodule BDS.Posts do
   alias BDS.Frontmatter
   alias BDS.Embeddings
   alias BDS.Metadata
+  alias BDS.Persistence
   alias BDS.PostLinks
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
@@ -15,7 +16,7 @@ defmodule BDS.Posts do
   alias BDS.Slug
 
   def create_post(attrs) do
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
     project_id = attr(attrs, :project_id)
     title = normalize_title(attr(attrs, :title))
     base_slug = title |> default_slug_source() |> Slug.slugify()
@@ -65,7 +66,7 @@ defmodule BDS.Posts do
 
       post ->
         with :ok <- validate_slug_change(post, attrs) do
-          now = System.system_time(:second)
+          now = Persistence.now_ms()
 
           updates =
             attrs
@@ -99,16 +100,14 @@ defmodule BDS.Posts do
 
       %Post{} = post ->
         project = Projects.get_project!(post.project_id)
-        published_at = post.published_at || System.system_time(:second)
+        published_at = post.published_at || Persistence.now_ms()
         relative_path = build_post_relative_path(post.slug, post.created_at)
         full_path = Path.join(Projects.project_data_dir(project), relative_path)
-        updated_at = System.system_time(:second)
+        updated_at = Persistence.now_ms()
         body = publishable_post_body(post, full_path, project)
 
-        :ok = File.mkdir_p(Path.dirname(full_path))
-
         :ok =
-          File.write(
+          Persistence.atomic_write(
             full_path,
             serialize_post_file(%{post | updated_at: updated_at, content: body}, published_at)
           )
@@ -171,7 +170,7 @@ defmodule BDS.Posts do
 
       %Post{status: status} = post when status in [:draft, :published] ->
         post
-        |> Post.changeset(%{status: :archived, updated_at: System.system_time(:second)})
+        |> Post.changeset(%{status: :archived, updated_at: Persistence.now_ms()})
         |> Repo.update()
         |> case do
           {:ok, updated_post} ->
@@ -218,7 +217,7 @@ defmodule BDS.Posts do
          )}
 
       %Post{} = post ->
-        now = System.system_time(:second)
+        now = Persistence.now_ms()
         normalized_language = normalize_language(language)
 
         translation =
@@ -322,14 +321,12 @@ defmodule BDS.Posts do
       project = Projects.get_project!(post.project_id)
       full_path = Path.join(Projects.project_data_dir(project), post.file_path)
       body = published_post_body(post, full_path)
-      :ok = File.mkdir_p(Path.dirname(full_path))
-
       :ok =
-        File.write(
+        Persistence.atomic_write(
           full_path,
           serialize_post_file(
             %{post | content: body},
-            post.published_at || System.system_time(:second)
+            post.published_at || Persistence.now_ms()
           )
         )
     end
@@ -451,7 +448,7 @@ defmodule BDS.Posts do
   defp default_slug_source(title), do: title
 
   defp build_post_relative_path(slug, created_at) do
-    datetime = DateTime.from_unix!(created_at)
+    datetime = Persistence.from_unix_ms!(created_at)
     year = Integer.to_string(datetime.year)
     month = datetime.month |> Integer.to_string() |> String.pad_leading(2, "0")
     Path.join(["posts", year, month, "#{slug}.md"])
@@ -513,7 +510,7 @@ defmodule BDS.Posts do
     contents = File.read!(path)
     {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
     relative_path = Path.relative_to(path, Projects.project_data_dir(project))
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
 
     attrs = %{
       id: Map.get(fields, "id") || Ecto.UUID.generate(),
@@ -626,16 +623,14 @@ defmodule BDS.Posts do
 
   defp publish_translation(%Post{} = post, %Translation{} = translation) do
     project = Projects.get_project!(post.project_id)
-    published_at = translation.published_at || System.system_time(:second)
+    published_at = translation.published_at || Persistence.now_ms()
     relative_path = build_translation_relative_path(post, translation.language)
     full_path = Path.join(Projects.project_data_dir(project), relative_path)
-    updated_at = System.system_time(:second)
+    updated_at = Persistence.now_ms()
     body = publishable_translation_body(translation, full_path)
 
-    :ok = File.mkdir_p(Path.dirname(full_path))
-
     :ok =
-      File.write(
+      Persistence.atomic_write(
         full_path,
         serialize_translation_file(
           %{translation | updated_at: updated_at, content: body},
@@ -657,7 +652,7 @@ defmodule BDS.Posts do
   end
 
   defp build_translation_relative_path(post, language) do
-    datetime = DateTime.from_unix!(post.created_at)
+    datetime = Persistence.from_unix_ms!(post.created_at)
     year = Integer.to_string(datetime.year)
     month = datetime.month |> Integer.to_string() |> String.pad_leading(2, "0")
     Path.join(["posts", year, month, "#{post.slug}.#{language}.md"])

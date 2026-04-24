@@ -74,7 +74,7 @@ defmodule BDS.PostLinksTest do
   end
 
   defp canonical_post_href(post) do
-    datetime = DateTime.from_unix!(post.created_at)
+    datetime = DateTime.from_unix!(post.created_at, :millisecond)
 
     Path.join([
       "",

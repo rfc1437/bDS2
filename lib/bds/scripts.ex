@@ -4,13 +4,14 @@ defmodule BDS.Scripts do
   import Ecto.Query
 
   alias BDS.Frontmatter
+  alias BDS.Persistence
   alias BDS.Projects
   alias BDS.Repo
   alias BDS.Scripts.Script
   alias BDS.Slug
 
   def create_script(attrs) do
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
     project_id = attr(attrs, :project_id)
     title = attr(attrs, :title) || ""
     kind = attr(attrs, :kind)
@@ -42,13 +43,11 @@ defmodule BDS.Scripts do
       script ->
         file_path = script_file_path(script.slug)
         full_path = full_file_path(script.project_id, file_path)
-        updated_at = System.system_time(:second)
+        updated_at = Persistence.now_ms()
         content = script.content || ""
 
-        :ok = File.mkdir_p(Path.dirname(full_path))
-
         :ok =
-          File.write(
+          Persistence.atomic_write(
             full_path,
             serialize_script_file(
               %{script | status: :published, file_path: file_path, updated_at: updated_at},
@@ -81,7 +80,7 @@ defmodule BDS.Scripts do
           end
 
         content_changed? = has_attr?(attrs, :content) and attr(attrs, :content) != script.content
-        now = System.system_time(:second)
+        now = Persistence.now_ms()
 
         updates =
           %{}
@@ -205,7 +204,7 @@ defmodule BDS.Scripts do
     contents = File.read!(path)
     {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
     relative_path = Path.relative_to(path, Projects.project_data_dir(project))
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
 
     attrs = %{
       id: Map.get(fields, "id") || Ecto.UUID.generate(),

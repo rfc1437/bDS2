@@ -5,6 +5,7 @@ defmodule BDS.Generation do
 
   alias BDS.Generation.GeneratedFileHash
   alias BDS.Metadata
+  alias BDS.Persistence
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
   alias BDS.Projects
@@ -52,7 +53,7 @@ defmodule BDS.Generation do
   def post_output_path(%Post{} = post), do: post_output_path(post, nil)
 
   def post_output_path(%Post{} = post, language) do
-    datetime = DateTime.from_unix!(post.created_at)
+    datetime = Persistence.from_unix_ms!(post.created_at)
     year = Integer.to_string(datetime.year)
     month = datetime.month |> Integer.to_string() |> String.pad_leading(2, "0")
     day = datetime.day |> Integer.to_string() |> String.pad_leading(2, "0")
@@ -70,7 +71,7 @@ defmodule BDS.Generation do
       when is_binary(project_id) and is_binary(relative_path) and is_binary(content) do
     project = Projects.get_project!(project_id)
     content_hash = sha256(content)
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
 
     case Repo.get_by(GeneratedFileHash, project_id: project_id, relative_path: relative_path) do
       %GeneratedFileHash{content_hash: ^content_hash} ->
@@ -78,8 +79,7 @@ defmodule BDS.Generation do
 
       _existing ->
         full_path = output_path(project, relative_path)
-        :ok = File.mkdir_p(Path.dirname(full_path))
-        :ok = File.write(full_path, content)
+        :ok = Persistence.atomic_write(full_path, content)
 
         attrs = %{
           project_id: project_id,
@@ -495,7 +495,7 @@ defmodule BDS.Generation do
   defp render_calendar(published_posts) do
     published_posts
     |> Enum.map(fn post ->
-      datetime = DateTime.from_unix!(post.created_at)
+      datetime = Persistence.from_unix_ms!(post.created_at)
       %{date: Date.to_iso8601(DateTime.to_date(datetime)), slug: post.slug, title: post.title}
     end)
     |> Jason.encode!()
@@ -637,13 +637,13 @@ defmodule BDS.Generation do
 
   defp year_key(created_at) do
     created_at
-    |> DateTime.from_unix!()
+    |> Persistence.from_unix_ms!()
     |> Map.fetch!(:year)
     |> Integer.to_string()
   end
 
   defp month_key(created_at) do
-    datetime = DateTime.from_unix!(created_at)
+    datetime = Persistence.from_unix_ms!(created_at)
 
     {Integer.to_string(datetime.year),
      Integer.to_string(datetime.month) |> String.pad_leading(2, "0")}

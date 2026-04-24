@@ -2,6 +2,8 @@ defmodule BDS.Metadata do
   @moduledoc false
 
   alias BDS.Embeddings
+  alias BDS.I18n
+  alias BDS.Persistence
   alias BDS.Projects
   alias BDS.Projects.Project
   alias BDS.Repo
@@ -9,6 +11,30 @@ defmodule BDS.Metadata do
 
   @default_max_posts_per_page 50
   @default_categories ["article", "aside", "page", "picture"]
+  @min_posts_per_page 1
+  @max_posts_per_page 500
+  @supported_pico_themes MapSet.new([
+                           "default",
+                           "amber",
+                           "blue",
+                           "cyan",
+                           "fuchsia",
+                           "green",
+                           "grey",
+                           "indigo",
+                           "jade",
+                           "lime",
+                           "orange",
+                           "pink",
+                           "pumpkin",
+                           "purple",
+                           "red",
+                           "sand",
+                           "slate",
+                           "violet",
+                           "yellow",
+                           "zinc"
+                         ])
 
   def get_project_metadata(project_id) do
     project = Projects.get_project!(project_id)
@@ -18,7 +44,7 @@ defmodule BDS.Metadata do
   def update_project_metadata(project_id, attrs) do
     project = Projects.get_project!(project_id)
     state = load_state(project)
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
 
     project_metadata =
       state
@@ -104,7 +130,7 @@ defmodule BDS.Metadata do
 
   def sync_project_metadata_from_filesystem(project_id) do
     project = Projects.get_project!(project_id)
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
 
     project_metadata_from_files =
       read_json(project, "project.json") ||
@@ -130,6 +156,10 @@ defmodule BDS.Metadata do
       persist_setting(project_id, "categories", categories_from_files, now)
       persist_setting(project_id, "category_meta", category_meta_from_files, now)
       persist_setting(project_id, "publishing", publishing_from_files, now)
+      write_project_json(updated_project, project_metadata_from_files)
+      write_categories_json(updated_project, categories_from_files["categories"] || @default_categories)
+      write_category_meta_json(updated_project, category_meta_from_files["categories"] || %{})
+      write_publishing_json(updated_project, publishing_from_files)
       load_state(updated_project)
     end)
     |> unwrap_transaction()
@@ -138,7 +168,7 @@ defmodule BDS.Metadata do
   defp update_state(project_id, updater) do
     project = Projects.get_project!(project_id)
     state = load_state(project)
-    now = System.system_time(:second)
+    now = Persistence.now_ms()
 
     Repo.transaction(fn ->
       updater.(project, state, now)
@@ -200,13 +230,13 @@ defmodule BDS.Metadata do
       name: attr(attrs, :name) || project.name,
       description: attr(attrs, :description),
       public_url: attr(attrs, :public_url),
-      main_language: attr(attrs, :main_language),
+      main_language: normalize_optional_language(attr(attrs, :main_language)),
       default_author: attr(attrs, :default_author),
-      max_posts_per_page: attr(attrs, :max_posts_per_page) || @default_max_posts_per_page,
+      max_posts_per_page: normalize_posts_per_page(attr(attrs, :max_posts_per_page)),
       blogmark_category: attr(attrs, :blogmark_category),
-      pico_theme: attr(attrs, :pico_theme),
+      pico_theme: normalize_pico_theme(attr(attrs, :pico_theme)),
       semantic_similarity_enabled: attr(attrs, :semantic_similarity_enabled) || false,
-      blog_languages: normalize_string_list(attr(attrs, :blog_languages) || [])
+      blog_languages: normalize_language_list(attr(attrs, :blog_languages) || [])
     }
   end
 
@@ -227,7 +257,7 @@ defmodule BDS.Metadata do
       "ssh_host" => attr(prefs, :ssh_host),
       "ssh_user" => attr(prefs, :ssh_user),
       "ssh_remote_path" => attr(prefs, :ssh_remote_path),
-      "ssh_mode" => attr(prefs, :ssh_mode) || "scp"
+      "ssh_mode" => normalize_ssh_mode(attr(prefs, :ssh_mode))
     }
   end
 
@@ -270,11 +300,8 @@ defmodule BDS.Metadata do
 
   defp write_json(project, file_name, payload) do
     meta_dir = Path.join(Projects.project_data_dir(project), "meta")
-    :ok = File.mkdir_p(meta_dir)
     path = Path.join(meta_dir, file_name)
-    temp_path = path <> ".tmp"
-    :ok = File.write(temp_path, Jason.encode!(payload))
-    File.rename(temp_path, path)
+    :ok = Persistence.atomic_write(path, Jason.encode!(payload))
   end
 
   defp read_json(project, file_name) do
@@ -304,11 +331,55 @@ defmodule BDS.Metadata do
 
   defp setting_key(project_id, suffix), do: "project:#{project_id}:#{suffix}"
 
-  defp normalize_string_list(values) do
+  defp normalize_posts_per_page(nil), do: @default_max_posts_per_page
+
+  defp normalize_posts_per_page(value) when is_integer(value) do
+    value
+    |> max(@min_posts_per_page)
+    |> min(@max_posts_per_page)
+  end
+
+  defp normalize_posts_per_page(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {integer, ""} -> normalize_posts_per_page(integer)
+      _ -> @default_max_posts_per_page
+    end
+  end
+
+  defp normalize_posts_per_page(_value), do: @default_max_posts_per_page
+
+  defp normalize_optional_language(nil), do: nil
+  defp normalize_optional_language(""), do: nil
+
+  defp normalize_optional_language(value) do
+    normalized = value |> to_string() |> String.trim() |> String.downcase()
+    supported_language_codes = Enum.map(I18n.supported_languages(), & &1.code)
+
+    if normalized in supported_language_codes do
+      normalized
+    else
+      nil
+    end
+  end
+
+  defp normalize_language_list(values) do
     values
-    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.map(&normalize_optional_language/1)
+    |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end
+
+  defp normalize_pico_theme(nil), do: nil
+  defp normalize_pico_theme(""), do: nil
+
+  defp normalize_pico_theme(value) do
+    normalized = value |> to_string() |> String.trim()
+    if MapSet.member?(@supported_pico_themes, normalized), do: normalized, else: nil
+  end
+
+  defp normalize_ssh_mode(:rsync), do: "rsync"
+  defp normalize_ssh_mode("rsync"), do: "rsync"
+  defp normalize_ssh_mode(_mode), do: "scp"
 
   defp unwrap_transaction({:ok, result}), do: {:ok, result}
   defp unwrap_transaction({:error, reason}), do: {:error, reason}

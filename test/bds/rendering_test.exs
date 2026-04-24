@@ -312,7 +312,7 @@ defmodule BDS.RenderingTest do
   end
 
   defp canonical_post_href(post) do
-    datetime = DateTime.from_unix!(post.created_at)
+    datetime = DateTime.from_unix!(post.created_at, :millisecond)
 
     "/#{datetime.year}/#{String.pad_leading(Integer.to_string(datetime.month), 2, "0")}/#{String.pad_leading(Integer.to_string(datetime.day), 2, "0")}/#{post.slug}/"
   end

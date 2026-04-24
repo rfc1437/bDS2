@@ -138,4 +138,26 @@ defmodule BDS.MetadataTest do
     assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: post.id) != nil
     assert File.exists?(BDS.Embeddings.index_path(project.id))
   end
+
+  test "sync_project_metadata_from_filesystem materializes the canonical metadata files when missing",
+       %{project: project, temp_dir: temp_dir} do
+    meta_dir = Path.join(temp_dir, "meta")
+    refute File.exists?(Path.join(meta_dir, "project.json"))
+    refute File.exists?(Path.join(meta_dir, "categories.json"))
+    refute File.exists?(Path.join(meta_dir, "category-meta.json"))
+    refute File.exists?(Path.join(meta_dir, "publishing.json"))
+
+    assert {:ok, metadata} = BDS.Metadata.sync_project_metadata_from_filesystem(project.id)
+
+    assert metadata.name == project.name
+    assert File.exists?(Path.join(meta_dir, "project.json"))
+    assert File.exists?(Path.join(meta_dir, "categories.json"))
+    assert File.exists?(Path.join(meta_dir, "category-meta.json"))
+    assert File.exists?(Path.join(meta_dir, "publishing.json"))
+
+    refute File.exists?(Path.join(meta_dir, "project.json.tmp"))
+    refute File.exists?(Path.join(meta_dir, "categories.json.tmp"))
+    refute File.exists?(Path.join(meta_dir, "category-meta.json.tmp"))
+    refute File.exists?(Path.join(meta_dir, "publishing.json.tmp"))
+  end
 end
