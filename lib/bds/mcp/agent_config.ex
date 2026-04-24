@@ -21,15 +21,23 @@ defmodule BDS.MCP.AgentConfig do
   def config_path(:claude_code, home_dir), do: Path.join(home_dir, ".claude.json")
   def config_path(:github_copilot, home_dir), do: Path.join([home_dir, "Library", "Application Support", "Code", "User", "mcp.json"])
 
+  def packaged_executable_path(install_root, platform) when is_binary(install_root) do
+    executable_name =
+      case normalize_platform(platform) do
+        :windows -> "bds-mcp.bat"
+        _other -> "bds-mcp"
+      end
+
+    Path.join([install_root, "mcp", "bin", executable_name])
+  end
+
   defp default_command(opts) do
-    Keyword.get(opts, :script_path, repo_script_path())
+    install_root = Keyword.fetch!(opts, :install_root)
+    platform = Keyword.get(opts, :platform, current_platform())
+    packaged_executable_path(install_root, platform)
   end
 
   defp default_args(_opts), do: []
-
-  defp repo_script_path do
-    Path.expand("../../../bin/bds-mcp", __DIR__)
-  end
 
   defp read_config(path) do
     if File.exists?(path) do
@@ -51,4 +59,15 @@ defmodule BDS.MCP.AgentConfig do
     servers = Map.get(config, "mcpServers", %{})
     Map.put(config, "mcpServers", Map.put(servers, @server_name, %{"command" => command, "args" => args}))
   end
+
+  defp current_platform do
+    case :os.type() do
+      {:win32, _type} -> :windows
+      {:unix, :darwin} -> :macos
+      {:unix, _type} -> :linux
+    end
+  end
+
+  defp normalize_platform(:darwin), do: :macos
+  defp normalize_platform(platform), do: platform
 end

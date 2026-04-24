@@ -6,6 +6,8 @@ defmodule BDS.MixProject do
       app: :bds,
       version: "0.1.0",
       elixir: "~> 1.17",
+      default_release: :bds,
+      releases: releases(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps()
@@ -39,6 +41,20 @@ defmodule BDS.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"]
+    ]
+  end
+
+  defp releases do
+    [
+      bds: [
+        include_executables_for: [:unix, :windows],
+        applications: [bds: :permanent]
+      ],
+      bds_mcp: [
+        path: "_build/#{Mix.env()}/rel/bds_mcp",
+        include_executables_for: [:unix, :windows],
+        applications: [bds: :permanent]
+      ]
     ]
   end
 end

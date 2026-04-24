@@ -108,6 +108,46 @@ The initial scaffold is intentionally small:
 
 This is not yet the desktop application. It is the base runtime that future work will extend with the domain model, persistence layer, content pipelines, and desktop-facing boundaries.
 
+## MCP Packaging
+
+The MCP server is packaged as its own self-contained release artifact and must not depend on the repository checkout at runtime.
+
+- Build the distributable MCP release with `MIX_ENV=prod mix release bds_mcp`.
+- The packaged artifact is assembled at `_build/prod/rel/bds_mcp`.
+- The distributable executable is exposed as `mcp/bin/bds-mcp` on Unix-like systems and `mcp/bin/bds-mcp.bat` on Windows inside the installed payload.
+- Agent configuration should point to the packaged executable inside the installed application resources, not to `mix`, not to source files, and not to repository-local scripts.
+
+This allows the later UI app to bundle the MCP payload as normal application resources on each supported operating system.
+
+## Release Build Flow
+
+The repository now has a thin platform build flow around Mix releases.
+
+- Unix-like systems: `scripts/release/build_platform.sh [macos|linux]`
+- Windows: `scripts/release/build_platform.bat [windows]`
+
+The scripts do the standard sequence:
+
+1. `mix deps.get`
+2. `mix test` unless `BDS_SKIP_TESTS=1`
+3. `MIX_ENV=prod mix release bds`
+4. `MIX_ENV=prod mix release bds_mcp`
+5. `MIX_ENV=prod mix bds.package <platform>`
+
+The packaging task creates a clean redistributable payload under `dist/<platform>/` with this layout:
+
+- `app/`: the full main `bds` release
+- `resources/`: the full `bds_mcp` release root
+- `resources/mcp/`: the MCP executable payload used by agent integrations
+- `manifest.json`: packaging metadata for downstream bundling
+
+The task also creates a platform archive alongside the payload:
+
+- macOS and Linux: `.tar.gz`
+- Windows: `.zip`
+
+This is the intermediate redistributable artifact intended to be consumed by the later desktop app bundling layer.
+
 ## Spec Hygiene
 
 When editing files in [specs/](/Users/gb/Projects/bDS2/specs):

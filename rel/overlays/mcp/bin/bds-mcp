@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+RELEASE_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+
+exec "$RELEASE_ROOT/bin/bds_mcp" eval "Application.ensure_all_started(:bds); BDS.MCP.Stdio.main()"
