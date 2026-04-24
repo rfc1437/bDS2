@@ -43,6 +43,8 @@ for await (const line of rl) {
           window_title: text("[data-testid='window-title']"),
           active_view: document.querySelector("[data-testid='activity-button'][data-active='true']")?.dataset.view ?? null,
           sidebar_visible: !hasClass("[data-testid='sidebar-shell']", "is-hidden"),
+          assistant_visible: !hasClass("[data-testid='assistant-shell']", "is-hidden"),
+          panel_visible: !hasClass(".panel-shell", "is-hidden"),
           editor_title: text("[data-testid='editor-title']"),
           activity_labels: texts("[data-testid='activity-button']", (node) => node.getAttribute("aria-label")),
           sidebar_sections: texts("[data-testid='sidebar-section-title']", (node) => node.textContent.trim()),

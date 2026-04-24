@@ -64,7 +64,7 @@ function renderTitlebar() {
           <span class="window-titlebar-panel-pane"></span>
         </span>
       `)}
-      ${renderTitlebarAction("toggle-assistant", "toggle-assistant", "Toggle assistant", `
+      ${renderTitlebarAction("toggle-assistant-sidebar", "toggle-assistant", "Toggle assistant", `
         <span class="window-titlebar-assistant-icon ${state.session.assistant_sidebar_visible ? "is-active" : "is-inactive"}">
           <span class="window-titlebar-assistant-pane"></span>
         </span>
@@ -184,7 +184,7 @@ function renderTab(tab) {
     <button class="tab ${active ? "active" : ""} ${tab.is_transient ? "transient" : ""}" data-tab-type="${tab.type}" data-tab-id="${tab.id}" type="button">
       <span class="tab-icon">${tabIcon(tab.type)}</span>
       <span class="tab-title">${escapeHtml(meta.title)}</span>
-      <span class="tab-close" aria-hidden="true">${tab.is_transient ? "Preview" : "Pinned"}</span>
+      <span class="tab-close" data-close-tab="${tab.type}:${tab.id}" role="button" aria-label="Close ${escapeHtmlAttribute(meta.title)}" title="Close tab">×</span>
     </button>
   `;
 }
@@ -419,11 +419,13 @@ function applyVisibility() {
 }
 
 function bindEvents() {
-  root.querySelectorAll("[data-command]").forEach((button) => {
+  root.querySelectorAll("button[data-command]").forEach((button) => {
     button.onclick = () => {
       const command = button.dataset.command;
       if (command === "open-tasks-panel") {
         openTasksPanel();
+        render();
+        return;
       }
       if (command === "toggle-offline-mode") {
         executeShellCommand("toggle_offline_mode");
@@ -467,6 +469,15 @@ function bindEvents() {
   root.querySelectorAll("[data-tab-id]").forEach((button) => {
     button.onclick = () => {
       state.session.active_tab = { type: button.dataset.tabType, id: button.dataset.tabId };
+      render();
+    };
+  });
+
+  root.querySelectorAll("[data-close-tab]").forEach((button) => {
+    button.onclick = (event) => {
+      event.stopPropagation();
+      const [type, id] = button.dataset.closeTab.split(":");
+      closeSpecificTab(type, id);
       render();
     };
   });
@@ -788,6 +799,30 @@ function closeActiveTab() {
     const next = state.session.tabs[state.session.tabs.length - 1];
     state.session.active_tab = { type: next.type, id: next.id };
   }
+}
+
+function closeSpecificTab(type, id) {
+  const index = state.session.tabs.findIndex((tab) => tab.type === type && tab.id === id);
+
+  if (index < 0) {
+    return;
+  }
+
+  const wasActive = state.session.active_tab?.type === type && state.session.active_tab?.id === id;
+  state.session.tabs.splice(index, 1);
+  delete state.tabMeta[`${type}:${id}`];
+
+  if (!state.session.tabs.length) {
+    state.session.active_tab = null;
+    return;
+  }
+
+  if (!wasActive) {
+    return;
+  }
+
+  const next = state.session.tabs[Math.min(index, state.session.tabs.length - 1)];
+  state.session.active_tab = { type: next.type, id: next.id };
 }
 
 function openTab(type, id, title, transient, meta = {}) {
@@ -1187,7 +1222,7 @@ function renderLanguageOptions() {
   return state.supportedUiLanguages
     .map((language) => {
       const selected = language.code === state.uiLanguage ? " selected" : "";
-      return `<option value="${escapeHtmlAttribute(language.code)}"${selected}>${escapeHtml(language.code.toUpperCase())}</option>`;
+      return `<option value="${escapeHtmlAttribute(language.code)}"${selected}>${escapeHtml(language.flag || language.code.toUpperCase())}</option>`;
     })
     .join("");
 }

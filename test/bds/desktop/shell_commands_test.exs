@@ -73,6 +73,13 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert wait_for_task(result.task_id, &(&1.status in [:completed, :failed])).status == :completed
   end
 
+  test "missing project schema returns a command error instead of raising" do
+    BDS.Repo.query!("DROP TABLE projects", [])
+
+    assert {:error, %{message: message}} = ShellCommands.execute("open_in_browser")
+    assert message =~ "Project database is not initialized"
+  end
+
   defp wait_for_task(task_id, matcher, timeout \\ 2_000)
 
   defp wait_for_task(task_id, _matcher, timeout) when timeout <= 0 do

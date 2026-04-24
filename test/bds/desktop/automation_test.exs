@@ -22,6 +22,8 @@ defmodule BDS.Desktop.AutomationTest do
     assert snapshot.window_title == "Blogging Desktop Server"
     assert snapshot.active_view == "posts"
     assert snapshot.sidebar_visible == true
+    assert snapshot.assistant_visible == false
+    assert snapshot.panel_visible == false
     assert snapshot.editor_title == "Dashboard"
     assert snapshot.activity_labels == [
              "Posts",
@@ -42,6 +44,12 @@ defmodule BDS.Desktop.AutomationTest do
 
     snapshot = Automation.snapshot(session)
     assert snapshot.sidebar_visible == false
+
+    assert :ok = Automation.click(session, "[data-testid='toggle-assistant']")
+
+    snapshot = Automation.snapshot(session)
+    assert snapshot.assistant_visible == true
+    assert snapshot.panel_visible == false
 
     screenshot_path = Path.join(screenshot_dir, "main-window.png")
     assert Automation.capture_screenshot(session, screenshot_path) == screenshot_path

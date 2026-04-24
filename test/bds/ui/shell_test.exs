@@ -130,6 +130,7 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "window-titlebar-sidebar-icon"
     assert js =~ "window-titlebar-panel-icon"
     assert js =~ "window-titlebar-assistant-icon"
+    assert js =~ "toggle-assistant-sidebar"
     assert js =~ "activity-bar-top"
     assert js =~ "activity-bar-bottom"
   end
@@ -148,6 +149,7 @@ defmodule BDS.UI.ShellTest do
     assert css =~ "gap: 4px"
     assert css =~ "padding: 0 8px"
     assert css =~ "height: 100%"
+    refute css =~ "background: var(--status)"
     assert css =~ ".status-bar-language-select"
     assert css =~ ".status-bar-item.language-badge"
     assert css =~ ".status-bar-item.offline-badge"
@@ -166,6 +168,9 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "executeBackendShellCommand"
     assert js =~ "applyShellCommandResult"
     assert js =~ "openTasksPanel"
+    assert js =~ "command === \"open-tasks-panel\")"
+    assert js =~ "openTasksPanel();"
+    assert js =~ "return;"
     assert js =~ "No background tasks running"
     assert js =~ "task-list"
     assert js =~ "output-list"
@@ -189,5 +194,8 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "case \"metadata_diff\""
     assert js =~ "case \"regenerate_calendar\""
     assert js =~ "case \"fill_missing_translations\""
+    assert js =~ "root.querySelectorAll(\"button[data-command]\")"
+    assert js =~ "[data-close-tab]"
+    assert js =~ "language.flag"
   end
 end

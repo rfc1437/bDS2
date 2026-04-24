@@ -249,6 +249,13 @@ defmodule BDS.Desktop.ShellCommands do
       nil -> {:error, %{message: "No active project selected"}}
       project -> {:ok, project}
     end
+  rescue
+    error in [Exqlite.Error] ->
+      if String.contains?(Exception.message(error), "no such table: projects") do
+        {:error, %{message: "Project database is not initialized"}}
+      else
+        reraise error, __STACKTRACE__
+      end
   end
 
   defp preview_url(server) do
