@@ -109,6 +109,10 @@ defmodule BDS.UI.ShellTest do
     assert html =~ ~s(src="/assets/app.js")
     assert html =~ ~s(href="/assets/app.css")
     assert html =~ ~s("task_status")
+    assert html =~ ~s("flag":"🇩🇪")
+    assert html =~ ~s("projects")
+    assert html =~ ~s("id":"default")
+    assert html =~ ~s("name":"My Blog")
   end
 
   test "static shell bundle exists for direct browser inspection" do
@@ -144,7 +148,7 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "window-titlebar-menu-bar is-hidden"
 
     assert css =~ ".window-titlebar-menu-bar.is-hidden"
-    assert css =~ "--vscode-statusBar-background: #181818"
+    assert css =~ "--vscode-statusBar-background: #007acc"
     assert css =~ ".status-bar-left,"
     assert css =~ "gap: 4px"
     assert css =~ "padding: 0 8px"
@@ -155,6 +159,7 @@ defmodule BDS.UI.ShellTest do
     assert css =~ ".status-bar-item.offline-badge"
 
     assert js =~ "renderLanguageOptions"
+    assert js =~ "language.flag || language.code.toUpperCase()"
     assert js =~ "status-bar-language-select"
     assert js =~ "setUiLanguage"
   end
@@ -163,6 +168,7 @@ defmodule BDS.UI.ShellTest do
     js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
 
     assert js =~ "/api/tasks"
+    assert js =~ "/api/projects"
     assert js =~ "/api/commands"
     assert js =~ "fetchTaskStatus"
     assert js =~ "executeBackendShellCommand"
@@ -177,6 +183,24 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "git-log-list"
     assert js =~ "data-panel-tab=\"output\""
     assert js =~ "data-panel-tab=\"git_log\""
+  end
+
+  test "static shell bundle renders a left-side project field with selection and create affordances" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert js =~ "project-selector-trigger"
+    assert js =~ "project-dropdown"
+    assert js =~ "create-project-btn"
+    assert js =~ "fetchProjects"
+    assert js =~ "createProject"
+    assert js =~ "selectProject"
+    assert js =~ "toggleProjectMenu"
+    assert js =~ "closeProjectMenu"
+
+    assert css =~ ".project-selector-trigger"
+    assert css =~ ".project-dropdown"
+    assert css =~ ".create-project-btn"
   end
 
   test "static shell bundle binds base shell hotkeys and menu actions to existing shell functionality" do

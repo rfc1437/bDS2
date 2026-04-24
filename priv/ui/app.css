@@ -5,7 +5,7 @@
   --vscode-panel-background: #1e1e1e;
   --vscode-titleBar-activeBackground: #252526;
   --vscode-titleBar-activeForeground: #cccccc;
-  --vscode-statusBar-background: #181818;
+  --vscode-statusBar-background: #007acc;
   --vscode-statusBar-foreground: #ffffff;
   --vscode-tab-activeBackground: #1e1e1e;
   --vscode-tab-inactiveBackground: #2d2d2d;
@@ -816,6 +816,128 @@ button {
 .status-bar-item.offline-badge.active {
   background-color: rgba(255, 196, 0, 0.28);
   opacity: 1;
+}
+
+.project-selector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.project-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  color: var(--vscode-statusBar-foreground);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+
+.project-selector-trigger:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.project-selector-trigger:focus {
+  outline: none;
+}
+
+.project-icon,
+.dropdown-arrow,
+.project-check-icon {
+  flex-shrink: 0;
+}
+
+.project-name,
+.project-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-name {
+  max-width: 180px;
+}
+
+.dropdown-arrow {
+  opacity: 0.6;
+}
+
+.project-dropdown {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  min-width: 220px;
+  margin-bottom: 4px;
+  background-color: #252526;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.project-dropdown-header {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--vscode-descriptionForeground);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.project-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.project-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.project-item:hover,
+.project-item.active {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.project-item.active .project-check-icon {
+  color: #89d185;
+}
+
+.project-dropdown-footer {
+  padding: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.create-project-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.create-project-btn:hover {
+  background-color: rgba(255, 255, 255, 0.18);
 }
 
 .status-bar-language-select {

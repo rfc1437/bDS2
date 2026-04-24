@@ -13,6 +13,8 @@ const isMac = typeof navigator !== "undefined" && navigator.platform.toLowerCase
 const state = {
   session: hydrateSession(clone(bootstrap.session)),
   status: clone(bootstrap.status),
+  projects: normalizeProjects(bootstrap.projects),
+  projectMenuOpen: false,
   taskStatus: normalizeTaskStatus(bootstrap.task_status),
   outputEntries: [],
   gitLogEntries: [],
@@ -24,6 +26,7 @@ const state = {
 bindNativeMenuBridge();
 bindGlobalHotkeys();
 scheduleTaskPolling();
+void fetchProjects();
 render();
 
 function render() {
@@ -393,6 +396,7 @@ function renderStatusBar() {
 
   root.querySelector(".status-bar").innerHTML = `
     <div class="status-bar-left">
+      ${renderProjectSelector()}
       <button class="status-bar-item status-bar-task-button" data-command="open-tasks-panel" type="button">
         <span>${escapeHtml(taskMessage)}</span>
         ${taskOverflow > 0 ? `<span class="status-bar-count">+${taskOverflow}</span>` : ""}
@@ -422,6 +426,10 @@ function bindEvents() {
   root.querySelectorAll("button[data-command]").forEach((button) => {
     button.onclick = () => {
       const command = button.dataset.command;
+      if (command === "create-project") {
+        void createProject();
+        return;
+      }
       if (command === "open-tasks-panel") {
         openTasksPanel();
         render();
@@ -432,6 +440,25 @@ function bindEvents() {
         return;
       }
       executeShellCommand(command.replace(/-/g, "_"));
+    };
+  });
+
+  root.querySelectorAll("[data-project-menu-trigger]").forEach((button) => {
+    button.onclick = (event) => {
+      event.stopPropagation();
+      toggleProjectMenu();
+    };
+  });
+
+  root.querySelectorAll("[data-project-id]").forEach((button) => {
+    button.onclick = () => {
+      void selectProject(button.dataset.projectId);
+    };
+  });
+
+  root.querySelectorAll("[data-project-create]").forEach((button) => {
+    button.onclick = () => {
+      void createProject();
     };
   });
 
@@ -512,6 +539,8 @@ function bindEvents() {
     },
     invert: true,
   });
+
+  bindProjectMenuDismiss();
 }
 
 function bindNativeMenuBridge() {
@@ -603,6 +632,101 @@ async function fetchTaskStatus() {
     render();
   } catch (_error) {
     // Keep the shell usable if task polling is temporarily unavailable.
+  }
+}
+
+async function fetchProjects() {
+  try {
+    const response = await fetch("/api/projects", {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    state.projects = normalizeProjects(await response.json());
+    if (!state.projects.active_project_id && state.projects.projects.length) {
+      state.projects.active_project_id = state.projects.projects[0].id;
+    }
+    render();
+  } catch (_error) {
+    // Keep the shell usable if project loading is temporarily unavailable.
+  }
+}
+
+async function createProject() {
+  const name = window.prompt("New project name", "New Project");
+  if (!name || !name.trim()) {
+    return;
+  }
+
+  closeProjectMenu();
+
+  try {
+    const response = await fetch("/api/projects", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: name.trim() }),
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok || payload.status !== "ok") {
+      appendOutputEntry("Create Project", payload.error?.message || `Command failed with HTTP ${response.status}`);
+      setPanelTab("output");
+      render();
+      return;
+    }
+
+    await fetchProjects();
+    appendOutputEntry("Create Project", `Activated ${payload.project.name}`);
+    render();
+  } catch (error) {
+    appendOutputEntry("Create Project", error?.message || String(error));
+    setPanelTab("output");
+    render();
+  }
+}
+
+async function selectProject(projectId) {
+  if (!projectId || projectId === state.projects.active_project_id) {
+    closeProjectMenu();
+    return;
+  }
+
+  closeProjectMenu();
+
+  try {
+    const response = await fetch("/api/projects", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ project_id: projectId }),
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok || payload.status !== "ok") {
+      appendOutputEntry("Select Project", payload.error?.message || `Command failed with HTTP ${response.status}`);
+      setPanelTab("output");
+      render();
+      return;
+    }
+
+    await fetchProjects();
+    appendOutputEntry("Select Project", `Activated ${payload.project.name}`);
+    render();
+  } catch (error) {
+    appendOutputEntry("Select Project", error?.message || String(error));
+    setPanelTab("output");
+    render();
   }
 }
 
@@ -1198,6 +1322,13 @@ function normalizeTaskStatus(taskStatus) {
   };
 }
 
+function normalizeProjects(projectsPayload) {
+  return {
+    active_project_id: projectsPayload?.active_project_id || null,
+    projects: Array.isArray(projectsPayload?.projects) ? projectsPayload.projects : [],
+  };
+}
+
 function panelTabs() {
   return ["tasks", state.session.panel.active_tab, "output", "git_log"].filter(uniqueValue);
 }
@@ -1225,6 +1356,93 @@ function renderLanguageOptions() {
       return `<option value="${escapeHtmlAttribute(language.code)}"${selected}>${escapeHtml(language.flag || language.code.toUpperCase())}</option>`;
     })
     .join("");
+}
+
+function renderProjectSelector() {
+  const activeProject = currentProject();
+
+  return `
+    <div class="project-selector${state.projectMenuOpen ? " is-open" : ""}">
+      <button class="project-selector-trigger" data-project-menu-trigger type="button" title="Switch project">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="project-icon">
+          <path d="M14.5 3H7.71l-.85-.85A.5.5 0 0 0 6.5 2h-5a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5v-10a.5.5 0 0 0-.5-.5zm-13 1h5.29l.85.85c.1.1.23.15.36.15h6.5v9h-13V4z"></path>
+        </svg>
+        <span class="project-name">${escapeHtml(activeProject?.name || "My Blog")}</span>
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="dropdown-arrow">
+          <path d="M4.5 5.5L8 9l3.5-3.5h-7z"></path>
+        </svg>
+      </button>
+      ${state.projectMenuOpen ? renderProjectDropdown() : ""}
+    </div>
+  `;
+}
+
+function renderProjectDropdown() {
+  return `
+    <div class="project-dropdown">
+      <div class="project-dropdown-header">
+        <span>Projects</span>
+      </div>
+      <div class="project-list">
+        ${state.projects.projects.map((project) => renderProjectItem(project)).join("")}
+      </div>
+      <div class="project-dropdown-footer">
+        <button class="create-project-btn" data-project-create type="button">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M14 7v1H8v6H7V8H1V7h6V1h1v6h6z"></path>
+          </svg>
+          New Project
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderProjectItem(project) {
+  const active = project.id === state.projects.active_project_id;
+
+  return `
+    <button class="project-item ${active ? "active" : ""}" data-project-id="${escapeHtmlAttribute(project.id)}" type="button">
+      <span class="project-item-name">${escapeHtml(project.name)}</span>
+      ${active ? `<span class="project-check-icon">✓</span>` : ""}
+    </button>
+  `;
+}
+
+function currentProject() {
+  return state.projects.projects.find((project) => project.id === state.projects.active_project_id) || state.projects.projects[0] || null;
+}
+
+function toggleProjectMenu() {
+  state.projectMenuOpen = !state.projectMenuOpen;
+  render();
+}
+
+function closeProjectMenu() {
+  if (!state.projectMenuOpen) {
+    return;
+  }
+
+  state.projectMenuOpen = false;
+  render();
+}
+
+function bindProjectMenuDismiss() {
+  if (window.__BDS_PROJECT_MENU_DISMISS_BOUND__) {
+    return;
+  }
+
+  window.__BDS_PROJECT_MENU_DISMISS_BOUND__ = true;
+  document.addEventListener("mousedown", (event) => {
+    if (!state.projectMenuOpen) {
+      return;
+    }
+
+    const selector = root.querySelector(".project-selector");
+    if (selector && !selector.contains(event.target)) {
+      closeProjectMenu();
+    }
+  });
 }
 
 function setUiLanguage(nextLanguage) {

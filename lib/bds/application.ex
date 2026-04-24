@@ -25,6 +25,7 @@ defmodule BDS.Application do
   def start(_type, _args) do
     children = [
       BDS.Repo,
+      BDS.RepoBootstrap,
       BDS.Tasks,
       BDS.Preview,
       BDS.Publishing,

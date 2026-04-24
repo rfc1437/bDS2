@@ -2,6 +2,7 @@ defmodule BDS.UI.ShellPage do
   @moduledoc false
 
   alias BDS.I18n
+  alias BDS.Projects
   alias BDS.UI.MenuBar
   alias BDS.UI.Registry
   alias BDS.UI.Session
@@ -57,7 +58,13 @@ defmodule BDS.UI.ShellPage do
       title: Application.get_env(:bds, :desktop)[:title] || "Blogging Desktop Server",
       i18n: %{
         ui_language: ui_language,
-        supported_ui_languages: Enum.map(I18n.supported_languages(), &Map.take(&1, [:code, :flag]))
+        supported_ui_languages:
+          Enum.map(I18n.supported_languages(), fn language ->
+            %{
+              code: language.code,
+              flag: I18n.flag(language.code)
+            }
+          end)
       },
       registry: %{
         sidebar_views: Enum.map(Registry.sidebar_views(), &encode_sidebar_view/1),
@@ -65,6 +72,7 @@ defmodule BDS.UI.ShellPage do
         default_sidebar_view: Atom.to_string(Registry.default_sidebar_view())
       },
       menu_groups: Enum.map(MenuBar.default_groups(), &encode_menu_group/1),
+      projects: project_snapshot(),
       session: Session.serialize(workbench),
       task_status: task_status,
       content: %{
@@ -95,6 +103,32 @@ defmodule BDS.UI.ShellPage do
       editor_route: Atom.to_string(view.editor_route),
       entity_tab: Map.get(view, :entity_tab, false),
       singleton: Map.get(view, :singleton, false)
+    }
+  end
+
+  defp project_snapshot do
+    Projects.shell_snapshot()
+  rescue
+    error in [Exqlite.Error, DBConnection.OwnershipError] ->
+      if match?(%Exqlite.Error{}, error) and not String.contains?(Exception.message(error), "no such table: projects") do
+        reraise error, __STACKTRACE__
+      end
+
+      default_project_snapshot()
+  end
+
+  defp default_project_snapshot do
+    %{
+      active_project_id: "default",
+      projects: [
+        %{
+          id: "default",
+          name: "My Blog",
+          slug: "my-blog",
+          data_path: nil,
+          is_active: true
+        }
+      ]
     }
   end
 

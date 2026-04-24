@@ -114,6 +114,64 @@ defmodule BDS.DesktopTest do
            end)
   end
 
+  test "desktop router exposes projects for shell project selection and creation" do
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+    BDS.Repo.delete_all(BDS.Projects.Project)
+
+    internal_projects_root = "/Users/gb/Projects/bDS2/priv/data/projects"
+    before_internal_dirs =
+      case File.ls(internal_projects_root) do
+        {:ok, entries} -> MapSet.new(entries)
+        {:error, :enoent} -> MapSet.new()
+      end
+
+    temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-projects-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+
+    on_exit(fn ->
+      File.rm_rf(temp_dir)
+    end)
+
+    {:ok, project} = BDS.Projects.create_project(%{name: "Desktop Projects", data_path: temp_dir})
+    {:ok, _active} = BDS.Projects.set_active_project(project.id)
+
+    conn = conn(:get, "/api/projects?k=#{Desktop.Auth.login_key()}")
+    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+
+    assert conn.status == 200
+
+    payload = Jason.decode!(conn.resp_body)
+    assert payload["active_project_id"] == project.id
+    assert Enum.any?(payload["projects"], &(&1["id"] == project.id and &1["name"] == "Desktop Projects"))
+    assert Enum.any?(payload["projects"], &(&1["id"] == "default" and &1["name"] == "My Blog"))
+
+    created_data_dir = Path.join(temp_dir, "created-from-shell")
+    create_conn =
+      conn(
+        :post,
+        "/api/projects?k=#{Desktop.Auth.login_key()}",
+        Jason.encode!(%{"name" => "Created From Shell", "data_path" => created_data_dir})
+      )
+      |> Plug.Conn.put_req_header("content-type", "application/json")
+
+    create_conn = BDS.Desktop.Router.call(create_conn, BDS.Desktop.Router.init([]))
+
+    assert create_conn.status == 200
+
+    created_payload = Jason.decode!(create_conn.resp_body)
+    assert created_payload["project"]["name"] == "Created From Shell"
+    assert created_payload["active_project_id"] == created_payload["project"]["id"]
+    assert created_payload["project"]["data_path"] == created_data_dir
+
+    after_internal_dirs =
+      case File.ls(internal_projects_root) do
+        {:ok, entries} -> MapSet.new(entries)
+        {:error, :enoent} -> MapSet.new()
+      end
+
+    assert after_internal_dirs == before_internal_dirs
+  end
+
     test "desktop router executes shell commands through the JSON api" do
       :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
       :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), Process.whereis(BDS.Preview))

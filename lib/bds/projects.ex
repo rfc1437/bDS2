@@ -21,6 +21,17 @@ defmodule BDS.Projects do
     Repo.one(from project in Project, where: project.is_active == true, limit: 1)
   end
 
+  def shell_snapshot do
+    _ = ensure_default_project()
+    projects = list_projects()
+    active_project = Enum.find(projects, & &1.is_active)
+
+    %{
+      active_project_id: active_project && active_project.id,
+      projects: Enum.map(projects, &project_summary/1)
+    }
+  end
+
   def get_project(id), do: Repo.get(Project, id)
   def get_project!(id), do: Repo.get!(Project, id)
 
@@ -148,6 +159,16 @@ defmodule BDS.Projects do
             {:error, reason}
         end
     end
+  end
+
+  defp project_summary(%Project{} = project) do
+    %{
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      data_path: project.data_path,
+      is_active: project.is_active
+    }
   end
 
   defp unique_slug(base_slug) do
