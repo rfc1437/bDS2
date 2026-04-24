@@ -22,7 +22,7 @@ defmodule BDS.Desktop.Menu do
 
   @impl true
   def handle_event("open", menu) do
-    Window.show(BDS.Desktop.MainWindow)
+    Window.show(BDS.Desktop.MainWindow.window_id())
     {:noreply, menu}
   end
 

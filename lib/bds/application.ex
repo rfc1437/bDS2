@@ -48,18 +48,16 @@ defmodule BDS.Application do
     if desktop_automation?() do
       []
     else
+      window_opts =
+        BDS.Desktop.MainWindow.window_options(
+          menubar: BDS.Desktop.MenuBar,
+          icon_menu: BDS.Desktop.Menu,
+          url: &BDS.Desktop.url/0
+        )
+
       [
-        {Desktop.Window,
-         [
-           app: :bds,
-           id: BDS.Desktop.MainWindow,
-           title: Application.get_env(:bds, :desktop)[:title] || "Blogging Desktop Server",
-           size: Application.get_env(:bds, :desktop)[:window_size] || {1440, 900},
-           min_size: Application.get_env(:bds, :desktop)[:window_min_size] || {1100, 700},
-           menubar: BDS.Desktop.MenuBar,
-           icon_menu: BDS.Desktop.Menu,
-           url: &BDS.Desktop.url/0
-         ]}
+        {Desktop.Window, window_opts},
+        Supervisor.child_spec({BDS.Desktop.MainWindow, []}, id: BDS.Desktop.MainWindow.Watcher)
       ]
     end
   end

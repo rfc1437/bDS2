@@ -9,6 +9,7 @@ defmodule BDS.DesktopTest do
 
   test "desktop child specs include the local shell server and desktop window in non-test environments" do
     children = BDS.Application.desktop_children(:dev)
+    child_ids = Enum.map(children, &Supervisor.child_spec(&1, []).id)
 
     assert Enum.any?(children, fn child ->
              match?({BDS.Desktop.Server, _opts}, child)
@@ -18,6 +19,8 @@ defmodule BDS.DesktopTest do
              match?({Desktop.Window, opts} when is_list(opts), child) and
                Keyword.fetch!(elem(child, 1), :id) == BDS.Desktop.MainWindow
            end)
+
+    assert Enum.uniq(child_ids) == child_ids
   end
 
   test "desktop children stay disabled in test so command-line tests do not spawn wx windows" do

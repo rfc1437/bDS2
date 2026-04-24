@@ -48,7 +48,7 @@ defmodule BDS.UI.ShellPage do
   end
 
   defp bootstrap do
-    workbench = Workbench.new(panel_visible: true, assistant_sidebar_visible: true)
+    workbench = Workbench.new()
 
     %{
       title: Application.get_env(:bds, :desktop)[:title] || "Blogging Desktop Server",

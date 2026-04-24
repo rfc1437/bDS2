@@ -5,9 +5,11 @@ if (!root || !bootstrapNode) {
   throw new Error("Missing shell bootstrap payload");
 }
 
+const SIDEBAR_STORAGE_KEY = "bds-panel-sidebar";
+const ASSISTANT_STORAGE_KEY = "bds-panel-assistant-sidebar";
 const bootstrap = JSON.parse(bootstrapNode.textContent);
 const state = {
-  session: clone(bootstrap.session),
+  session: hydrateSession(clone(bootstrap.session)),
   tabMeta: {},
 };
 
@@ -15,10 +17,7 @@ render();
 
 function render() {
   root.style.setProperty("--sidebar-width", state.session.sidebar_visible ? `${state.session.sidebar_width}px` : "0px");
-  root.style.setProperty(
-    "--assistant-width",
-    state.session.assistant_sidebar_visible ? `${state.session.assistant_sidebar_width}px` : "0px"
-  );
+  root.style.setProperty("--assistant-width", state.session.assistant_sidebar_visible ? `${state.session.assistant_sidebar_width}px` : "0px");
 
   renderTitlebar();
   renderActivityBar();
@@ -39,12 +38,33 @@ function renderTitlebar() {
         .map((group) => `<button class="window-titlebar-menu-button" type="button">${escapeHtml(group.label)}</button>`)
         .join("")}
     </div>
+    <div class="window-titlebar-drag-region"></div>
     <div class="window-titlebar-title" data-testid="window-title">${escapeHtml(bootstrap.title)}</div>
     <div class="window-titlebar-actions">
-      <button class="window-titlebar-action-button" data-command="toggle-sidebar" data-testid="toggle-sidebar" type="button" aria-label="Toggle sidebar">Sidebar</button>
-      <button class="window-titlebar-action-button" data-command="toggle-panel" data-testid="toggle-panel" type="button" aria-label="Toggle panel">Panel</button>
-      <button class="window-titlebar-action-button" data-command="toggle-assistant" data-testid="toggle-assistant" type="button" aria-label="Toggle assistant">Assistant</button>
+      ${renderTitlebarAction("toggle-sidebar", "toggle-sidebar", "Toggle sidebar", `
+        <span class="window-titlebar-sidebar-icon ${state.session.sidebar_visible ? "is-active" : "is-inactive"}">
+          <span class="window-titlebar-sidebar-pane"></span>
+        </span>
+      `)}
+      ${renderTitlebarAction("toggle-panel", "toggle-panel", "Toggle panel", `
+        <span class="window-titlebar-panel-icon ${state.session.panel.visible ? "is-active" : "is-inactive"}">
+          <span class="window-titlebar-panel-pane"></span>
+        </span>
+      `)}
+      ${renderTitlebarAction("toggle-assistant", "toggle-assistant", "Toggle assistant", `
+        <span class="window-titlebar-assistant-icon ${state.session.assistant_sidebar_visible ? "is-active" : "is-inactive"}">
+          <span class="window-titlebar-assistant-pane"></span>
+        </span>
+      `)}
     </div>
+  `;
+}
+
+function renderTitlebarAction(command, testId, label, iconMarkup) {
+  return `
+    <button class="window-titlebar-action-button" data-command="${command}" data-testid="${testId}" type="button" aria-label="${label}" title="${label}">
+      ${iconMarkup}
+    </button>
   `;
 }
 
@@ -53,8 +73,8 @@ function renderActivityBar() {
   const bottom = sidebarViews().filter((view) => view.activity_group === "bottom");
 
   root.querySelector(".activity-bar").innerHTML = `
-    <div class="activity-bar-group">${top.map(renderActivityButton).join("")}</div>
-    <div class="activity-bar-group">${bottom.map(renderActivityButton).join("")}</div>
+    <div class="activity-bar-top">${top.map(renderActivityButton).join("")}</div>
+    <div class="activity-bar-bottom">${bottom.map(renderActivityButton).join("")}</div>
   `;
 }
 
@@ -71,7 +91,7 @@ function renderActivityButton(view) {
       aria-label="${escapeHtml(view.label)}"
       title="${escapeHtml(view.label)}"
     >
-      <span class="activity-bar-glyph">${escapeHtml(view.label.slice(0, 1))}</span>
+      ${activityIcon(view.id)}
     </button>
   `;
 }
@@ -82,11 +102,10 @@ function renderSidebar() {
 
   root.querySelector(".sidebar").innerHTML = `
     <div class="sidebar-header">
-      <div>
-        <div class="sidebar-eyebrow">${escapeHtml(view.label)}</div>
+      <div class="sidebar-title-row">
         <strong>${escapeHtml(data.title)}</strong>
+        <span class="sidebar-subtitle">${escapeHtml(data.subtitle)}</span>
       </div>
-      <span class="sidebar-subtitle">${escapeHtml(data.subtitle)}</span>
     </div>
     <div class="sidebar-content">
       ${data.sections
@@ -95,7 +114,6 @@ function renderSidebar() {
             <section class="sidebar-section">
               <div class="sidebar-section-header">
                 <span data-testid="sidebar-section-title">${escapeHtml(section.title)}</span>
-                <span>${section.items.length}</span>
               </div>
               <div class="sidebar-section-items">
                 ${section.items.map((item) => renderSidebarItem(item, view)).join("")}
@@ -151,6 +169,7 @@ function renderTab(tab) {
 
   return `
     <button class="tab ${active ? "active" : ""} ${tab.is_transient ? "transient" : ""}" data-tab-type="${tab.type}" data-tab-id="${tab.id}" type="button">
+      <span class="tab-icon">${tabIcon(tab.type)}</span>
       <span class="tab-title">${escapeHtml(meta.title)}</span>
       <span class="tab-close" aria-hidden="true">${tab.is_transient ? "Preview" : "Pinned"}</span>
     </button>
@@ -174,7 +193,7 @@ function renderEditor() {
         ${meta
           .map(
             (item) => `
-              <section class="editor-meta-card">
+              <section class="editor-meta-row">
                 <strong data-testid="editor-meta-label">${escapeHtml(item.label)}</strong>
                 <span>${escapeHtml(item.value)}</span>
               </section>
@@ -190,34 +209,28 @@ function renderEditorBody(route) {
   if (route === "dashboard") {
     const dashboard = bootstrap.content.dashboard;
     return `
-      <div class="dashboard-grid">
-        ${dashboard.summary_cards
-          .map(
-            (card) => `
-              <article class="dashboard-card">
-                <span>${escapeHtml(card.label)}</span>
-                <strong>${escapeHtml(card.value)}</strong>
-                <p>${escapeHtml(card.detail)}</p>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-      <div class="editor-section">
+      <section class="editor-section">
+        <ul class="editor-list compact">
+          ${dashboard.summary_cards
+            .map((card) => `<li><strong>${escapeHtml(card.label)}:</strong> ${escapeHtml(card.value)} <span>${escapeHtml(card.detail)}</span></li>`)
+            .join("")}
+        </ul>
+      </section>
+      <section class="editor-section">
         <h2>Workbench Notes</h2>
-        <ul>
+        <ul class="editor-list">
           ${dashboard.checklist.map((entry) => `<li>${escapeHtml(entry)}</li>`).join("")}
         </ul>
-      </div>
+      </section>
     `;
   }
 
   const active = activeItem();
   return `
     <div class="editor-toolbar">
-      <button type="button">Open</button>
-      <button type="button">Preview</button>
-      <button type="button">Metadata</button>
+      <button class="editor-toolbar-button" type="button">Open</button>
+      <button class="editor-toolbar-button" type="button">Preview</button>
+      <button class="editor-toolbar-button" type="button">Metadata</button>
     </div>
     <div class="editor-section">
       <h2>${escapeHtml(active?.title || routeLabel(route))}</h2>
@@ -240,7 +253,6 @@ function renderPanel() {
           )
           .join("")}
       </div>
-      <span>${state.session.panel.visible ? "Visible" : "Hidden"}</span>
     </div>
     <div class="panel-content">
       <div class="panel-entry">
@@ -255,7 +267,6 @@ function renderAssistant() {
   root.querySelector(".assistant-sidebar").innerHTML = `
     <div class="assistant-header">
       <strong>Assistant</strong>
-      <span>Project context</span>
     </div>
     <div class="assistant-content">
       ${bootstrap.content.assistant_cards
@@ -285,7 +296,7 @@ function renderStatusBar() {
       <span class="status-bar-item">${escapeHtml(status.right.theme_badge)}</span>
       <span class="status-bar-item">${status.right.offline_mode ? "Offline" : "Online"}</span>
       <span class="status-bar-item">${escapeHtml(status.right.ui_language.toUpperCase())}</span>
-      <span class="status-bar-item">${escapeHtml(status.right.brand)}</span>
+      <span class="status-bar-item brand">${escapeHtml(status.right.brand)}</span>
     </div>
   `;
 }
@@ -302,12 +313,14 @@ function bindEvents() {
       const command = button.dataset.command;
       if (command === "toggle-sidebar") {
         state.session.sidebar_visible = !state.session.sidebar_visible;
+        persistSessionWidths();
       }
       if (command === "toggle-panel") {
         state.session.panel.visible = !state.session.panel.visible;
       }
       if (command === "toggle-assistant") {
         state.session.assistant_sidebar_visible = !state.session.assistant_sidebar_visible;
+        persistSessionWidths();
       }
       render();
     };
@@ -316,6 +329,29 @@ function bindEvents() {
   root.querySelectorAll("[data-activity]").forEach((button) => {
     button.onclick = () => {
       const next = button.dataset.activity;
+
+  bindResizeHandle("sidebar", {
+    key: SIDEBAR_STORAGE_KEY,
+    min: 200,
+    max: 500,
+    get: () => state.session.sidebar_width,
+    set: (value) => {
+      state.session.sidebar_width = value;
+      state.session.sidebar_visible = true;
+    },
+  });
+
+  bindResizeHandle("assistant", {
+    key: ASSISTANT_STORAGE_KEY,
+    min: 280,
+    max: 640,
+    get: () => state.session.assistant_sidebar_width,
+    set: (value) => {
+      state.session.assistant_sidebar_width = value;
+      state.session.assistant_sidebar_visible = true;
+    },
+    invert: true,
+  });
       if (state.session.active_view === next && state.session.sidebar_visible) {
         state.session.sidebar_visible = false;
       } else {
@@ -475,6 +511,86 @@ function titleCase(value) {
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function hydrateSession(session) {
+  const next = session;
+  next.sidebar_width = readStoredSize(SIDEBAR_STORAGE_KEY, next.sidebar_width, 200, 500);
+  next.assistant_sidebar_width = readStoredSize(ASSISTANT_STORAGE_KEY, next.assistant_sidebar_width, 280, 640);
+  return next;
+}
+
+function bindResizeHandle(name, options) {
+  const handle = root.querySelector(`[data-resize='${name}']`);
+  if (!handle) {
+    return;
+  }
+
+  handle.onmousedown = (event) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = options.get();
+
+    const onMouseMove = (moveEvent) => {
+      const delta = options.invert ? startX - moveEvent.clientX : moveEvent.clientX - startX;
+      const width = clamp(startWidth + delta, options.min, options.max);
+      options.set(width);
+      persistSessionWidths();
+      render();
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
+}
+
+function persistSessionWidths() {
+  localStorage.setItem(SIDEBAR_STORAGE_KEY, String(state.session.sidebar_width));
+  localStorage.setItem(ASSISTANT_STORAGE_KEY, String(state.session.assistant_sidebar_width));
+}
+
+function readStoredSize(key, fallback, min, max) {
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isNaN(parsed)) {
+    return fallback;
+  }
+
+  return clamp(parsed, min, max);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function activityIcon(id) {
+  const icons = {
+    posts: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"></path><path d="M8 12h8v2H8zm0 4h8v2H8z"></path></svg>',
+    pages: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h10v4h6v12H4V4zm10 1.5V9h4.5L14 5.5zM7 12h10v1.5H7V12zm0 3h10v1.5H7V15z"></path></svg>',
+    media: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"></path></svg>',
+    scripts: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h7v2H8v2h8v-2h-3v-2h7a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1zM5 14V5h14v9H5zm2-7.5L9.5 9 7 11.5l1.4 1.4L12.3 9 8.4 5.1 7 6.5zm6.5 5.5h4v-2h-4v2z"></path></svg>',
+    templates: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7zM5.5 5.5v4h4v-4h-4zm9 0v4h4v-4h-4zm-9 9v4h4v-4h-4zm9 0v4h4v-4h-4z"></path></svg>',
+    tags: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"></path></svg>',
+    chat: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"></path><circle cx="8" cy="10" r="1.5"></circle><circle cx="12" cy="10" r="1.5"></circle><circle cx="16" cy="10" r="1.5"></circle></svg>',
+    import: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>',
+    git: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M22 11.73L12.27 2a1 1 0 0 0-1.41 0L8.84 4.02l2.56 2.56a1.2 1.2 0 0 1 1.52 1.53l2.47 2.47a1.2 1.2 0 1 1-.72.67l-2.3-2.3v6.06a1.2 1.2 0 1 1-.85 0V8.9a1.2 1.2 0 0 1-.66-1.59L8.35 4.8 2 11.16a1 1 0 0 0 0 1.41L11.73 22a1 1 0 0 0 1.41 0L22 13.14a1 1 0 0 0 0-1.41z"></path></svg>',
+    settings: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg>',
+  };
+
+  return icons[id] || icons.posts;
+}
+
+function tabIcon(type) {
+  return activityIcon(type === "post" ? "posts" : type);
 }
 
 function escapeHtml(value) {

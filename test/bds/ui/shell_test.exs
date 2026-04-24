@@ -107,4 +107,21 @@ defmodule BDS.UI.ShellTest do
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/app.css")
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/app.js")
   end
+
+  test "static shell bundle keeps the old compact frame metrics and icon-based controls" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert css =~ ".window-titlebar"
+    assert css =~ "height: 34px"
+    assert css =~ "width: 48px"
+    assert css =~ "height: 35px"
+    assert css =~ "height: 22px"
+
+    assert js =~ "window-titlebar-sidebar-icon"
+    assert js =~ "window-titlebar-panel-icon"
+    assert js =~ "window-titlebar-assistant-icon"
+    assert js =~ "activity-bar-top"
+    assert js =~ "activity-bar-bottom"
+  end
 end

@@ -13,8 +13,8 @@ config :bds, BDS.Application, desktop_adapter: :desktop
 
 config :bds, :desktop,
   port: 4010,
-  window_size: {1440, 900},
-  window_min_size: {1100, 700},
+  window_size: {1280, 780},
+  window_min_size: {800, 600},
   title: "Blogging Desktop Server",
   secret_key_base: "bds_desktop_shell_secret_key_base_64_chars_minimum_seed_value_001"
 
