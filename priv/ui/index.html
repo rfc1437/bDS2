@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>bDS Shell</title>
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body>
+  <!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Blogging Desktop Server</title>
+      <link rel="stylesheet" href="/assets/app.css" />
+    </head>
+    <body>
+      <div class="app" id="app">
+        <div class="window-titlebar">
+          <div class="window-titlebar-menu-bar"></div>
+          <div class="window-titlebar-title">Blogging Desktop Server</div>
+          <div class="window-titlebar-actions">
+            <button class="window-titlebar-action-button" data-command="toggle-sidebar" aria-label="Toggle sidebar">
+              <span class="window-titlebar-sidebar-icon"><span class="window-titlebar-sidebar-pane"></span></span>
+            </button>
+            <button class="window-titlebar-action-button" data-command="toggle-panel" aria-label="Toggle panel">
+              <span class="window-titlebar-panel-icon"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="app-main">
+          <aside class="activity-bar"></aside>
+
+          <section class="sidebar-shell">
+            <div class="sidebar"></div>
+            <div class="resizable-panel-divider sidebar-divider" data-resize="sidebar"></div>
+          </section>
+
+          <main class="app-content">
+            <div class="tab-bar"></div>
+            <div class="editor-shell"></div>
+            <div class="panel-shell"></div>
+          </main>
+
+          <section class="assistant-sidebar-shell">
+            <div class="resizable-panel-divider assistant-divider" data-resize="assistant"></div>
+            <div class="assistant-sidebar"></div>
+          </section>
+        </div>
+
+        <div class="status-bar"></div>
+      </div>
+
+      <script id="bds-bootstrap" type="application/json">
+        {
+          "menuGroups": [
+            {"id":"app","label":"App","items":[{"id":"about","label":"About"}]},
+            {"id":"file","label":"File","items":[{"id":"new_post","label":"New Post"},{"id":"close_tab","label":"Close Tab"}]},
+            {"id":"edit","label":"Edit","items":[{"id":"undo","label":"Undo"},{"id":"redo","label":"Redo"}]},
+            {"id":"view","label":"View","items":[{"id":"toggle_sidebar","label":"Toggle Sidebar"},{"id":"toggle_panel","label":"Toggle Panel"},{"id":"toggle_assistant_sidebar","label":"Toggle Assistant Sidebar"}]},
+            {"id":"window","label":"Window","items":[{"id":"minimize","label":"Minimize"}]},
+            {"id":"help","label":"Help","items":[{"id":"documentation","label":"Documentation"}]}
+          ],
+          "sidebarViews": [
+            {"id":"posts","label":"Posts","group":"top","items":["welcome.md","launch-plan.md","publishing-notes.md"]},
+            {"id":"pages","label":"Pages","group":"top","items":["about.md","contact.md"]},
+            {"id":"media","label":"Media","group":"top","items":["cover.jpg","launch-banner.png"]},
+            {"id":"scripts","label":"Scripts","group":"top","items":["import_posts.exs","sync_tags.exs"]},
+            {"id":"templates","label":"Templates","group":"top","items":["post.liquid","listing.liquid"]},
+            {"id":"git","label":"Git","group":"bottom","items":["Working tree clean"]},
+            {"id":"settings","label":"Settings","group":"bottom","items":["Project", "Publishing", "AI"]}
+          ],
+          "tabs": [
+            {"id":"dashboard","title":"Dashboard","kind":"dashboard","pinned":true,"dirty":false},
+            {"id":"post:welcome","title":"welcome.md","kind":"post","pinned":true,"dirty":true},
+            {"id":"post:launch","title":"launch-plan.md","kind":"post","pinned":false,"dirty":false}
+          ],
+          "activeTabId": "post:welcome",
+          "activeView": "posts",
+          "sidebarVisible": true,
+          "sidebarWidth": 320,
+          "assistantVisible": true,
+          "assistantWidth": 336,
+          "panelVisible": true,
+          "panelTab": "problems",
+          "statusBar": {
+            "left": [
+              {"id":"branch","label":"main"},
+              {"id":"sync","label":"Filesystem synced"},
+              {"id":"language","label":"EN"}
+            ],
+            "right": [
+              {"id":"project","label":"Starter project"},
+              {"id":"mode","label":"Airplane off"},
+              {"id":"theme","label":"Desktop shell"}
+            ]
+          }
+        }
+      </script>
+      <script src="/assets/app.js"></script>
+    </body>
+  </html>

@@ -16,7 +16,7 @@ defmodule BDS.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :wx],
       mod: {BDS.Application, []}
     ]
   end
@@ -30,6 +30,8 @@ defmodule BDS.MixProject do
       {:earmark, "~> 1.4"},
       {:liquex, "~> 0.13.1"},
       {:plug, "~> 1.18"},
+      {:bandit, "~> 1.5"},
+      {:desktop, "~> 1.5"},
       {:image, "~> 0.65"},
       {:stemex, "~> 0.2.1"}
     ]

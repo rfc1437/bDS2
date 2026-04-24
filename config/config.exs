@@ -9,7 +9,14 @@ config :bds, BDS.Repo,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
 
-config :bds, BDS.Application, desktop_adapter: :pending_selection
+config :bds, BDS.Application, desktop_adapter: :desktop
+
+config :bds, :desktop,
+  port: 4010,
+  window_size: {1440, 900},
+  window_min_size: {1100, 700},
+  title: "Blogging Desktop Server",
+  secret_key_base: "bds_desktop_shell_secret_key_base_64_chars_minimum_seed_value_001"
 
 config :bds, :scripting,
   runtime: BDS.Scripting.Lua,
