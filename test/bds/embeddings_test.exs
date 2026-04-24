@@ -39,7 +39,7 @@ defmodule BDS.EmbeddingsTest do
     %{project: project}
   end
 
-  test "embeddings index published posts when semantic similarity is enabled and support similarity, duplicates, dismissals, and tag suggestions",
+  test "embeddings index published posts when semantic similarity is enabled and support similarity, dismissals, and tag suggestions",
        %{project: project} do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
@@ -89,19 +89,8 @@ defmodule BDS.EmbeddingsTest do
     assert {:ok, suggestions} = BDS.Embeddings.suggest_tags(alpha.id, "rocket orbit mission")
     assert "space" in suggestions
 
-    assert {:ok, duplicates} = BDS.Embeddings.find_duplicates(project.id)
-    assert Enum.any?(duplicates, fn pair ->
-             MapSet.new([pair.post_id_a, pair.post_id_b]) == MapSet.new([alpha.id, beta.id])
-           end)
-
     assert {:ok, dismissal} = BDS.Embeddings.dismiss_duplicate_pair(alpha.id, beta.id)
     assert dismissal.project_id == project.id
-
-    assert {:ok, filtered_duplicates} = BDS.Embeddings.find_duplicates(project.id)
-
-    refute Enum.any?(filtered_duplicates, fn pair ->
-             MapSet.new([pair.post_id_a, pair.post_id_b]) == MapSet.new([alpha.id, beta.id])
-           end)
 
     assert {:ok, alpha} = BDS.Posts.update_post(alpha.id, %{content: "kitchen flour dough loaf"})
     assert {:ok, alpha} = BDS.Posts.publish_post(alpha.id)
@@ -113,6 +102,97 @@ defmodule BDS.EmbeddingsTest do
 
     assert {:ok, after_delete} = BDS.Embeddings.compute_similarities(alpha.id, [beta.id, gamma.id])
     refute Map.has_key?(after_delete, gamma.id)
+  end
+
+  test "duplicate detection keeps exact matches and excludes lower-similarity pairs below the spec threshold",
+       %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert {:ok, exact_a} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Exact Match",
+               content: "space rocket launch orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, exact_b} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Exact Match",
+               content: "space rocket launch orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, fuzzy} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Fuzzy",
+               content: "space rocket launch mission orbit space station",
+               language: "en"
+             })
+
+    assert {:ok, exact_a} = BDS.Posts.publish_post(exact_a.id)
+    assert {:ok, exact_b} = BDS.Posts.publish_post(exact_b.id)
+    assert {:ok, fuzzy} = BDS.Posts.publish_post(fuzzy.id)
+
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
+    assert {:ok, duplicates} = BDS.Embeddings.find_duplicates(project.id)
+
+    assert [%{post_id_a: post_id_a, post_id_b: post_id_b, score: score}] = duplicates
+    assert MapSet.new([post_id_a, post_id_b]) == MapSet.new([exact_a.id, exact_b.id])
+    assert score >= 0.99
+    assert hd(duplicates).similarity == score
+    assert hd(duplicates).exact_match == true
+
+    assert MapSet.new([hd(duplicates).title_a, hd(duplicates).title_b]) ==
+             MapSet.new(["Exact Match", "Exact Match"])
+
+    refute Enum.any?(duplicates, fn pair ->
+             MapSet.new([pair.post_id_a, pair.post_id_b]) == MapSet.new([exact_a.id, fuzzy.id])
+           end)
+  end
+
+  test "batch duplicate dismissal stores canonical pairs and excludes them from future searches",
+       %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert {:ok, exact_a} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Exact Match",
+               content: "space rocket launch orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, exact_b} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Exact Match",
+               content: "space rocket launch orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, exact_a} = BDS.Posts.publish_post(exact_a.id)
+    assert {:ok, exact_b} = BDS.Posts.publish_post(exact_b.id)
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
+
+    assert {:ok, duplicates} = BDS.Embeddings.find_duplicates(project.id)
+    assert length(duplicates) == 1
+
+    assert {:ok, dismissed_pairs} =
+             BDS.Embeddings.dismiss_duplicate_pairs([
+               {exact_b.id, exact_a.id},
+               {exact_a.id, exact_b.id}
+             ])
+
+    assert length(dismissed_pairs) == 1
+    assert hd(dismissed_pairs).project_id == project.id
+
+    assert {:ok, filtered_duplicates} = BDS.Embeddings.find_duplicates(project.id)
+    assert filtered_duplicates == []
   end
 
   test "embedding queries are gated off when semantic similarity is disabled", %{project: project} do
@@ -128,6 +208,41 @@ defmodule BDS.EmbeddingsTest do
     assert {:ok, []} = BDS.Embeddings.find_similar(post.id, 5)
     assert {:ok, []} = BDS.Embeddings.find_duplicates(project.id)
     assert {:ok, %{}} = BDS.Embeddings.compute_similarities(post.id, [post.id])
+  end
+
+  test "get_indexing_progress returns zero indexed and total when a project has no posts", %{
+    project: project
+  } do
+    assert {:ok, %{indexed: 0, total: 0}} = BDS.Embeddings.get_indexing_progress(project.id)
+  end
+
+  test "get_indexing_progress returns indexed embeddings and total posts for the project", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert {:ok, indexed_post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Indexed",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, unindexed_post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Unindexed",
+               content: "flour yeast dough oven loaf kitchen",
+               language: "en"
+             })
+
+    assert {:ok, indexed_post} = BDS.Posts.publish_post(indexed_post.id)
+
+    assert {:ok, %{indexed: 2, total: 2}} = BDS.Embeddings.get_indexing_progress(project.id)
+
+    assert unindexed_post.id != indexed_post.id
   end
 
   test "embeddings use the configured in-app backend module", %{project: project} do
@@ -149,5 +264,83 @@ defmodule BDS.EmbeddingsTest do
 
     assert {:ok, indexed} = BDS.Embeddings.index_unindexed(project.id)
     assert post.id in indexed
+  end
+
+  test "embedding indexing persists a project-local similarity snapshot", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert {:ok, alpha} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Alpha",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, beta} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Beta",
+               content: "rocket launch orbit mission station",
+               language: "en"
+             })
+
+    assert {:ok, alpha} = BDS.Posts.publish_post(alpha.id)
+    assert {:ok, beta} = BDS.Posts.publish_post(beta.id)
+
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
+
+    index_path = BDS.Embeddings.index_path(project.id)
+    assert File.exists?(index_path)
+
+    snapshot = index_path |> File.read!() |> Jason.decode!()
+    assert snapshot["project_id"] == project.id
+    assert snapshot["model_id"] == "fake/multilingual-e5-small"
+    assert snapshot["dimensions"] == 384
+    assert snapshot["entries"][alpha.id]["label"] != nil
+    assert snapshot["entries"][alpha.id]["content_hash"] != nil
+
+    assert Enum.any?(snapshot["entries"][alpha.id]["neighbors"], fn neighbor ->
+             neighbor["post_id"] == beta.id
+           end)
+  end
+
+  test "embedding index uses the old-app persisted file name", %{project: project} do
+    assert BDS.Embeddings.index_path(project.id) =~ "/embeddings.usearch"
+  end
+
+
+  test "reindex_all rebuilds stored embeddings for the whole project", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Reindex Target",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, post} = BDS.Posts.publish_post(post.id)
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
+
+    original_key = BDS.Repo.get_by!(BDS.Embeddings.Key, project_id: project.id, post_id: post.id)
+
+    assert {:ok, post} =
+             BDS.Posts.update_post(post.id, %{content: "kitchen flour dough oven loaf"})
+
+    assert {:ok, post} = BDS.Posts.publish_post(post.id)
+    stale_key = BDS.Repo.get_by!(BDS.Embeddings.Key, project_id: project.id, post_id: post.id)
+
+    assert stale_key.content_hash != original_key.content_hash
+
+    assert {:ok, rebuilt_ids} = BDS.Embeddings.reindex_all(project.id)
+    assert post.id in rebuilt_ids
+
+    refreshed_key = BDS.Repo.get_by!(BDS.Embeddings.Key, project_id: project.id, post_id: post.id)
+    assert refreshed_key.content_hash == stale_key.content_hash
+    assert File.exists?(BDS.Embeddings.index_path(project.id))
   end
 end

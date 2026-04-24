@@ -6,6 +6,7 @@ defmodule BDS.Maintenance do
   alias BDS.Frontmatter
   alias BDS.Media.Media
   alias BDS.Media.Translation, as: MediaTranslation
+  alias BDS.Embeddings
   alias BDS.Posts.Post
   alias BDS.Posts.Translation, as: PostTranslation
   alias BDS.Projects
@@ -20,6 +21,7 @@ defmodule BDS.Maintenance do
       :media -> BDS.Media.rebuild_media_from_files(project_id)
       :script -> BDS.Scripts.rebuild_scripts_from_files(project_id)
       :template -> BDS.Templates.rebuild_templates_from_files(project_id)
+      :embedding -> Embeddings.rebuild_project(project_id)
       :unsupported -> {:error, :unsupported_entity_type}
     end
   end
@@ -33,7 +35,8 @@ defmodule BDS.Maintenance do
         media_diff_reports(project_id, project) ++
         media_translation_diff_reports(project_id, project) ++
         script_diff_reports(project_id, project) ++
-        template_diff_reports(project_id, project)
+        template_diff_reports(project_id, project) ++
+        Embeddings.diff_reports(project_id)
 
     orphan_reports = orphan_reports(project_id, project)
 
@@ -44,10 +47,13 @@ defmodule BDS.Maintenance do
   defp normalize_entity_type(:media), do: :media
   defp normalize_entity_type(:script), do: :script
   defp normalize_entity_type(:template), do: :template
+  defp normalize_entity_type(:embedding), do: :embedding
   defp normalize_entity_type("post"), do: :post
   defp normalize_entity_type("media"), do: :media
   defp normalize_entity_type("script"), do: :script
   defp normalize_entity_type("template"), do: :template
+  defp normalize_entity_type("embedding"), do: :embedding
+  defp normalize_entity_type("embeddings"), do: :embedding
   defp normalize_entity_type(_entity_type), do: :unsupported
 
   defp post_diff_reports(project_id, project) do

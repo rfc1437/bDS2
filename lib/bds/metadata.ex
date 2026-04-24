@@ -1,6 +1,7 @@
 defmodule BDS.Metadata do
   @moduledoc false
 
+  alias BDS.Embeddings
   alias BDS.Projects
   alias BDS.Projects.Project
   alias BDS.Repo
@@ -50,6 +51,7 @@ defmodule BDS.Metadata do
       load_state(updated_project)
     end)
     |> unwrap_transaction()
+    |> maybe_backfill_embeddings(project_id, state, project_metadata)
   end
 
   def add_category(project_id, name) do
@@ -310,6 +312,17 @@ defmodule BDS.Metadata do
 
   defp unwrap_transaction({:ok, result}), do: {:ok, result}
   defp unwrap_transaction({:error, reason}), do: {:error, reason}
+
+  defp maybe_backfill_embeddings({:ok, _metadata} = result, project_id, previous_state, project_metadata) do
+    if previous_state.semantic_similarity_enabled != true and
+         project_metadata.semantic_similarity_enabled == true do
+      {:ok, _indexed_post_ids} = Embeddings.index_unindexed(project_id)
+    end
+
+    result
+  end
+
+  defp maybe_backfill_embeddings(result, _project_id, _previous_state, _project_metadata), do: result
 
   defp attr(attrs, key) do
     cond do

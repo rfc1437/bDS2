@@ -116,4 +116,26 @@ defmodule BDS.MetadataTest do
              "ssh_mode" => "rsync"
            }
   end
+
+  test "enabling semantic similarity backfills embeddings for existing published posts", %{
+    project: project
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Backfill Me",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, post} = BDS.Posts.publish_post(post.id)
+    assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: post.id) == nil
+
+    assert {:ok, metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert metadata.semantic_similarity_enabled == true
+    assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: post.id) != nil
+    assert File.exists?(BDS.Embeddings.index_path(project.id))
+  end
 end

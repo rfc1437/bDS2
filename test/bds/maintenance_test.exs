@@ -1,6 +1,8 @@
 defmodule BDS.MaintenanceTest do
   use ExUnit.Case, async: false
 
+  import Ecto.Query
+
   alias BDS.Repo
 
   setup do
@@ -132,6 +134,39 @@ defmodule BDS.MaintenanceTest do
   test "rebuild_from_filesystem rejects unsupported entity types", %{project: project} do
     assert {:error, :unsupported_entity_type} =
              BDS.Maintenance.rebuild_from_filesystem(project.id, "unknown")
+  end
+
+  test "maintenance rebuilds and diffs embedding state explicitly", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Embedding Drift",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, post} = BDS.Posts.publish_post(post.id)
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
+
+    index_path = BDS.Embeddings.index_path(project.id)
+    assert File.exists?(index_path)
+
+    Repo.delete_all(from key in BDS.Embeddings.Key, where: key.project_id == ^project.id)
+    File.rm!(index_path)
+
+    assert {:ok, %{diff_reports: diff_reports}} = BDS.Maintenance.metadata_diff(project.id)
+
+    assert Enum.any?(diff_reports, fn report ->
+             report.entity_type == "embedding" and report.entity_id == post.id
+           end)
+
+    assert {:ok, rebuilt_post_ids} = BDS.Maintenance.rebuild_from_filesystem(project.id, "embedding")
+    assert post.id in rebuilt_post_ids
+    assert Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: post.id) != nil
+    assert File.exists?(index_path)
   end
 
   test "metadata_diff reports field differences and orphan files across managed entities", %{
