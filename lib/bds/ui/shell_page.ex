@@ -10,10 +10,11 @@ defmodule BDS.UI.ShellPage do
 
   def render do
     bootstrap = bootstrap()
+    ui_language = get_in(bootstrap, [:i18n, :ui_language]) || "en"
 
     [
       "<!DOCTYPE html>",
-      "<html lang=\"en\">",
+      "<html lang=\"#{ui_language}\">",
       "<head>",
       "  <meta charset=\"utf-8\">",
       "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
@@ -58,6 +59,10 @@ defmodule BDS.UI.ShellPage do
       title: Application.get_env(:bds, :desktop)[:title] || "Blogging Desktop Server",
       i18n: %{
         ui_language: ui_language,
+        catalogs:
+          Enum.into(I18n.supported_languages(), %{}, fn language ->
+            {language.code, I18n.get_ui_translations(language.code)}
+          end),
         supported_ui_languages:
           Enum.map(I18n.supported_languages(), fn language ->
             %{

@@ -115,6 +115,27 @@ defmodule BDS.UI.ShellTest do
     assert html =~ ~s("name":"My Blog")
   end
 
+  test "shell page localizes bootstrap content for german ui locale" do
+    previous_lang = System.get_env("LANG")
+    previous_lc_all = System.get_env("LC_ALL")
+
+    on_exit(fn ->
+      restore_env("LANG", previous_lang)
+      restore_env("LC_ALL", previous_lc_all)
+    end)
+
+    System.put_env("LANG", "de_DE.UTF-8")
+    System.delete_env("LC_ALL")
+
+    html = ShellPage.render()
+
+    assert html =~ ~s("ui_language":"de")
+    assert html =~ ~s("catalogs")
+    assert html =~ ~s("File":"Datei")
+    assert html =~ ~s("Dashboard":"Instrumententafel")
+    assert html =~ ~s("Assistant":"Assistent")
+  end
+
   test "static shell bundle exists for direct browser inspection" do
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/index.html")
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/app.css")
@@ -185,6 +206,12 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "data-panel-tab=\"git_log\""
   end
 
+  test "static shell bundle keeps bottom panel tabs in a stable order" do
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert js =~ "return [\"tasks\", \"output\", \"git_log\", state.session.panel.active_tab].filter(uniqueValue);"
+  end
+
   test "static shell bundle renders a left-side project field with selection and create affordances" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
     js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
@@ -201,6 +228,16 @@ defmodule BDS.UI.ShellTest do
     assert css =~ ".project-selector-trigger"
     assert css =~ ".project-dropdown"
     assert css =~ ".create-project-btn"
+  end
+
+  test "static shell bundle uses translation catalogs for visible shell chrome" do
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert js =~ "translationsForLanguage"
+    assert js =~ "function t("
+    assert js =~ "New Project"
+    assert js =~ "No background tasks running"
+    assert js =~ "Idle"
   end
 
   test "static shell bundle binds base shell hotkeys and menu actions to existing shell functionality" do
@@ -222,4 +259,7 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "[data-close-tab]"
     assert js =~ "language.flag"
   end
+
+  defp restore_env(key, nil), do: System.delete_env(key)
+  defp restore_env(key, value), do: System.put_env(key, value)
 end

@@ -183,7 +183,9 @@ defmodule BDS.UI.Workbench do
       right: %{
         post_status: post_status(state, Keyword.get(opts, :active_post_status)),
         post_count: "#{Keyword.get(opts, :post_count, 0)} posts",
+        post_count_value: Keyword.get(opts, :post_count, 0),
         media_count: "#{Keyword.get(opts, :media_count, 0)} media",
+        media_count_value: Keyword.get(opts, :media_count, 0),
         token_usage: token_usage(state, Keyword.get(opts, :token_usage)),
         theme_badge: Keyword.get(opts, :theme_badge, "default"),
         offline_mode: Keyword.get(opts, :offline_mode, false),

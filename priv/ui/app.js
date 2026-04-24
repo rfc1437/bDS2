@@ -23,6 +23,25 @@ const state = {
   tabMeta: {},
 };
 
+function translationsForLanguage(language) {
+  return bootstrap.i18n?.catalogs?.[language] || bootstrap.i18n?.catalogs?.en || {};
+}
+
+function t(key, bindings = {}) {
+  const catalog = translationsForLanguage(state.uiLanguage);
+  let text = catalog[key] || key;
+
+  Object.entries(bindings).forEach(([binding, value]) => {
+    text = text.replaceAll(`%{${binding}}`, String(value));
+  });
+
+  return text;
+}
+
+function tText(value, bindings = {}) {
+  return t(String(value), bindings);
+}
+
 bindNativeMenuBridge();
 bindGlobalHotkeys();
 scheduleTaskPolling();
@@ -51,23 +70,23 @@ function renderTitlebar() {
   root.querySelector(".window-titlebar").innerHTML = `
     <div class="${menuBarClass}">
       ${bootstrap.menu_groups
-        .map((group) => `<button class="window-titlebar-menu-button" type="button">${escapeHtml(group.label)}</button>`)
+        .map((group) => `<button class="window-titlebar-menu-button" type="button">${escapeHtml(tText(group.label))}</button>`)
         .join("")}
     </div>
     <div class="window-titlebar-drag-region"></div>
     <div class="window-titlebar-title" data-testid="window-title">${escapeHtml(bootstrap.title)}</div>
     <div class="window-titlebar-actions">
-      ${renderTitlebarAction("toggle-sidebar", "toggle-sidebar", "Toggle sidebar", `
+      ${renderTitlebarAction("toggle-sidebar", "toggle-sidebar", t("Toggle sidebar"), `
         <span class="window-titlebar-sidebar-icon ${state.session.sidebar_visible ? "is-active" : "is-inactive"}">
           <span class="window-titlebar-sidebar-pane"></span>
         </span>
       `)}
-      ${renderTitlebarAction("toggle-panel", "toggle-panel", "Toggle panel", `
+      ${renderTitlebarAction("toggle-panel", "toggle-panel", t("Toggle panel"), `
         <span class="window-titlebar-panel-icon ${state.session.panel.visible ? "is-active" : "is-inactive"}">
           <span class="window-titlebar-panel-pane"></span>
         </span>
       `)}
-      ${renderTitlebarAction("toggle-assistant-sidebar", "toggle-assistant", "Toggle assistant", `
+      ${renderTitlebarAction("toggle-assistant-sidebar", "toggle-assistant", t("Toggle assistant"), `
         <span class="window-titlebar-assistant-icon ${state.session.assistant_sidebar_visible ? "is-active" : "is-inactive"}">
           <span class="window-titlebar-assistant-pane"></span>
         </span>
@@ -104,8 +123,8 @@ function renderActivityButton(view) {
       data-active="${String(active)}"
       data-testid="activity-button"
       type="button"
-      aria-label="${escapeHtml(view.label)}"
-      title="${escapeHtml(view.label)}"
+      aria-label="${escapeHtml(tText(view.label))}"
+      title="${escapeHtml(tText(view.label))}"
     >
       ${activityIcon(view.id)}
     </button>
@@ -119,8 +138,8 @@ function renderSidebar() {
   root.querySelector(".sidebar").innerHTML = `
     <div class="sidebar-header">
       <div class="sidebar-title-row">
-        <strong>${escapeHtml(data.title)}</strong>
-        <span class="sidebar-subtitle">${escapeHtml(data.subtitle)}</span>
+        <strong>${escapeHtml(tText(data.title))}</strong>
+        <span class="sidebar-subtitle">${escapeHtml(tText(data.subtitle))}</span>
       </div>
     </div>
     <div class="sidebar-content">
@@ -129,7 +148,7 @@ function renderSidebar() {
           (section) => `
             <section class="sidebar-section">
               <div class="sidebar-section-header">
-                <span data-testid="sidebar-section-title">${escapeHtml(section.title)}</span>
+                <span data-testid="sidebar-section-title">${escapeHtml(tText(section.title))}</span>
               </div>
               <div class="sidebar-section-items">
                 ${section.items.map((item) => renderSidebarItem(item, view)).join("")}
@@ -153,12 +172,12 @@ function renderSidebarItem(item, view) {
       class="sidebar-item ${active ? "active" : ""}"
       data-open-tab="${tabId}"
       data-open-route="${itemRoute}"
-      data-open-title="${escapeHtmlAttribute(item.title)}"
+      data-open-title="${escapeHtmlAttribute(tText(item.title))}"
       type="button"
     >
-      <strong>${escapeHtml(item.title)}</strong>
-      <span>${escapeHtml(item.meta || view.label)}</span>
-      ${item.badge ? `<span class="sidebar-badge">${escapeHtml(item.badge)}</span>` : ""}
+      <strong>${escapeHtml(tText(item.title))}</strong>
+      <span>${escapeHtml(tText(item.meta || view.label))}</span>
+      ${item.badge ? `<span class="sidebar-badge">${escapeHtml(tText(item.badge))}</span>` : ""}
     </button>
   `;
 }
@@ -168,7 +187,7 @@ function renderTabs() {
   const node = root.querySelector(".tab-bar");
 
   if (tabs.length === 0) {
-    node.innerHTML = `<div class="tab-bar-empty">Dashboard</div>`;
+    node.innerHTML = `<div class="tab-bar-empty">${escapeHtml(t("Dashboard"))}</div>`;
     return;
   }
 
@@ -186,8 +205,8 @@ function renderTab(tab) {
   return `
     <button class="tab ${active ? "active" : ""} ${tab.is_transient ? "transient" : ""}" data-tab-type="${tab.type}" data-tab-id="${tab.id}" type="button">
       <span class="tab-icon">${tabIcon(tab.type)}</span>
-      <span class="tab-title">${escapeHtml(meta.title)}</span>
-      <span class="tab-close" data-close-tab="${tab.type}:${tab.id}" role="button" aria-label="Close ${escapeHtmlAttribute(meta.title)}" title="Close tab">×</span>
+      <span class="tab-title">${escapeHtml(tText(meta.title))}</span>
+      <span class="tab-close" data-close-tab="${tab.type}:${tab.id}" role="button" aria-label="${escapeHtmlAttribute(t("Close %{title}", { title: tText(meta.title) }))}" title="${escapeHtmlAttribute(t("Close tab"))}">×</span>
     </button>
   `;
 }
@@ -210,8 +229,8 @@ function renderEditor() {
           .map(
             (item) => `
               <section class="editor-meta-row">
-                <strong data-testid="editor-meta-label">${escapeHtml(item.label)}</strong>
-                <span>${escapeHtml(item.value)}</span>
+                <strong data-testid="editor-meta-label">${escapeHtml(tText(item.label))}</strong>
+                <span>${escapeHtml(tText(item.value))}</span>
               </section>
             `
           )
@@ -230,14 +249,14 @@ function renderEditorBody(route) {
       <section class="editor-section">
         <ul class="editor-list compact">
           ${dashboard.summary_cards
-            .map((card) => `<li><strong>${escapeHtml(card.label)}:</strong> ${escapeHtml(card.value)} <span>${escapeHtml(card.detail)}</span></li>`)
+            .map((card) => `<li><strong>${escapeHtml(tText(card.label))}:</strong> ${escapeHtml(card.value)} <span>${escapeHtml(tText(card.detail))}</span></li>`)
             .join("")}
         </ul>
       </section>
       <section class="editor-section">
-        <h2>Workbench Notes</h2>
+        <h2>${escapeHtml(t("Workbench Notes"))}</h2>
         <ul class="editor-list">
-          ${dashboard.checklist.map((entry) => `<li>${escapeHtml(entry)}</li>`).join("")}
+          ${dashboard.checklist.map((entry) => `<li>${escapeHtml(tText(entry))}</li>`).join("")}
         </ul>
       </section>
     `;
@@ -250,13 +269,13 @@ function renderEditorBody(route) {
   const active = activeItem();
   return `
     <div class="editor-toolbar">
-      <button class="editor-toolbar-button" type="button">Open</button>
-      <button class="editor-toolbar-button" type="button">Preview</button>
-      <button class="editor-toolbar-button" type="button">Metadata</button>
+      <button class="editor-toolbar-button" type="button">${escapeHtml(t("Open"))}</button>
+      <button class="editor-toolbar-button" type="button">${escapeHtml(t("Preview"))}</button>
+      <button class="editor-toolbar-button" type="button">${escapeHtml(t("Metadata"))}</button>
     </div>
     <div class="editor-section">
-      <h2>${escapeHtml(active?.title || routeLabel(route))}</h2>
-      <p>${escapeHtml(active?.meta || "Desktop workbench content routed through the Elixir shell.")}</p>
+      <h2>${escapeHtml(tText(active?.title || routeLabel(route)))}</h2>
+      <p>${escapeHtml(tText(active?.meta || "Desktop workbench content routed through the Elixir shell."))}</p>
     </div>
   `;
 }
@@ -292,7 +311,7 @@ function renderPanelBody() {
   return `
     <div class="panel-entry">
       <strong>${escapeHtml(routeLabel(state.session.panel.active_tab))}</strong>
-      <span>The shared lower panel is available for tasks, output, git details, and editor-specific diagnostics.</span>
+      <span>${escapeHtml(t("The shared lower panel is available for tasks, output, git details, and editor-specific diagnostics."))}</span>
     </div>
   `;
 }
@@ -301,8 +320,8 @@ function renderTaskPanelEntries() {
   if (!state.taskStatus.tasks.length) {
     return `
       <div class="panel-entry panel-empty-state">
-        <strong>Tasks</strong>
-        <span>No background tasks running</span>
+        <strong>${escapeHtml(t("Tasks"))}</strong>
+        <span>${escapeHtml(t("No background tasks running"))}</span>
       </div>
     `;
   }
@@ -335,8 +354,8 @@ function renderOutputEntries() {
   if (!state.outputEntries.length) {
     return `
       <div class="panel-entry panel-empty-state output-list">
-        <strong>Output</strong>
-        <span>No shell output yet</span>
+        <strong>${escapeHtml(t("Output"))}</strong>
+        <span>${escapeHtml(t("No shell output yet"))}</span>
       </div>
     `;
   }
@@ -362,8 +381,8 @@ function renderGitLogEntries() {
   return `
     <div class="git-log-list">
       <div class="panel-entry">
-        <strong>Git Log</strong>
-        <span>Working tree integration is not wired yet in the shell, but the tab is selectable and ready for command output.</span>
+        <strong>${escapeHtml(t("Git Log"))}</strong>
+        <span>${escapeHtml(t("Working tree integration is not wired yet in the shell, but the tab is selectable and ready for command output."))}</span>
       </div>
     </div>
   `;
@@ -372,15 +391,15 @@ function renderGitLogEntries() {
 function renderAssistant() {
   root.querySelector(".assistant-sidebar").innerHTML = `
     <div class="assistant-header">
-      <strong>Assistant</strong>
+      <strong>${escapeHtml(t("Assistant"))}</strong>
     </div>
     <div class="assistant-content">
       ${bootstrap.content.assistant_cards
         .map(
           (card) => `
             <section class="assistant-card">
-              <strong>${escapeHtml(card.label)}</strong>
-              <span>${escapeHtml(card.text)}</span>
+              <strong>${escapeHtml(tText(card.label))}</strong>
+              <span>${escapeHtml(tText(card.text))}</span>
             </section>
           `
         )
@@ -392,23 +411,25 @@ function renderAssistant() {
 function renderStatusBar() {
   const status = state.status;
   const taskOverflow = state.taskStatus.running_task_overflow;
-  const taskMessage = state.taskStatus.running_task_message || "Idle";
+  const taskMessage = state.taskStatus.running_task_message || t("Idle");
+  const postCount = status.right.post_count_value ?? status.right.post_count;
+  const mediaCount = status.right.media_count_value ?? status.right.media_count;
 
   root.querySelector(".status-bar").innerHTML = `
     <div class="status-bar-left">
       ${renderProjectSelector()}
       <button class="status-bar-item status-bar-task-button" data-command="open-tasks-panel" type="button">
-        <span>${escapeHtml(taskMessage)}</span>
+        <span>${escapeHtml(tText(taskMessage))}</span>
         ${taskOverflow > 0 ? `<span class="status-bar-count">+${taskOverflow}</span>` : ""}
       </button>
     </div>
     <div class="status-bar-right">
-      <span class="status-bar-item">${escapeHtml(status.right.post_count)}</span>
-      <span class="status-bar-item">${escapeHtml(status.right.media_count)}</span>
+      <span class="status-bar-item">${escapeHtml(typeof postCount === "number" ? t("%{count} posts", { count: postCount }) : tText(postCount))}</span>
+      <span class="status-bar-item">${escapeHtml(typeof mediaCount === "number" ? t("%{count} media", { count: mediaCount }) : tText(mediaCount))}</span>
       <span class="status-bar-item theme-badge">${escapeHtml(status.right.theme_badge)}</span>
-      <button class="status-bar-item offline-badge${status.right.offline_mode ? " active" : ""}" data-command="toggle-offline-mode" type="button" title="Toggle offline mode">✈</button>
+      <button class="status-bar-item offline-badge${status.right.offline_mode ? " active" : ""}" data-command="toggle-offline-mode" type="button" title="${escapeHtmlAttribute(t("Toggle offline mode"))}">✈</button>
       <label class="status-bar-item language-badge">
-        <span>UI</span>
+        <span>${escapeHtml(t("UI"))}</span>
         <select class="status-bar-language-select" data-command="set-ui-language">${renderLanguageOptions()}</select>
       </label>
       <span class="status-bar-item brand">${escapeHtml(status.right.brand)}</span>
@@ -657,7 +678,7 @@ async function fetchProjects() {
 }
 
 async function createProject() {
-  const name = window.prompt("New project name", "New Project");
+  const name = window.prompt(t("New project name"), t("New Project"));
   if (!name || !name.trim()) {
     return;
   }
@@ -677,17 +698,17 @@ async function createProject() {
     const payload = await response.json();
 
     if (!response.ok || payload.status !== "ok") {
-      appendOutputEntry("Create Project", payload.error?.message || `Command failed with HTTP ${response.status}`);
+      appendOutputEntry(t("Create Project"), payload.error?.message || t("Command failed with HTTP %{status}", { status: response.status }));
       setPanelTab("output");
       render();
       return;
     }
 
     await fetchProjects();
-    appendOutputEntry("Create Project", `Activated ${payload.project.name}`);
+    appendOutputEntry(t("Create Project"), t("Activated %{name}", { name: payload.project.name }));
     render();
   } catch (error) {
-    appendOutputEntry("Create Project", error?.message || String(error));
+    appendOutputEntry(t("Create Project"), error?.message || String(error));
     setPanelTab("output");
     render();
   }
@@ -714,17 +735,17 @@ async function selectProject(projectId) {
     const payload = await response.json();
 
     if (!response.ok || payload.status !== "ok") {
-      appendOutputEntry("Select Project", payload.error?.message || `Command failed with HTTP ${response.status}`);
+      appendOutputEntry(t("Select Project"), payload.error?.message || t("Command failed with HTTP %{status}", { status: response.status }));
       setPanelTab("output");
       render();
       return;
     }
 
     await fetchProjects();
-    appendOutputEntry("Select Project", `Activated ${payload.project.name}`);
+    appendOutputEntry(t("Select Project"), t("Activated %{name}", { name: payload.project.name }));
     render();
   } catch (error) {
-    appendOutputEntry("Select Project", error?.message || String(error));
+    appendOutputEntry(t("Select Project"), error?.message || String(error));
     setPanelTab("output");
     render();
   }
@@ -792,11 +813,11 @@ function executeLocalShellCommand(action) {
       openSingletonTab("api_documentation");
       return true;
     case "regenerate_calendar":
-      appendOutputEntry("Regenerate Calendar", "Calendar regeneration is not wired yet, but the base shell now surfaces the command and keeps the Output tab selectable.");
+      appendOutputEntry(t("Regenerate Calendar"), t("Calendar regeneration is not wired yet, but the base shell now surfaces the command and keeps the Output tab selectable."));
       setPanelTab("output");
       return true;
     case "fill_missing_translations":
-      appendOutputEntry("Fill Missing Translations", "Translation fill is not wired yet, but the command is now routed into Output instead of being ignored.");
+      appendOutputEntry(t("Fill Missing Translations"), t("Translation fill is not wired yet, but the command is now routed into Output instead of being ignored."));
       setPanelTab("output");
       return true;
     case "toggle_offline_mode":
@@ -819,7 +840,7 @@ async function executeBackendShellCommand(action) {
     });
 
     if (!response.ok) {
-      appendOutputEntry(routeLabel(action), `Command failed with HTTP ${response.status}`);
+      appendOutputEntry(routeLabel(action), t("Command failed with HTTP %{status}", { status: response.status }));
       setPanelTab("output");
       render();
       return;
@@ -850,7 +871,7 @@ function applyShellCommandResult(result) {
       void fetchTaskStatus();
       break;
     case "open_url":
-      appendOutputEntry(result.title, result.url || result.message || "Opened URL");
+      appendOutputEntry(tText(result.title), tText(result.url || result.message || "Opened URL"));
       setPanelTab("output");
 
       if (result.url) {
@@ -867,11 +888,11 @@ function applyShellCommandResult(result) {
       });
       return;
     case "output":
-      appendOutputEntry(result.title, result.message, result.details);
+      appendOutputEntry(tText(result.title), tText(result.message), result.details);
       setPanelTab(result.panel_tab || "output");
       break;
     default:
-      appendOutputEntry(routeLabel(result.action || "output"), result.message || "Command completed");
+      appendOutputEntry(routeLabel(result.action || "output"), tText(result.message || "Command completed"));
       setPanelTab("output");
       break;
   }
@@ -880,7 +901,7 @@ function applyShellCommandResult(result) {
 }
 
 function applyShellCommandError(action, error) {
-  appendOutputEntry(routeLabel(action), error?.message || "Command failed");
+  appendOutputEntry(routeLabel(action), error?.message || t("Command failed"));
   setPanelTab("output");
   render();
 }
@@ -996,7 +1017,7 @@ function tabMetadata(tab) {
 
   const item = activeItem();
   if (item && tab.id === tabIdForItem(item, item.route)) {
-    return { title: item.title };
+    return { title: tText(item.title) };
   }
 
   return { title: routeLabel(tab.type) };
@@ -1026,53 +1047,53 @@ function currentEditorMeta() {
 function editorTitle() {
   const meta = currentTabMeta();
   if (meta?.title) {
-    return meta.title;
+    return tText(meta.title);
   }
 
   const item = activeItem();
-  return item?.title || bootstrap.content.dashboard.title;
+  return tText(item?.title || bootstrap.content.dashboard.title);
 }
 
 function editorSubtitle(route) {
   const meta = currentTabMeta();
   if (meta?.subtitle) {
-    return meta.subtitle;
+    return tText(meta.subtitle);
   }
 
   if (route === "dashboard") {
-    return bootstrap.content.dashboard.subtitle;
+    return tText(bootstrap.content.dashboard.subtitle);
   }
 
   const item = activeItem();
-  return item?.meta || `${routeLabel(route)} content loaded through the desktop shell.`;
+  return tText(item?.meta || "Desktop workbench content routed through the Elixir shell.");
 }
 
 function routeLabel(route) {
   if (!route) {
-    return "Dashboard";
+    return t("Dashboard");
   }
 
   if (route === "output") {
-    return "Output";
+    return t("Output");
   }
 
   if (route === "git_log") {
-    return "Git Log";
+    return t("Git Log");
   }
 
   if (route === "open_in_browser") {
-    return "Open in Browser";
+    return t("Open in Browser");
   }
 
   if (route === "open_data_folder") {
-    return "Open Data Folder";
+    return t("Open Data Folder");
   }
 
   if (route === "upload_site") {
-    return "Upload Site";
+    return t("Upload Site");
   }
 
-  return (
+  return tText(
     bootstrap.registry.editor_routes.find((item) => item.id === route)?.title ||
     sidebarViews().find((item) => item.id === route)?.label ||
     titleCase(route)
@@ -1085,16 +1106,16 @@ function renderCommandPayload(route, payload) {
       return `
         <section class="editor-section">
           <ul class="editor-list compact">
-            <li><strong>Diffs:</strong> ${escapeHtml(String(payload.summary?.diff_count || 0))}</li>
-            <li><strong>Orphans:</strong> ${escapeHtml(String(payload.summary?.orphan_count || 0))}</li>
+            <li><strong>${escapeHtml(t("Diffs"))}:</strong> ${escapeHtml(String(payload.summary?.diff_count || 0))}</li>
+            <li><strong>${escapeHtml(t("Orphans"))}:</strong> ${escapeHtml(String(payload.summary?.orphan_count || 0))}</li>
           </ul>
         </section>
         <section class="editor-section">
-          <h2>Diff Reports</h2>
+          <h2>${escapeHtml(t("Diff Reports"))}</h2>
           ${renderKeyedEntries(payload.diff_reports, ["entity_type", "entity_id", "differences"])}
         </section>
         <section class="editor-section">
-          <h2>Orphan Reports</h2>
+          <h2>${escapeHtml(t("Orphan Reports"))}</h2>
           ${renderKeyedEntries(payload.orphan_reports, ["entity_type", "path"])}
         </section>
       `;
@@ -1102,51 +1123,51 @@ function renderCommandPayload(route, payload) {
       return `
         <section class="editor-section">
           <ul class="editor-list compact">
-            <li><strong>Missing:</strong> ${escapeHtml(String(payload.summary?.missing_count || 0))}</li>
-            <li><strong>Extra:</strong> ${escapeHtml(String(payload.summary?.extra_count || 0))}</li>
-            <li><strong>Stale:</strong> ${escapeHtml(String(payload.summary?.stale_count || 0))}</li>
+            <li><strong>${escapeHtml(t("Missing"))}:</strong> ${escapeHtml(String(payload.summary?.missing_count || 0))}</li>
+            <li><strong>${escapeHtml(t("Extra"))}:</strong> ${escapeHtml(String(payload.summary?.extra_count || 0))}</li>
+            <li><strong>${escapeHtml(t("Stale"))}:</strong> ${escapeHtml(String(payload.summary?.stale_count || 0))}</li>
           </ul>
         </section>
         <section class="editor-section">
-          <h2>Missing Pages</h2>
-          ${renderStringList(payload.missing_pages, "No missing pages")}
+          <h2>${escapeHtml(t("Missing Pages"))}</h2>
+          ${renderStringList(payload.missing_pages, t("No missing pages"))}
         </section>
         <section class="editor-section">
-          <h2>Extra Pages</h2>
-          ${renderStringList(payload.extra_pages, "No extra pages")}
+          <h2>${escapeHtml(t("Extra Pages"))}</h2>
+          ${renderStringList(payload.extra_pages, t("No extra pages"))}
         </section>
         <section class="editor-section">
-          <h2>Stale Pages</h2>
-          ${renderStringList(payload.stale_pages, "No stale pages")}
+          <h2>${escapeHtml(t("Stale Pages"))}</h2>
+          ${renderStringList(payload.stale_pages, t("No stale pages"))}
         </section>
       `;
     case "translation_validation":
       return `
         <section class="editor-section">
           <ul class="editor-list compact">
-            <li><strong>Missing:</strong> ${escapeHtml(String(payload.summary?.missing_count || 0))}</li>
-            <li><strong>Orphan Files:</strong> ${escapeHtml(String(payload.summary?.orphan_count || 0))}</li>
-            <li><strong>Do Not Translate:</strong> ${escapeHtml(String(payload.summary?.do_not_translate_count || 0))}</li>
+            <li><strong>${escapeHtml(t("Missing"))}:</strong> ${escapeHtml(String(payload.summary?.missing_count || 0))}</li>
+            <li><strong>${escapeHtml(t("Orphan Files"))}:</strong> ${escapeHtml(String(payload.summary?.orphan_count || 0))}</li>
+            <li><strong>${escapeHtml(t("Do Not Translate"))}:</strong> ${escapeHtml(String(payload.summary?.do_not_translate_count || 0))}</li>
           </ul>
         </section>
         <section class="editor-section">
-          <h2>Missing Translations</h2>
+          <h2>${escapeHtml(t("Missing Translations"))}</h2>
           ${renderKeyedEntries(payload.missing, ["post_id", "language"])}
         </section>
         <section class="editor-section">
-          <h2>Orphan Files</h2>
-          ${renderStringList(payload.orphan_files, "No orphan translation files")}
+          <h2>${escapeHtml(t("Orphan Files"))}</h2>
+          ${renderStringList(payload.orphan_files, t("No orphan translation files"))}
         </section>
       `;
     case "find_duplicates":
       return `
         <section class="editor-section">
           <ul class="editor-list compact">
-            <li><strong>Pairs:</strong> ${escapeHtml(String(payload.summary?.pair_count || 0))}</li>
+            <li><strong>${escapeHtml(t("Pairs"))}:</strong> ${escapeHtml(String(payload.summary?.pair_count || 0))}</li>
           </ul>
         </section>
         <section class="editor-section">
-          <h2>Duplicate Candidates</h2>
+          <h2>${escapeHtml(t("Duplicate Candidates"))}</h2>
           ${renderKeyedEntries(payload.pairs, ["title_a", "title_b", "score"])}
         </section>
       `;
@@ -1169,7 +1190,7 @@ function renderStringList(items, emptyMessage) {
 
 function renderKeyedEntries(items, keys) {
   if (!items || !items.length) {
-    return `<p>No items</p>`;
+    return `<p>${escapeHtml(t("No items"))}</p>`;
   }
 
   return `
@@ -1330,20 +1351,20 @@ function normalizeProjects(projectsPayload) {
 }
 
 function panelTabs() {
-  return ["tasks", state.session.panel.active_tab, "output", "git_log"].filter(uniqueValue);
+  return ["tasks", "output", "git_log", state.session.panel.active_tab].filter(uniqueValue);
 }
 
 function renderPanelTab(tab) {
   if (tab === "tasks") {
-    return `<button class="panel-tab ${state.session.panel.active_tab === "tasks" ? "active" : ""}" data-panel-tab="tasks" type="button">Tasks</button>`;
+    return `<button class="panel-tab ${state.session.panel.active_tab === "tasks" ? "active" : ""}" data-panel-tab="tasks" type="button">${escapeHtml(t("Tasks"))}</button>`;
   }
 
   if (tab === "output") {
-    return `<button class="panel-tab ${state.session.panel.active_tab === "output" ? "active" : ""}" data-panel-tab="output" type="button">Output</button>`;
+    return `<button class="panel-tab ${state.session.panel.active_tab === "output" ? "active" : ""}" data-panel-tab="output" type="button">${escapeHtml(t("Output"))}</button>`;
   }
 
   if (tab === "git_log") {
-    return `<button class="panel-tab ${state.session.panel.active_tab === "git_log" ? "active" : ""}" data-panel-tab="git_log" type="button">Git Log</button>`;
+    return `<button class="panel-tab ${state.session.panel.active_tab === "git_log" ? "active" : ""}" data-panel-tab="git_log" type="button">${escapeHtml(t("Git Log"))}</button>`;
   }
 
   return `<button class="panel-tab ${state.session.panel.active_tab === tab ? "active" : ""}" data-panel-tab="${tab}" type="button">${escapeHtml(routeLabel(tab))}</button>`;
@@ -1363,7 +1384,7 @@ function renderProjectSelector() {
 
   return `
     <div class="project-selector${state.projectMenuOpen ? " is-open" : ""}">
-      <button class="project-selector-trigger" data-project-menu-trigger type="button" title="Switch project">
+      <button class="project-selector-trigger" data-project-menu-trigger type="button" title="${escapeHtmlAttribute(t("Switch project"))}">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="project-icon">
           <path d="M14.5 3H7.71l-.85-.85A.5.5 0 0 0 6.5 2h-5a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5v-10a.5.5 0 0 0-.5-.5zm-13 1h5.29l.85.85c.1.1.23.15.36.15h6.5v9h-13V4z"></path>
         </svg>
@@ -1381,7 +1402,7 @@ function renderProjectDropdown() {
   return `
     <div class="project-dropdown">
       <div class="project-dropdown-header">
-        <span>Projects</span>
+        <span>${escapeHtml(t("Projects"))}</span>
       </div>
       <div class="project-list">
         ${state.projects.projects.map((project) => renderProjectItem(project)).join("")}
@@ -1391,7 +1412,7 @@ function renderProjectDropdown() {
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
             <path d="M14 7v1H8v6H7V8H1V7h6V1h1v6h6z"></path>
           </svg>
-          New Project
+          ${escapeHtml(t("New Project"))}
         </button>
       </div>
     </div>
@@ -1459,11 +1480,11 @@ function readStoredUiLanguage(fallback) {
 function statusLabel(status) {
   switch (status) {
     case "running":
-      return "Running";
+      return t("Running");
     case "pending":
-      return "Queued";
+      return t("Queued");
     default:
-      return titleCase(status || "task");
+      return tText(titleCase(status || "task"));
   }
 }
 
