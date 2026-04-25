@@ -100,14 +100,39 @@
             }
           },
           "dashboard": {
-            "title": "Dashboard",
-            "subtitle": "Static shell bundle for direct inspection",
-            "summary_cards": [
-              { "label": "Posts", "value": "42", "detail": "Drafts, published, archive" }
+            "title": "dashboard.title",
+            "subtitle": "dashboard.subtitle",
+            "post_stats": {
+              "total_posts": 42,
+              "draft_count": 18,
+              "published_count": 21,
+              "archived_count": 3
+            },
+            "media_stats": {
+              "media_count": 18,
+              "image_count": 15,
+              "total_bytes": 12884902
+            },
+            "timeline_entries": [
+              { "year": 2025, "month": 11, "count": 2 },
+              { "year": 2025, "month": 12, "count": 3 },
+              { "year": 2026, "month": 1, "count": 5 },
+              { "year": 2026, "month": 2, "count": 7 },
+              { "year": 2026, "month": 3, "count": 9 },
+              { "year": 2026, "month": 4, "count": 6 }
             ],
-            "checklist": [
-              "Static bundle is valid HTML",
-              "Shell assets render without duplicated bootstrap code"
+            "tag_cloud_items": [
+              { "tag": "launch", "count": 12, "color": "#2962ff" },
+              { "tag": "writing", "count": 7, "color": "#00897b" },
+              { "tag": "elixir", "count": 5, "color": "#e65100" }
+            ],
+            "category_counts": [
+              { "category": "notes", "count": 14 },
+              { "category": "projects", "count": 8 }
+            ],
+            "recent_posts": [
+              { "id": "post-welcome", "title": "Welcome to bDS2", "status": "draft", "updated_at": 1774972800000 },
+              { "id": "post-roadmap", "title": "Roadmap", "status": "published", "updated_at": 1774540800000 }
             ]
           },
           "assistant_cards": [

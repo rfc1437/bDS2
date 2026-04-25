@@ -214,8 +214,14 @@ function renderTab(tab) {
 
 function renderEditor() {
   const route = currentRoute();
-  const meta = currentEditorMeta();
   const node = root.querySelector(".editor-shell");
+
+  if (route === "dashboard") {
+    node.innerHTML = renderDashboard();
+    return;
+  }
+
+  const meta = currentEditorMeta();
 
   node.innerHTML = `
     <div class="editor-frame">
@@ -241,27 +247,147 @@ function renderEditor() {
   `;
 }
 
+function renderDashboard() {
+  const dashboard = bootstrap.content.dashboard || {};
+  const postStats = dashboard.post_stats || {};
+  const mediaStats = dashboard.media_stats || {};
+  const timelineEntries = Array.isArray(dashboard.timeline_entries) ? dashboard.timeline_entries : [];
+  const tagCloudItems = buildDashboardTagCloudItems(dashboard.tag_cloud_items || []);
+  const categoryCounts = Array.isArray(dashboard.category_counts) ? dashboard.category_counts : [];
+  const recentPosts = Array.isArray(dashboard.recent_posts) ? dashboard.recent_posts : [];
+  const meta = currentEditorMeta();
+  const maxCount = Math.max(1, ...timelineEntries.map((entry) => Number(entry.count) || 0));
+
+  return `
+    <div class="editor-empty">
+      <div class="dashboard-content">
+        <h1 data-testid="editor-title">${escapeHtml(t("dashboard.title"))}</h1>
+        <p class="text-muted">${escapeHtml(t("dashboard.subtitle"))}</p>
+
+        <div class="dashboard-stats">
+          <div class="stat-card">
+            <div class="stat-number">${escapeHtml(String(postStats.total_posts || 0))}</div>
+            <div class="stat-label">${escapeHtml(t("dashboard.stats.totalPosts"))}</div>
+            <div class="stat-breakdown">
+              <span class="stat-tag stat-published">${escapeHtml(t("dashboard.stats.published", { count: postStats.published_count || 0 }))}</span>
+              <span class="stat-tag stat-draft">${escapeHtml(t("dashboard.stats.drafts", { count: postStats.draft_count || 0 }))}</span>
+              ${(postStats.archived_count || 0) > 0 ? `<span class="stat-tag stat-archived">${escapeHtml(t("dashboard.stats.archived", { count: postStats.archived_count || 0 }))}</span>` : ""}
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">${escapeHtml(String(mediaStats.media_count || 0))}</div>
+            <div class="stat-label">${escapeHtml(t("dashboard.stats.mediaFiles"))}</div>
+            <div class="stat-breakdown">
+              <span class="stat-tag">${escapeHtml(t("dashboard.stats.images", { count: mediaStats.image_count || 0 }))}</span>
+              <span class="stat-tag">${escapeHtml(formatBytes(mediaStats.total_bytes || 0))}</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">${escapeHtml(String((dashboard.tag_cloud_items || []).length))}</div>
+            <div class="stat-label">${escapeHtml(t("dashboard.stats.tags"))}</div>
+            <div class="stat-breakdown">
+              <span class="stat-tag">${escapeHtml(t("dashboard.stats.categories", { count: categoryCounts.length }))}</span>
+            </div>
+          </div>
+        </div>
+
+        ${timelineEntries.length ? `
+          <div class="dashboard-section">
+            <h4>${escapeHtml(t("dashboard.section.postsOverTime"))}</h4>
+            <div class="timeline-chart">
+              ${timelineEntries
+                .map(
+                  (entry) => `
+                    <div class="timeline-bar-container">
+                      <div class="timeline-bar" style="height: ${Math.max(4, ((Number(entry.count) || 0) / maxCount) * 100)}%">
+                        <span class="timeline-bar-count">${escapeHtml(String(entry.count || 0))}</span>
+                      </div>
+                      <div class="timeline-bar-label">
+                        <span class="timeline-bar-label-month">${escapeHtml(formatDashboardMonth(entry.year, entry.month))}</span>
+                        <span class="timeline-bar-label-year">${escapeHtml(String(entry.year || ""))}</span>
+                      </div>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          </div>
+        ` : ""}
+
+        ${tagCloudItems.length ? `
+          <div class="dashboard-section">
+            <h4>${escapeHtml(t("dashboard.section.tags"))}</h4>
+            <div class="tag-cloud">
+              ${tagCloudItems
+                .map((item) => `<span class="dashboard-tag${item.color ? " has-color" : ""}" style="${escapeHtmlAttribute(renderDashboardTagStyle(item))}" title="${escapeHtmlAttribute(dashboardPostCountLabel(item.count))}">${escapeHtml(item.tag)}</span>`)
+                .join("")}
+              ${(dashboard.tag_cloud_items || []).length > 40 ? `<span class="text-muted tag-cloud-more">${escapeHtml(t("dashboard.tagCloud.more", { count: (dashboard.tag_cloud_items || []).length - 40 }))}</span>` : ""}
+            </div>
+          </div>
+        ` : ""}
+
+        ${categoryCounts.length ? `
+          <div class="dashboard-section">
+            <h4>${escapeHtml(t("dashboard.section.categories"))}</h4>
+            <div class="tag-cloud">
+              ${categoryCounts
+                .map(
+                  (category) => `
+                    <span class="dashboard-tag dashboard-category" title="${escapeHtmlAttribute(dashboardPostCountLabel(category.count || 0))}">
+                      ${escapeHtml(category.category || "")}
+                      <span class="tag-count">${escapeHtml(String(category.count || 0))}</span>
+                    </span>
+                  `
+                )
+                .join("")}
+            </div>
+          </div>
+        ` : ""}
+
+        ${recentPosts.length ? `
+          <div class="dashboard-section">
+            <h4>${escapeHtml(t("dashboard.section.recentlyUpdated"))}</h4>
+            <div class="recent-posts-list">
+              ${recentPosts
+                .map(
+                  (post) => `
+                    <button
+                      class="recent-post-item"
+                      data-open-tab="${escapeHtmlAttribute(post.id || "") }"
+                      data-open-route="post"
+                      data-open-title="${escapeHtmlAttribute(post.title || "") }"
+                      type="button"
+                    >
+                      <span class="recent-post-title">${escapeHtml(post.title || "")}</span>
+                      <span class="recent-post-status status-${escapeHtmlAttribute(post.status || "draft")}">${escapeHtml(dashboardStatusLabel(post.status || "draft"))}</span>
+                      <span class="recent-post-date">${escapeHtml(formatDashboardDate(post.updated_at))}</span>
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>
+          </div>
+        ` : ""}
+
+        <div class="dashboard-inspector-meta" hidden>
+          ${meta
+            .map(
+              (item) => `
+                <section class="editor-meta-row">
+                  <strong data-testid="editor-meta-label">${escapeHtml(tText(item.label))}</strong>
+                  <span>${escapeHtml(tText(item.value))}</span>
+                </section>
+              `
+            )
+            .join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderEditorBody(route) {
   const meta = currentTabMeta();
-
-  if (route === "dashboard") {
-    const dashboard = bootstrap.content.dashboard;
-    return `
-      <section class="editor-section">
-        <ul class="editor-list compact">
-          ${dashboard.summary_cards
-            .map((card) => `<li><strong>${escapeHtml(tText(card.label))}:</strong> ${escapeHtml(card.value)} <span>${escapeHtml(tText(card.detail))}</span></li>`)
-            .join("")}
-        </ul>
-      </section>
-      <section class="editor-section">
-        <h2>${escapeHtml(t("Workbench Notes"))}</h2>
-        <ul class="editor-list">
-          ${dashboard.checklist.map((entry) => `<li>${escapeHtml(tText(entry))}</li>`).join("")}
-        </ul>
-      </section>
-    `;
-  }
 
   if (meta?.payload) {
     return renderCommandPayload(route, meta.payload);
@@ -1586,6 +1712,114 @@ function statusLabel(status) {
     default:
       return tText(titleCase(status || "task"));
   }
+}
+
+function buildDashboardTagCloudItems(items) {
+  if (!Array.isArray(items) || !items.length) {
+    return [];
+  }
+
+  const topItems = items
+    .slice()
+    .sort((left, right) => (Number(right.count) || 0) - (Number(left.count) || 0))
+    .slice(0, 40);
+
+  const counts = topItems.map((item) => Number(item.count) || 0);
+  const maxCount = Math.max(1, ...counts);
+  const minCount = Math.min(...counts);
+  const range = Math.max(1, maxCount - minCount);
+
+  return topItems
+    .map((item) => ({
+      ...item,
+      color: normalizeDashboardTagColor(item.color),
+      fontSize: 11 + (((Number(item.count) || 0) - minCount) / range) * 11,
+    }))
+    .sort((left, right) => String(left.tag || "").localeCompare(String(right.tag || "")));
+}
+
+function dashboardPostCountLabel(count) {
+  const normalizedCount = Number(count) || 0;
+  return t(normalizedCount === 1 ? "dashboard.postCount.one" : "dashboard.postCount.other", { count: normalizedCount });
+}
+
+function dashboardStatusLabel(status) {
+  const keys = {
+    draft: "dashboard.status.draft",
+    published: "dashboard.status.published",
+    archived: "dashboard.status.archived",
+  };
+
+  return keys[status] ? t(keys[status]) : tText(titleCase(status || "draft"));
+}
+
+function formatDashboardMonth(year, month) {
+  return new Intl.DateTimeFormat(formatLocaleFor(state.uiLanguage), { month: "short" }).format(new Date(year, (month || 1) - 1, 1));
+}
+
+function formatDashboardDate(timestamp) {
+  if (!timestamp) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(formatLocaleFor(state.uiLanguage)).format(new Date(timestamp));
+}
+
+function formatLocaleFor(language) {
+  const locales = {
+    de: "de-DE",
+    en: "en-US",
+    es: "es-ES",
+    fr: "fr-FR",
+    it: "it-IT",
+  };
+
+  return locales[language] || locales.en;
+}
+
+function formatBytes(bytes) {
+  const normalizedBytes = Number(bytes) || 0;
+
+  if (normalizedBytes === 0) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  const unitIndex = Math.min(Math.floor(Math.log(normalizedBytes) / Math.log(1024)), units.length - 1);
+  const value = normalizedBytes / Math.pow(1024, unitIndex);
+  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function renderDashboardTagStyle(item) {
+  const declarations = [`font-size: ${(item.fontSize || 11).toFixed(1)}px;`];
+
+  if (item.color) {
+    declarations.push(`background-color: ${item.color};`);
+    declarations.push(`color: ${dashboardContrastColor(item.color)};`);
+  }
+
+  return declarations.join(" ");
+}
+
+function normalizeDashboardTagColor(color) {
+  if (typeof color !== "string") {
+    return null;
+  }
+
+  const trimmed = color.trim();
+  return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed) ? trimmed : null;
+}
+
+function dashboardContrastColor(hexColor) {
+  const normalized = hexColor.length === 4
+    ? `#${hexColor[1]}${hexColor[1]}${hexColor[2]}${hexColor[2]}${hexColor[3]}${hexColor[3]}`
+    : hexColor;
+
+  const red = Number.parseInt(normalized.slice(1, 3), 16);
+  const green = Number.parseInt(normalized.slice(3, 5), 16);
+  const blue = Number.parseInt(normalized.slice(5, 7), 16);
+  const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+  return luminance >= 140 ? "#111111" : "#f5f5f5";
 }
 
 function escapeHtml(value) {

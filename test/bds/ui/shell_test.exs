@@ -136,6 +136,29 @@ defmodule BDS.UI.ShellTest do
     assert html =~ ~s("Assistant":"Assistent")
   end
 
+  test "shell bootstrap and static bundle expose the old dashboard sections" do
+    html = ShellPage.render()
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert html =~ ~s("timeline_entries")
+    assert html =~ ~s("tag_cloud_items")
+    assert html =~ ~s("category_counts")
+    assert html =~ ~s("recent_posts")
+
+    assert js =~ "dashboard-content"
+    assert js =~ "dashboard-stats"
+    assert js =~ "timeline-chart"
+    assert js =~ "tag-cloud"
+    assert js =~ "recent-posts-list"
+
+    assert css =~ ".dashboard-content"
+    assert css =~ ".dashboard-stats"
+    assert css =~ ".timeline-chart"
+    assert css =~ ".tag-cloud"
+    assert css =~ ".recent-posts-list"
+  end
+
   test "static shell bundle exists for direct browser inspection" do
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/index.html")
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/app.css")

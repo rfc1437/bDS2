@@ -3,6 +3,7 @@ defmodule BDS.UI.ShellPage do
 
   alias BDS.I18n
   alias BDS.Projects
+  alias BDS.UI.Dashboard
   alias BDS.UI.MenuBar
   alias BDS.UI.Registry
   alias BDS.UI.Session
@@ -54,6 +55,8 @@ defmodule BDS.UI.ShellPage do
     workbench = Workbench.new()
     task_status = BDS.Tasks.status_snapshot()
     ui_language = I18n.current_ui_locale()
+    projects = project_snapshot()
+    dashboard = dashboard_content(projects.active_project_id)
 
     %{
       title: Application.get_env(:bds, :desktop)[:title] || "Blogging Desktop Server",
@@ -77,19 +80,19 @@ defmodule BDS.UI.ShellPage do
         default_sidebar_view: Atom.to_string(Registry.default_sidebar_view())
       },
       menu_groups: Enum.map(MenuBar.default_groups(), &encode_menu_group/1),
-      projects: project_snapshot(),
+      projects: projects,
       session: Session.serialize(workbench),
       task_status: task_status,
       content: %{
         sidebar: sidebar_content(),
-        dashboard: dashboard_content(task_status),
+        dashboard: dashboard,
         assistant_cards: assistant_cards(),
         editor_meta: editor_meta(task_status)
       },
       status:
         Workbench.status_bar(workbench,
-          post_count: 42,
-          media_count: 18,
+          post_count: dashboard.post_stats.total_posts,
+          media_count: dashboard.media_stats.media_count,
           theme_badge: "desktop-shell",
           ui_language: ui_language,
           offline_mode: true,
@@ -227,25 +230,15 @@ defmodule BDS.UI.ShellPage do
     %{title: title, subtitle: subtitle, sections: [%{title: title, items: items}]}
   end
 
-  defp dashboard_content(task_status) do
-    %{
-      title: "Dashboard",
-      subtitle: "Desktop workbench shell wired through Elixir",
-      summary_cards: [
-        %{label: "Posts", value: "42", detail: "Across draft, published, and archive"},
-        %{label: "Media", value: "18", detail: "Images and documents indexed"},
-        %{
-          label: "Tasks",
-          value: Integer.to_string(task_status.active_count),
-          detail: task_summary_detail(task_status)
-        }
-      ],
-      checklist: [
-        "Native menu groups mirror the old application shell",
-        "Sidebar, tabs, panel, and assistant panes are inspectable DOM regions",
-        "Automation can boot the shell in a separate process and capture screenshots"
-      ]
-    }
+  defp dashboard_content(project_id) do
+    Dashboard.snapshot(project_id)
+  rescue
+    error in [Exqlite.Error, DBConnection.OwnershipError] ->
+      if match?(%Exqlite.Error{}, error) and not String.contains?(Exception.message(error), "no such table") do
+        reraise error, __STACKTRACE__
+      end
+
+      Dashboard.empty_snapshot()
   end
 
   defp assistant_cards do
@@ -264,18 +257,6 @@ defmodule BDS.UI.ShellPage do
         %{label: "Main Language", value: "en"}
       ]
     }
-  end
-
-  defp task_summary_detail(%{active_count: 0}), do: "No active background tasks"
-
-  defp task_summary_detail(%{running_count: running, pending_count: pending}) do
-    segments = []
-    segments = if running > 0, do: ["#{running} running" | segments], else: segments
-    segments = if pending > 0, do: ["#{pending} queued" | segments], else: segments
-
-    segments
-    |> Enum.reverse()
-    |> Enum.join(", ")
   end
 
   defp normalize_view_label(:chat, _label), do: "Chat"
