@@ -1636,6 +1636,36 @@ button {
   font-size: 20px;
 }
 
+.media-thumbnail.has-image {
+  position: relative;
+}
+
+.media-thumbnail-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.media-thumbnail-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.media-thumbnail.is-loaded .media-thumbnail-image {
+  opacity: 1;
+}
+
+.media-thumbnail.is-loaded .media-thumbnail-fallback {
+  opacity: 0;
+}
+
 .media-item-info {
   flex: 1;
   min-width: 0;

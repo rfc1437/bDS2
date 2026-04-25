@@ -199,12 +199,16 @@ defmodule BDS.UI.ShellTest do
     assert js =~ "renderSidebarFilterStatus"
     assert js =~ "applySidebarPostFilters"
     assert js =~ "applySidebarMediaFilters"
+    assert js =~ "media-thumbnail-image"
+    assert js =~ "/api/media-thumbnail/"
+    assert js =~ "loading=\"lazy\""
 
     assert css =~ ".search-box"
     assert css =~ ".filter-panel"
     assert css =~ ".calendar-view"
     assert css =~ ".filter-chip"
     assert css =~ ".filter-status"
+    assert css =~ ".media-thumbnail-image"
   end
 
   test "clearing sidebar filters resets from the baseline seed instead of the filtered payload" do

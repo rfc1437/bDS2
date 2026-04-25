@@ -312,10 +312,42 @@ defmodule BDS.DesktopTest do
     assert payload["result"]["url"] == "http://127.0.0.1:4123/"
   end
 
+  test "desktop router serves active-project media thumbnails for the sidebar" do
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+
+    temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-thumbnail-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+
+    on_exit(fn ->
+      File.rm_rf(temp_dir)
+    end)
+
+    {:ok, project} = BDS.Projects.create_project(%{name: "Desktop Thumbnails", data_path: temp_dir})
+    {:ok, _active} = BDS.Projects.set_active_project(project.id)
+
+    source_path = Path.join(temp_dir, "sample.jpg")
+    File.write!(source_path, tiny_jpeg_binary())
+
+    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    conn = conn(:get, "/api/media-thumbnail/#{media.id}?k=#{Desktop.Auth.login_key()}")
+    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+
+    assert conn.status == 200
+    assert [content_type] = Plug.Conn.get_resp_header(conn, "content-type")
+    assert String.starts_with?(content_type, "image/webp")
+    assert byte_size(conn.resp_body) > 0
+  end
+
   defp menu_item(groups, id) do
     groups
     |> Enum.flat_map(& &1.items)
     |> Enum.find(&Map.get(&1, :id) == id)
+  end
+
+  defp tiny_jpeg_binary do
+    Image.new!(3, 2, color: [255, 0, 0])
+    |> Image.write!(:memory, suffix: ".jpg", quality: 85)
   end
 
   defp wait_for_task(task_id, matcher, timeout \\ 2_000)

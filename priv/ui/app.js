@@ -439,6 +439,7 @@ function renderSidebarMediaItem(item, view) {
   const itemRoute = item.route || view.editor_route;
   const tabId = tabIdForItem(item, itemRoute);
   const active = tabRef && tabRef.type === itemRoute && tabRef.id === tabId;
+  const thumbnail = renderMediaThumbnail(item);
 
   return `
     <button
@@ -449,12 +450,34 @@ function renderSidebarMediaItem(item, view) {
       type="button"
       title="${escapeHtmlAttribute(item.title || "") }"
     >
-      <span class="media-thumbnail">${escapeHtml(mediaThumbnailGlyph(item.mime_type))}</span>
+      ${thumbnail}
       <span class="media-item-info">
         <span class="media-item-name">${escapeHtml(item.title || "")}</span>
         <span class="media-item-size">${escapeHtml(item.meta || "")}</span>
       </span>
     </button>
+  `;
+}
+
+function renderMediaThumbnail(item) {
+  const fallback = escapeHtml(mediaThumbnailGlyph(item.mime_type));
+
+  if (!String(item.mime_type || "").startsWith("image/")) {
+    return `<span class="media-thumbnail"><span class="media-thumbnail-fallback">${fallback}</span></span>`;
+  }
+
+  return `
+    <span class="media-thumbnail has-image" data-media-thumbnail-state="pending">
+      <span class="media-thumbnail-fallback">${fallback}</span>
+      <img
+        class="media-thumbnail-image"
+        data-media-thumbnail-image
+        src="${escapeHtmlAttribute(mediaThumbnailUrl(item.id))}"
+        alt=""
+        loading="lazy"
+        decoding="async"
+      >
+    </span>
   `;
 }
 
@@ -1256,6 +1279,25 @@ function bindEvents() {
         applySidebarPostFilters(viewId);
       }
     };
+  });
+
+  root.querySelectorAll("[data-media-thumbnail-image]").forEach((image) => {
+    const container = image.closest(".media-thumbnail");
+
+    image.onload = () => {
+      container?.classList.add("is-loaded");
+      container?.classList.remove("is-error");
+    };
+
+    image.onerror = () => {
+      container?.classList.add("is-error");
+      container?.classList.remove("is-loaded");
+    };
+
+    if (image.complete && image.naturalWidth > 0) {
+      container?.classList.add("is-loaded");
+      container?.classList.remove("is-error");
+    }
   });
 
   root.querySelectorAll("[data-open-tab]").forEach((button) => {
@@ -2418,6 +2460,10 @@ function mediaThumbnailGlyph(mimeType) {
   }
 
   return "📄";
+}
+
+function mediaThumbnailUrl(mediaId) {
+  return `/api/media-thumbnail/${encodeURIComponent(mediaId)}`;
 }
 
 function buildDashboardTagCloudItems(items) {

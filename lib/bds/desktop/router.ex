@@ -42,6 +42,10 @@ defmodule BDS.Desktop.Router do
     |> Plug.Conn.send_resp(200, BDS.Desktop.ShellController.projects_json())
   end
 
+  get "/api/media-thumbnail/:media_id" do
+    BDS.Desktop.ShellController.media_thumbnail(conn, media_id, conn.params)
+  end
+
   post "/api/sidebar" do
     {:ok, body, conn} = Plug.Conn.read_body(conn)
     payload = if body == "", do: %{}, else: Jason.decode!(body)

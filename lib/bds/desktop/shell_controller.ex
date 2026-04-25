@@ -1,6 +1,10 @@
 defmodule BDS.Desktop.ShellController do
   @moduledoc false
 
+  alias BDS.Media
+  alias BDS.Media.Media, as: MediaRecord
+  alias BDS.Projects
+  alias BDS.Repo
   alias BDS.UI.Sidebar
 
   def index_html do
@@ -47,6 +51,18 @@ defmodule BDS.Desktop.ShellController do
     case BDS.Desktop.ShellCommands.execute(action, params) do
       {:ok, result} -> Jason.encode!(%{status: "ok", result: result})
       {:error, error} -> Jason.encode!(%{status: "error", error: normalize_error(error)})
+    end
+  end
+
+  def media_thumbnail(conn, media_id, params \\ %{}) when is_binary(media_id) do
+    case active_media_thumbnail(media_id, Map.get(params, "size") || Map.get(params, :size)) do
+      {:ok, content_type, path} ->
+        conn
+        |> Plug.Conn.put_resp_content_type(content_type)
+        |> Plug.Conn.send_file(200, path)
+
+      :error ->
+        Plug.Conn.send_resp(conn, 404, "not found")
     end
   end
 
@@ -186,6 +202,43 @@ defmodule BDS.Desktop.ShellController do
 
   defp present?(value) when is_binary(value), do: String.trim(value) != ""
   defp present?(_value), do: false
+
+  defp active_media_thumbnail(media_id, size) do
+    with %{} = project <- Projects.get_active_project(),
+         %MediaRecord{} = media <- Repo.get(MediaRecord, media_id),
+         true <- media.project_id == project.id,
+         relative_path when is_binary(relative_path) <- Media.thumbnail_paths(media)[thumbnail_size(size)],
+         absolute_path = Path.join(Projects.project_data_dir(project), relative_path),
+         true <- File.exists?(absolute_path) do
+      {:ok, thumbnail_content_type(relative_path), absolute_path}
+    else
+      _other -> :error
+    end
+  rescue
+    error in [Exqlite.Error, DBConnection.OwnershipError] ->
+      if match?(%Exqlite.Error{}, error) and not String.contains?(Exception.message(error), "no such table") do
+        reraise error, __STACKTRACE__
+      end
+
+      :error
+  end
+
+  defp thumbnail_size(size) do
+    case to_string(size || "small") do
+      "medium" -> :medium
+      "large" -> :large
+      "ai" -> :ai
+      _other -> :small
+    end
+  end
+
+  defp thumbnail_content_type(path) do
+    case Path.extname(path) do
+      ".jpg" -> "image/jpeg"
+      ".jpeg" -> "image/jpeg"
+      _other -> "image/webp"
+    end
+  end
 
   defp blank_to_nil(value) when is_binary(value) do
     trimmed = String.trim(value)
