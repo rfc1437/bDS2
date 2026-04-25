@@ -1,7 +1,7 @@
 defmodule BDS.Desktop.Menu do
   @moduledoc false
 
-  use Desktop.Menu
+  use BDS.Desktop.MenuCompat
   alias Desktop.Window
 
   @impl true

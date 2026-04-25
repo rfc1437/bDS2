@@ -1,7 +1,7 @@
 defmodule BDS.Desktop.MenuBar do
   @moduledoc false
 
-  use Desktop.Menu
+  use BDS.Desktop.MenuCompat
   alias BDS.UI.MenuBar, as: ShellMenuBar
   alias Desktop.OS
   alias Desktop.Window
