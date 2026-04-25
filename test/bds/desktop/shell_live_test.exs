@@ -10,6 +10,8 @@ defmodule BDS.Desktop.ShellLiveTest do
     {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
     assert html =~ ~s(data-testid="sidebar-shell")
+    assert html =~ ~s(data-testid="status-bar")
+    assert html =~ ~s(data-testid="status-task-button")
     assert html =~ ~s(class="panel-shell is-hidden")
     assert html =~ ~s(data-testid="activity-button")
     assert html =~ ~s(data-view="posts")
@@ -38,5 +40,20 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ ~s(aria-label="Media")
     assert html =~ ~s(data-view="media")
+
+    html =
+      view
+      |> element("[data-testid='activity-button'][data-view='settings']")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="sidebar-open-item")
+
+    html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='settings-project']")
+      |> render_click()
+
+    assert html =~ ~s(data-tab-type="settings")
+    assert html =~ ">Settings<"
   end
 end

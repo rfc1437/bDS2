@@ -1,0 +1,348 @@
+<div class="app" id="bds-shell-app">
+  <div class="window-titlebar" data-region="title-bar">
+    <div class="window-titlebar-menu-bar is-hidden">
+      <button class="window-titlebar-menu-button" type="button">File</button>
+      <button class="window-titlebar-menu-button" type="button">Edit</button>
+      <button class="window-titlebar-menu-button" type="button">View</button>
+      <button class="window-titlebar-menu-button" type="button">Blog</button>
+      <button class="window-titlebar-menu-button" type="button">Help</button>
+    </div>
+    <div class="window-titlebar-drag-region"></div>
+    <div class="window-titlebar-title" data-testid="window-title"><%= @page_title %></div>
+    <div class="window-titlebar-actions">
+      <button
+        class="window-titlebar-action-button"
+        data-testid="toggle-sidebar"
+        type="button"
+        phx-click="toggle_sidebar"
+        aria-label="Toggle sidebar"
+        title="Toggle sidebar"
+      >
+        <span class={["window-titlebar-sidebar-icon", if(@workbench.sidebar_visible, do: "is-active", else: "is-inactive")]}> 
+          <span class="window-titlebar-sidebar-pane"></span>
+        </span>
+      </button>
+      <button
+        class="window-titlebar-action-button"
+        data-testid="toggle-panel"
+        type="button"
+        phx-click="toggle_panel"
+        aria-label="Toggle panel"
+        title="Toggle panel"
+      >
+        <span class={["window-titlebar-panel-icon", if(@workbench.panel.visible, do: "is-active", else: "is-inactive")]}> 
+          <span class="window-titlebar-panel-pane"></span>
+        </span>
+      </button>
+      <button
+        class="window-titlebar-action-button"
+        data-testid="toggle-assistant"
+        type="button"
+        phx-click="toggle_assistant_sidebar"
+        aria-label="Toggle assistant"
+        title="Toggle assistant"
+      >
+        <span class={["window-titlebar-assistant-icon", if(@workbench.assistant_sidebar_visible, do: "is-active", else: "is-inactive")]}> 
+          <span class="window-titlebar-assistant-pane"></span>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <div class="app-main">
+    <aside class="activity-bar" data-region="activity-bar">
+      <div class="activity-bar-top">
+        <%= for button <- Enum.filter(@activity_buttons, &(&1.activity_group == :top)) do %>
+          <button
+            class={["activity-bar-item", if(button.active, do: "active")]}
+            data-testid="activity-button"
+            data-view={button.id}
+            data-active={to_string(button.active)}
+            type="button"
+            phx-click="select_view"
+            phx-value-view={button.id}
+            title={activity_label(button.label)}
+            aria-label={activity_label(button.label)}
+          >
+            <%= raw(ShellData.activity_icon(button.id)) %>
+          </button>
+        <% end %>
+      </div>
+      <div class="activity-bar-bottom">
+        <%= for button <- Enum.filter(@activity_buttons, &(&1.activity_group == :bottom)) do %>
+          <button
+            class={["activity-bar-item", if(button.active, do: "active")]}
+            data-testid="activity-button"
+            data-view={button.id}
+            data-active={to_string(button.active)}
+            type="button"
+            phx-click="select_view"
+            phx-value-view={button.id}
+            title={activity_label(button.label)}
+            aria-label={activity_label(button.label)}
+          >
+            <%= raw(ShellData.activity_icon(button.id)) %>
+          </button>
+        <% end %>
+      </div>
+    </aside>
+
+    <section
+      class={["sidebar-shell", if(not @workbench.sidebar_visible, do: "is-hidden")]}
+      data-testid="sidebar-shell"
+      style={"width: #{@workbench.sidebar_width}px;"}
+    >
+      <div class="sidebar" data-region="sidebar">
+        <div class="sidebar-content sidebar-body">
+          <div class="sidebar-section">
+            <div class="sidebar-section-header">
+              <span><%= String.upcase(sidebar_header_label(@sidebar_header)) %></span>
+            </div>
+          </div>
+          <%= render_sidebar_body(assigns) %>
+        </div>
+      </div>
+      <div class="resizable-panel-divider sidebar-divider" data-resize="sidebar" data-role="resize-handle"></div>
+    </section>
+
+    <main class="app-content" data-region="content">
+      <div class="tab-bar" data-region="tab-bar">
+        <%= if Enum.empty?(@workbench.tabs) do %>
+          <div class="tab-bar-empty"><%= translated("Dashboard") %></div>
+        <% else %>
+          <div class="tab-bar-tabs">
+            <%= for tab <- @workbench.tabs do %>
+              <button
+                class={["tab", if(@workbench.active_tab == {tab.type, tab.id}, do: "active"), if(tab.is_transient, do: "transient")]}
+                data-tab-type={tab.type}
+                data-tab-id={tab.id}
+                type="button"
+                phx-click="select_tab"
+                phx-value-type={tab.type}
+                phx-value-id={tab.id}
+              >
+                <span class="tab-icon"><%= raw(ShellData.activity_icon(tab_icon_id(tab))) %></span>
+                <span class="tab-title"><%= tab_title(tab, @tab_meta) %></span>
+                <span class="tab-close" aria-hidden="true">×</span>
+              </button>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+
+      <section class="editor-shell" data-region="editor">
+        <%= if is_nil(@current_tab) do %>
+          <div class="editor-empty">
+            <div class="dashboard-content">
+              <h1 data-testid="editor-title"><%= translated("dashboard.title") %></h1>
+              <p class="text-muted"><%= translated("dashboard.subtitle") %></p>
+
+              <div class="dashboard-stats">
+                <div class="stat-card">
+                  <div class="stat-number"><%= @dashboard.post_stats.total_posts || 0 %></div>
+                  <div class="stat-label"><%= translated("dashboard.stats.totalPosts") %></div>
+                  <div class="stat-breakdown">
+                    <span class="stat-tag stat-published"><%= translated("dashboard.stats.published", %{count: @dashboard.post_stats.published_count || 0}) %></span>
+                    <span class="stat-tag stat-draft"><%= translated("dashboard.stats.drafts", %{count: @dashboard.post_stats.draft_count || 0}) %></span>
+                    <%= if (@dashboard.post_stats.archived_count || 0) > 0 do %>
+                      <span class="stat-tag stat-archived"><%= translated("dashboard.stats.archived", %{count: @dashboard.post_stats.archived_count || 0}) %></span>
+                    <% end %>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-number"><%= @dashboard.media_stats.media_count || 0 %></div>
+                  <div class="stat-label"><%= translated("dashboard.stats.mediaFiles") %></div>
+                  <div class="stat-breakdown">
+                    <span class="stat-tag"><%= translated("dashboard.stats.images", %{count: @dashboard.media_stats.image_count || 0}) %></span>
+                    <span class="stat-tag"><%= ShellData.format_bytes(@dashboard.media_stats.total_bytes || 0) %></span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-number"><%= length(@dashboard_tag_cloud_items) %></div>
+                  <div class="stat-label"><%= translated("dashboard.stats.tags") %></div>
+                  <div class="stat-breakdown">
+                    <span class="stat-tag"><%= translated("dashboard.stats.categories", %{count: length(@dashboard_category_counts)}) %></span>
+                  </div>
+                </div>
+              </div>
+
+              <%= if Enum.any?(@dashboard_timeline_entries) do %>
+                <div class="dashboard-section">
+                  <h4><%= translated("dashboard.section.postsOverTime") %></h4>
+                  <div class="timeline-chart">
+                    <%= for entry <- @dashboard_timeline_entries do %>
+                      <div class="timeline-bar-container">
+                        <div class="timeline-bar" style={"height: #{timeline_height(entry, @dashboard_timeline_entries)}%"}>
+                          <span class="timeline-bar-count"><%= entry.count || 0 %></span>
+                        </div>
+                        <div class="timeline-bar-label">
+                          <span class="timeline-bar-label-month"><%= ShellData.format_dashboard_month(entry.year, entry.month) %></span>
+                          <span class="timeline-bar-label-year"><%= entry.year %></span>
+                        </div>
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+
+              <%= if Enum.any?(@dashboard_tag_cloud_items) do %>
+                <div class="dashboard-section">
+                  <h4><%= translated("dashboard.section.tags") %></h4>
+                  <div class="tag-cloud">
+                    <%= for item <- @dashboard_tag_cloud_items do %>
+                      <span class={["dashboard-tag", if(item.color, do: "has-color")]} style={ShellData.render_dashboard_tag_style(item)} title={ShellData.dashboard_post_count_label(item.count)}><%= item.tag %></span>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+
+              <%= if Enum.any?(@dashboard_category_counts) do %>
+                <div class="dashboard-section">
+                  <h4><%= translated("dashboard.section.categories") %></h4>
+                  <div class="tag-cloud">
+                    <%= for category <- @dashboard_category_counts do %>
+                      <span class="dashboard-tag dashboard-category" title={ShellData.dashboard_post_count_label(category.count || 0)}>
+                        <%= category.category || "" %>
+                        <span class="tag-count"><%= category.count || 0 %></span>
+                      </span>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+
+              <%= if Enum.any?(@dashboard_recent_posts) do %>
+                <div class="dashboard-section">
+                  <h4><%= translated("dashboard.section.recentlyUpdated") %></h4>
+                  <div class="recent-posts-list">
+                    <%= for post <- @dashboard_recent_posts do %>
+                      <button class="recent-post-item" type="button">
+                        <span class="recent-post-title"><%= post.title || "" %></span>
+                        <span class={"recent-post-status status-#{post.status || "draft"}"}><%= ShellData.dashboard_status_label(post.status || "draft") %></span>
+                        <span class="recent-post-date"><%= ShellData.format_dashboard_date(post.updated_at) %></span>
+                      </button>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+
+              <div class="dashboard-inspector-meta" hidden>
+                <%= for item <- @editor_meta do %>
+                  <section class="editor-meta-row">
+                    <strong data-testid="editor-meta-label"><%= translated(item.label) %></strong>
+                    <span><%= translated(item.value) %></span>
+                  </section>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% else %>
+          <div class="editor-frame">
+            <section class="editor-main">
+              <div class="editor-kicker"><%= tab_route_label(@current_tab) %></div>
+              <h1 class="editor-title" data-testid="editor-title"><%= tab_title(@current_tab, @tab_meta) %></h1>
+              <p class="editor-subtitle"><%= tab_subtitle(@current_tab, @tab_meta) %></p>
+
+              <div class="editor-toolbar">
+                <button class="editor-toolbar-button" type="button">Open</button>
+                <button class="editor-toolbar-button" type="button">Preview</button>
+                <button class="editor-toolbar-button" type="button">Metadata</button>
+              </div>
+
+              <div class="editor-section">
+                <h2><%= tab_title(@current_tab, @tab_meta) %></h2>
+                <p>Desktop workbench content routed through the Elixir shell.</p>
+              </div>
+            </section>
+
+            <aside class="editor-meta">
+              <%= for item <- @editor_meta do %>
+                <section class="editor-meta-row">
+                  <strong data-testid="editor-meta-label"><%= translated(item.label) %></strong>
+                  <span><%= translated(item.value) %></span>
+                </section>
+              <% end %>
+            </aside>
+          </div>
+        <% end %>
+      </section>
+
+      <section class={["panel-shell", if(not @workbench.panel.visible, do: "is-hidden")]} data-region="panel">
+        <div class="panel-header">
+          <div class="panel-tabs">
+            <%= for tab <- @panel_tabs do %>
+              <button
+                class={["panel-tab", if(@workbench.panel.active_tab == tab, do: "active")]}
+                type="button"
+                phx-click="select_panel_tab"
+                phx-value-tab={tab}
+              >
+                <%= panel_tab_label(tab) %>
+              </button>
+            <% end %>
+          </div>
+        </div>
+        <div class="panel-content">
+          <%= render_panel_body(assigns) %>
+        </div>
+      </section>
+    </main>
+
+    <section
+      class={["assistant-sidebar-shell", if(not @workbench.assistant_sidebar_visible, do: "is-hidden")]}
+      data-testid="assistant-shell"
+      style={"width: #{@workbench.assistant_sidebar_width}px;"}
+    >
+      <div class="resizable-panel-divider assistant-divider" data-resize="assistant" data-role="resize-handle"></div>
+      <aside class="assistant-sidebar" data-region="assistant-sidebar">
+        <div class="assistant-header">
+          <strong><%= translated("Assistant") %></strong>
+        </div>
+        <div class="assistant-content">
+          <%= for card <- @assistant_cards do %>
+            <section class="assistant-card">
+              <strong><%= translated(card.label) %></strong>
+              <span><%= translated(card.text) %></span>
+            </section>
+          <% end %>
+        </div>
+      </aside>
+    </section>
+  </div>
+
+  <footer class="status-bar" data-region="status-bar" data-testid="status-bar">
+    <div class="status-bar-left">
+      <div class="project-selector">
+        <button class="project-selector-trigger" type="button" title={translated("Switch project")}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="project-icon">
+            <path d="M14.5 3H7.71l-.85-.85A.5.5 0 0 0 6.5 2h-5a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5v-10a.5.5 0 0 0-.5-.5zm-13 1h5.29l.85.85c.1.1.23.15.36.15h6.5v9h-13V4z"></path>
+          </svg>
+          <span class="project-name"><%= if @current_project, do: @current_project.name, else: "My Blog" %></span>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="dropdown-arrow">
+            <path d="M4.5 5.5L8 9l3.5-3.5h-7z"></path>
+          </svg>
+        </button>
+      </div>
+      <button class="status-bar-item status-bar-task-button" data-testid="status-task-button" type="button" phx-click="toggle_panel">
+        <span><%= @status.left.running_task_message || translated("Idle") %></span>
+        <%= if (@status.left.running_task_overflow || 0) > 0 do %>
+          <span class="status-bar-count">+<%= @status.left.running_task_overflow %></span>
+        <% end %>
+      </button>
+    </div>
+    <div class="status-bar-right">
+      <span class="status-bar-item"><%= @status.right.post_count %></span>
+      <span class="status-bar-item"><%= @status.right.media_count %></span>
+      <span class="status-bar-item theme-badge"><%= @status.right.theme_badge %></span>
+      <button class={["status-bar-item", "offline-badge", if(@status.right.offline_mode, do: "active")]} data-testid="status-offline-button" type="button" phx-click="toggle_offline_mode" title={translated("Toggle offline mode")}>✈</button>
+      <label class="status-bar-item language-badge">
+        <span><%= translated("UI") %></span>
+        <select class="status-bar-language-select">
+          <%= for language <- @supported_ui_languages do %>
+            <option selected={language.code == @page_language} value={language.code}><%= language.flag %></option>
+          <% end %>
+        </select>
+      </label>
+      <span class="status-bar-item brand"><%= @status.right.brand %></span>
+    </div>
+  </footer>
+</div>

@@ -192,7 +192,7 @@ defmodule BDS.Sidecar do
     else
       inner
       |> String.split(",", trim: true)
-      |> Enum.map(&(String.trim(&1) |> parse_scalar(nil)))
+      |> Enum.map(&parse_scalar(nil, String.trim(&1)))
     end
   end
 
