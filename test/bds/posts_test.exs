@@ -104,6 +104,35 @@ defmodule BDS.PostsTest do
     assert reopened.updated_at >= published.updated_at
   end
 
+  test "update_post keeps published posts published and rewrites the file when only template_slug changes",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Template Rewrite",
+               content: "Body",
+               template_slug: "article"
+             })
+
+    assert {:ok, published} = BDS.Posts.publish_post(post.id)
+
+    full_path = Path.join(temp_dir, published.file_path)
+    original_contents = File.read!(full_path)
+
+    assert original_contents =~ "templateSlug: article\n"
+
+    assert {:ok, updated} =
+             BDS.Posts.update_post(post.id, %{template_slug: "landing-page"})
+
+    assert updated.status == :published
+    assert updated.template_slug == "landing-page"
+    assert updated.file_path == published.file_path
+
+    rewritten_contents = File.read!(full_path)
+    assert rewritten_contents =~ "templateSlug: landing-page\n"
+    refute rewritten_contents =~ "templateSlug: article\n"
+  end
+
   test "publish_post writes frontmatter to the project data directory and clears draft content" do
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-post-publish-#{System.unique_integer([:positive])}")

@@ -38,7 +38,7 @@ Ordered from base contracts upward:
 | Persistence and file contracts | `schema`, `frontmatter`, `project`, `post`, `translation`, `media`, `tag`, `template`, `script`, `menu`, `metadata` | Implemented | Core schemas, file formats, publish flows, sidecars, rebuild, and metadata diff are present and tested. |
 | Rendering and output pipelines | `template_context`, `search`, `generation`, `preview`, `publishing`, `task`, `i18n` | Implemented | Rendering, generation, preview, publishing, task tracking, and localization are in place. |
 | Integrations | `git`, `mcp`, `ai`, `embedding`, `cli_sync`, `metadata_diff` | Implemented | Service layer and test coverage exist for these domains. |
-| Desktop shell primitives | `layout`, `tabs`, `sidebar_views` | Partial | Shell frame, sidebar views, tabs, filters, hotkeys, and panel exist, but route content is incomplete. |
+| Desktop shell primitives | `layout`, `tabs`, `sidebar_views` | Implemented | Route state, registry-backed sidebar/editor coverage, panel fallback rules, menu/native-command wiring, and shell frame parity are in place; route bodies remain generic until the editor UX phase. |
 | Cross-cutting flows | `ui_data_flow`, `engine_side_effects`, `action_patterns`, `media_processing` | Partial | Most backend behavior exists, but UI coordination, explicit engine event modeling, and some parity details are still incomplete. |
 | Editor UX layer | `editor_post`, `editor_media`, `editor_settings`, `editor_tags`, `editor_chat`, `editor_script`, `editor_template`, `editor_misc`, `modals` | Partial to missing | Route registration exists, but feature-complete editors and modal workflows are not done. |
 
@@ -50,10 +50,10 @@ The remaining work needs to proceed from base contracts upward. Later phases sho
    Schema, frontmatter, sidecars, template context, generation output, preview behavior, metadata diff, and rebuild behavior are now pinned against the Allium specs and the old bDS application with executable parity tests.
 
 2. Close engine-level behavior gaps. Completed 2026-04-25.
-   Save/publish/delete side-effects, manual-translation source-post reopening, post-to-media sidecar cleanup, auto-translation task cascades, linked-media translation cascades, link graph maintenance, thumbnail regeneration rules, and rebuild notifications are now implemented and covered at the backend layer independent of UI.
+   Save/publish/delete side-effects, published-post `templateSlug` frontmatter rewrites, manual-translation source-post reopening, post-to-media sidecar cleanup, auto-translation task cascades, linked-media translation cascades, link graph maintenance, thumbnail regeneration rules, and rebuild notifications are now implemented and covered at the backend layer independent of UI.
 
-3. Finish the desktop shell primitives.
-   Complete route state, shell command coverage, panel integration, and menu wiring for every sidebar view and editor route so the shell exposes the entire product surface cleanly.
+3. Finish the desktop shell primitives. Completed 2026-04-25.
+   Route state, registry-backed shell command coverage, panel fallback integration, and menu/native-command wiring now cover every sidebar view and singleton editor route while preserving the old app shell frame and styling.
 
 4. Implement the shared modal and confirmation layer.
    Add the modal/overlay system required by the specs: AI suggestions, delete confirmations, merge confirmation, picker overlays, and gallery flows.

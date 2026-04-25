@@ -85,6 +85,12 @@ defmodule BDS.Posts do
           |> Repo.update()
           |> case do
             {:ok, updated_post} ->
+              if post.status == :published and updated_post.status == :published and
+                   Map.get(updates, :template_slug) != nil and
+                   updated_post.template_slug != post.template_slug do
+                :ok = rewrite_published_post(updated_post.id)
+              end
+
               :ok = Embeddings.sync_post(updated_post)
               :ok = PostLinks.sync_post_links(updated_post)
               :ok = Search.sync_post(updated_post)
@@ -560,7 +566,6 @@ defmodule BDS.Posts do
         :content,
         :author,
         :language,
-        :template_slug,
         :tags,
         :categories,
         :do_not_translate

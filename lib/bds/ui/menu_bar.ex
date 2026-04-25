@@ -1,6 +1,7 @@
 defmodule BDS.UI.MenuBar do
   @moduledoc false
 
+  alias BDS.UI.Registry
   alias BDS.UI.Workbench
 
   def default_groups(opts \\ []) do
@@ -82,8 +83,12 @@ defmodule BDS.UI.MenuBar do
   def execute(state, :toggle_sidebar), do: Workbench.toggle_sidebar(state)
   def execute(state, :toggle_panel), do: Workbench.toggle_panel(state)
   def execute(state, :toggle_assistant_sidebar), do: Workbench.toggle_assistant_sidebar(state)
-  def execute(state, :view_posts), do: %{state | active_view: :posts, sidebar_visible: true}
-  def execute(state, :view_media), do: %{state | active_view: :media, sidebar_visible: true}
+  def execute(state, :view_posts), do: open_sidebar_view(state, :posts)
+  def execute(state, :view_media), do: open_sidebar_view(state, :media)
+  def execute(state, :edit_preferences), do: open_singleton_editor(state, :settings)
+  def execute(state, :edit_menu), do: open_singleton_editor(state, :menu_editor)
+  def execute(state, :documentation), do: open_singleton_editor(state, :documentation)
+  def execute(state, :api_documentation), do: open_singleton_editor(state, :api_documentation)
 
   def execute(state, :close_tab) do
     case state.active_tab do
@@ -92,7 +97,47 @@ defmodule BDS.UI.MenuBar do
     end
   end
 
+  def execute(state, command_id) when is_atom(command_id) do
+    with {:ok, view_id} <- sidebar_view_command(command_id) do
+      open_sidebar_view(state, view_id)
+    else
+      :error ->
+        case singleton_editor_command(command_id) do
+          {:ok, route_id} -> open_singleton_editor(state, route_id)
+          :error -> state
+        end
+    end
+  end
+
   def execute(state, _command_id), do: state
+
+  defp open_sidebar_view(state, view_id) do
+    %{state | active_view: view_id, sidebar_visible: true}
+  end
+
+  defp open_singleton_editor(state, route_id) do
+    Workbench.open_tab(state, route_id, Atom.to_string(route_id), :pin)
+  end
+
+  defp sidebar_view_command(command_id) do
+    with "view_" <> suffix <- Atom.to_string(command_id),
+         view_id = String.to_atom(suffix),
+         %{} <- Registry.sidebar_view(view_id) do
+      {:ok, view_id}
+    else
+      _other -> :error
+    end
+  end
+
+  defp singleton_editor_command(command_id) do
+    with "open_" <> suffix <- Atom.to_string(command_id),
+         route_id = String.to_atom(suffix),
+         %{singleton: true} <- Registry.editor_route(route_id) do
+      {:ok, route_id}
+    else
+      _other -> :error
+    end
+  end
 
   defp view_items(dev_mode?) do
     items = [

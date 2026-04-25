@@ -1657,6 +1657,18 @@ function executeShellCommand(action) {
 }
 
 function executeLocalShellCommand(action) {
+  if (isSidebarViewCommand(action)) {
+    const viewId = action.slice(5);
+    state.session.active_view = viewId;
+    state.session.sidebar_visible = true;
+    return true;
+  }
+
+  if (isSingletonEditorCommand(action)) {
+    openSingletonTab(action.slice(5));
+    return true;
+  }
+
   switch (action) {
     case "toggle_sidebar":
       state.session.sidebar_visible = !state.session.sidebar_visible;
@@ -1671,14 +1683,6 @@ function executeLocalShellCommand(action) {
     case "toggle_assistant_sidebar":
       state.session.assistant_sidebar_visible = !state.session.assistant_sidebar_visible;
       persistSessionWidths();
-      return true;
-    case "view_posts":
-      state.session.active_view = "posts";
-      state.session.sidebar_visible = true;
-      return true;
-    case "view_media":
-      state.session.active_view = "media";
-      state.session.sidebar_visible = true;
       return true;
     case "close_tab":
       closeActiveTab();
@@ -1709,6 +1713,21 @@ function executeLocalShellCommand(action) {
     default:
       return false;
   }
+}
+
+function isSidebarViewCommand(action) {
+  return typeof action === "string"
+    && action.startsWith("view_")
+    && sidebarViews().some((view) => view.id === action.slice(5));
+}
+
+function isSingletonEditorCommand(action) {
+  if (typeof action !== "string" || !action.startsWith("open_")) {
+    return false;
+  }
+
+  const route = bootstrap.registry.editor_routes.find((item) => item.id === action.slice(5));
+  return Boolean(route?.singleton);
 }
 
 async function executeBackendShellCommand(action) {

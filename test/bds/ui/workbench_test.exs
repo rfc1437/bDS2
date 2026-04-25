@@ -1,6 +1,7 @@
 defmodule BDS.UI.WorkbenchTest do
   use ExUnit.Case, async: true
 
+  alias BDS.UI.Registry
   alias BDS.UI.MenuBar
   alias BDS.UI.Workbench
 
@@ -186,5 +187,40 @@ defmodule BDS.UI.WorkbenchTest do
     assert state.sidebar_visible == true
     assert state.panel.visible == true
     assert state.active_view == :media
+  end
+
+  test "shared menu command routing covers every sidebar view and singleton editor route" do
+    sidebar_views = Registry.sidebar_views()
+
+    state =
+      Enum.reduce(sidebar_views, Workbench.new(sidebar_visible: false), fn view, acc ->
+        command = String.to_atom("view_#{view.id}")
+        next = MenuBar.execute(acc, command)
+
+        assert next.active_view == view.id
+        assert next.sidebar_visible == true
+
+        %{next | sidebar_visible: false}
+      end)
+
+    singleton_routes =
+      Registry.editor_routes()
+      |> Enum.filter(& &1.singleton)
+      |> Enum.reject(&(&1.id == :dashboard))
+
+    final_state =
+      Enum.reduce(singleton_routes, state, fn route, acc ->
+        command = String.to_atom("open_#{route.id}")
+        next = MenuBar.execute(acc, command)
+
+        assert next.active_tab == {route.id, Atom.to_string(route.id)}
+        assert next.editor_route == route.id
+
+        next
+      end)
+
+    assert Enum.any?(final_state.tabs, &(&1.type == :settings and &1.id == "settings"))
+    assert Enum.any?(final_state.tabs, &(&1.type == :menu_editor and &1.id == "menu_editor"))
+    assert Enum.any?(final_state.tabs, &(&1.type == :find_duplicates and &1.id == "find_duplicates"))
   end
 end
