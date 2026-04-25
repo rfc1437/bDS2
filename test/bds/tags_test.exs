@@ -30,7 +30,7 @@ defmodule BDS.TagsTest do
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
     assert File.exists?(tags_path)
 
-    assert %{"tags" => [%{"name" => "Alpha"}, %{"color" => "#000000", "name" => "Zebra"}]} =
+    assert [%{"name" => "Alpha"}, %{"color" => "#000000", "name" => "Zebra"}] =
              Jason.decode!(File.read!(tags_path))
   end
 
@@ -59,11 +59,9 @@ defmodule BDS.TagsTest do
 
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
 
-    assert %{
-             "tags" => [
-               %{"name" => "Alpha", "color" => "#112233", "post_template_slug" => "article"}
-             ]
-           } =
+    assert [
+             %{"name" => "Alpha", "color" => "#112233", "postTemplateSlug" => "article"}
+           ] =
              Jason.decode!(File.read!(tags_path))
   end
 
@@ -93,7 +91,7 @@ defmodule BDS.TagsTest do
     assert contents =~ "\n---\nBody\n"
 
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
-    assert %{"tags" => [%{"name" => "Beta"}]} = Jason.decode!(File.read!(tags_path))
+    assert [%{"name" => "Beta"}] = Jason.decode!(File.read!(tags_path))
   end
 
   test "merge_tags moves source tags onto the target, deduplicates post tags, deletes sources, and refreshes tags.json",
@@ -126,7 +124,7 @@ defmodule BDS.TagsTest do
     assert contents =~ "\n---\nBody\n"
 
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
-    assert %{"tags" => [%{"name" => "Gamma"}]} = Jason.decode!(File.read!(tags_path))
+    assert [%{"name" => "Gamma"}] = Jason.decode!(File.read!(tags_path))
   end
 
   test "delete_tag removes the tag from posts, rewrites published files, deletes the row, and refreshes tags.json",
@@ -157,7 +155,7 @@ defmodule BDS.TagsTest do
     assert contents =~ "\n---\nBody\n"
 
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
-    assert %{"tags" => [%{"name" => "Beta"}]} = Jason.decode!(File.read!(tags_path))
+    assert [%{"name" => "Beta"}] = Jason.decode!(File.read!(tags_path))
   end
 
   test "sync_tags_from_posts creates missing tags from post tag arrays and refreshes tags.json",
@@ -196,17 +194,15 @@ defmodule BDS.TagsTest do
 
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
 
-    assert %{
-             "tags" => [
-               %{"name" => "Another"},
-               %{
-                 "name" => "Existing",
-                 "color" => "#112233",
-                 "post_template_slug" => "feature-view"
-               },
-               %{"name" => "Missing"}
-             ]
-           } = Jason.decode!(File.read!(tags_path))
+    assert [
+             %{"name" => "Another"},
+             %{
+               "name" => "Existing",
+               "color" => "#112233",
+               "postTemplateSlug" => "feature-view"
+             },
+             %{"name" => "Missing"}
+           ] = Jason.decode!(File.read!(tags_path))
   end
 
   defp errors_on(changeset) do

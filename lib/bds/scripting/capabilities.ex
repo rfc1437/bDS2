@@ -3,6 +3,8 @@ defmodule BDS.Scripting.Capabilities do
 
   import Ecto.Query
 
+  @compiled_env Application.compile_env(:bds, :current_env, Mix.env())
+
   alias BDS.AI
   alias BDS.Desktop.FolderPicker
   alias BDS.Desktop.MenuBar
@@ -1704,6 +1706,10 @@ defmodule BDS.Scripting.Capabilities do
   end
 
   defp test_mode? do
-    Application.get_env(:bds, :test_mode, false)
+    Application.get_env(:bds, :test_mode, false) or current_env() == :test
+  end
+
+  defp current_env do
+    Application.get_env(:bds, :current_env_override) || @compiled_env
   end
 end

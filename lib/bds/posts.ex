@@ -605,20 +605,20 @@ defmodule BDS.Posts do
   defp serialize_post_file(post, published_at) do
     Frontmatter.serialize_document(
       [
-        {:id, post.id},
-        {:title, post.title},
-        {:slug, post.slug},
-        {:excerpt, post.excerpt},
-        {:status, :published},
-        {:author, post.author},
-        {:language, post.language},
-        {:do_not_translate, post.do_not_translate},
-        {:template_slug, post.template_slug},
-        {:created_at, post.created_at},
-        {:updated_at, post.updated_at},
-        {:published_at, published_at},
-        {:tags, post.tags || []},
-        {:categories, post.categories || []}
+        {"id", post.id},
+        {"title", post.title},
+        {"slug", post.slug},
+        {"excerpt", post.excerpt},
+        {"status", :published},
+        {"author", post.author},
+        {"language", post.language},
+        {"doNotTranslate", post.do_not_translate},
+        {"templateSlug", post.template_slug},
+        {"createdAt", post.created_at},
+        {"updatedAt", post.updated_at},
+        {"publishedAt", published_at},
+        {"tags", post.tags || []},
+        {"categories", post.categories || []}
       ],
       post.content
     )
@@ -641,9 +641,8 @@ defmodule BDS.Posts do
   end
 
   defp upsert_post_from_file(project_id, project, path) do
-    project
-    |> parse_rebuild_file(path)
-    |> upsert_post_from_rebuild_file(project_id)
+    rebuild_file = parse_rebuild_file(project, path)
+    upsert_post_from_rebuild_file(project_id, rebuild_file)
   end
 
   defp upsert_post_from_rebuild_file(project_id, rebuild_file) do
@@ -749,8 +748,8 @@ defmodule BDS.Posts do
       {"updatedAt", "updated_at"},
       {"publishedAt", "published_at"}
     ]
-    |> Enum.reduce(fields, fn {legacy_key, current_key}, acc ->
-      case Map.fetch(acc, legacy_key) do
+    |> Enum.reduce(fields, fn {file_key, current_key}, acc ->
+      case Map.fetch(acc, file_key) do
         {:ok, value} -> Map.put_new(acc, current_key, normalize_rebuild_field_value(current_key, value))
         :error -> acc
       end
@@ -875,15 +874,15 @@ defmodule BDS.Posts do
   defp serialize_translation_file(translation, published_at) do
     Frontmatter.serialize_document(
       [
-        {:id, translation.id},
-        {:translation_for, translation.translation_for},
-        {:language, translation.language},
-        {:title, translation.title},
-        {:excerpt, translation.excerpt},
-        {:status, :published},
-        {:created_at, translation.created_at},
-        {:updated_at, translation.updated_at},
-        {:published_at, published_at}
+        {"id", translation.id},
+        {"translationFor", translation.translation_for},
+        {"language", translation.language},
+        {"title", translation.title},
+        {"excerpt", translation.excerpt},
+        {"status", :published},
+        {"createdAt", translation.created_at},
+        {"updatedAt", translation.updated_at},
+        {"publishedAt", published_at}
       ],
       translation.content
     )

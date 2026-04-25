@@ -65,14 +65,15 @@ defmodule BDS.ScriptsTest do
 
     contents = File.read!(full_path)
     assert contents =~ "---\nid: #{published.id}\n"
+    assert contents =~ "projectId: #{project.id}\n"
     assert contents =~ "slug: process-feed\n"
     assert contents =~ "title: Process Feed\n"
     assert contents =~ "kind: utility\n"
     assert contents =~ "entrypoint: main\n"
     assert contents =~ "enabled: true\n"
     assert contents =~ "version: 1\n"
-    assert contents =~ ~r/created_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
-    assert contents =~ ~r/updated_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert contents =~ ~r/createdAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert contents =~ ~r/updatedAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
     assert contents =~ "\n---\nfunction main() return 'ok' end\n"
     refute File.exists?(full_path <> ".tmp")
   end
@@ -139,14 +140,15 @@ defmodule BDS.ScriptsTest do
       [
         "---",
         "id: script-from-file",
+        "projectId: #{project.id}",
         "slug: recovered",
         "title: Recovered Script",
         "kind: utility",
         "entrypoint: main",
         "enabled: true",
         "version: 4",
-        "created_at: 1970-01-01T00:00:00.301Z",
-        "updated_at: 1970-01-01T00:00:00.404Z",
+        "createdAt: 1970-01-01T00:00:00.301Z",
+        "updatedAt: 1970-01-01T00:00:00.404Z",
         "---",
         "function main() return 'restored' end",
         ""

@@ -147,13 +147,13 @@ defmodule BDS.PostsTest do
     assert file_contents =~ "excerpt: Summary\n"
     assert file_contents =~ "author: Writer\n"
     assert file_contents =~ "language: en\n"
-    assert file_contents =~ "do_not_translate: true\n"
-    assert file_contents =~ "template_slug: article\n"
+    assert file_contents =~ "doNotTranslate: true\n"
+    assert file_contents =~ "templateSlug: article\n"
     assert file_contents =~ "tags:\n  - alpha\n"
     assert file_contents =~ "categories:\n  - notes\n"
-    assert file_contents =~ ~r/created_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
-    assert file_contents =~ ~r/updated_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
-    assert file_contents =~ ~r/published_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert file_contents =~ ~r/createdAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert file_contents =~ ~r/updatedAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert file_contents =~ ~r/publishedAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
     assert file_contents =~ "\n---\nHello from markdown\n"
 
     refute File.exists?(full_path <> ".tmp")
@@ -274,11 +274,11 @@ defmodule BDS.PostsTest do
         "status: published",
         "author: Writer",
         "language: en",
-        "do_not_translate: true",
-        "template_slug: article",
-        "created_at: 2024-03-30T21:20:00.000Z",
-        "updated_at: 2024-03-31T21:20:00.000Z",
-        "published_at: 2024-04-01T21:20:00.000Z",
+        "doNotTranslate: true",
+        "templateSlug: article",
+        "createdAt: 2024-03-30T21:20:00.000Z",
+        "updatedAt: 2024-03-31T21:20:00.000Z",
+        "publishedAt: 2024-04-01T21:20:00.000Z",
         "tags:",
         "  - alpha",
         "categories:",
@@ -313,7 +313,7 @@ defmodule BDS.PostsTest do
     assert post.content == nil
   end
 
-  test "rebuild_posts_from_files imports legacy old-app translation files alongside canonical posts" do
+  test "rebuild_posts_from_files imports canonical bDS translation files alongside canonical posts" do
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-post-rebuild-legacy-#{System.unique_integer([:positive])}")
 

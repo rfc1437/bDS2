@@ -44,16 +44,16 @@ defmodule BDS.MenuTest do
     assert File.exists?(opml_path)
 
     contents = File.read!(opml_path)
-    assert contents =~ ~s(<outline kind="home" text="Home")
-    assert contents =~ ~s(<outline kind="page" text="About" slug="about")
-    assert contents =~ ~s(<outline kind="submenu" text="Sections")
-    assert contents =~ ~s(<outline kind="category_archive" text="Notes" slug="notes")
+    assert contents =~ ~s(<outline text="Home" type="home" pageSlug="home")
+    assert contents =~ ~s(<outline text="About" type="page" pageSlug="about")
+    assert contents =~ ~s(<outline text="Sections" type="submenu")
+    assert contents =~ ~s(<outline text="Notes" type="category-archive" categoryName="notes")
 
     assert {:ok, loaded} = BDS.Menu.get_menu(project.id)
     assert loaded == menu
   end
 
-  test "sync_menu_from_filesystem loads canonical OPML and preserves a prepended Home entry", %{
+  test "sync_menu_from_filesystem loads canonical bDS OPML and preserves a prepended Home entry", %{
     project: project,
     temp_dir: temp_dir
   } do
@@ -65,10 +65,14 @@ defmodule BDS.MenuTest do
       [
         ~s(<?xml version="1.0" encoding="UTF-8"?>),
         ~s(<opml version="2.0">),
+        ~s(  <head>),
+        ~s(    <title>Blog Menu</title>),
+        ~s(  </head>),
         ~s(  <body>),
-        ~s(    <outline kind="page" text="Blog" slug="blog" />),
-        ~s(    <outline kind="submenu" text="Topics">),
-        ~s(      <outline kind="category_archive" text="Elixir" slug="elixir" />),
+        ~s(    <outline id="menu-home" text="Home" type="home" pageSlug="home"/>),
+        ~s(    <outline id="menu-topics" text="Topics" type="submenu">),
+        ~s(      <outline id="menu-page" text="Blog" type="page" pageId="page-1" pageSlug="blog"/>),
+        ~s(      <outline id="menu-cat" text="Elixir" type="category-archive" categoryName="elixir"/>),
         ~s(    </outline>),
         ~s(  </body>),
         ~s(</opml>)
@@ -80,12 +84,12 @@ defmodule BDS.MenuTest do
 
     assert menu.items == [
              %{kind: :home, label: "Home", slug: nil},
-             %{kind: :page, label: "Blog", slug: "blog"},
              %{
                kind: :submenu,
                label: "Topics",
                slug: nil,
                children: [
+                 %{kind: :page, label: "Blog", slug: "blog"},
                  %{kind: :category_archive, label: "Elixir", slug: "elixir"}
                ]
              }

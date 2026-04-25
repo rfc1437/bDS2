@@ -56,6 +56,7 @@ defmodule BDS.PostTranslationsTest do
     assert File.exists?(translation_path)
 
     translation_contents = File.read!(translation_path)
+    assert translation_contents =~ "translationFor: #{post.id}\n"
     assert translation_contents =~ "title: Kanonischer Beitrag\n"
     assert translation_contents =~ "language: de\n"
     assert translation_contents =~ "status: published\n"
@@ -124,13 +125,13 @@ defmodule BDS.PostTranslationsTest do
       [
         "---",
         "id: orphan-translation",
-        "translation_for: missing-post",
+        "translationFor: missing-post",
         "language: fr",
         "title: Orpheline",
         "status: published",
-        "created_at: 1711843200",
-        "updated_at: 1711929600",
-        "published_at: 1712016000",
+        "createdAt: 1711843200",
+        "updatedAt: 1711929600",
+        "publishedAt: 1712016000",
         "---",
         "Texte orphelin",
         ""

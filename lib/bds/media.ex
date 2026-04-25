@@ -341,6 +341,7 @@ defmodule BDS.Media do
 
   defp upsert_media_from_sidecar(project, sidecar_path) do
     {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
+    fields = normalize_media_sidecar_fields(fields)
     relative_sidecar_path = Path.relative_to(sidecar_path, Projects.project_data_dir(project))
     relative_file_path = String.trim_trailing(relative_sidecar_path, ".meta")
     filename = Path.basename(relative_file_path)
@@ -386,20 +387,21 @@ defmodule BDS.Media do
     atomic_write(
       path,
       Sidecar.serialize_document([
-        {:id, media.id},
-        {:original_name, media.original_name},
-        {:mime_type, media.mime_type},
-        {:size, media.size},
-        {:width, media.width},
-        {:height, media.height},
-        {:title, media.title},
-        {:alt, media.alt},
-        {:caption, media.caption},
-        {:author, media.author},
-        {:language, media.language},
-        {:created_at, media.created_at},
-        {:updated_at, media.updated_at},
-        {:tags, media.tags || []}
+        {"id", media.id},
+        {"originalName", media.original_name},
+        {"mimeType", media.mime_type},
+        {"size", media.size},
+        {"width", media.width},
+        {"height", media.height},
+        {"title", media.title},
+        {"alt", media.alt},
+        {"caption", media.caption},
+        {"author", media.author},
+        {"language", media.language},
+        {"createdAt", media.created_at},
+        {"updatedAt", media.updated_at},
+        {"linkedPostIds", linked_post_ids(media.id)},
+        {"tags", media.tags || []}
       ])
     )
   end
@@ -416,11 +418,11 @@ defmodule BDS.Media do
     atomic_write(
       path,
       Sidecar.serialize_document([
-        {:translation_for, media.id},
-        {:language, translation.language},
-        {:title, translation.title},
-        {:alt, translation.alt},
-        {:caption, translation.caption}
+        {"translationFor", media.id},
+        {"language", translation.language},
+        {"title", translation.title},
+        {"alt", translation.alt},
+        {"caption", translation.caption}
       ])
     )
   end
@@ -434,6 +436,7 @@ defmodule BDS.Media do
 
       media ->
         {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
+        fields = normalize_media_sidecar_fields(fields)
         now = Persistence.now_ms()
         language = Map.fetch!(fields, "language")
 
@@ -605,6 +608,30 @@ defmodule BDS.Media do
 
   defp atomic_write(path, contents) do
     Persistence.atomic_write(path, contents)
+  end
+
+  defp normalize_media_sidecar_fields(fields) when is_map(fields) do
+    [
+      {"originalName", "original_name"},
+      {"mimeType", "mime_type"},
+      {"createdAt", "created_at"},
+      {"updatedAt", "updated_at"},
+      {"translationFor", "translation_for"},
+      {"linkedPostIds", "linked_post_ids"}
+    ]
+    |> Enum.reduce(fields, fn {file_key, current_key}, acc ->
+      case Map.fetch(acc, file_key) do
+        {:ok, value} -> Map.put_new(acc, current_key, value)
+        :error -> acc
+      end
+    end)
+  end
+
+  defp linked_post_ids(media_id) do
+    case Repo.query("SELECT post_id FROM post_media WHERE media_id = ? ORDER BY sort_order ASC, post_id ASC", [media_id]) do
+      {:ok, %{rows: rows}} -> Enum.map(rows, fn [post_id] -> post_id end)
+      {:error, _reason} -> []
+    end
   end
 
   defp blank_to_nil(nil), do: nil

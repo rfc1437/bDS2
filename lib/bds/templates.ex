@@ -219,14 +219,15 @@ defmodule BDS.Templates do
   defp serialize_template_file(template, content) do
     Frontmatter.serialize_document(
       [
-        {:id, template.id},
-        {:slug, template.slug},
-        {:title, template.title},
-        {:kind, template.kind},
-        {:enabled, template.enabled},
-        {:version, template.version},
-        {:created_at, template.created_at},
-        {:updated_at, template.updated_at}
+        {"id", template.id},
+        {"projectId", template.project_id},
+        {"slug", template.slug},
+        {"title", template.title},
+        {"kind", template.kind},
+        {"enabled", template.enabled},
+        {"version", template.version},
+        {"createdAt", template.created_at},
+        {"updatedAt", template.updated_at}
       ],
       content
     )
@@ -342,6 +343,7 @@ defmodule BDS.Templates do
   defp upsert_template_from_file(project_id, project, path) do
     contents = File.read!(path)
     {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
+    fields = normalize_template_fields(fields)
     relative_path = Path.relative_to(path, Projects.project_data_dir(project))
     now = Persistence.now_ms()
 
@@ -372,6 +374,20 @@ defmodule BDS.Templates do
   defp parse_template_kind("list"), do: :list
   defp parse_template_kind("not_found"), do: :not_found
   defp parse_template_kind("partial"), do: :partial
+
+  defp normalize_template_fields(fields) when is_map(fields) do
+    [
+      {"createdAt", "created_at"},
+      {"updatedAt", "updated_at"},
+      {"projectId", "project_id"}
+    ]
+    |> Enum.reduce(fields, fn {file_key, current_key}, acc ->
+      case Map.fetch(acc, file_key) do
+        {:ok, value} -> Map.put_new(acc, current_key, value)
+        :error -> acc
+      end
+    end)
+  end
 
   defp list_matching_files(dir, pattern) do
     if File.dir?(dir) do

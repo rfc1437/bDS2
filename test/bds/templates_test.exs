@@ -66,13 +66,14 @@ defmodule BDS.TemplatesTest do
 
     contents = File.read!(full_path)
     assert contents =~ "---\nid: #{published.id}\n"
+    assert contents =~ "projectId: #{project.id}\n"
     assert contents =~ "slug: landing-page\n"
     assert contents =~ "title: Landing Page\n"
     assert contents =~ "kind: list\n"
     assert contents =~ "enabled: true\n"
     assert contents =~ "version: 1\n"
-    assert contents =~ ~r/created_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
-    assert contents =~ ~r/updated_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert contents =~ ~r/createdAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert contents =~ ~r/updatedAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
     assert contents =~ "\n---\n<section>{{ page_title }}</section>\n"
     refute File.exists?(full_path <> ".tmp")
   end
@@ -153,7 +154,7 @@ defmodule BDS.TemplatesTest do
     assert post_contents =~ "\n---\nBody\n"
 
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
-    assert %{"tags" => [%{"name" => "Feature"}]} = Jason.decode!(File.read!(tags_path))
+    assert [%{"name" => "Feature"}] = Jason.decode!(File.read!(tags_path))
   end
 
   test "update_template cascades slug changes to posts and tags and renames the published file",
@@ -208,12 +209,12 @@ defmodule BDS.TemplatesTest do
     assert template_contents =~ "\n---\n<article>{{ content }}</article>\n"
 
     post_contents = File.read!(Path.join(temp_dir, reloaded_post.file_path))
-    assert post_contents =~ "template_slug: feature-view\n"
+    assert post_contents =~ "templateSlug: feature-view\n"
     assert post_contents =~ "\n---\nBody\n"
 
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
 
-    assert %{"tags" => [%{"name" => "Feature", "post_template_slug" => "feature-view"}]} =
+    assert [%{"name" => "Feature", "postTemplateSlug" => "feature-view"}] =
              Jason.decode!(File.read!(tags_path))
   end
 
@@ -231,13 +232,14 @@ defmodule BDS.TemplatesTest do
       [
         "---",
         "id: template-from-file",
+        "projectId: #{project.id}",
         "slug: recovered-view",
         "title: Recovered View",
         "kind: list",
         "enabled: true",
         "version: 3",
-        "created_at: 1970-01-01T00:00:00.101Z",
-        "updated_at: 1970-01-01T00:00:00.202Z",
+        "createdAt: 1970-01-01T00:00:00.101Z",
+        "updatedAt: 1970-01-01T00:00:00.202Z",
         "---",
         "<section>Recovered</section>",
         ""

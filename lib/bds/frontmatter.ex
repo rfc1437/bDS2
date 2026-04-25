@@ -175,5 +175,8 @@ defmodule BDS.Frontmatter do
     end
   end
 
-  defp timestamp_key?(key), do: String.ends_with?(to_string(key), "_at")
+  defp timestamp_key?(key) do
+    rendered = to_string(key)
+    String.ends_with?(rendered, "_at") or String.ends_with?(rendered, "At")
+  end
 end

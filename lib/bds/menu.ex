@@ -128,11 +128,8 @@ defmodule BDS.Menu do
   end
 
   defp render_attributes(item) do
-    [
-      {"kind", item.kind},
-      {"text", item.label},
-      {"slug", item.slug}
-    ]
+    item
+    |> render_outline_attributes()
     |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
     |> Enum.map_join("", fn {key, value} -> ~s( #{key}="#{xml_escape(to_string(value))}") end)
   end
@@ -145,12 +142,12 @@ defmodule BDS.Menu do
   end
 
   defp parse_outline(element) do
-    kind = element |> xml_attr(:kind) |> normalize_kind()
+    kind = element |> outline_kind() |> normalize_kind()
 
     base = %{
       kind: kind,
       label: xml_attr(element, :text) || "",
-      slug: normalize_optional_string(xml_attr(element, :slug))
+      slug: element |> outline_slug(kind) |> normalize_optional_string()
     }
 
     children =
@@ -164,6 +161,33 @@ defmodule BDS.Menu do
     end
   end
 
+  defp render_outline_attributes(item) do
+    kind = Map.get(item, :kind)
+
+    [
+      {"text", item.label},
+      {"type", render_outline_kind(kind)},
+      {"pageSlug", render_page_slug(kind, item.slug)},
+      {"categoryName", render_category_name(kind, item.slug)}
+    ]
+  end
+
+  defp outline_kind(element), do: xml_attr(element, :type) || xml_attr(element, :kind)
+
+  defp outline_slug(element, :category_archive), do: xml_attr(element, :categoryName) || xml_attr(element, :slug)
+  defp outline_slug(element, :home), do: xml_attr(element, :pageSlug) || xml_attr(element, :slug)
+  defp outline_slug(element, _kind), do: xml_attr(element, :pageSlug) || xml_attr(element, :slug)
+
+  defp render_outline_kind(:category_archive), do: "category-archive"
+  defp render_outline_kind(kind), do: to_string(kind)
+
+  defp render_page_slug(:home, _slug), do: "home"
+  defp render_page_slug(kind, slug) when kind in [:page], do: slug
+  defp render_page_slug(_kind, _slug), do: nil
+
+  defp render_category_name(:category_archive, slug), do: slug
+  defp render_category_name(_kind, _slug), do: nil
+
   defp xml_attr(element, name) do
     element
     |> xmlElement(:attributes)
@@ -176,10 +200,16 @@ defmodule BDS.Menu do
 
   defp normalize_kind(kind) when is_atom(kind) and kind in @valid_kinds, do: kind
 
+  defp normalize_kind(nil), do: :page
+
   defp normalize_kind(kind) when is_binary(kind) do
-    kind
-    |> String.to_existing_atom()
-    |> normalize_kind()
+    case kind do
+      "category-archive" -> :category_archive
+      other ->
+        other
+        |> String.to_existing_atom()
+        |> normalize_kind()
+    end
   rescue
     _error -> :page
   end

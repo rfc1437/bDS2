@@ -157,8 +157,8 @@ defmodule BDS.Metadata do
       persist_setting(project_id, "category_meta", category_meta_from_files, now)
       persist_setting(project_id, "publishing", publishing_from_files, now)
       write_project_json(updated_project, project_metadata_from_files)
-      write_categories_json(updated_project, categories_from_files["categories"] || @default_categories)
-      write_category_meta_json(updated_project, category_meta_from_files["categories"] || %{})
+      write_categories_json(updated_project, normalized_categories(categories_from_files))
+      write_category_meta_json(updated_project, normalized_category_settings(category_meta_from_files))
       write_publishing_json(updated_project, publishing_from_files)
       load_state(updated_project)
     end)
@@ -248,7 +248,8 @@ defmodule BDS.Metadata do
       "post_template_slug" =>
         Map.get(settings, :post_template_slug, Map.get(settings, "post_template_slug")),
       "list_template_slug" =>
-        Map.get(settings, :list_template_slug, Map.get(settings, "list_template_slug"))
+        Map.get(settings, :list_template_slug, Map.get(settings, "list_template_slug")),
+      "title" => Map.get(settings, :title, Map.get(settings, "title"))
     }
   end
 
@@ -284,18 +285,18 @@ defmodule BDS.Metadata do
   end
 
   defp write_project_json(project, project_json),
-    do: write_json(project, "project.json", project_json)
+    do: write_json(project, "project.json", render_project_metadata_json(project_json))
 
   defp write_categories_json(project, categories) do
-    write_json(project, "categories.json", %{"categories" => Enum.sort(categories)})
+    write_json(project, "categories.json", Enum.sort(categories))
   end
 
   defp write_category_meta_json(project, category_settings) do
-    write_json(project, "category-meta.json", %{"categories" => category_settings})
+    write_json(project, "category-meta.json", render_category_meta_json(category_settings))
   end
 
   defp write_publishing_json(project, publishing_preferences) do
-    write_json(project, "publishing.json", publishing_preferences)
+    write_json(project, "publishing.json", render_publishing_json(publishing_preferences))
   end
 
   defp write_json(project, file_name, payload) do
@@ -308,9 +309,119 @@ defmodule BDS.Metadata do
     path = Path.join([Projects.project_data_dir(project), "meta", file_name])
 
     case File.read(path) do
-      {:ok, contents} -> Jason.decode!(contents)
+      {:ok, contents} -> contents |> Jason.decode!() |> normalize_json(file_name)
       {:error, :enoent} -> nil
     end
+  end
+
+  defp normalize_json(payload, "project.json"), do: parse_project_metadata_json(payload)
+  defp normalize_json(payload, "categories.json"), do: parse_categories_json(payload)
+  defp normalize_json(payload, "category-meta.json"), do: parse_category_meta_json(payload)
+  defp normalize_json(payload, "publishing.json"), do: parse_publishing_json(payload)
+  defp normalize_json(payload, _file_name), do: payload
+
+  defp parse_project_metadata_json(payload) when is_map(payload) do
+    %{
+      "name" => Map.get(payload, "name"),
+      "description" => Map.get(payload, "description"),
+      "public_url" => Map.get(payload, "publicUrl"),
+      "main_language" => Map.get(payload, "mainLanguage"),
+      "default_author" => Map.get(payload, "defaultAuthor"),
+      "max_posts_per_page" => Map.get(payload, "maxPostsPerPage", @default_max_posts_per_page),
+      "blogmark_category" => Map.get(payload, "blogmarkCategory"),
+      "pico_theme" => Map.get(payload, "picoTheme"),
+      "semantic_similarity_enabled" => Map.get(payload, "semanticSimilarityEnabled", false),
+      "blog_languages" => Map.get(payload, "blogLanguages", [])
+    }
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
+
+  defp parse_categories_json(payload) when is_list(payload), do: %{"categories" => payload}
+  defp parse_categories_json(_payload), do: %{"categories" => @default_categories}
+
+  defp parse_category_meta_json(payload) when is_map(payload) do
+    %{"categories" => normalized_category_settings(payload)}
+  end
+
+  defp parse_publishing_json(payload) when is_map(payload) do
+    %{
+      "ssh_host" => Map.get(payload, "sshHost"),
+      "ssh_user" => Map.get(payload, "sshUser"),
+      "ssh_remote_path" => Map.get(payload, "sshRemotePath"),
+      "ssh_mode" => Map.get(payload, "sshMode", "scp")
+    }
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
+
+  defp normalized_categories(%{"categories" => categories}) when is_list(categories), do: categories
+  defp normalized_categories(categories) when is_list(categories), do: categories
+  defp normalized_categories(_payload), do: @default_categories
+
+  defp normalized_category_settings(%{"categories" => settings}) when is_map(settings),
+    do: normalized_category_settings(settings)
+
+  defp normalized_category_settings(settings) when is_map(settings) do
+    Map.new(settings, fn {category, category_settings} ->
+      {category,
+       %{
+         "render_in_lists" =>
+           Map.get(category_settings, "render_in_lists", Map.get(category_settings, "renderInLists", true)),
+         "show_title" =>
+           Map.get(category_settings, "show_title", Map.get(category_settings, "showTitle", true)),
+         "post_template_slug" =>
+           Map.get(category_settings, "post_template_slug", Map.get(category_settings, "postTemplateSlug")),
+         "list_template_slug" =>
+           Map.get(category_settings, "list_template_slug", Map.get(category_settings, "listTemplateSlug")),
+         "title" => Map.get(category_settings, "title")
+       }
+       |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+       |> Map.new()}
+    end)
+  end
+
+  defp render_project_metadata_json(project_metadata) when is_map(project_metadata) do
+    %{
+      "name" => Map.get(project_metadata, "name"),
+      "description" => Map.get(project_metadata, "description"),
+      "publicUrl" => Map.get(project_metadata, "public_url"),
+      "mainLanguage" => Map.get(project_metadata, "main_language"),
+      "defaultAuthor" => Map.get(project_metadata, "default_author"),
+      "maxPostsPerPage" => Map.get(project_metadata, "max_posts_per_page", @default_max_posts_per_page),
+      "blogmarkCategory" => Map.get(project_metadata, "blogmark_category"),
+      "picoTheme" => Map.get(project_metadata, "pico_theme"),
+      "semanticSimilarityEnabled" => Map.get(project_metadata, "semantic_similarity_enabled", false),
+      "blogLanguages" => Map.get(project_metadata, "blog_languages", [])
+    }
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
+
+  defp render_category_meta_json(category_settings) when is_map(category_settings) do
+    Map.new(category_settings, fn {category, settings} ->
+      {category,
+       %{
+         "renderInLists" => Map.get(settings, "render_in_lists", true),
+         "showTitle" => Map.get(settings, "show_title", true),
+         "postTemplateSlug" => Map.get(settings, "post_template_slug"),
+         "listTemplateSlug" => Map.get(settings, "list_template_slug"),
+         "title" => Map.get(settings, "title")
+       }
+       |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+       |> Map.new()}
+    end)
+  end
+
+  defp render_publishing_json(publishing_preferences) when is_map(publishing_preferences) do
+    %{
+      "sshHost" => Map.get(publishing_preferences, "ssh_host"),
+      "sshUser" => Map.get(publishing_preferences, "ssh_user"),
+      "sshRemotePath" => Map.get(publishing_preferences, "ssh_remote_path"),
+      "sshMode" => Map.get(publishing_preferences, "ssh_mode", "scp")
+    }
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
   end
 
   defp load_setting(project_id, suffix) do

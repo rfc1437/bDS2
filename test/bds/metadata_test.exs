@@ -38,14 +38,14 @@ defmodule BDS.MetadataTest do
     assert %{
              "name" => "Renamed Blog",
              "description" => "Description",
-             "public_url" => "https://example.com",
-             "main_language" => "en",
-             "default_author" => "Writer",
-             "max_posts_per_page" => 25,
-             "blogmark_category" => "links",
-             "pico_theme" => "blue",
-             "semantic_similarity_enabled" => true,
-             "blog_languages" => ["de", "fr"]
+             "publicUrl" => "https://example.com",
+             "mainLanguage" => "en",
+             "defaultAuthor" => "Writer",
+             "maxPostsPerPage" => 25,
+             "blogmarkCategory" => "links",
+             "picoTheme" => "blue",
+             "semanticSimilarityEnabled" => true,
+             "blogLanguages" => ["de", "fr"]
            } = Jason.decode!(File.read!(project_json_path))
 
     assert {:ok, loaded} = BDS.Metadata.get_project_metadata(project.id)
@@ -78,25 +78,23 @@ defmodule BDS.MetadataTest do
     category_meta_path = Path.join([temp_dir, "meta", "category-meta.json"])
     publishing_path = Path.join([temp_dir, "meta", "publishing.json"])
 
-    assert %{"categories" => ["article", "aside", "news", "page", "picture"]} =
+    assert ["article", "aside", "news", "page", "picture"] =
              Jason.decode!(File.read!(categories_path))
 
     assert %{
-             "categories" => %{
-               "news" => %{
-                 "render_in_lists" => false,
-                 "show_title" => true,
-                 "post_template_slug" => "article",
-                 "list_template_slug" => "listing"
-               }
+             "news" => %{
+               "renderInLists" => false,
+               "showTitle" => true,
+               "postTemplateSlug" => "article",
+               "listTemplateSlug" => "listing"
              }
            } = Jason.decode!(File.read!(category_meta_path))
 
     assert %{
-             "ssh_host" => "example.com",
-             "ssh_user" => "deploy",
-             "ssh_remote_path" => "/srv/site",
-             "ssh_mode" => "rsync"
+             "sshHost" => "example.com",
+             "sshUser" => "deploy",
+             "sshRemotePath" => "/srv/site",
+             "sshMode" => "rsync"
            } = Jason.decode!(File.read!(publishing_path))
 
     assert {:ok, synced} = BDS.Metadata.sync_project_metadata_from_filesystem(project.id)
@@ -113,6 +111,87 @@ defmodule BDS.MetadataTest do
              "ssh_host" => "example.com",
              "ssh_user" => "deploy",
              "ssh_remote_path" => "/srv/site",
+             "ssh_mode" => "rsync"
+           }
+  end
+
+  test "sync_project_metadata_from_filesystem reads canonical bDS metadata file shapes", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    meta_dir = Path.join(temp_dir, "meta")
+    File.mkdir_p!(meta_dir)
+
+    File.write!(
+      Path.join(meta_dir, "project.json"),
+      Jason.encode!(%{
+        "name" => "Legacy Blog",
+        "description" => "Imported",
+        "publicUrl" => "https://legacy.example",
+        "mainLanguage" => "de",
+        "defaultAuthor" => "Legacy Writer",
+        "maxPostsPerPage" => 17,
+        "blogmarkCategory" => "aside",
+        "picoTheme" => "slate",
+        "semanticSimilarityEnabled" => true,
+        "blogLanguages" => ["en"]
+      })
+    )
+
+    File.write!(
+      Path.join(meta_dir, "categories.json"),
+      Jason.encode!(["article", "aside", "legacy", "page", "picture"])
+    )
+
+    File.write!(
+      Path.join(meta_dir, "category-meta.json"),
+      Jason.encode!(%{
+        "legacy" => %{
+          "renderInLists" => false,
+          "showTitle" => true,
+          "postTemplateSlug" => "feature-view",
+          "listTemplateSlug" => "feature-list",
+          "title" => "Legacy"
+        }
+      })
+    )
+
+    File.write!(
+      Path.join(meta_dir, "publishing.json"),
+      Jason.encode!(%{
+        "sshHost" => "legacy.example",
+        "sshUser" => "deploy",
+        "sshRemotePath" => "/srv/legacy",
+        "sshMode" => "rsync"
+      })
+    )
+
+    assert {:ok, synced} = BDS.Metadata.sync_project_metadata_from_filesystem(project.id)
+
+    assert synced.name == "Legacy Blog"
+    assert synced.description == "Imported"
+    assert synced.public_url == "https://legacy.example"
+    assert synced.main_language == "de"
+    assert synced.default_author == "Legacy Writer"
+    assert synced.max_posts_per_page == 17
+    assert synced.blogmark_category == "aside"
+    assert synced.pico_theme == "slate"
+    assert synced.semantic_similarity_enabled == true
+    assert synced.blog_languages == ["en"]
+    assert synced.categories == ["article", "aside", "legacy", "page", "picture"]
+
+    assert synced.category_settings["legacy"] == %{
+             "render_in_lists" => false,
+             "show_title" => true,
+             "post_template_slug" => "feature-view",
+             "list_template_slug" => "feature-list",
+             "title" => "Legacy"
+           }
+
+    assert synced.publishing_preferences == %{
+             "ssh_host" => "legacy.example",
+             "ssh_user" => "deploy",
+             "ssh_remote_path" => "/srv/legacy",
              "ssh_mode" => "rsync"
            }
   end

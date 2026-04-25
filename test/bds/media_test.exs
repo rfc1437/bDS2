@@ -43,16 +43,17 @@ defmodule BDS.MediaTest do
 
     sidecar = File.read!(Path.join(temp_dir, media.sidecar_path))
     assert sidecar =~ "id: #{media.id}\n"
-    assert sidecar =~ "original_name: sample.txt\n"
-    assert sidecar =~ "mime_type: text/plain\n"
+    assert sidecar =~ "originalName: sample.txt\n"
+    assert sidecar =~ "mimeType: text/plain\n"
     assert sidecar =~ "title: Sample\n"
     assert sidecar =~ "alt: Alt text\n"
     assert sidecar =~ "caption: Caption\n"
     assert sidecar =~ "author: Writer\n"
     assert sidecar =~ "language: en\n"
     assert sidecar =~ "tags:\n  - alpha\n"
-    assert sidecar =~ ~r/created_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
-    assert sidecar =~ ~r/updated_at: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert sidecar =~ "linkedPostIds:\n"
+    assert sidecar =~ ~r/createdAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert sidecar =~ ~r/updatedAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
     refute File.exists?(Path.join(temp_dir, media.sidecar_path <> ".tmp"))
   end
 
@@ -130,8 +131,8 @@ defmodule BDS.MediaTest do
       sidecar_path,
       [
         "id: media-from-file",
-        "original_name: original.jpg",
-        "mime_type: image/jpeg",
+        "originalName: original.jpg",
+        "mimeType: image/jpeg",
         "size: #{byte_size(tiny_jpeg_binary())}",
         "width: 3",
         "height: 2",
@@ -140,8 +141,10 @@ defmodule BDS.MediaTest do
         "caption: Recovered caption",
         "author: Writer",
         "language: en",
-        "created_at: 2024-03-30T21:20:00.000Z",
-        "updated_at: 2024-03-31T21:20:00.000Z",
+        "createdAt: 2024-03-30T21:20:00.000Z",
+        "updatedAt: 2024-03-31T21:20:00.000Z",
+        "linkedPostIds:",
+        "  - post-a",
         "tags:",
         "  - alpha",
         ""
@@ -152,7 +155,7 @@ defmodule BDS.MediaTest do
     File.write!(
       binary_path <> ".de.meta",
       [
-        "translation_for: media-from-file",
+        "translationFor: media-from-file",
         "language: de",
         "title: Titel",
         "alt: Alt text",
@@ -371,7 +374,7 @@ defmodule BDS.MediaTest do
 
     translated_sidecar_path = Path.join(temp_dir, media.file_path <> ".de.meta")
     contents = File.read!(translated_sidecar_path)
-    assert contents =~ "translation_for: #{media.id}\n"
+    assert contents =~ "translationFor: #{media.id}\n"
     assert contents =~ "language: de\n"
     assert contents =~ "title: Titel\n"
     assert contents =~ "alt: Alt text\n"

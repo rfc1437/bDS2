@@ -215,17 +215,15 @@ defmodule BDS.Tags do
     path = Path.join([Projects.project_data_dir(project), "meta", "tags.json"])
     :ok = File.mkdir_p(Path.dirname(path))
 
-    payload = %{
-      "tags" =>
-        project_id
-        |> list_tags()
-        |> Enum.sort_by(&String.downcase(&1.name))
-        |> Enum.map(fn tag ->
-          %{"name" => tag.name}
-          |> maybe_put("color", tag.color)
-          |> maybe_put("post_template_slug", tag.post_template_slug)
-        end)
-    }
+    payload =
+      project_id
+      |> list_tags()
+      |> Enum.sort_by(&String.downcase(&1.name))
+      |> Enum.map(fn tag ->
+        %{"name" => tag.name}
+        |> maybe_put("color", tag.color)
+        |> maybe_put("postTemplateSlug", tag.post_template_slug)
+      end)
 
     :ok = Persistence.atomic_write(path, Jason.encode!(payload))
   end

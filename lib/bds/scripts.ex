@@ -174,15 +174,16 @@ defmodule BDS.Scripts do
   defp serialize_script_file(script, content) do
     Frontmatter.serialize_document(
       [
-        {:id, script.id},
-        {:slug, script.slug},
-        {:title, script.title},
-        {:kind, script.kind},
-        {:entrypoint, script.entrypoint},
-        {:enabled, script.enabled},
-        {:version, script.version},
-        {:created_at, script.created_at},
-        {:updated_at, script.updated_at}
+        {"id", script.id},
+        {"projectId", script.project_id},
+        {"slug", script.slug},
+        {"title", script.title},
+        {"kind", script.kind},
+        {"entrypoint", script.entrypoint},
+        {"enabled", script.enabled},
+        {"version", script.version},
+        {"createdAt", script.created_at},
+        {"updatedAt", script.updated_at}
       ],
       content
     )
@@ -203,6 +204,7 @@ defmodule BDS.Scripts do
   defp upsert_script_from_file(project_id, project, path) do
     contents = File.read!(path)
     {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
+    fields = normalize_script_fields(fields)
     relative_path = Path.relative_to(path, Projects.project_data_dir(project))
     now = Persistence.now_ms()
 
@@ -233,6 +235,20 @@ defmodule BDS.Scripts do
   defp parse_script_kind("macro"), do: :macro
   defp parse_script_kind("utility"), do: :utility
   defp parse_script_kind("transform"), do: :transform
+
+  defp normalize_script_fields(fields) when is_map(fields) do
+    [
+      {"createdAt", "created_at"},
+      {"updatedAt", "updated_at"},
+      {"projectId", "project_id"}
+    ]
+    |> Enum.reduce(fields, fn {file_key, current_key}, acc ->
+      case Map.fetch(acc, file_key) do
+        {:ok, value} -> Map.put_new(acc, current_key, value)
+        :error -> acc
+      end
+    end)
+  end
 
   defp list_matching_files(dir, pattern) do
     if File.dir?(dir) do
