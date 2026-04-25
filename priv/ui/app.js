@@ -144,7 +144,23 @@ function renderSidebar() {
       </div>
     </div>
     <div class="sidebar-content">
-      ${data.sections
+      ${renderSidebarBody(data, view)}
+    </div>
+  `;
+}
+
+function renderSidebarBody(data, view) {
+  switch (data.layout) {
+    case "post_list":
+      return renderSidebarPostList(data, view);
+    case "media_grid":
+      return renderSidebarMediaGrid(data, view);
+    case "entity_list":
+      return renderSidebarEntityList(data, view);
+    case "nav_list":
+      return renderSidebarNavList(data, view);
+    default:
+      return (data.sections || [])
         .map(
           (section) => `
             <section class="sidebar-section">
@@ -152,17 +168,85 @@ function renderSidebar() {
                 <span data-testid="sidebar-section-title">${escapeHtml(tText(section.title))}</span>
               </div>
               <div class="sidebar-section-items">
-                ${section.items.map((item) => renderSidebarItem(item, view)).join("")}
+                ${(section.items || []).map((item) => renderSidebarItem(item, view)).join("")}
               </div>
             </section>
           `
         )
-        .join("")}
+        .join("");
+  }
+}
+
+function renderSidebarPostList(data, view) {
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+  const hasItems = sections.some((section) => (section.items || []).length > 0);
+
+  return `
+    ${sections
+      .map(
+        (section) => `
+          <section class="sidebar-section">
+            <div class="sidebar-section-title">
+              <span class="section-icon status-${escapeHtmlAttribute(section.status || "draft")}">●</span>
+              <span data-testid="sidebar-section-title">${escapeHtml(tText(section.title))}</span>
+              <span class="sidebar-section-count">${escapeHtml(String(section.count || (section.items || []).length))}</span>
+            </div>
+            <div class="sidebar-list">
+              ${(section.items || []).map((item) => renderSidebarPostItem(item, view)).join("")}
+            </div>
+          </section>
+        `
+      )
+      .join("")}
+    ${hasItems ? "" : renderSidebarEmpty(data.empty_message || "No items")}
+  `;
+}
+
+function renderSidebarPostItem(item, view) {
+  const tabRef = currentTabRef();
+  const itemRoute = item.route || view.editor_route;
+  const tabId = tabIdForItem(item, itemRoute);
+  const active = tabRef && tabRef.type === itemRoute && tabRef.id === tabId;
+  const postType = getSidebarPostType(item.categories || []);
+  const languageBadge = Number(item.language_count) > 1
+    ? `<span class="sidebar-item-language-badge" title="${escapeHtmlAttribute(String(item.language_count))}">${escapeHtml(String(item.language_count))}</span>`
+    : "";
+
+  return `
+    <button
+      class="sidebar-item sidebar-post-item post-type-${escapeHtmlAttribute(postType.type)} ${active ? "active" : ""}"
+      data-open-tab="${escapeHtmlAttribute(tabId)}"
+      data-open-route="${escapeHtmlAttribute(itemRoute)}"
+      data-open-title="${escapeHtmlAttribute(item.title || routeLabel(itemRoute))}"
+      type="button"
+    >
+      <span class="post-type-icon" title="${escapeHtmlAttribute(postType.type)}">${escapeHtml(postType.icon)}</span>
+      <span class="sidebar-item-content">
+        <span class="sidebar-item-title-row">
+          <span class="sidebar-item-title">${escapeHtml(item.title || "")}</span>
+          ${languageBadge}
+        </span>
+        <span class="sidebar-item-meta">${escapeHtml(formatSidebarAbsoluteDate(item.meta_timestamp))}</span>
+      </span>
+    </button>
+  `;
+}
+
+function renderSidebarMediaGrid(data, view) {
+  const items = Array.isArray(data.items) ? data.items : [];
+
+  if (!items.length) {
+    return renderSidebarEmpty(data.empty_message || "No items");
+  }
+
+  return `
+    <div class="sidebar-list media-grid">
+      ${items.map((item) => renderSidebarMediaItem(item, view)).join("")}
     </div>
   `;
 }
 
-function renderSidebarItem(item, view) {
+function renderSidebarMediaItem(item, view) {
   const tabRef = currentTabRef();
   const itemRoute = item.route || view.editor_route;
   const tabId = tabIdForItem(item, itemRoute);
@@ -170,16 +254,89 @@ function renderSidebarItem(item, view) {
 
   return `
     <button
-      class="sidebar-item ${active ? "active" : ""}"
-      data-open-tab="${tabId}"
-      data-open-route="${itemRoute}"
-      data-open-title="${escapeHtmlAttribute(tText(item.title))}"
+      class="media-item ${active ? "selected" : ""}"
+      data-open-tab="${escapeHtmlAttribute(tabId)}"
+      data-open-route="${escapeHtmlAttribute(itemRoute)}"
+      data-open-title="${escapeHtmlAttribute(item.title || routeLabel(itemRoute))}"
+      type="button"
+      title="${escapeHtmlAttribute(item.title || "") }"
+    >
+      <span class="media-thumbnail">${escapeHtml(mediaThumbnailGlyph(item.mime_type))}</span>
+      <span class="media-item-info">
+        <span class="media-item-name">${escapeHtml(item.title || "")}</span>
+        <span class="media-item-size">${escapeHtml(item.meta || "")}</span>
+      </span>
+    </button>
+  `;
+}
+
+function renderSidebarEntityList(data, view) {
+  const items = Array.isArray(data.items) ? data.items : [];
+
+  if (!items.length) {
+    return renderSidebarEmpty(data.empty_message || "No items");
+  }
+
+  return items.map((item) => renderSidebarEntityItem(item, view)).join("");
+}
+
+function renderSidebarEntityItem(item, view) {
+  const tabRef = currentTabRef();
+  const itemRoute = item.route || view.editor_route;
+  const tabId = tabIdForItem(item, itemRoute);
+  const active = tabRef && tabRef.type === itemRoute && tabRef.id === tabId;
+  const meta = item.updated_at ? formatSidebarRelativeDateMs(item.updated_at) : tText(item.meta || "");
+
+  return `
+    <button
+      class="chat-list-item ${active ? "active" : ""}"
+      data-open-tab="${escapeHtmlAttribute(tabId)}"
+      data-open-route="${escapeHtmlAttribute(itemRoute)}"
+      data-open-title="${escapeHtmlAttribute(item.title || routeLabel(itemRoute))}"
       type="button"
     >
-      <strong>${escapeHtml(tText(item.title))}</strong>
-      <span>${escapeHtml(tText(item.meta || view.label))}</span>
-      ${item.badge ? `<span class="sidebar-badge">${escapeHtml(tText(item.badge))}</span>` : ""}
+      <span class="chat-item-content">
+        <span class="chat-item-title">${escapeHtml(item.title || "")}</span>
+        <span class="chat-item-date">${escapeHtml(meta || "")}</span>
+      </span>
     </button>
+  `;
+}
+
+function renderSidebarNavList(data, view) {
+  const items = Array.isArray(data.items) ? data.items : [];
+
+  return `
+    <div class="settings-nav-list">
+      ${items.map((item) => renderSidebarNavItem(item, view)).join("")}
+    </div>
+  `;
+}
+
+function renderSidebarNavItem(item, view) {
+  const itemRoute = item.route || view.editor_route;
+  const tabId = tabIdForItem(item, itemRoute);
+  const tabTitle = routeLabel(itemRoute);
+
+  return `
+    <button
+      class="settings-nav-entry"
+      data-open-tab="${escapeHtmlAttribute(tabId)}"
+      data-open-route="${escapeHtmlAttribute(itemRoute)}"
+      data-open-title="${escapeHtmlAttribute(tabTitle)}"
+      type="button"
+    >
+      <span class="settings-nav-entry-icon">${escapeHtml(item.icon || "")}</span>
+      <span>${escapeHtml(tText(item.title || ""))}</span>
+    </button>
+  `;
+}
+
+function renderSidebarEmpty(message) {
+  return `
+    <div class="sidebar-empty">
+      <p>${escapeHtml(tText(message))}</p>
+    </div>
   `;
 }
 
@@ -361,7 +518,7 @@ function renderDashboard() {
                       <span class="recent-post-title">${escapeHtml(post.title || "")}</span>
                       <span class="recent-post-status status-${escapeHtmlAttribute(post.status || "draft")}">${escapeHtml(dashboardStatusLabel(post.status || "draft"))}</span>
                       <span class="recent-post-date">${escapeHtml(formatDashboardDate(post.updated_at))}</span>
-                    </button>
+            if (route === "settings" || route === "tags" || route === "style") {
                   `
                 )
                 .join("")}
@@ -1146,6 +1303,7 @@ function closeActiveTab() {
   }
 
   const index = state.session.tabs.findIndex((tab) => tab.type === active.type && tab.id === active.id);
+
   if (index < 0) {
     return;
   }
@@ -1225,8 +1383,16 @@ function activeItem() {
     return null;
   }
 
-  const sections = Object.values(bootstrap.content.sidebar).flatMap((view) => view.sections);
-  return sections.flatMap((section) => section.items).find((item) => tabIdForItem(item, item.route) === tab.id) || null;
+  const items = Object.values(bootstrap.content.sidebar).flatMap(flattenSidebarItems);
+  return items.find((item) => item.route === tab.type && tabIdForItem(item, item.route) === tab.id) || null;
+}
+
+function flattenSidebarItems(view) {
+  if (Array.isArray(view.sections)) {
+    return view.sections.flatMap((section) => section.items || []);
+  }
+
+  return Array.isArray(view.items) ? view.items : [];
 }
 
 function tabMetadata(tab) {
@@ -1442,7 +1608,7 @@ function formatPayloadValue(value) {
 }
 
 function tabIdForItem(item, route) {
-  if (route === "settings" || route === "tags") {
+  if (route === "settings" || route === "tags" || route === "style") {
     return route;
   }
 
@@ -1712,6 +1878,76 @@ function statusLabel(status) {
     default:
       return tText(titleCase(status || "task"));
   }
+}
+
+function getSidebarPostType(categories) {
+  const lowerCategories = (categories || []).map((category) => String(category).toLowerCase());
+
+  if (lowerCategories.includes("picture") || lowerCategories.includes("photo") || lowerCategories.includes("image")) {
+    return { icon: "🖼️", type: "picture" };
+  }
+
+  if (lowerCategories.includes("aside") || lowerCategories.includes("note") || lowerCategories.includes("quick")) {
+    return { icon: "📝", type: "aside" };
+  }
+
+  if (lowerCategories.includes("link") || lowerCategories.includes("bookmark")) {
+    return { icon: "🔗", type: "link" };
+  }
+
+  if (lowerCategories.includes("video")) {
+    return { icon: "🎬", type: "video" };
+  }
+
+  if (lowerCategories.includes("quote")) {
+    return { icon: "💬", type: "quote" };
+  }
+
+  return { icon: "📄", type: "article" };
+}
+
+function formatSidebarAbsoluteDate(timestamp) {
+  if (!timestamp) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(formatLocaleFor(state.uiLanguage), {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(timestamp));
+}
+
+function formatSidebarRelativeDateMs(timestamp) {
+  if (!timestamp) {
+    return "";
+  }
+
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return date.toLocaleTimeString(formatLocaleFor(state.uiLanguage), { hour: "numeric", minute: "2-digit" });
+  }
+
+  if (diffDays === 1) {
+    return t("sidebar.chat.yesterday");
+  }
+
+  if (diffDays < 7) {
+    return date.toLocaleDateString(formatLocaleFor(state.uiLanguage), { weekday: "short" });
+  }
+
+  return date.toLocaleDateString(formatLocaleFor(state.uiLanguage), { month: "short", day: "numeric" });
+}
+
+function mediaThumbnailGlyph(mimeType) {
+  if (String(mimeType || "").startsWith("image/")) {
+    return "🖼️";
+  }
+
+  return "📄";
 }
 
 function buildDashboardTagCloudItems(items) {

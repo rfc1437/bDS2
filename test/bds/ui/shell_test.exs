@@ -159,6 +159,27 @@ defmodule BDS.UI.ShellTest do
     assert css =~ ".recent-posts-list"
   end
 
+  test "shell bootstrap and static bundle expose the old sidebar view contracts" do
+    html = ShellPage.render()
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert html =~ ~s("layout":"post_list")
+    assert html =~ ~s("layout":"media_grid")
+    assert html =~ ~s("layout":"entity_list")
+    assert html =~ ~s("layout":"nav_list")
+
+    assert js =~ "renderSidebarPostList"
+    assert js =~ "renderSidebarMediaGrid"
+    assert js =~ "renderSidebarEntityList"
+    assert js =~ "renderSidebarNavList"
+
+    assert css =~ ".sidebar-section-title"
+    assert css =~ ".media-grid"
+    assert css =~ ".chat-list-item"
+    assert css =~ ".settings-nav-entry"
+  end
+
   test "static shell bundle exists for direct browser inspection" do
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/index.html")
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/app.css")

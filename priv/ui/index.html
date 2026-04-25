@@ -53,11 +53,14 @@
           "sidebar_visible": true,
           "sidebar_width": 280,
           "active_view": "posts",
-          "assistant_sidebar_visible": false,
+              "layout": "post_list",
+              "sections": [
           "assistant_sidebar_width": 360,
+                  "status": "draft",
+                  "count": 1,
           "panel": { "visible": false, "active_tab": "tasks" },
           "tabs": [],
-          "active_tab": null,
+                    { "id": "post-welcome", "title": "Welcome to bDS2", "meta_timestamp": 1774972800000, "language_count": 1, "categories": ["note"], "route": "post" }
           "dirty_tabs": []
         },
         "content": {
@@ -65,98 +68,71 @@
             "posts": {
               "title": "Posts",
               "subtitle": "Drafts and publishing",
-              "sections": [
-                {
-                  "title": "Drafts",
-                  "items": [
-                    { "id": "post-welcome", "title": "Welcome to bDS2", "meta": "Updated today", "badge": "draft", "route": "post" }
-                  ]
-                }
-              ]
+              "layout": "post_list",
+              "sections": []
             },
             "media": {
               "title": "Media",
               "subtitle": "Images and files",
-              "sections": [
-                {
-                  "title": "Media",
-                  "items": [
-                    { "id": "media-hero", "title": "hero-shot.jpg", "meta": "Image asset", "route": "media" }
-                  ]
-                }
+              "layout": "media_grid",
+              "items": [
+                { "id": "media-hero", "title": "hero.jpg", "meta": "1.2 MB", "mime_type": "image/jpeg", "route": "media" }
+              ]
+            },
+            "scripts": {
+              "title": "Scripts",
+              "subtitle": "Automation helpers",
+              "layout": "entity_list",
+              "items": [
+                { "id": "script-sync", "title": "Sync tags", "updated_at": 1774800000000, "route": "scripts" }
+              ]
+            },
+            "templates": {
+              "title": "Templates",
+              "subtitle": "Site rendering",
+              "layout": "entity_list",
+              "items": [
+                { "id": "template-post", "title": "post.liquid", "updated_at": 1774713600000, "route": "templates" }
+              ]
+            },
+            "tags": {
+              "title": "Tags",
+              "subtitle": "Tag management",
+              "layout": "nav_list",
+              "items": [
+                { "id": "tags-cloud", "title": "Tag Cloud", "icon": "☁️", "route": "tags" },
+                { "id": "tags-manage", "title": "Create / Edit", "icon": "✏️", "route": "tags" },
+                { "id": "tags-merge", "title": "Merge Tags", "icon": "🔀", "route": "tags" }
+              ]
+            },
+            "chat": {
+              "title": "Chat",
+              "subtitle": "AI conversations",
+              "layout": "entity_list",
+              "items": [
+                { "id": "chat-planning", "title": "Planning session", "updated_at": 1774886400000, "route": "chat" }
+              ]
+            },
+            "import": {
+              "title": "Import",
+              "subtitle": "Import definitions",
+              "layout": "entity_list",
+              "items": []
+            },
+            "git": {
+              "title": "Git",
+              "subtitle": "Working tree and history",
+              "layout": "entity_list",
+              "items": [
+                { "id": "git-working-tree", "title": "Working tree", "meta": "Working tree and history", "route": "git_diff" }
               ]
             },
             "settings": {
               "title": "Settings",
               "subtitle": "Project preferences",
-              "sections": [
-                {
-                  "title": "Settings",
-                  "items": [
-                    { "id": "settings", "title": "Project", "meta": "Defaults and paths", "route": "settings" }
-                  ]
-                }
+              "layout": "nav_list",
+              "items": [
+                { "id": "settings-project", "title": "Project", "icon": "📁", "route": "settings" },
+                { "id": "settings-style", "title": "Style", "icon": "🎨", "route": "style" }
               ]
-            }
-          },
-          "dashboard": {
-            "title": "dashboard.title",
-            "subtitle": "dashboard.subtitle",
-            "post_stats": {
-              "total_posts": 42,
-              "draft_count": 18,
-              "published_count": 21,
-              "archived_count": 3
             },
-            "media_stats": {
-              "media_count": 18,
-              "image_count": 15,
-              "total_bytes": 12884902
-            },
-            "timeline_entries": [
-              { "year": 2025, "month": 11, "count": 2 },
-              { "year": 2025, "month": 12, "count": 3 },
-              { "year": 2026, "month": 1, "count": 5 },
-              { "year": 2026, "month": 2, "count": 7 },
-              { "year": 2026, "month": 3, "count": 9 },
-              { "year": 2026, "month": 4, "count": 6 }
-            ],
-            "tag_cloud_items": [
-              { "tag": "launch", "count": 12, "color": "#2962ff" },
-              { "tag": "writing", "count": 7, "color": "#00897b" },
-              { "tag": "elixir", "count": 5, "color": "#e65100" }
-            ],
-            "category_counts": [
-              { "category": "notes", "count": 14 },
-              { "category": "projects", "count": 8 }
-            ],
-            "recent_posts": [
-              { "id": "post-welcome", "title": "Welcome to bDS2", "status": "draft", "updated_at": 1774972800000 },
-              { "id": "post-roadmap", "title": "Roadmap", "status": "published", "updated_at": 1774540800000 }
-            ]
-          },
-          "assistant_cards": [
-            { "label": "Desktop Runtime", "text": "Static bundle mirrors the desktop shell layout." }
-          ],
-          "editor_meta": {
-            "dashboard": [
-              { "label": "Status", "value": "Ready" }
-            ]
-          }
-        },
-        "status": {
-          "left": { "running_task_message": "Static preview", "running_task_overflow": 0 },
-          "right": {
-            "post_count": "42 posts",
-            "media_count": "18 media",
-            "theme_badge": "desktop-shell",
-            "offline_mode": true,
-            "ui_language": "en",
-            "brand": "bDS"
-          }
-        }
-      }
-    </script>
-    <script src="./app.js"></script>
-  </body>
-</html>

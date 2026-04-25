@@ -6,6 +6,7 @@ defmodule BDS.UI.ShellPage do
   alias BDS.UI.Dashboard
   alias BDS.UI.MenuBar
   alias BDS.UI.Registry
+  alias BDS.UI.Sidebar
   alias BDS.UI.Session
   alias BDS.UI.Workbench
 
@@ -84,7 +85,7 @@ defmodule BDS.UI.ShellPage do
       session: Session.serialize(workbench),
       task_status: task_status,
       content: %{
-        sidebar: sidebar_content(),
+        sidebar: sidebar_content(projects.active_project_id),
         dashboard: dashboard,
         assistant_cards: assistant_cards(),
         editor_meta: editor_meta(task_status)
@@ -162,72 +163,15 @@ defmodule BDS.UI.ShellPage do
     }
   end
 
-  defp sidebar_content do
-    %{
-      "posts" => %{
-        title: "Posts",
-        subtitle: "Drafts, published entries, and archive history",
-        sections: [
-          %{
-            title: "Drafts",
-            items: [
-              %{id: "post-welcome", title: "Welcome to bDS2", meta: "Updated today", badge: "draft", route: "post"},
-              %{id: "post-launch-plan", title: "Launch plan", meta: "Updated yesterday", badge: "draft", route: "post"}
-            ]
-          },
-          %{
-            title: "Published",
-            items: [
-              %{id: "post-roadmap", title: "Roadmap", meta: "Published Feb 10, 2026", badge: "2 langs", route: "post"}
-            ]
-          },
-          %{
-            title: "Archived",
-            items: [
-              %{id: "post-retrospective", title: "Retrospective", meta: "Archived Jan 12, 2026", badge: "archive", route: "post"}
-            ]
-          }
-        ]
-      },
-      "pages" => simple_list_view("Pages", "Standalone pages", [
-        %{id: "page-about", title: "About", meta: "Static page", route: "post"},
-        %{id: "page-contact", title: "Contact", meta: "Static page", route: "post"}
-      ]),
-      "media" => simple_list_view("Media", "Images and files", [
-        %{id: "media-hero", title: "hero-shot.jpg", meta: "Image asset", route: "media"},
-        %{id: "media-banner", title: "launch-banner.png", meta: "Image asset", route: "media"}
-      ]),
-      "scripts" => simple_list_view("Scripts", "Automation helpers", [
-        %{id: "script-import", title: "Import posts", meta: "Lua utility", route: "scripts"},
-        %{id: "script-sync", title: "Sync tags", meta: "Lua utility", route: "scripts"}
-      ]),
-      "templates" => simple_list_view("Templates", "Site rendering", [
-        %{id: "template-post", title: "post.liquid", meta: "Post template", route: "templates"},
-        %{id: "template-list", title: "list.liquid", meta: "List template", route: "templates"}
-      ]),
-      "tags" => simple_list_view("Tags", "Tag management", [
-        %{id: "tag-launch", title: "launch", meta: "12 posts", route: "tags"},
-        %{id: "tag-writing", title: "writing", meta: "7 posts", route: "tags"}
-      ]),
-      "chat" => simple_list_view("Chat", "AI conversations", [
-        %{id: "chat-planning", title: "Planning session", meta: "Offline gated", route: "chat"},
-        %{id: "chat-translation", title: "Translation QA", meta: "Offline gated", route: "chat"}
-      ]),
-      "import" => simple_list_view("Import", "Import definitions", [
-        %{id: "import-wordpress", title: "WordPress import", meta: "Ready", route: "import"}
-      ]),
-      "git" => simple_list_view("Git", "Working tree and history", [
-        %{id: "git-working-tree", title: "Working tree", meta: "3 changed files", route: "git_diff"}
-      ]),
-      "settings" => simple_list_view("Settings", "Project and publishing", [
-        %{id: "settings-project", title: "Project", meta: "Paths and defaults", route: "settings"},
-        %{id: "settings-ai", title: "AI", meta: "Offline controls", route: "settings"}
-      ])
-    }
-  end
+  defp sidebar_content(project_id) do
+    Sidebar.snapshot(project_id)
+  rescue
+    error in [Exqlite.Error, DBConnection.OwnershipError] ->
+      if match?(%Exqlite.Error{}, error) and not String.contains?(Exception.message(error), "no such table") do
+        reraise error, __STACKTRACE__
+      end
 
-  defp simple_list_view(title, subtitle, items) do
-    %{title: title, subtitle: subtitle, sections: [%{title: title, items: items}]}
+      Sidebar.empty_snapshot()
   end
 
   defp dashboard_content(project_id) do
