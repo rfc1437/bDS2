@@ -1,6 +1,8 @@
 defmodule BDS.Desktop.ShellController do
   @moduledoc false
 
+  alias BDS.UI.Sidebar
+
   def index_html do
     BDS.UI.ShellPage.render()
   end
@@ -46,6 +48,28 @@ defmodule BDS.Desktop.ShellController do
       {:ok, result} -> Jason.encode!(%{status: "ok", result: result})
       {:error, error} -> Jason.encode!(%{status: "error", error: normalize_error(error)})
     end
+  end
+
+  def sidebar_json(payload) when is_map(payload) do
+    view = Map.get(payload, "view") || Map.get(payload, :view)
+    filters = Map.get(payload, "filters") || Map.get(payload, :filters) || %{}
+
+    data =
+      try do
+        case active_project_id() do
+          nil -> Sidebar.view(nil, view, filters)
+          project_id -> Sidebar.view(project_id, view, filters)
+        end
+      rescue
+        error in [Exqlite.Error, DBConnection.OwnershipError] ->
+          if match?(%Exqlite.Error{}, error) and not String.contains?(Exception.message(error), "no such table") do
+            reraise error, __STACKTRACE__
+          end
+
+          Sidebar.view(nil, view, filters)
+      end
+
+    Jason.encode!(%{status: "ok", view: view, data: data})
   end
 
   defp normalize_error(error) when is_map(error), do: error
@@ -147,6 +171,17 @@ defmodule BDS.Desktop.ShellController do
         }
       ]
     }
+  end
+
+  defp active_project_id do
+    BDS.Projects.shell_snapshot().active_project_id
+  rescue
+    error in [Exqlite.Error, DBConnection.OwnershipError] ->
+      if match?(%Exqlite.Error{}, error) and not String.contains?(Exception.message(error), "no such table") do
+        reraise error, __STACKTRACE__
+      end
+
+      nil
   end
 
   defp present?(value) when is_binary(value), do: String.trim(value) != ""

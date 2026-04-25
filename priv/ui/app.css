@@ -1563,6 +1563,201 @@ button {
   font-size: 28px;
 }
 
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+}
+
+.sidebar-action:hover,
+.sidebar-action.active {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.search-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+
+.search-box input {
+  min-width: 0;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 6px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-foreground);
+  padding: 7px 10px;
+}
+
+.search-box button,
+.clear-filter,
+.filter-status button,
+.load-more-button,
+.calendar-year-header,
+.calendar-month,
+.filter-header,
+.filter-chip {
+  border: none;
+  cursor: pointer;
+}
+
+.search-box button,
+.clear-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-foreground);
+}
+
+.search-box button:hover,
+.clear-search:hover,
+.clear-filter:hover,
+.load-more-button:hover,
+.calendar-year-header:hover,
+.calendar-month:hover,
+.filter-header:hover,
+.filter-chip:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.calendar-view,
+.filter-panel,
+.filter-status,
+.sidebar-load-more {
+  padding: 10px 12px 0;
+}
+
+.collapsible-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  background: transparent;
+  color: var(--vscode-foreground);
+  text-align: left;
+}
+
+.collapse-icon {
+  width: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.calendar-years,
+.calendar-months,
+.filter-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.calendar-year-header,
+.calendar-month {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  text-align: left;
+}
+
+.calendar-year-header.selected,
+.calendar-month.selected,
+.filter-chip.active {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.year-count,
+.month-count,
+.sidebar-section-count {
+  margin-left: auto;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.month-label,
+.year-label {
+  flex: 1;
+}
+
+.calendar-months {
+  padding-left: 18px;
+}
+
+.filter-section {
+  padding-top: 4px;
+}
+
+.filter-header {
+  width: 100%;
+  padding: 6px 0;
+  background: transparent;
+  color: var(--vscode-foreground);
+  text-align: left;
+}
+
+.filter-chips {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-foreground);
+}
+
+.filter-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.filter-status button,
+.load-more-button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-foreground);
+}
+
+.sidebar-load-more {
+  padding-bottom: 12px;
+}
+
+.load-more-button {
+  width: 100%;
+}
+
 .media-item-info {
   display: flex;
   flex-direction: column;

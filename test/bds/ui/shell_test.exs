@@ -180,6 +180,33 @@ defmodule BDS.UI.ShellTest do
     assert css =~ ".settings-nav-entry"
   end
 
+  test "shell bootstrap and static bundle expose old sidebar filters and the post cutoff contract" do
+    html = ShellPage.render()
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert html =~ ~s("filters")
+    assert html =~ ~s("search_placeholder":"sidebar.searchPostsPlaceholder")
+    assert html =~ ~s("search_placeholder":"sidebar.searchMediaPlaceholder")
+    assert html =~ ~s("year_month_counts")
+    assert html =~ ~s("available_tags")
+    assert html =~ ~s("available_categories")
+    assert html =~ ~s("max_items":500)
+
+    assert js =~ "renderSidebarSearchBox"
+    assert js =~ "renderSidebarArchiveFilter"
+    assert js =~ "renderSidebarFilterPanel"
+    assert js =~ "renderSidebarFilterStatus"
+    assert js =~ "applySidebarPostFilters"
+    assert js =~ "applySidebarMediaFilters"
+
+    assert css =~ ".search-box"
+    assert css =~ ".filter-panel"
+    assert css =~ ".calendar-view"
+    assert css =~ ".filter-chip"
+    assert css =~ ".filter-status"
+  end
+
   test "static shell bundle exists for direct browser inspection" do
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/index.html")
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/app.css")

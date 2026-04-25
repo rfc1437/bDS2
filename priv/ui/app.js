@@ -14,6 +14,8 @@ const state = {
   session: hydrateSession(clone(bootstrap.session)),
   status: clone(bootstrap.status),
   projects: normalizeProjects(bootstrap.projects),
+  sidebarContent: clone(bootstrap.content.sidebar),
+  sidebarFilters: hydrateSidebarFilters(bootstrap.content.sidebar),
   projectMenuOpen: false,
   taskStatus: normalizeTaskStatus(bootstrap.task_status),
   handledTaskResults: {},
@@ -135,6 +137,7 @@ function renderActivityButton(view) {
 function renderSidebar() {
   const view = currentSidebarView();
   const data = currentSidebarData();
+  const filterState = currentSidebarFilterState(view.id);
 
   root.querySelector(".sidebar").innerHTML = `
     <div class="sidebar-header">
@@ -142,9 +145,186 @@ function renderSidebar() {
         <strong>${escapeHtml(tText(data.title))}</strong>
         <span class="sidebar-subtitle">${escapeHtml(tText(data.subtitle))}</span>
       </div>
+      ${data.filters?.enabled ? `
+        <div class="sidebar-actions">
+          <button class="sidebar-action ${filterState.showFilters ? "active" : ""}" data-sidebar-toggle-filters="${escapeHtmlAttribute(view.id)}" type="button" title="${escapeHtmlAttribute(t(data.filters.toggle_filters_label))}">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M6 12v-1h4v1H6zM4 8v-1h8v1H4zm-2-4v-1h12v1H2z"></path>
+            </svg>
+          </button>
+        </div>
+      ` : ""}
     </div>
-    <div class="sidebar-content">
+    ${renderSidebarSearchBox(data, view, filterState)}
+    ${renderSidebarFilterPanel(data, view, filterState)}
+    ${renderSidebarFilterStatus(data, view, filterState)}
+    <div class="sidebar-content sidebar-body">
       ${renderSidebarBody(data, view)}
+    </div>
+    ${renderSidebarLoadMore(data, view)}
+  `;
+}
+
+function renderSidebarSearchBox(data, view, filterState) {
+  if (!data.filters?.enabled) {
+    return "";
+  }
+
+  return `
+    <form class="search-box" data-sidebar-search="${escapeHtmlAttribute(view.id)}">
+      <input
+        type="text"
+        value="${escapeHtmlAttribute(filterState.search || "") }"
+        placeholder="${escapeHtmlAttribute(t(data.filters.search_placeholder))}"
+        data-sidebar-search-input="${escapeHtmlAttribute(view.id)}"
+      >
+      <button type="submit" title="${escapeHtmlAttribute(t("sidebar.search"))}">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M15.7 14.3l-4.2-4.2c-.2-.2-.5-.3-.8-.3.9-1.1 1.5-2.5 1.5-4C12.2 2.6 9.6 0 6.4 0S.6 2.6.6 5.8s2.6 5.8 5.8 5.8c1.5 0 2.9-.5 4-1.4 0 .3.1.6.3.8l4.2 4.2c.2.2.5.3.7.3s.5-.1.7-.3c.4-.4.4-1 0-1.4zm-9.3-4c-2.5 0-4.5-2-4.5-4.5s2-4.5 4.5-4.5 4.5 2 4.5 4.5-2 4.5-4.5 4.5z"></path>
+        </svg>
+      </button>
+      ${filterState.search ? `<button type="button" class="clear-search" data-sidebar-clear-search="${escapeHtmlAttribute(view.id)}" title="${escapeHtmlAttribute(t("sidebar.clearFilters"))}">✕</button>` : ""}
+    </form>
+  `;
+}
+
+function renderSidebarFilterPanel(data, view, filterState) {
+  if (!data.filters?.enabled || !filterState.showFilters) {
+    return "";
+  }
+
+  return `
+    ${renderSidebarArchiveFilter(data, view, filterState)}
+    ${renderSidebarFilterChips(data, view, filterState)}
+  `;
+}
+
+function renderSidebarArchiveFilter(data, view, filterState) {
+  const entries = Array.isArray(data.filters?.year_month_counts) ? data.filters.year_month_counts : [];
+  const years = groupSidebarYearMonths(entries);
+
+  return `
+    <div class="calendar-view">
+      <button class="calendar-header collapsible-header ${filterState.archiveCollapsed ? "collapsed" : "expanded"}" data-sidebar-toggle-collapse="${escapeHtmlAttribute(view.id)}:archive" type="button">
+        <span class="collapse-icon">${filterState.archiveCollapsed ? "▶" : "▼"}</span>
+        <span>${escapeHtml(t(data.filters.archive_label))}</span>
+      </button>
+      ${(filterState.year || filterState.month) ? `<button class="clear-filter" data-sidebar-clear-date="${escapeHtmlAttribute(view.id)}" type="button" title="${escapeHtmlAttribute(t(data.filters.clear_filters_label))}">✕</button>` : ""}
+      ${filterState.archiveCollapsed ? "" : `
+        <div class="calendar-years">
+          ${years
+            .map(
+              (yearEntry) => `
+                <div class="calendar-year">
+                  <button class="calendar-year-header ${filterState.year === yearEntry.year && !filterState.month ? "selected" : ""}" data-sidebar-year="${escapeHtmlAttribute(view.id)}:${yearEntry.year}" type="button">
+                    <span class="expand-icon">${filterState.expandedYear === yearEntry.year ? "▼" : "▶"}</span>
+                    <span class="year-label">${escapeHtml(String(yearEntry.year))}</span>
+                    <span class="year-count">${escapeHtml(String(yearEntry.count))}</span>
+                  </button>
+                  ${filterState.expandedYear === yearEntry.year ? `
+                    <div class="calendar-months">
+                      ${yearEntry.months
+                        .map(
+                          (monthEntry) => `
+                            <button class="calendar-month ${filterState.year === yearEntry.year && filterState.month === monthEntry.month ? "selected" : ""}" data-sidebar-month="${escapeHtmlAttribute(view.id)}:${yearEntry.year}:${monthEntry.month}" type="button">
+                              <span class="month-label">${escapeHtml(formatDashboardMonth(yearEntry.year, monthEntry.month))}</span>
+                              <span class="month-count">${escapeHtml(String(monthEntry.count))}</span>
+                            </button>
+                          `
+                        )
+                        .join("")}
+                    </div>
+                  ` : ""}
+                </div>
+              `
+            )
+            .join("")}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function renderSidebarFilterChips(data, view, filterState) {
+  const tags = Array.isArray(data.filters?.available_tags) ? data.filters.available_tags : [];
+  const categories = Array.isArray(data.filters?.available_categories) ? data.filters.available_categories : [];
+
+  return `
+    <div class="filter-panel">
+      ${tags.length ? `
+        <div class="filter-section">
+          <button class="filter-header collapsible-header ${filterState.tagsCollapsed ? "collapsed" : "expanded"}" data-sidebar-toggle-collapse="${escapeHtmlAttribute(view.id)}:tags" type="button">
+            <span class="collapse-icon">${filterState.tagsCollapsed ? "▶" : "▼"}</span>
+            <span>${escapeHtml(t(data.filters.tags_label))}</span>
+          </button>
+          ${filterState.tagsCollapsed ? "" : `
+            <div class="filter-chips">
+              ${tags
+                .map(
+                  (tag) => `
+                    <button class="filter-chip ${filterState.tags.includes(tag) ? "active" : ""}" data-sidebar-tag="${escapeHtmlAttribute(view.id)}:${escapeHtmlAttribute(tag)}" type="button">
+                      ${escapeHtml(tag)}
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>
+          `}
+        </div>
+      ` : ""}
+      ${categories.length ? `
+        <div class="filter-section">
+          <button class="filter-header collapsible-header ${filterState.categoriesCollapsed ? "collapsed" : "expanded"}" data-sidebar-toggle-collapse="${escapeHtmlAttribute(view.id)}:categories" type="button">
+            <span class="collapse-icon">${filterState.categoriesCollapsed ? "▶" : "▼"}</span>
+            <span>${escapeHtml(t(data.filters.categories_label))}</span>
+          </button>
+          ${filterState.categoriesCollapsed ? "" : `
+            <div class="filter-chips">
+              ${categories
+                .map(
+                  (category) => `
+                    <button class="filter-chip ${filterState.categories.includes(category) ? "active" : ""}" data-sidebar-category="${escapeHtmlAttribute(view.id)}:${escapeHtmlAttribute(category)}" type="button">
+                      ${escapeHtml(category)}
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>
+          `}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderSidebarFilterStatus(data, view, filterState) {
+  if (!data.filters?.enabled || !data.filters.has_active_filters) {
+    return "";
+  }
+
+  const count = Number(data.filters.total_count) || 0;
+  const label = filterState.search
+    ? t(data.filters.results_for_label, { count, query: filterState.search })
+    : t(data.filters.results_label, { count });
+
+  return `
+    <div class="filter-status">
+      <span>${escapeHtml(label)}</span>
+      <button data-sidebar-clear-filters="${escapeHtmlAttribute(view.id)}" type="button">${escapeHtml(t(data.filters.clear_filters_label))}</button>
+    </div>
+  `;
+}
+
+function renderSidebarLoadMore(data, view) {
+  if (!data.filters?.enabled || !data.filters.has_more) {
+    return "";
+  }
+
+  return `
+    <div class="sidebar-load-more">
+      <button class="load-more-button" data-sidebar-load-more="${escapeHtmlAttribute(view.id)}" type="button">
+        ${escapeHtml(t("sidebar.loadMore", { loaded: data.filters.loaded_count || 0, total: data.filters.total_count || 0 }))}
+      </button>
     </div>
   `;
 }
@@ -338,6 +518,113 @@ function renderSidebarEmpty(message) {
       <p>${escapeHtml(tText(message))}</p>
     </div>
   `;
+}
+
+function groupSidebarYearMonths(entries) {
+  const years = new Map();
+
+  entries.forEach((entry) => {
+    const year = Number(entry.year);
+    const month = Number(entry.month);
+    const count = Number(entry.count) || 0;
+
+    if (!years.has(year)) {
+      years.set(year, { year, count: 0, months: [] });
+    }
+
+    const yearEntry = years.get(year);
+    yearEntry.count += count;
+    yearEntry.months.push({ month, count });
+  });
+
+  return Array.from(years.values())
+    .map((yearEntry) => ({
+      ...yearEntry,
+      months: yearEntry.months.sort((left, right) => right.month - left.month),
+    }))
+    .sort((left, right) => right.year - left.year);
+}
+
+function hydrateSidebarFilters(sidebarContent) {
+  return Object.fromEntries(
+    Object.entries(sidebarContent || {}).map(([viewId, data]) => [viewId, defaultSidebarFilterState(viewId, data)])
+  );
+}
+
+function defaultSidebarFilterState(viewId, data) {
+  const selected = data?.filters?.selected || {};
+
+  return {
+    search: selected.search || "",
+    year: selected.year || null,
+    month: selected.month || null,
+    tags: Array.isArray(selected.tags) ? [...selected.tags] : [],
+    categories: Array.isArray(selected.categories) ? [...selected.categories] : [],
+    showFilters: false,
+    archiveCollapsed: true,
+    tagsCollapsed: true,
+    categoriesCollapsed: true,
+    expandedYear: selected.year || null,
+    displayLimit: data?.filters?.display_limit || data?.filters?.max_items || 500,
+  };
+}
+
+function currentSidebarFilterState(viewId) {
+  if (!state.sidebarFilters[viewId]) {
+    state.sidebarFilters[viewId] = defaultSidebarFilterState(viewId, state.sidebarContent[viewId]);
+  }
+
+  return state.sidebarFilters[viewId];
+}
+
+function applySidebarPostFilters(viewId) {
+  void refreshSidebarView(viewId);
+}
+
+function applySidebarMediaFilters(viewId) {
+  void refreshSidebarView(viewId);
+}
+
+async function refreshSidebarView(viewId) {
+  try {
+    const filterState = currentSidebarFilterState(viewId);
+    const response = await fetch("/api/sidebar", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        view: viewId,
+        filters: {
+          search: filterState.search,
+          year: filterState.year,
+          month: filterState.month,
+          tags: filterState.tags,
+          categories: filterState.categories,
+          display_limit: filterState.displayLimit,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = await response.json();
+    if (payload.status !== "ok") {
+      return;
+    }
+
+    state.sidebarContent[viewId] = payload.data;
+    state.sidebarFilters[viewId] = {
+      ...filterState,
+      displayLimit: payload.data?.filters?.display_limit || filterState.displayLimit,
+    };
+    render();
+  } catch (_error) {
+    // Keep the shell usable if sidebar filtering is temporarily unavailable.
+  }
 }
 
 function renderTabs() {
@@ -791,6 +1078,171 @@ function bindEvents() {
         state.session.sidebar_visible = true;
       }
       render();
+    };
+  });
+
+  root.querySelectorAll("[data-sidebar-toggle-filters]").forEach((button) => {
+    button.onclick = () => {
+      const viewId = button.dataset.sidebarToggleFilters;
+      const filterState = currentSidebarFilterState(viewId);
+      filterState.showFilters = !filterState.showFilters;
+      render();
+    };
+  });
+
+  root.querySelectorAll("form[data-sidebar-search]").forEach((form) => {
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      const viewId = form.dataset.sidebarSearch;
+      const input = form.querySelector("input[data-sidebar-search-input]");
+      const filterState = currentSidebarFilterState(viewId);
+      filterState.search = input?.value?.trim() || "";
+      filterState.displayLimit = state.sidebarContent[viewId]?.filters?.max_items || filterState.displayLimit;
+      if (viewId === "media") {
+        applySidebarMediaFilters(viewId);
+      } else {
+        applySidebarPostFilters(viewId);
+      }
+    };
+  });
+
+  root.querySelectorAll("[data-sidebar-clear-search]").forEach((button) => {
+    button.onclick = () => {
+      const viewId = button.dataset.sidebarClearSearch;
+      const filterState = currentSidebarFilterState(viewId);
+      filterState.search = "";
+      filterState.displayLimit = state.sidebarContent[viewId]?.filters?.max_items || filterState.displayLimit;
+      if (viewId === "media") {
+        applySidebarMediaFilters(viewId);
+      } else {
+        applySidebarPostFilters(viewId);
+      }
+    };
+  });
+
+  root.querySelectorAll("[data-sidebar-toggle-collapse]").forEach((button) => {
+    button.onclick = () => {
+      const [viewId, section] = button.dataset.sidebarToggleCollapse.split(":");
+      const filterState = currentSidebarFilterState(viewId);
+
+      if (section === "archive") {
+        filterState.archiveCollapsed = !filterState.archiveCollapsed;
+      }
+
+      if (section === "tags") {
+        filterState.tagsCollapsed = !filterState.tagsCollapsed;
+      }
+
+      if (section === "categories") {
+        filterState.categoriesCollapsed = !filterState.categoriesCollapsed;
+      }
+
+      render();
+    };
+  });
+
+  root.querySelectorAll("[data-sidebar-year]").forEach((button) => {
+    button.onclick = () => {
+      const [viewId, year] = button.dataset.sidebarYear.split(":");
+      const filterState = currentSidebarFilterState(viewId);
+      const nextYear = Number.parseInt(year, 10);
+      filterState.expandedYear = filterState.expandedYear === nextYear ? null : nextYear;
+      filterState.year = nextYear;
+      filterState.month = null;
+      filterState.displayLimit = state.sidebarContent[viewId]?.filters?.max_items || filterState.displayLimit;
+      if (viewId === "media") {
+        applySidebarMediaFilters(viewId);
+      } else {
+        applySidebarPostFilters(viewId);
+      }
+    };
+  });
+
+  root.querySelectorAll("[data-sidebar-month]").forEach((button) => {
+    button.onclick = () => {
+      const [viewId, year, month] = button.dataset.sidebarMonth.split(":");
+      const filterState = currentSidebarFilterState(viewId);
+      filterState.year = Number.parseInt(year, 10);
+      filterState.month = Number.parseInt(month, 10);
+      filterState.expandedYear = filterState.year;
+      filterState.displayLimit = state.sidebarContent[viewId]?.filters?.max_items || filterState.displayLimit;
+      if (viewId === "media") {
+        applySidebarMediaFilters(viewId);
+      } else {
+        applySidebarPostFilters(viewId);
+      }
+    };
+  });
+
+  root.querySelectorAll("[data-sidebar-clear-date]").forEach((button) => {
+    button.onclick = () => {
+      const viewId = button.dataset.sidebarClearDate;
+      const filterState = currentSidebarFilterState(viewId);
+      filterState.year = null;
+      filterState.month = null;
+      filterState.expandedYear = null;
+      filterState.displayLimit = state.sidebarContent[viewId]?.filters?.max_items || filterState.displayLimit;
+      if (viewId === "media") {
+        applySidebarMediaFilters(viewId);
+      } else {
+        applySidebarPostFilters(viewId);
+      }
+    };
+  });
+
+  root.querySelectorAll("[data-sidebar-tag]").forEach((button) => {
+    button.onclick = () => {
+      const [viewId, tag] = button.dataset.sidebarTag.split(":");
+      const filterState = currentSidebarFilterState(viewId);
+      filterState.tags = toggleSidebarFilterValue(filterState.tags, tag);
+      filterState.displayLimit = state.sidebarContent[viewId]?.filters?.max_items || filterState.displayLimit;
+      if (viewId === "media") {
+        applySidebarMediaFilters(viewId);
+      } else {
+        applySidebarPostFilters(viewId);
+      }
+    };
+  });
+
+  root.querySelectorAll("[data-sidebar-category]").forEach((button) => {
+    button.onclick = () => {
+      const [viewId, category] = button.dataset.sidebarCategory.split(":");
+      const filterState = currentSidebarFilterState(viewId);
+      filterState.categories = toggleSidebarFilterValue(filterState.categories, category);
+      filterState.displayLimit = state.sidebarContent[viewId]?.filters?.max_items || filterState.displayLimit;
+      applySidebarPostFilters(viewId);
+    };
+  });
+
+  root.querySelectorAll("[data-sidebar-clear-filters]").forEach((button) => {
+    button.onclick = () => {
+      const viewId = button.dataset.sidebarClearFilters;
+      const existing = currentSidebarFilterState(viewId);
+      state.sidebarFilters[viewId] = {
+        ...defaultSidebarFilterState(viewId, state.sidebarContent[viewId]),
+        showFilters: existing.showFilters,
+        archiveCollapsed: existing.archiveCollapsed,
+        tagsCollapsed: existing.tagsCollapsed,
+        categoriesCollapsed: existing.categoriesCollapsed,
+      };
+      if (viewId === "media") {
+        applySidebarMediaFilters(viewId);
+      } else {
+        applySidebarPostFilters(viewId);
+      }
+    };
+  });
+
+  root.querySelectorAll("[data-sidebar-load-more]").forEach((button) => {
+    button.onclick = () => {
+      const viewId = button.dataset.sidebarLoadMore;
+      const filterState = currentSidebarFilterState(viewId);
+      filterState.displayLimit += state.sidebarContent[viewId]?.filters?.max_items || 500;
+      if (viewId === "media") {
+        applySidebarMediaFilters(viewId);
+      } else {
+        applySidebarPostFilters(viewId);
+      }
     };
   });
 
@@ -1383,7 +1835,7 @@ function activeItem() {
     return null;
   }
 
-  const items = Object.values(bootstrap.content.sidebar).flatMap(flattenSidebarItems);
+  const items = Object.values(state.sidebarContent).flatMap(flattenSidebarItems);
   return items.find((item) => item.route === tab.type && tabIdForItem(item, item.route) === tab.id) || null;
 }
 
@@ -1414,7 +1866,7 @@ function currentSidebarView() {
 }
 
 function currentSidebarData() {
-  return bootstrap.content.sidebar[state.session.active_view] || bootstrap.content.sidebar[bootstrap.registry.default_sidebar_view];
+  return state.sidebarContent[state.session.active_view] || state.sidebarContent[bootstrap.registry.default_sidebar_view];
 }
 
 function currentTabRef() {
@@ -1613,6 +2065,12 @@ function tabIdForItem(item, route) {
   }
 
   return item.id;
+}
+
+function toggleSidebarFilterValue(values, value) {
+  return values.includes(value)
+    ? values.filter((entry) => entry !== value)
+    : [...values, value];
 }
 
 function sidebarViews() {
