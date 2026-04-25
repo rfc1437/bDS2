@@ -20,6 +20,13 @@ config :bds, :desktop,
   title: "Blogging Desktop Server",
   secret_key_base: "bds_desktop_shell_secret_key_base_64_chars_minimum_seed_value_001"
 
+config :bds, BDS.Desktop.Endpoint,
+  url: [host: "127.0.0.1"],
+  adapter: Bandit.PhoenixAdapter,
+  render_errors: [formats: [html: BDS.Desktop.ErrorHTML], layout: false],
+  pubsub_server: BDS.PubSub,
+  live_view: [signing_salt: "desktop-live-view"]
+
 config :bds, :scripting,
   runtime: BDS.Scripting.Lua,
   timeout: 300_000,

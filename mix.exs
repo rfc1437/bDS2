@@ -35,6 +35,7 @@ defmodule BDS.MixProject do
       {:desktop, "~> 1.5"},
       {:image, "~> 0.65"},
       {:stemex, "~> 0.2.1"},
+      {:lazy_html, ">= 0.1.0", only: :test},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end

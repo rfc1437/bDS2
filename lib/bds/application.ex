@@ -26,6 +26,8 @@ defmodule BDS.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {Phoenix.PubSub, name: BDS.PubSub},
+      {BDS.Desktop.Endpoint, secret_key_base: desktop_secret_key_base()},
       BDS.Repo,
       BDS.RepoBootstrap,
       BDS.Tasks,
@@ -66,5 +68,10 @@ defmodule BDS.Application do
 
   defp desktop_automation? do
     System.get_env("BDS_DESKTOP_AUTOMATION") in ["1", "true", "TRUE"]
+  end
+
+  defp desktop_secret_key_base do
+    Application.get_env(:bds, :desktop)[:secret_key_base] ||
+      raise "missing :desktop secret_key_base configuration"
   end
 end

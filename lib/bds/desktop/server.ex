@@ -29,7 +29,7 @@ defmodule BDS.Desktop.Server do
   def init(_opts) do
     {:ok, bandit_pid} =
       Bandit.start_link(
-        plug: BDS.Desktop.Router,
+        plug: BDS.Desktop.Endpoint,
         scheme: :http,
         ip: {127, 0, 0, 1},
         port: port(),

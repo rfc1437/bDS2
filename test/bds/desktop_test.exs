@@ -3,10 +3,6 @@ defmodule BDS.DesktopTest do
 
   import Plug.Test
 
-  defmodule TestFolderPicker do
-    def choose_directory(_prompt), do: Process.get(:test_folder_picker_response, :cancel)
-  end
-
   test "desktop configuration no longer uses a pending adapter" do
     assert Application.get_env(:bds, BDS.Application)[:desktop_adapter] == :desktop
   end
@@ -99,220 +95,39 @@ defmodule BDS.DesktopTest do
     assert menu_item(groups, :metadata_diff).shortcut == nil
   end
 
-  test "desktop shell html follows the old app frame regions and references bundled assets" do
-    html = BDS.Desktop.ShellController.index_html()
-
-    assert html =~ ~s(class="app")
-    assert html =~ ~s(class="window-titlebar")
-    assert html =~ ~s(class="activity-bar")
-    assert html =~ ~s(class="sidebar")
-    assert html =~ ~s(class="tab-bar")
-    assert html =~ ~s(class="status-bar")
-    assert html =~ ~s(src="/assets/app.js")
-    assert html =~ ~s(href="/assets/app.css")
-  end
-
-  test "desktop router serves the shell without requiring Phoenix endpoint secrets" do
+  test "desktop root html is a LiveView shell and references only the live bootstrap assets" do
     conn = conn(:get, "/?k=#{Desktop.Auth.login_key()}")
-    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+    conn = BDS.Desktop.Endpoint.call(conn, BDS.Desktop.Endpoint.init([]))
 
     assert conn.status == 200
     assert conn.resp_body =~ ~s(class="app")
+    assert conn.resp_body =~ ~s(class="window-titlebar")
+    assert conn.resp_body =~ ~s(class="activity-bar")
+    assert conn.resp_body =~ ~s(class="sidebar")
+    assert conn.resp_body =~ ~s(class="status-bar")
+    assert conn.resp_body =~ ~s(data-phx-main)
+    assert conn.resp_body =~ ~s(src="/assets/live.js")
+    assert conn.resp_body =~ ~s(href="/assets/app.css")
+    refute conn.resp_body =~ ~s(src="/assets/app.js")
   end
 
-  test "desktop router exposes live task status for shell polling" do
-    :ok = BDS.Tasks.clear_finished()
-
-    assert {:ok, task} =
-             BDS.Tasks.register_external_task("preview build", %{
-               group_id: "generation",
-               group_name: "Generation"
-             })
-
-    on_exit(fn ->
-      _ = BDS.Tasks.complete_task(task.id)
-      _ = BDS.Tasks.clear_finished()
-    end)
-
-    assert :ok = BDS.Tasks.report_progress(task.id, 0.5, "halfway")
-
-    conn = conn(:get, "/api/tasks?k=#{Desktop.Auth.login_key()}")
-    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+  test "desktop endpoint serves the live shell without extra router-side secret injection" do
+    conn = conn(:get, "/?k=#{Desktop.Auth.login_key()}")
+    conn = BDS.Desktop.Endpoint.call(conn, BDS.Desktop.Endpoint.init([]))
 
     assert conn.status == 200
-    assert Plug.Conn.get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
-
-    payload = Jason.decode!(conn.resp_body)
-
-    assert payload["active_count"] >= 1
-    assert payload["running_task_message"] == "preview build: halfway"
-
-    assert Enum.any?(payload["tasks"], fn item ->
-             item["id"] == task.id and item["group_name"] == "Generation" and item["progress"] == 0.5
-           end)
+    assert conn.resp_body =~ ~s(data-phx-main)
   end
 
-  test "desktop router encodes failed task snapshots even when the task error is a tuple" do
-    :ok = BDS.Tasks.clear_finished()
-
-    assert {:ok, task} =
-             BDS.Tasks.submit_task(
-               "broken rebuild",
-               fn _report ->
-                 {:error, {{:badkey, "slug"}, [{BDS.Posts, :upsert_post_from_file, 3, [line: 644]}]}}
-               end,
-               %{group_id: "maintenance", group_name: "Maintenance"}
-             )
-
-    on_exit(fn ->
-      _ = BDS.Tasks.clear_finished()
-    end)
-
-    failed = wait_for_task(task.id, &(&1.status == :failed and &1.error != nil))
-
-    conn = conn(:get, "/api/tasks?k=#{Desktop.Auth.login_key()}")
-    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+  test "desktop endpoint exposes a simple health route" do
+    conn = conn(:get, "/health?k=#{Desktop.Auth.login_key()}")
+    conn = BDS.Desktop.Endpoint.call(conn, BDS.Desktop.Endpoint.init([]))
 
     assert conn.status == 200
-    payload = Jason.decode!(conn.resp_body)
-
-    assert Enum.any?(payload["tasks"], fn item ->
-             item["id"] == failed.id and item["status"] == "failed" and is_binary(item["error"])
-           end)
-
-    assert Enum.any?(payload["tasks"], fn item ->
-             item["id"] == failed.id and String.contains?(item["error"], "badkey")
-           end)
+    assert conn.resp_body == "ok"
   end
 
-  test "desktop router exposes projects for shell project selection and creation" do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
-    BDS.Repo.delete_all(BDS.Projects.Project)
-
-    internal_projects_root = "/Users/gb/Projects/bDS2/priv/data/projects"
-    before_internal_dirs =
-      case File.ls(internal_projects_root) do
-        {:ok, entries} -> MapSet.new(entries)
-        {:error, :enoent} -> MapSet.new()
-      end
-
-    temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-projects-#{System.unique_integer([:positive])}")
-    File.mkdir_p!(temp_dir)
-
-    on_exit(fn ->
-      File.rm_rf(temp_dir)
-    end)
-
-    {:ok, project} = BDS.Projects.create_project(%{name: "Desktop Projects", data_path: temp_dir})
-    {:ok, _active} = BDS.Projects.set_active_project(project.id)
-
-    conn = conn(:get, "/api/projects?k=#{Desktop.Auth.login_key()}")
-    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
-
-    assert conn.status == 200
-
-    payload = Jason.decode!(conn.resp_body)
-    assert payload["active_project_id"] == project.id
-    assert Enum.any?(payload["projects"], &(&1["id"] == project.id and &1["name"] == "Desktop Projects"))
-    assert Enum.any?(payload["projects"], &(&1["id"] == "default" and &1["name"] == "My Blog"))
-
-    created_data_dir = Path.join(temp_dir, "created-from-shell")
-    create_conn =
-      conn(
-        :post,
-        "/api/projects?k=#{Desktop.Auth.login_key()}",
-        Jason.encode!(%{"name" => "Created From Shell", "data_path" => created_data_dir})
-      )
-      |> Plug.Conn.put_req_header("content-type", "application/json")
-
-    create_conn = BDS.Desktop.Router.call(create_conn, BDS.Desktop.Router.init([]))
-
-    assert create_conn.status == 200
-
-    created_payload = Jason.decode!(create_conn.resp_body)
-    assert created_payload["project"]["name"] == "Created From Shell"
-    assert created_payload["active_project_id"] == created_payload["project"]["id"]
-    assert created_payload["project"]["data_path"] == created_data_dir
-
-    after_internal_dirs =
-      case File.ls(internal_projects_root) do
-        {:ok, entries} -> MapSet.new(entries)
-        {:error, :enoent} -> MapSet.new()
-      end
-
-    assert after_internal_dirs == before_internal_dirs
-  end
-
-  test "desktop router lets the shell choose an existing project folder and reuses matching projects" do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
-
-    temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-existing-project-#{System.unique_integer([:positive])}")
-    meta_dir = Path.join(temp_dir, "meta")
-    File.mkdir_p!(meta_dir)
-
-    File.write!(
-      Path.join(meta_dir, "project.json"),
-      Jason.encode!(%{"name" => "Existing Blog", "description" => "Imported from disk"})
-    )
-
-    {:ok, project} = BDS.Projects.create_project(%{name: "Existing Blog", data_path: temp_dir})
-
-    previous_desktop = Application.get_env(:bds, :desktop, [])
-    Application.put_env(:bds, :desktop, Keyword.put(previous_desktop, :folder_picker, TestFolderPicker))
-    Process.put(:test_folder_picker_response, {:ok, temp_dir})
-
-    on_exit(fn ->
-      Application.put_env(:bds, :desktop, previous_desktop)
-      Process.delete(:test_folder_picker_response)
-      File.rm_rf(temp_dir)
-    end)
-
-    conn = conn(:post, "/api/project-folder?k=#{Desktop.Auth.login_key()}")
-    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
-
-    assert conn.status == 200
-
-    payload = Jason.decode!(conn.resp_body)
-
-    assert payload["status"] == "ok"
-    assert payload["path"] == temp_dir
-    assert payload["name"] == "Existing Blog"
-    assert payload["description"] == "Imported from disk"
-    assert payload["existing_project_id"] == project.id
-  end
-
-  test "desktop router executes shell commands through the JSON api" do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
-    :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), Process.whereis(BDS.Preview))
-
-    temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-router-#{System.unique_integer([:positive])}")
-    File.mkdir_p!(temp_dir)
-
-    on_exit(fn ->
-      File.rm_rf(temp_dir)
-      _ = BDS.Preview.stop_preview("default")
-    end)
-
-    {:ok, project} = BDS.Projects.create_project(%{name: "Desktop Router", data_path: temp_dir})
-    {:ok, _project} = BDS.Projects.set_active_project(project.id)
-
-    conn =
-      conn(:post, "/api/commands?k=#{Desktop.Auth.login_key()}", Jason.encode!(%{"action" => "open_in_browser"}))
-      |> Plug.Conn.put_req_header("content-type", "application/json")
-
-    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
-
-    assert conn.status == 200
-    assert Plug.Conn.get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
-
-    payload = Jason.decode!(conn.resp_body)
-
-    assert payload["result"]["kind"] == "open_url"
-    assert payload["result"]["project_id"] == project.id
-    assert payload["result"]["url"] == "http://127.0.0.1:4123/"
-  end
-
-  test "desktop router serves active-project media thumbnails for the sidebar" do
+  test "desktop endpoint serves active-project media thumbnails for the live sidebar" do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
     temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-thumbnail-#{System.unique_integer([:positive])}")
@@ -330,8 +145,8 @@ defmodule BDS.DesktopTest do
 
     assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
-    conn = conn(:get, "/api/media-thumbnail/#{media.id}?k=#{Desktop.Auth.login_key()}")
-    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+  conn = conn(:get, "/media-thumbnail/#{media.id}?k=#{Desktop.Auth.login_key()}")
+  conn = BDS.Desktop.Endpoint.call(conn, BDS.Desktop.Endpoint.init([]))
 
     assert conn.status == 200
     assert [content_type] = Plug.Conn.get_resp_header(conn, "content-type")
@@ -348,22 +163,5 @@ defmodule BDS.DesktopTest do
   defp tiny_jpeg_binary do
     Image.new!(3, 2, color: [255, 0, 0])
     |> Image.write!(:memory, suffix: ".jpg", quality: 85)
-  end
-
-  defp wait_for_task(task_id, matcher, timeout \\ 2_000)
-
-  defp wait_for_task(task_id, _matcher, timeout) when timeout <= 0 do
-    BDS.Tasks.get_task(task_id)
-  end
-
-  defp wait_for_task(task_id, matcher, timeout) do
-    task = BDS.Tasks.get_task(task_id)
-
-    if task && matcher.(task) do
-      task
-    else
-      Process.sleep(50)
-      wait_for_task(task_id, matcher, timeout - 50)
-    end
   end
 end

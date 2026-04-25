@@ -13,7 +13,7 @@ The rewrite already implements most of the backend and compatibility-critical su
 - Compatibility parity locks: executable parity coverage now pins the old-bDS behavior for serializer/file contracts, metadata-diff ordering, canonical generation routes, feed output, localized archive rendering, preview draft language selection, taxonomy archive links, and media URL rewriting.
 - Core editorial domains: projects, posts, post translations, media, media translations, tags, templates, scripts, menu data, and project metadata.
 - Output and infrastructure: search, Liquid rendering, site generation, preview server, publishing, background tasks, i18n, git support, MCP server, AI operations, embeddings, and CLI sync.
-- Desktop shell foundation: native menu definitions, shell HTML/CSS/JS bundle, activity bar, sidebar views, tab/workbench state, task panel, assistant sidebar, project switcher, and shell command routing.
+- Desktop shell foundation: native menu definitions, LiveView shell endpoint, activity bar, sidebar views, tab/workbench state, task panel, assistant sidebar, project switcher, and shell command routing.
 
 ### Implemented But Not Yet At Parity
 
@@ -38,7 +38,7 @@ Ordered from base contracts upward:
 | Persistence and file contracts | `schema`, `frontmatter`, `project`, `post`, `translation`, `media`, `tag`, `template`, `script`, `menu`, `metadata` | Implemented | Core schemas, file formats, publish flows, sidecars, rebuild, and metadata diff are present and tested. |
 | Rendering and output pipelines | `template_context`, `search`, `generation`, `preview`, `publishing`, `task`, `i18n` | Implemented | Rendering, generation, preview, publishing, task tracking, and localization are in place. |
 | Integrations | `git`, `mcp`, `ai`, `embedding`, `cli_sync`, `metadata_diff` | Implemented | Service layer and test coverage exist for these domains. |
-| Desktop shell primitives | `layout`, `tabs`, `sidebar_views` | Implemented | Route state, registry-backed sidebar/editor coverage, panel fallback rules, menu/native-command wiring, and shell frame parity are in place; route bodies remain generic until the editor UX phase. |
+| Desktop shell primitives | `layout`, `tabs`, `sidebar_views` | Implemented | Route state, registry-backed sidebar/editor coverage, panel fallback rules, menu/native-command wiring, and a LiveView-owned shell frame are in place; route bodies remain generic until the editor UX phase. |
 | Cross-cutting flows | `ui_data_flow`, `engine_side_effects`, `action_patterns`, `media_processing` | Partial | Most backend behavior exists, but UI coordination, explicit engine event modeling, and some parity details are still incomplete. |
 | Editor UX layer | `editor_post`, `editor_media`, `editor_settings`, `editor_tags`, `editor_chat`, `editor_script`, `editor_template`, `editor_misc`, `modals` | Partial to missing | Route registration exists, but feature-complete editors and modal workflows are not done. |
 
