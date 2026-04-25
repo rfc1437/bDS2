@@ -341,7 +341,6 @@ defmodule BDS.Media do
 
   defp upsert_media_from_sidecar(project, sidecar_path) do
     {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
-    fields = normalize_media_sidecar_fields(fields)
     relative_sidecar_path = Path.relative_to(sidecar_path, Projects.project_data_dir(project))
     relative_file_path = String.trim_trailing(relative_sidecar_path, ".meta")
     filename = Path.basename(relative_file_path)
@@ -351,8 +350,8 @@ defmodule BDS.Media do
       id: Map.get(fields, "id") || Ecto.UUID.generate(),
       project_id: project.id,
       filename: filename,
-      original_name: Map.get(fields, "original_name") || filename,
-      mime_type: Map.get(fields, "mime_type") || detect_mime(filename),
+      original_name: Map.get(fields, "originalName") || filename,
+      mime_type: Map.get(fields, "mimeType") || detect_mime(filename),
       size: Map.get(fields, "size", 0),
       width: blank_to_nil(Map.get(fields, "width")),
       height: blank_to_nil(Map.get(fields, "height")),
@@ -365,8 +364,8 @@ defmodule BDS.Media do
       sidecar_path: relative_sidecar_path,
       checksum: nil,
       tags: Map.get(fields, "tags", []),
-      created_at: Map.get(fields, "created_at", now),
-      updated_at: Map.get(fields, "updated_at", now)
+      created_at: Map.get(fields, "createdAt", now),
+      updated_at: Map.get(fields, "updatedAt", now)
     }
 
     media =
@@ -436,7 +435,6 @@ defmodule BDS.Media do
 
       media ->
         {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
-        fields = normalize_media_sidecar_fields(fields)
         now = Persistence.now_ms()
         language = Map.fetch!(fields, "language")
 
@@ -608,23 +606,6 @@ defmodule BDS.Media do
 
   defp atomic_write(path, contents) do
     Persistence.atomic_write(path, contents)
-  end
-
-  defp normalize_media_sidecar_fields(fields) when is_map(fields) do
-    [
-      {"originalName", "original_name"},
-      {"mimeType", "mime_type"},
-      {"createdAt", "created_at"},
-      {"updatedAt", "updated_at"},
-      {"translationFor", "translation_for"},
-      {"linkedPostIds", "linked_post_ids"}
-    ]
-    |> Enum.reduce(fields, fn {file_key, current_key}, acc ->
-      case Map.fetch(acc, file_key) do
-        {:ok, value} -> Map.put_new(acc, current_key, value)
-        :error -> acc
-      end
-    end)
   end
 
   defp linked_post_ids(media_id) do

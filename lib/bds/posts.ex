@@ -658,16 +658,16 @@ defmodule BDS.Posts do
       content: nil,
       status: parse_post_status(Map.get(fields, "status", "published")),
       author: Map.get(fields, "author"),
-      created_at: Map.get(fields, "created_at", now),
-      updated_at: Map.get(fields, "updated_at", now),
-      published_at: Map.get(fields, "published_at"),
+      created_at: Map.get(fields, "createdAt", now),
+      updated_at: Map.get(fields, "updatedAt", now),
+      published_at: Map.get(fields, "publishedAt"),
       file_path: rebuild_file.relative_path,
       checksum: nil,
       tags: Map.get(fields, "tags", []),
       categories: Map.get(fields, "categories", []),
-      template_slug: Map.get(fields, "template_slug"),
+      template_slug: Map.get(fields, "templateSlug"),
       language: Map.get(fields, "language"),
-      do_not_translate: Map.get(fields, "do_not_translate", false),
+      do_not_translate: Map.get(fields, "doNotTranslate", false),
       published_title: nil,
       published_content: nil,
       published_tags: nil,
@@ -686,7 +686,7 @@ defmodule BDS.Posts do
 
   defp upsert_post_translation_from_rebuild_file(project_id, rebuild_file) do
     fields = rebuild_file.fields
-    source_post_id = Map.fetch!(fields, "translation_for")
+    source_post_id = Map.fetch!(fields, "translationFor")
     source_post = Repo.get!(Post, source_post_id)
     now = Persistence.now_ms()
     language = normalize_language(Map.fetch!(fields, "language"))
@@ -703,9 +703,9 @@ defmodule BDS.Posts do
       excerpt: Map.get(fields, "excerpt"),
       content: nil,
       status: parse_translation_status(Map.get(fields, "status", "published")),
-      created_at: Map.get(fields, "created_at", source_post.created_at || now),
-      updated_at: Map.get(fields, "updated_at", source_post.updated_at || source_post.created_at || now),
-      published_at: Map.get(fields, "published_at", source_post.published_at),
+      created_at: Map.get(fields, "createdAt", source_post.created_at || now),
+      updated_at: Map.get(fields, "updatedAt", source_post.updated_at || source_post.created_at || now),
+      published_at: Map.get(fields, "publishedAt", source_post.published_at),
       file_path: rebuild_file.relative_path,
       checksum: nil
     }
@@ -731,37 +731,13 @@ defmodule BDS.Posts do
     %{
       path: path,
       relative_path: Path.relative_to(path, Projects.project_data_dir(project)),
-      fields: normalize_rebuild_fields(fields)
+      fields: fields
     }
   end
 
   defp translation_rebuild_file?(%{fields: fields}) do
-    Map.has_key?(fields, "translation_for") and not Map.has_key?(fields, "slug")
+    Map.has_key?(fields, "translationFor") and not Map.has_key?(fields, "slug")
   end
-
-  defp normalize_rebuild_fields(fields) when is_map(fields) do
-    [
-      {"translationFor", "translation_for"},
-      {"doNotTranslate", "do_not_translate"},
-      {"templateSlug", "template_slug"},
-      {"createdAt", "created_at"},
-      {"updatedAt", "updated_at"},
-      {"publishedAt", "published_at"}
-    ]
-    |> Enum.reduce(fields, fn {file_key, current_key}, acc ->
-      case Map.fetch(acc, file_key) do
-        {:ok, value} -> Map.put_new(acc, current_key, normalize_rebuild_field_value(current_key, value))
-        :error -> acc
-      end
-    end)
-  end
-
-  defp normalize_rebuild_field_value(key, value)
-       when key in ["created_at", "updated_at", "published_at"] do
-    Persistence.parse_timestamp(value) || value
-  end
-
-  defp normalize_rebuild_field_value(_key, value), do: value
 
   defp list_matching_files(dir, pattern) do
     if File.dir?(dir) do

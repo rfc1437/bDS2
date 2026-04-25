@@ -343,7 +343,6 @@ defmodule BDS.Templates do
   defp upsert_template_from_file(project_id, project, path) do
     contents = File.read!(path)
     {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
-    fields = normalize_template_fields(fields)
     relative_path = Path.relative_to(path, Projects.project_data_dir(project))
     now = Persistence.now_ms()
 
@@ -358,8 +357,8 @@ defmodule BDS.Templates do
       file_path: relative_path,
       status: :published,
       content: nil,
-      created_at: Map.get(fields, "created_at", now),
-      updated_at: Map.get(fields, "updated_at", now)
+      created_at: Map.get(fields, "createdAt", now),
+      updated_at: Map.get(fields, "updatedAt", now)
     }
 
     template = Repo.get_by(Template, project_id: project_id, slug: attrs.slug) || %Template{}
@@ -374,20 +373,6 @@ defmodule BDS.Templates do
   defp parse_template_kind("list"), do: :list
   defp parse_template_kind("not_found"), do: :not_found
   defp parse_template_kind("partial"), do: :partial
-
-  defp normalize_template_fields(fields) when is_map(fields) do
-    [
-      {"createdAt", "created_at"},
-      {"updatedAt", "updated_at"},
-      {"projectId", "project_id"}
-    ]
-    |> Enum.reduce(fields, fn {file_key, current_key}, acc ->
-      case Map.fetch(acc, file_key) do
-        {:ok, value} -> Map.put_new(acc, current_key, value)
-        :error -> acc
-      end
-    end)
-  end
 
   defp list_matching_files(dir, pattern) do
     if File.dir?(dir) do

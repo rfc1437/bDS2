@@ -36,9 +36,9 @@ defmodule BDS.MaintenanceTest do
         "title: Dispatch Post",
         "slug: dispatch-post",
         "status: published",
-        "created_at: 1711843200",
-        "updated_at: 1711929600",
-        "published_at: 1712016000",
+        "createdAt: 1711843200",
+        "updatedAt: 1711929600",
+        "publishedAt: 1712016000",
         "tags:",
         "categories:",
         "---",
@@ -56,11 +56,11 @@ defmodule BDS.MaintenanceTest do
       Path.join(media_dir, "asset.txt.meta"),
       [
         "id: dispatch-media",
-        "original_name: original.txt",
-        "mime_type: text/plain",
+        "originalName: original.txt",
+        "mimeType: text/plain",
         "size: 11",
-        "created_at: 1711843200",
-        "updated_at: 1711929600",
+        "createdAt: 1711843200",
+        "updatedAt: 1711929600",
         "tags:",
         ""
       ]
@@ -80,8 +80,8 @@ defmodule BDS.MaintenanceTest do
         "kind: list",
         "enabled: true",
         "version: 1",
-        "created_at: 101",
-        "updated_at: 202",
+        "createdAt: 101",
+        "updatedAt: 202",
         "---",
         "<section>Template</section>",
         ""
@@ -103,8 +103,8 @@ defmodule BDS.MaintenanceTest do
         "entrypoint: main",
         "enabled: true",
         "version: 1",
-        "created_at: 301",
-        "updated_at: 404",
+        "createdAt: 301",
+        "updatedAt: 404",
         "---",
         "function main() return true end",
         ""
@@ -253,11 +253,11 @@ defmodule BDS.MaintenanceTest do
         "status: published",
         "author: Editor",
         "language: de",
-        "do_not_translate: false",
-        "template_slug: ",
-        "created_at: #{published_post.created_at + 10}",
-        "updated_at: #{published_post.updated_at + 20}",
-        "published_at: #{published_post.published_at + 30}",
+        "doNotTranslate: false",
+        "templateSlug: ",
+        "createdAt: #{published_post.created_at + 10}",
+        "updatedAt: #{published_post.updated_at + 20}",
+        "publishedAt: #{published_post.published_at + 30}",
         "tags:",
         "  - beta",
         "categories:",
@@ -276,14 +276,14 @@ defmodule BDS.MaintenanceTest do
       [
         "---",
         "id: #{published_post_translation.id}",
-        "translation_for: #{published_post_translation.translation_for}",
+        "translationFor: #{published_post_translation.translation_for}",
         "language: #{published_post_translation.language}",
         "title: Bearbeiteter Beitrag",
         "excerpt: Bearbeitete Zusammenfassung",
         "status: published",
-        "created_at: #{published_post_translation.created_at}",
-        "updated_at: #{published_post_translation.updated_at}",
-        "published_at: #{published_post_translation.published_at}",
+        "createdAt: #{published_post_translation.created_at}",
+        "updatedAt: #{published_post_translation.updated_at}",
+        "publishedAt: #{published_post_translation.published_at}",
         "---",
         "Bearbeiteter Inhalt",
         ""
@@ -297,16 +297,16 @@ defmodule BDS.MaintenanceTest do
       media_sidecar_path,
       [
         "id: #{media.id}",
-        "original_name: #{media.original_name}",
-        "mime_type: #{media.mime_type}",
+        "originalName: #{media.original_name}",
+        "mimeType: #{media.mime_type}",
         "size: #{media.size}",
         "title: Edited media title",
         "alt: Edited alt",
         "caption: Edited caption",
         "author: Editor",
         "language: de",
-        "created_at: #{media.created_at}",
-        "updated_at: #{media.updated_at}",
+        "createdAt: #{media.created_at}",
+        "updatedAt: #{media.updated_at}",
         "tags:",
         "  - beta",
         ""
@@ -320,7 +320,7 @@ defmodule BDS.MaintenanceTest do
     File.write!(
       media_translation_sidecar_path,
       [
-        "translation_for: #{media.id}",
+        "translationFor: #{media.id}",
         "language: #{media_translation.language}",
         "title: Bearbeiteter Medientitel",
         "alt: Bearbeiteter Alt-Text",
@@ -337,14 +337,15 @@ defmodule BDS.MaintenanceTest do
       [
         "---",
         "id: #{published_script.id}",
+        "projectId: #{project.id}",
         "slug: #{published_script.slug}",
         "title: Edited Script",
         "kind: utility",
         "entrypoint: run",
         "enabled: false",
         "version: #{published_script.version}",
-        "created_at: #{published_script.created_at}",
-        "updated_at: #{published_script.updated_at}",
+        "createdAt: #{published_script.created_at}",
+        "updatedAt: #{published_script.updated_at}",
         "---",
         "function run() return false end",
         ""
@@ -359,13 +360,14 @@ defmodule BDS.MaintenanceTest do
       [
         "---",
         "id: #{published_template.id}",
+        "projectId: #{project.id}",
         "slug: #{published_template.slug}",
         "title: Edited Template",
         "kind: list",
         "enabled: false",
         "version: #{published_template.version}",
-        "created_at: #{published_template.created_at}",
-        "updated_at: #{published_template.updated_at}",
+        "createdAt: #{published_template.created_at}",
+        "updatedAt: #{published_template.updated_at}",
         "---",
         "<section>Edited</section>",
         ""
@@ -375,34 +377,34 @@ defmodule BDS.MaintenanceTest do
 
     File.write!(
       Path.join([temp_dir, "posts", "2026", "04", "orphan-post.md"]),
-      "---\nid: orphan\ntitle: Orphan\nslug: orphan\nstatus: published\ncreated_at: 1\nupdated_at: 1\npublished_at: 1\ntags:\ncategories:\n---\nBody\n"
+      "---\nid: orphan\ntitle: Orphan\nslug: orphan\nstatus: published\ncreatedAt: 1\nupdatedAt: 1\npublishedAt: 1\ntags:\ncategories:\n---\nBody\n"
     )
 
     File.write!(
       Path.join([temp_dir, "posts", "2026", "04", "orphan-post.es.md"]),
-      "---\nid: orphan-post-translation\ntranslation_for: orphan\nlanguage: es\ntitle: Huerfano\nstatus: published\ncreated_at: 1\nupdated_at: 1\npublished_at: 1\n---\nCuerpo\n"
+      "---\nid: orphan-post-translation\ntranslationFor: orphan\nlanguage: es\ntitle: Huerfano\nstatus: published\ncreatedAt: 1\nupdatedAt: 1\npublishedAt: 1\n---\nCuerpo\n"
     )
 
     File.write!(Path.join([temp_dir, "media", "2026", "04", "orphan.txt"]), "orphan")
 
     File.write!(
       Path.join([temp_dir, "media", "2026", "04", "orphan.txt.meta"]),
-      "id: orphan-media\noriginal_name: orphan.txt\nmime_type: text/plain\nsize: 6\ncreated_at: 1\nupdated_at: 1\ntags:\n"
+      "id: orphan-media\noriginalName: orphan.txt\nmimeType: text/plain\nsize: 6\ncreatedAt: 1\nupdatedAt: 1\ntags:\n"
     )
 
     File.write!(
       Path.join([temp_dir, "media", "2026", "04", "orphan.txt.es.meta"]),
-      "translation_for: orphan-media\nlanguage: es\ntitle: Huerfano\nalt: Texto\ncaption: Leyenda\n"
+      "translationFor: orphan-media\nlanguage: es\ntitle: Huerfano\nalt: Texto\ncaption: Leyenda\n"
     )
 
     File.write!(
       Path.join([temp_dir, "scripts", "orphan.lua"]),
-      "---\nid: orphan-script\nslug: orphan-script\ntitle: Orphan Script\nkind: utility\nentrypoint: main\nenabled: true\nversion: 1\ncreated_at: 1\nupdated_at: 1\n---\nfunction main() return true end\n"
+      "---\nid: orphan-script\nprojectId: #{project.id}\nslug: orphan-script\ntitle: Orphan Script\nkind: utility\nentrypoint: main\nenabled: true\nversion: 1\ncreatedAt: 1\nupdatedAt: 1\n---\nfunction main() return true end\n"
     )
 
     File.write!(
       Path.join([temp_dir, "templates", "orphan-view.liquid"]),
-      "---\nid: orphan-template\nslug: orphan-view\ntitle: Orphan View\nkind: list\nenabled: true\nversion: 1\ncreated_at: 1\nupdated_at: 1\n---\n<section>Orphan</section>\n"
+      "---\nid: orphan-template\nprojectId: #{project.id}\nslug: orphan-view\ntitle: Orphan View\nkind: list\nenabled: true\nversion: 1\ncreatedAt: 1\nupdatedAt: 1\n---\n<section>Orphan</section>\n"
     )
 
     assert {:ok, %{diff_reports: diff_reports, orphan_reports: orphan_reports}} =

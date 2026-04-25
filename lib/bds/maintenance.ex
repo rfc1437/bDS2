@@ -72,10 +72,10 @@ defmodule BDS.Maintenance do
               diff_field("author", post.author, Map.get(fields, "author")),
               diff_field("language", post.language, Map.get(fields, "language")),
               diff_field("status", post.status, Map.get(fields, "status")),
-              diff_field("template_slug", post.template_slug, Map.get(fields, "template_slug")),
-              diff_field("created_at", post.created_at, Map.get(fields, "created_at")),
-              diff_field("updated_at", post.updated_at, Map.get(fields, "updated_at")),
-              diff_field("published_at", post.published_at, Map.get(fields, "published_at")),
+              diff_field("template_slug", post.template_slug, Map.get(fields, "templateSlug")),
+              diff_field("created_at", post.created_at, Map.get(fields, "createdAt")),
+              diff_field("updated_at", post.updated_at, Map.get(fields, "updatedAt")),
+              diff_field("published_at", post.published_at, Map.get(fields, "publishedAt")),
               diff_field("tags", post.tags, Map.get(fields, "tags", [])),
               diff_field("categories", post.categories, Map.get(fields, "categories", []))
             ]
@@ -110,8 +110,8 @@ defmodule BDS.Maintenance do
               diff_field("caption", media.caption, Map.get(fields, "caption")),
               diff_field("author", media.author, Map.get(fields, "author")),
               diff_field("language", media.language, Map.get(fields, "language")),
-              diff_field("created_at", media.created_at, Map.get(fields, "created_at")),
-              diff_field("updated_at", media.updated_at, Map.get(fields, "updated_at")),
+              diff_field("created_at", media.created_at, Map.get(fields, "createdAt")),
+              diff_field("updated_at", media.updated_at, Map.get(fields, "updatedAt")),
               diff_field("tags", media.tags, Map.get(fields, "tags", []))
             ]
             |> Enum.reject(&is_nil/1)
@@ -147,14 +147,14 @@ defmodule BDS.Maintenance do
               diff_field(
                 "translation_for",
                 translation.translation_for,
-                Map.get(fields, "translation_for")
+                Map.get(fields, "translationFor")
               ),
-              diff_field("created_at", translation.created_at, Map.get(fields, "created_at")),
-              diff_field("updated_at", translation.updated_at, Map.get(fields, "updated_at")),
+              diff_field("created_at", translation.created_at, Map.get(fields, "createdAt")),
+              diff_field("updated_at", translation.updated_at, Map.get(fields, "updatedAt")),
               diff_field(
                 "published_at",
                 translation.published_at,
-                Map.get(fields, "published_at")
+                Map.get(fields, "publishedAt")
               )
             ]
             |> Enum.reject(&is_nil/1)
@@ -193,7 +193,7 @@ defmodule BDS.Maintenance do
               diff_field(
                 "translation_for",
                 translation.translation_for,
-                Map.get(fields, "translation_for")
+                Map.get(fields, "translationFor")
               )
             ]
             |> Enum.reject(&is_nil/1)
@@ -231,8 +231,8 @@ defmodule BDS.Maintenance do
               diff_field("title", script.title, Map.get(fields, "title")),
               diff_field("entrypoint", script.entrypoint, Map.get(fields, "entrypoint")),
               diff_field("enabled", script.enabled, Map.get(fields, "enabled")),
-              diff_field("created_at", script.created_at, Map.get(fields, "created_at")),
-              diff_field("updated_at", script.updated_at, Map.get(fields, "updated_at"))
+              diff_field("created_at", script.created_at, Map.get(fields, "createdAt")),
+              diff_field("updated_at", script.updated_at, Map.get(fields, "updatedAt"))
             ]
             |> Enum.reject(&is_nil/1)
 
@@ -262,8 +262,8 @@ defmodule BDS.Maintenance do
             [
               diff_field("title", template.title, Map.get(fields, "title")),
               diff_field("enabled", template.enabled, Map.get(fields, "enabled")),
-              diff_field("created_at", template.created_at, Map.get(fields, "created_at")),
-              diff_field("updated_at", template.updated_at, Map.get(fields, "updated_at"))
+              diff_field("created_at", template.created_at, Map.get(fields, "createdAt")),
+              diff_field("updated_at", template.updated_at, Map.get(fields, "updatedAt"))
             ]
             |> Enum.reject(&is_nil/1)
 
