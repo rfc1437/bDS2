@@ -688,7 +688,10 @@ defmodule BDS.Posts do
       published_excerpt: nil
     }
 
-    post = Repo.get_by(Post, project_id: project_id, slug: attrs.slug) || %Post{}
+    post =
+      Repo.get(Post, attrs.id) ||
+        Repo.get_by(Post, project_id: project_id, file_path: rebuild_file.relative_path) ||
+        Repo.get_by(Post, project_id: project_id, slug: attrs.slug) || %Post{}
 
     post
     |> Post.changeset(attrs)
@@ -700,7 +703,7 @@ defmodule BDS.Posts do
   defp upsert_post_translation_from_rebuild_file(project_id, rebuild_file) do
     fields = rebuild_file.fields
     source_post_id = Map.fetch!(fields, "translationFor")
-    source_post = Repo.get!(Post, source_post_id)
+    source_post = Repo.get_by!(Post, project_id: project_id, id: source_post_id)
     now = Persistence.now_ms()
     language = normalize_language(Map.fetch!(fields, "language"))
 

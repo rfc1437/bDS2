@@ -508,6 +508,116 @@ defmodule BDS.PostsTest do
              "Introducing Thirty Ten, my guide to creating a Twenty Ten Child Theme | aaron.jorb.inaaron.jorb.in"
   end
 
+    test "rebuild_posts_from_files realigns an existing slug match to the canonical file id before importing translations",
+      %{project: project} do
+    assert {:ok, _stale_post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Old Title",
+               slug: "chimera",
+               content: "stale body"
+             })
+
+    posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2026", "04"])
+    File.mkdir_p!(posts_dir)
+
+    File.write!(
+      Path.join(posts_dir, "chimera.md"),
+      [
+        "---",
+        "id: canonical-post-id",
+        "title: Chimera Source",
+        "slug: chimera",
+        "status: published",
+        "language: de",
+        "createdAt: 2024-03-30T21:20:00.000Z",
+        "updatedAt: 2024-03-31T21:20:00.000Z",
+        "publishedAt: 2024-04-01T21:20:00.000Z",
+        "---",
+        "Quelle",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(
+      Path.join(posts_dir, "chimera.en.md"),
+      [
+        "---",
+        "id: translation-from-old-app",
+        "translationFor: canonical-post-id",
+        "language: en",
+        "title: Chimera",
+        "excerpt: Imported translation",
+        "---",
+        "Translated body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, [post]} = BDS.Posts.rebuild_posts_from_files(project.id)
+    assert post.id == "canonical-post-id"
+    assert post.slug == "chimera"
+
+    assert {:ok, [translation]} = BDS.Posts.list_post_translations(post.id)
+    assert translation.translation_for == post.id
+  end
+
+  test "rebuild_posts_from_files repairs a stale row that matches by file path but has a broken slug",
+       %{project: project} do
+    now = BDS.Persistence.now_ms()
+    relative_path = "posts/2010/11/chimera.md"
+
+    stale_post =
+      %BDS.Posts.Post{}
+      |> BDS.Posts.Post.changeset(%{
+        id: "stale-post-id",
+        project_id: project.id,
+        title: ">-",
+        slug: ">-",
+        status: :published,
+        created_at: now,
+        updated_at: now,
+        file_path: relative_path,
+        do_not_translate: false
+      })
+      |> BDS.Repo.insert!()
+
+    posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2010", "11"])
+    File.mkdir_p!(posts_dir)
+
+    File.write!(
+      Path.join(posts_dir, "chimera.md"),
+      [
+        "---",
+        "id: canonical-post-id",
+        "title: Chimera Source",
+        "slug: chimera",
+        "status: published",
+        "language: de",
+        "createdAt: 2024-03-30T21:20:00.000Z",
+        "updatedAt: 2024-03-31T21:20:00.000Z",
+        "publishedAt: 2024-04-01T21:20:00.000Z",
+        "---",
+        "Quelle",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, [post]} = BDS.Posts.rebuild_posts_from_files(project.id)
+    assert post.id == "canonical-post-id"
+    assert post.slug == "chimera"
+
+    posts =
+      BDS.Repo.all(BDS.Posts.Post)
+      |> Enum.filter(&(&1.project_id == project.id))
+
+    assert length(posts) == 1
+    refute BDS.Repo.get(BDS.Posts.Post, stale_post.id)
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->
