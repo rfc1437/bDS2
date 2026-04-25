@@ -41,7 +41,7 @@ defmodule BDS.Scripting do
   def execute_project_script(project_id, source, entrypoint, args \\ [], opts \\ [])
       when is_binary(project_id) and is_binary(source) and is_binary(entrypoint) and
              is_list(args) and is_list(opts) do
-    capabilities = Capabilities.for_project(project_id)
+    capabilities = Capabilities.for_project(project_id, opts)
     execute(source, entrypoint, args, Keyword.put(opts, :capabilities, capabilities))
   end
 

@@ -23,6 +23,18 @@ defmodule BDS.Tasks do
     GenServer.call(__MODULE__, :status_snapshot)
   end
 
+  def list_tasks do
+    GenServer.call(__MODULE__, :list_tasks)
+  end
+
+  def list_running_tasks do
+    GenServer.call(__MODULE__, :list_running_tasks)
+  end
+
+  def clear_completed do
+    GenServer.call(__MODULE__, :clear_completed)
+  end
+
   def cancel_task(task_id) when is_binary(task_id) do
     GenServer.call(__MODULE__, {:cancel_task, task_id})
   end
@@ -73,6 +85,23 @@ defmodule BDS.Tasks do
 
   def handle_call(:status_snapshot, _from, state) do
     {:reply, build_status_snapshot(state), state}
+  end
+
+  def handle_call(:list_tasks, _from, state) do
+    {:reply, all_tasks(state) |> Enum.map(&public_task/1), state}
+  end
+
+  def handle_call(:list_running_tasks, _from, state) do
+    {:reply, running_tasks(state) |> Enum.map(&public_task/1), state}
+  end
+
+  def handle_call(:clear_completed, _from, state) do
+    next_tasks =
+      state.tasks
+      |> Enum.reject(fn {_task_id, task} -> task.status == :completed end)
+      |> Map.new()
+
+    {:reply, :ok, %{state | tasks: next_tasks}}
   end
 
   def handle_call({:cancel_task, task_id}, _from, state) do
@@ -327,6 +356,19 @@ defmodule BDS.Tasks do
     state.tasks
     |> Map.values()
     |> Enum.filter(&(&1.status in [:running, :pending]))
+    |> Enum.sort_by(&task_sort_key/1)
+  end
+
+  defp all_tasks(state) do
+    state.tasks
+    |> Map.values()
+    |> Enum.sort_by(&DateTime.to_unix(&1.created_at, :microsecond), :desc)
+  end
+
+  defp running_tasks(state) do
+    state.tasks
+    |> Map.values()
+    |> Enum.filter(&(&1.status == :running))
     |> Enum.sort_by(&task_sort_key/1)
   end
 
