@@ -207,6 +207,15 @@ defmodule BDS.UI.ShellTest do
     assert css =~ ".filter-status"
   end
 
+  test "clearing sidebar filters resets from the baseline seed instead of the filtered payload" do
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert js =~ "sidebarFilterSeeds"
+    assert js =~ "function sidebarFilterSeed(viewId)"
+    assert js =~ "defaultSidebarFilterState(viewId, sidebarFilterSeed(viewId))"
+    refute js =~ "defaultSidebarFilterState(viewId, state.sidebarContent[viewId])"
+  end
+
   test "static shell bundle exists for direct browser inspection" do
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/index.html")
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/app.css")

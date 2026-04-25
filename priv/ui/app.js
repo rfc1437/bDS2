@@ -15,6 +15,7 @@ const state = {
   status: clone(bootstrap.status),
   projects: normalizeProjects(bootstrap.projects),
   sidebarContent: clone(bootstrap.content.sidebar),
+  sidebarFilterSeeds: clone(bootstrap.content.sidebar),
   sidebarFilters: hydrateSidebarFilters(bootstrap.content.sidebar),
   projectMenuOpen: false,
   taskStatus: normalizeTaskStatus(bootstrap.task_status),
@@ -569,9 +570,13 @@ function defaultSidebarFilterState(viewId, data) {
   };
 }
 
+function sidebarFilterSeed(viewId) {
+  return state.sidebarFilterSeeds[viewId] || state.sidebarContent[viewId] || null;
+}
+
 function currentSidebarFilterState(viewId) {
   if (!state.sidebarFilters[viewId]) {
-    state.sidebarFilters[viewId] = defaultSidebarFilterState(viewId, state.sidebarContent[viewId]);
+    state.sidebarFilters[viewId] = defaultSidebarFilterState(viewId, sidebarFilterSeed(viewId));
   }
 
   return state.sidebarFilters[viewId];
@@ -1219,7 +1224,7 @@ function bindEvents() {
       const viewId = button.dataset.sidebarClearFilters;
       const existing = currentSidebarFilterState(viewId);
       state.sidebarFilters[viewId] = {
-        ...defaultSidebarFilterState(viewId, state.sidebarContent[viewId]),
+        ...defaultSidebarFilterState(viewId, sidebarFilterSeed(viewId)),
         showFilters: existing.showFilters,
         archiveCollapsed: existing.archiveCollapsed,
         tagsCollapsed: existing.tagsCollapsed,
