@@ -68,6 +68,37 @@ defmodule BDS.DesktopTest do
     assert :api_documentation in help_actions
   end
 
+  test "desktop menu bar exposes native accelerator labels for system menu items" do
+    groups = BDS.Desktop.MenuBar.groups(dev_mode?: false)
+
+    assert menu_item(groups, :new_post).native_label == "New Post\tCTRL+N"
+    assert menu_item(groups, :import_media).native_label == "Import Media\tCTRL+I"
+    assert menu_item(groups, :save).native_label == "Save\tCTRL+S"
+    assert menu_item(groups, :close_tab).shortcut == "CTRL+W"
+    assert menu_item(groups, :close_tab).native_label == "Close Tab\tCTRL+W"
+    assert menu_item(groups, :quit).native_label == "Quit\tCTRL+Q"
+    assert menu_item(groups, :undo).native_label == "Undo\tCTRL+Z"
+    assert menu_item(groups, :redo).native_label == "Redo\tCTRL+Y"
+    assert menu_item(groups, :cut).native_label == "Cut\tCTRL+X"
+    assert menu_item(groups, :copy).native_label == "Copy\tCTRL+C"
+    assert menu_item(groups, :paste).native_label == "Paste\tCTRL+V"
+    assert menu_item(groups, :select_all).native_label == "Select All\tCTRL+A"
+    assert menu_item(groups, :find).native_label == "Find\tCTRL+F"
+    assert menu_item(groups, :replace).native_label == "Replace\tCTRL+H"
+    assert menu_item(groups, :edit_preferences).native_label == "Preferences\tCTRL+,"
+    assert menu_item(groups, :view_posts).native_label == "Posts\tCTRL+1"
+    assert menu_item(groups, :view_media).native_label == "Media\tCTRL+2"
+    assert menu_item(groups, :toggle_sidebar).native_label == "Toggle Sidebar\tCTRL+B"
+    assert menu_item(groups, :toggle_panel).native_label == "Toggle Panel\tCTRL+J"
+    assert menu_item(groups, :toggle_assistant_sidebar).native_label == "Toggle Assistant Sidebar\tCTRL+\\"
+    assert menu_item(groups, :publish_selected).native_label == "Publish Selected\tCTRL+SHIFT+P"
+    assert menu_item(groups, :preview_post).native_label == "Preview Post\tCTRL+SHIFT+V"
+    assert menu_item(groups, :generate_sitemap).native_label == "Generate Sitemap\tCTRL+R"
+    assert menu_item(groups, :validate_site).native_label == "Validate Site\tCTRL+SHIFT+L"
+    assert menu_item(groups, :upload_site).native_label == "Upload Site\tCTRL+SHIFT+U"
+    assert menu_item(groups, :metadata_diff).shortcut == nil
+  end
+
   test "desktop shell html follows the old app frame regions and references bundled assets" do
     html = BDS.Desktop.ShellController.index_html()
 
@@ -243,5 +274,11 @@ defmodule BDS.DesktopTest do
     assert payload["result"]["kind"] == "open_url"
     assert payload["result"]["project_id"] == project.id
     assert payload["result"]["url"] == "http://127.0.0.1:4123/"
+  end
+
+  defp menu_item(groups, id) do
+    groups
+    |> Enum.flat_map(& &1.items)
+    |> Enum.find(&Map.get(&1, :id) == id)
   end
 end

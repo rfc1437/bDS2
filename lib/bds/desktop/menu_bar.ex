@@ -2,6 +2,7 @@ defmodule BDS.Desktop.MenuBar do
   @moduledoc false
 
   use BDS.Desktop.MenuCompat
+  alias BDS.UI.Commands
   alias BDS.UI.MenuBar, as: ShellMenuBar
   alias Desktop.OS
   alias Desktop.Window
@@ -38,7 +39,7 @@ defmodule BDS.Desktop.MenuBar do
             <%= if item.separator do %>
               <hr />
             <% else %>
-              <item onclick={Atom.to_string(item.id)}>{item.label}</item>
+              <item onclick={Atom.to_string(item.id)}>{item.native_label}</item>
             <% end %>
           <% end %>
         </menu>
@@ -110,8 +111,20 @@ defmodule BDS.Desktop.MenuBar do
   defp normalize_item(%{separator: true}), do: %{separator: true}
 
   defp normalize_item(item) do
-    %{id: item.id, label: item_label(item.id), separator: false}
+    label = item_label(item.id)
+    shortcut = Commands.accelerator_label(item.id)
+
+    %{
+      id: item.id,
+      label: label,
+      native_label: native_label(label, shortcut),
+      separator: false,
+      shortcut: shortcut
+    }
   end
+
+  defp native_label(label, nil), do: label
+  defp native_label(label, shortcut), do: label <> "\t" <> shortcut
 
   defp group_label(:file), do: "File"
   defp group_label(:edit), do: "Edit"
