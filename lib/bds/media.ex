@@ -7,6 +7,7 @@ defmodule BDS.Media do
   alias BDS.Media.Translation
   alias BDS.Persistence
   alias BDS.Projects
+  alias BDS.Rebuild
   alias BDS.Repo
   alias BDS.Search
   alias BDS.Sidecar
@@ -322,6 +323,7 @@ defmodule BDS.Media do
       |> list_matching_files("*.meta")
       |> Enum.filter(&canonical_sidecar?/1)
       |> Enum.filter(&binary_exists_for_sidecar?/1)
+      |> Rebuild.parallel_map(&parse_canonical_sidecar(project, &1))
 
     translation_sidecars =
       project
@@ -329,6 +331,7 @@ defmodule BDS.Media do
       |> Path.join("media")
       |> list_matching_files("*.meta")
       |> Enum.filter(&translation_sidecar?/1)
+      |> Rebuild.parallel_map(&parse_translation_sidecar(&1))
 
     total_files = length(canonical_sidecars) + length(translation_sidecars)
     :ok = report_rebuild_started(on_progress, total_files, "media files")
@@ -336,8 +339,8 @@ defmodule BDS.Media do
     media_items =
       canonical_sidecars
       |> Enum.with_index(1)
-      |> Enum.map(fn {sidecar_path, index} ->
-        media = upsert_media_from_sidecar(project, sidecar_path)
+      |> Enum.map(fn {sidecar, index} ->
+        media = upsert_media_from_sidecar(project, sidecar, sync_search: false)
         :ok = report_rebuild_progress(on_progress, index, total_files, "media files")
         media
       end)
@@ -349,51 +352,58 @@ defmodule BDS.Media do
 
     translation_sidecars
     |> Enum.with_index(length(canonical_sidecars) + 1)
-    |> Enum.each(fn {sidecar_path, index} ->
-      upsert_translation_from_sidecar(project, canonical_media_by_binary_path, sidecar_path)
+    |> Enum.each(fn {sidecar, index} ->
+      upsert_translation_from_sidecar(project, canonical_media_by_binary_path, sidecar, sync_search: false)
       :ok = report_rebuild_progress(on_progress, index, total_files, "media files")
     end)
+
+    if Keyword.get(opts, :reindex_search, true) do
+      :ok = report_rebuild_phase(on_progress, 0.99, "Refreshing media search index")
+      :ok = Search.reindex_media(project.id)
+    end
 
     {:ok, media_items}
   end
 
-  defp upsert_media_from_sidecar(project, sidecar_path) do
-    {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
-    relative_sidecar_path = Path.relative_to(sidecar_path, Projects.project_data_dir(project))
-    relative_file_path = String.trim_trailing(relative_sidecar_path, ".meta")
-    filename = Path.basename(relative_file_path)
+  defp upsert_media_from_sidecar(project, sidecar, opts) do
     now = Persistence.now_ms()
 
     attrs = %{
-      id: Map.get(fields, "id") || Ecto.UUID.generate(),
+      id: Map.get(sidecar.fields, "id") || Ecto.UUID.generate(),
       project_id: project.id,
-      filename: filename,
-      original_name: Map.get(fields, "originalName") || filename,
-      mime_type: Map.get(fields, "mimeType") || detect_mime(filename),
-      size: Map.get(fields, "size", 0),
-      width: blank_to_nil(Map.get(fields, "width")),
-      height: blank_to_nil(Map.get(fields, "height")),
-      title: Map.get(fields, "title"),
-      alt: Map.get(fields, "alt"),
-      caption: Map.get(fields, "caption"),
-      author: Map.get(fields, "author"),
-      language: Map.get(fields, "language"),
-      file_path: relative_file_path,
-      sidecar_path: relative_sidecar_path,
+      filename: sidecar.filename,
+      original_name: Map.get(sidecar.fields, "originalName") || sidecar.filename,
+      mime_type: Map.get(sidecar.fields, "mimeType") || detect_mime(sidecar.filename),
+      size: Map.get(sidecar.fields, "size", 0),
+      width: blank_to_nil(Map.get(sidecar.fields, "width")),
+      height: blank_to_nil(Map.get(sidecar.fields, "height")),
+      title: Map.get(sidecar.fields, "title"),
+      alt: Map.get(sidecar.fields, "alt"),
+      caption: Map.get(sidecar.fields, "caption"),
+      author: Map.get(sidecar.fields, "author"),
+      language: Map.get(sidecar.fields, "language"),
+      file_path: sidecar.relative_file_path,
+      sidecar_path: sidecar.relative_sidecar_path,
       checksum: nil,
-      tags: Map.get(fields, "tags", []),
-      created_at: Map.get(fields, "createdAt", now),
-      updated_at: Map.get(fields, "updatedAt", now)
+      tags: Map.get(sidecar.fields, "tags", []),
+      created_at: Map.get(sidecar.fields, "createdAt", now),
+      updated_at: Map.get(sidecar.fields, "updatedAt", now)
     }
 
     media =
       Repo.get(Media, attrs.id) ||
-        Repo.get_by(Media, project_id: project.id, file_path: relative_file_path) || %Media{}
+        Repo.get_by(Media, project_id: project.id, file_path: sidecar.relative_file_path) || %Media{}
+
+    media =
+      media
+      |> Media.changeset(attrs)
+      |> Repo.insert_or_update!()
+
+    if Keyword.get(opts, :sync_search, true) do
+      :ok = Search.sync_media(media)
+    end
 
     media
-    |> Media.changeset(attrs)
-    |> Repo.insert_or_update!()
-    |> tap(&Search.sync_media/1)
   end
 
   defp write_sidecar(project, media) do
@@ -443,17 +453,14 @@ defmodule BDS.Media do
     )
   end
 
-  defp upsert_translation_from_sidecar(project, canonical_media_by_binary_path, sidecar_path) do
-    binary_path = binary_path_for_translation_sidecar(sidecar_path)
-
-    case Map.get(canonical_media_by_binary_path, binary_path) do
+  defp upsert_translation_from_sidecar(project, canonical_media_by_binary_path, sidecar, opts) do
+    case Map.get(canonical_media_by_binary_path, sidecar.binary_path) do
       nil ->
         :skip
 
       media ->
-        {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
         now = Persistence.now_ms()
-        language = Map.fetch!(fields, "language")
+        language = Map.fetch!(sidecar.fields, "language")
 
         translation =
           Repo.get_by(Translation, translation_for: media.id, language: language) ||
@@ -465,16 +472,40 @@ defmodule BDS.Media do
           project_id: project.id,
           translation_for: media.id,
           language: language,
-          title: Map.get(fields, "title"),
-          alt: Map.get(fields, "alt"),
-          caption: Map.get(fields, "caption"),
+          title: Map.get(sidecar.fields, "title"),
+          alt: Map.get(sidecar.fields, "alt"),
+          caption: Map.get(sidecar.fields, "caption"),
           created_at: translation.created_at || now,
           updated_at: now
         })
         |> Repo.insert_or_update!()
 
-        :ok = Search.sync_media(media.id)
+        if Keyword.get(opts, :sync_search, true) do
+          :ok = Search.sync_media(media.id)
+        end
     end
+  end
+
+  defp parse_canonical_sidecar(project, sidecar_path) do
+    {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
+    relative_sidecar_path = Path.relative_to(sidecar_path, Projects.project_data_dir(project))
+    relative_file_path = String.trim_trailing(relative_sidecar_path, ".meta")
+
+    %{
+      fields: fields,
+      relative_sidecar_path: relative_sidecar_path,
+      relative_file_path: relative_file_path,
+      filename: Path.basename(relative_file_path)
+    }
+  end
+
+  defp parse_translation_sidecar(sidecar_path) do
+    {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
+
+    %{
+      fields: fields,
+      binary_path: binary_path_for_translation_sidecar(sidecar_path)
+    }
   end
 
   defp ensure_thumbnails(project, media) do
@@ -671,6 +702,13 @@ defmodule BDS.Media do
 
   defp report_rebuild_progress(callback, current, total, label) do
     callback.(0.05 + 0.95 * (current / total), "Rebuilding #{label} (#{current}/#{total})")
+    :ok
+  end
+
+  defp report_rebuild_phase(nil, _progress, _message), do: :ok
+
+  defp report_rebuild_phase(callback, progress, message) do
+    callback.(progress, message)
     :ok
   end
 end

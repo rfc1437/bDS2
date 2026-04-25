@@ -12,6 +12,7 @@ defmodule BDS.Posts do
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
   alias BDS.Projects
+  alias BDS.Rebuild
   alias BDS.Repo
   alias BDS.Search
   alias BDS.Slug
@@ -145,7 +146,7 @@ defmodule BDS.Posts do
       |> Projects.project_data_dir()
       |> Path.join("posts")
       |> list_matching_files("*.md")
-      |> Enum.map(&parse_rebuild_file(project, &1))
+      |> Rebuild.parallel_map(&parse_rebuild_file(project, &1))
 
     total_files = length(rebuild_files)
     :ok = report_rebuild_started(on_progress, total_files, "post files")
@@ -156,7 +157,7 @@ defmodule BDS.Posts do
       post_files
       |> Enum.with_index(1)
       |> Enum.map(fn {file, index} ->
-        post = upsert_post_from_rebuild_file(project_id, file)
+        post = upsert_post_from_rebuild_file(project_id, file, sync_search: false, sync_embeddings: false)
         :ok = report_rebuild_progress(on_progress, index, total_files, "post files")
         post
       end)
@@ -164,9 +165,19 @@ defmodule BDS.Posts do
     translation_files
     |> Enum.with_index(length(post_files) + 1)
     |> Enum.each(fn {file, index} ->
-      upsert_post_translation_from_rebuild_file(project_id, file)
+      upsert_post_translation_from_rebuild_file(project_id, file, sync_search: false)
       :ok = report_rebuild_progress(on_progress, index, total_files, "post files")
     end)
+
+    if Keyword.get(opts, :reindex_search, true) do
+      :ok = report_rebuild_phase(on_progress, 0.97, "Refreshing post search index")
+      :ok = Search.reindex_posts(project_id)
+    end
+
+    if Keyword.get(opts, :rebuild_embeddings, true) do
+      :ok = report_rebuild_phase(on_progress, 0.99, "Refreshing post embeddings")
+      {:ok, _rebuilt_post_ids} = Embeddings.rebuild_project(project_id)
+    end
 
     {:ok, posts}
   end
@@ -658,7 +669,7 @@ defmodule BDS.Posts do
     upsert_post_from_rebuild_file(project_id, rebuild_file)
   end
 
-  defp upsert_post_from_rebuild_file(project_id, rebuild_file) do
+  defp upsert_post_from_rebuild_file(project_id, rebuild_file, opts \\ []) do
     fields = rebuild_file.fields
     now = Persistence.now_ms()
 
@@ -693,14 +704,23 @@ defmodule BDS.Posts do
         Repo.get_by(Post, project_id: project_id, file_path: rebuild_file.relative_path) ||
         Repo.get_by(Post, project_id: project_id, slug: attrs.slug) || %Post{}
 
+    post =
+      post
+      |> Post.changeset(attrs)
+      |> Repo.insert_or_update!()
+
+    if Keyword.get(opts, :sync_search, true) do
+      :ok = Search.sync_post(post)
+    end
+
+    if Keyword.get(opts, :sync_embeddings, true) do
+      :ok = Embeddings.sync_post(post)
+    end
+
     post
-    |> Post.changeset(attrs)
-    |> Repo.insert_or_update!()
-    |> tap(&Search.sync_post/1)
-    |> tap(&Embeddings.sync_post/1)
   end
 
-  defp upsert_post_translation_from_rebuild_file(project_id, rebuild_file) do
+  defp upsert_post_translation_from_rebuild_file(project_id, rebuild_file, opts) do
     fields = rebuild_file.fields
     source_post_id = Map.fetch!(fields, "translationFor")
     source_post = Repo.get_by!(Post, project_id: project_id, id: source_post_id)
@@ -730,7 +750,9 @@ defmodule BDS.Posts do
     |> Translation.changeset(attrs)
     |> Repo.insert_or_update!()
     |> tap(fn _translation ->
-      :ok = Search.sync_post(source_post_id)
+      if Keyword.get(opts, :sync_search, true) do
+        :ok = Search.sync_post(source_post_id)
+      end
     end)
   end
 
@@ -982,6 +1004,13 @@ defmodule BDS.Posts do
 
   defp report_rebuild_progress(callback, current, total, label) do
     callback.(0.05 + 0.95 * (current / total), "Rebuilding #{label} (#{current}/#{total})")
+    :ok
+  end
+
+  defp report_rebuild_phase(nil, _progress, _message), do: :ok
+
+  defp report_rebuild_phase(callback, progress, message) do
+    callback.(progress, message)
     :ok
   end
 end

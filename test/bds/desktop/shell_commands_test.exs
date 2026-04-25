@@ -323,10 +323,22 @@ defmodule BDS.Desktop.ShellCommandsTest do
       )
 
     assert progressed.group_name == "Maintenance"
-    assert progressed.message =~ "Rebuilding post files"
+    assert String.contains?(progressed.message, "post")
 
     assert wait_for_task(progressed.id, &(&1.status == :completed and &1.progress == 1.0), 5_000).status ==
              :completed
+
+    tasks = wait_for_tasks_by_name([
+      "Rebuild Posts From Files",
+      "Rebuild Media From Files",
+      "Rebuild Scripts From Files",
+      "Rebuild Templates From Files",
+      "Rebuild Post Links",
+      "Regenerate Missing Thumbnails",
+      "Rebuild Embedding Index"
+    ], &(&1.status == :completed), 20_000)
+
+    assert Enum.all?(tasks, &(&1.status == :completed))
   end
 
   test "reindex_text queues a tracked background task for the active project", %{project: project} do

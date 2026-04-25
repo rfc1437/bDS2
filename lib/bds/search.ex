@@ -135,7 +135,7 @@ defmodule BDS.Search do
     )
 
     Repo.all(from post in Post, where: post.project_id == ^project_id)
-    |> Enum.each(&sync_post/1)
+    |> Enum.each(&insert_post_index/1)
 
     :ok
   end
@@ -147,21 +147,14 @@ defmodule BDS.Search do
     )
 
     Repo.all(from media in Media, where: media.project_id == ^project_id)
-    |> Enum.each(&sync_media/1)
+    |> Enum.each(&insert_media_index/1)
 
     :ok
   end
 
   def sync_post(%Post{} = post) do
     delete_post(post.id)
-
-    {title, excerpt, content, tags, categories} = post_index_fields(post)
-
-    Repo.query!(
-      "INSERT INTO posts_fts (post_id, title, excerpt, content, tags, categories) VALUES (?, ?, ?, ?, ?, ?)",
-      [post.id, title, excerpt, content, tags, categories]
-    )
-
+    insert_post_index(post)
     :ok
   end
 
@@ -181,14 +174,7 @@ defmodule BDS.Search do
 
   def sync_media(%Media{} = media) do
     delete_media(media.id)
-
-    {title, alt, caption, original_name, tags} = media_index_fields(media)
-
-    Repo.query!(
-      "INSERT INTO media_fts (media_id, title, alt, caption, original_name, tags) VALUES (?, ?, ?, ?, ?, ?)",
-      [media.id, title, alt, caption, original_name, tags]
-    )
-
+    insert_media_index(media)
     :ok
   end
 
@@ -204,6 +190,24 @@ defmodule BDS.Search do
   def delete_media(media_id) when is_binary(media_id) do
     Repo.query!("DELETE FROM media_fts WHERE media_id = ?", [media_id])
     :ok
+  end
+
+  defp insert_post_index(%Post{} = post) do
+    {title, excerpt, content, tags, categories} = post_index_fields(post)
+
+    Repo.query!(
+      "INSERT INTO posts_fts (post_id, title, excerpt, content, tags, categories) VALUES (?, ?, ?, ?, ?, ?)",
+      [post.id, title, excerpt, content, tags, categories]
+    )
+  end
+
+  defp insert_media_index(%Media{} = media) do
+    {title, alt, caption, original_name, tags} = media_index_fields(media)
+
+    Repo.query!(
+      "INSERT INTO media_fts (media_id, title, alt, caption, original_name, tags) VALUES (?, ?, ?, ?, ?, ?)",
+      [media.id, title, alt, caption, original_name, tags]
+    )
   end
 
   defp candidate_post_ids(project_id, query, language) do

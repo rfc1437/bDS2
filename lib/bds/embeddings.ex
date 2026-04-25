@@ -39,7 +39,11 @@ defmodule BDS.Embeddings do
   end
 
   def sync_post(%Post{} = post) do
-    sync_post(post, refresh_index: true)
+    if enabled_for_project?(post.project_id) do
+      sync_post_if_enabled(post, refresh_index: true)
+    else
+      :ok
+    end
   end
 
   def sync_post(post_id) when is_binary(post_id) do
@@ -61,7 +65,7 @@ defmodule BDS.Embeddings do
           where: key.project_id == ^project_id and key.post_id not in ^post_ids
       )
 
-      Enum.each(posts, &sync_post(&1, refresh_index: false))
+      Enum.each(posts, &sync_post_if_enabled(&1, refresh_index: false))
       :ok = rebuild_snapshot(project_id)
       {:ok, post_ids}
     else
@@ -109,38 +113,34 @@ defmodule BDS.Embeddings do
     end
   end
 
-  defp sync_post(%Post{} = post, opts) do
-    if enabled_for_project?(post.project_id) do
-      body = resolve_post_body(post)
-      raw_text = compose_embedding_source(post.title, body)
-      content_hash = hash_text(raw_text)
+  defp sync_post_if_enabled(%Post{} = post, opts) do
+    body = resolve_post_body(post)
+    raw_text = compose_embedding_source(post.title, body)
+    content_hash = hash_text(raw_text)
 
-      case Repo.get_by(Key, post_id: post.id, project_id: post.project_id) do
-        %Key{content_hash: ^content_hash} ->
-          :ok
+    case Repo.get_by(Key, post_id: post.id, project_id: post.project_id) do
+      %Key{content_hash: ^content_hash} ->
+        :ok
 
-        existing_key ->
-          label = existing_key_label(existing_key) || next_label()
-          {:ok, vector} = embed_text(raw_text, post.language)
+      existing_key ->
+        label = existing_key_label(existing_key) || next_label()
+        {:ok, vector} = embed_text(raw_text, post.language)
 
-          (existing_key || %Key{})
-          |> Key.changeset(%{
-            label: label,
-            post_id: post.id,
-            project_id: post.project_id,
-            content_hash: content_hash,
-            vector: Jason.encode!(vector)
-          })
-          |> Repo.insert_or_update()
+        (existing_key || %Key{})
+        |> Key.changeset(%{
+          label: label,
+          post_id: post.id,
+          project_id: post.project_id,
+          content_hash: content_hash,
+          vector: Jason.encode!(vector)
+        })
+        |> Repo.insert_or_update()
 
-          if Keyword.get(opts, :refresh_index, true) do
-            :ok = rebuild_snapshot(post.project_id)
-          end
+        if Keyword.get(opts, :refresh_index, true) do
+          :ok = rebuild_snapshot(post.project_id)
+        end
 
-          :ok
-      end
-    else
-      :ok
+        :ok
     end
   end
 
@@ -176,7 +176,7 @@ defmodule BDS.Embeddings do
             %Key{content_hash: ^content_hash} -> :ok
             _other ->
               :ok =
-                sync_post(
+                sync_post_if_enabled(
                   %{post | content: if(post.content in [nil, ""], do: body, else: post.content)},
                   refresh_index: false
                 )

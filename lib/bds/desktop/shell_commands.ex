@@ -236,7 +236,12 @@ defmodule BDS.Desktop.ShellCommands do
       %{
         name: "Rebuild Posts From Files",
         work: fn report ->
-          {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post", on_progress: report)
+          {:ok, posts} =
+            Maintenance.rebuild_from_filesystem(project.id, "post",
+              on_progress: report,
+              rebuild_embeddings: false
+            )
+
           report.(1.0, "Post rebuild complete")
           %{project_id: project.id, counts: %{posts: length(posts)}}
         end

@@ -618,11 +618,85 @@ defmodule BDS.PostsTest do
     refute BDS.Repo.get(BDS.Posts.Post, stale_post.id)
   end
 
+  test "rebuild_posts_from_files batches search and embedding refresh after import", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2026", "04"])
+    File.mkdir_p!(posts_dir)
+
+    Enum.each(1..3, fn index ->
+      slug = "batched-post-#{index}"
+
+      File.write!(
+        Path.join(posts_dir, "#{slug}.md"),
+        [
+          "---",
+          "id: #{slug}",
+          "title: Batched Post #{index}",
+          "slug: #{slug}",
+          "status: published",
+          "language: en",
+          "createdAt: 1711843200",
+          "updatedAt: 1711929600",
+          "publishedAt: 1712016000",
+          "tags:",
+          "categories:",
+          "---",
+          "Body #{index}",
+          ""
+        ]
+        |> Enum.join("\n")
+      )
+    end)
+
+    handler_id = "posts-rebuild-batch-#{System.unique_integer([:positive])}"
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        [:bds, :repo, :query],
+        &__MODULE__.handle_repo_query/4,
+        self()
+      )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    assert {:ok, posts} = BDS.Posts.rebuild_posts_from_files(project.id)
+    assert length(posts) == 3
+
+    queries = drain_repo_queries([])
+
+    assert count_queries(queries, "settings") <= 12
+    assert count_queries(queries, "posts_fts") <= 4
+
+    assert {:ok, results} = BDS.Search.search_posts(project.id, "Batched Post", %{})
+    assert results.total == 3
+
+    assert {:ok, %{indexed: 3, total: 3}} = BDS.Embeddings.get_indexing_progress(project.id)
+  end
+
+  def handle_repo_query(_event, _measurements, metadata, owner_pid) do
+    send(owner_pid, {:repo_query, metadata.query || ""})
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->
         opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
       end)
     end)
+  end
+
+  defp drain_repo_queries(acc) do
+    receive do
+      {:repo_query, query} -> drain_repo_queries([query | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
+  defp count_queries(queries, fragment) do
+    Enum.count(queries, &String.contains?(&1, fragment))
   end
 end
