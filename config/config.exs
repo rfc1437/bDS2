@@ -6,6 +6,8 @@ config :bds,
 config :bds, BDS.Repo,
   database: Path.expand("../priv/data/bds_dev.db", __DIR__),
   pool_size: 5,
+  busy_timeout: 15_000,
+  log: false,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
 

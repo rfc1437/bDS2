@@ -13,6 +13,7 @@ defmodule BDS.Desktop.ShellCommands do
   alias BDS.Tasks
 
   @site_sections [:core, :single, :category, :tag, :date]
+  @rebuild_phase_timeout 600_000
 
   def execute(action, params \\ %{})
 
@@ -119,44 +120,16 @@ defmodule BDS.Desktop.ShellCommands do
   defp dispatch("rebuild_database", project, _params) do
     group_id = task_group_id("rebuild_database")
     attrs = %{group_id: group_id, group_name: "Maintenance"}
+    [first_step | remaining_steps] = rebuild_database_steps(project)
 
     {:ok, posts_task} =
-      Tasks.submit_task("Rebuild Posts From Files", fn report ->
-        {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post", on_progress: report)
-        report.(1.0, "Post rebuild complete")
-        %{project_id: project.id, counts: %{posts: length(posts)}}
-      end, attrs)
-
-    {:ok, _media_task} =
-      Tasks.submit_task("Rebuild Media From Files", fn report ->
-        {:ok, media} = Maintenance.rebuild_from_filesystem(project.id, "media", on_progress: report)
-        report.(1.0, "Media rebuild complete")
-        %{project_id: project.id, counts: %{media: length(media)}}
-      end, attrs)
-
-    {:ok, _scripts_task} =
-      Tasks.submit_task("Rebuild Scripts From Files", fn report ->
-        {:ok, scripts} = Maintenance.rebuild_from_filesystem(project.id, "script", on_progress: report)
-        report.(1.0, "Script rebuild complete")
-        %{project_id: project.id, counts: %{scripts: length(scripts)}}
-      end, attrs)
-
-    {:ok, _templates_task} =
-      Tasks.submit_task("Rebuild Templates From Files", fn report ->
-        {:ok, templates} = Maintenance.rebuild_from_filesystem(project.id, "template", on_progress: report)
-        report.(1.0, "Template rebuild complete")
-        %{project_id: project.id, counts: %{templates: length(templates)}}
-      end, attrs)
+      Tasks.submit_task(first_step.name, first_step.work, attrs)
 
     Task.start(fn ->
-      wait_for_group_phase(group_id, [
-        "Rebuild Posts From Files",
-        "Rebuild Media From Files",
-        "Rebuild Scripts From Files",
-        "Rebuild Templates From Files"
-      ])
-
-      submit_rebuild_followups(project, attrs)
+      case wait_for_group_phase(group_id, [first_step.name], @rebuild_phase_timeout) do
+        :ok -> run_rebuild_sequence(group_id, attrs, remaining_steps)
+        _other -> :ok
+      end
     end)
 
     {:ok,
@@ -258,35 +231,80 @@ defmodule BDS.Desktop.ShellCommands do
      }}
   end
 
-  defp submit_rebuild_followups(project, attrs) do
-    {:ok, _links_task} =
-      Tasks.submit_task("Rebuild Post Links", fn report ->
-        report.(0.0, "Rebuilding link graph")
-        :ok = Posts.rebuild_post_links(project.id)
-        report.(1.0, "Post links rebuilt")
-        %{project_id: project.id}
-      end, attrs)
-
-    {:ok, _thumbs_task} =
-      Tasks.submit_task("Regenerate Missing Thumbnails", fn report ->
-        report.(0.0, "Checking missing thumbnails")
-        result = BDS.Media.regenerate_missing_thumbnails(project.id)
-        report.(1.0, "Missing thumbnails regenerated")
-        Map.put(result, :project_id, project.id)
-      end, attrs)
-
-    {:ok, _embeddings_task} =
-      Tasks.submit_task("Rebuild Embedding Index", fn report ->
-        report.(0.0, "Rebuilding semantic index")
-        {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id)
-        report.(1.0, "Embedding index rebuilt")
-        %{project_id: project.id, rebuilt_post_ids: rebuilt_post_ids, rebuilt_count: length(rebuilt_post_ids)}
-      end, attrs)
-
-    :ok
+  defp rebuild_database_steps(project) do
+    [
+      %{
+        name: "Rebuild Posts From Files",
+        work: fn report ->
+          {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post", on_progress: report)
+          report.(1.0, "Post rebuild complete")
+          %{project_id: project.id, counts: %{posts: length(posts)}}
+        end
+      },
+      %{
+        name: "Rebuild Media From Files",
+        work: fn report ->
+          {:ok, media} = Maintenance.rebuild_from_filesystem(project.id, "media", on_progress: report)
+          report.(1.0, "Media rebuild complete")
+          %{project_id: project.id, counts: %{media: length(media)}}
+        end
+      },
+      %{
+        name: "Rebuild Scripts From Files",
+        work: fn report ->
+          {:ok, scripts} = Maintenance.rebuild_from_filesystem(project.id, "script", on_progress: report)
+          report.(1.0, "Script rebuild complete")
+          %{project_id: project.id, counts: %{scripts: length(scripts)}}
+        end
+      },
+      %{
+        name: "Rebuild Templates From Files",
+        work: fn report ->
+          {:ok, templates} = Maintenance.rebuild_from_filesystem(project.id, "template", on_progress: report)
+          report.(1.0, "Template rebuild complete")
+          %{project_id: project.id, counts: %{templates: length(templates)}}
+        end
+      },
+      %{
+        name: "Rebuild Post Links",
+        work: fn report ->
+          report.(0.0, "Rebuilding link graph")
+          :ok = Posts.rebuild_post_links(project.id)
+          report.(1.0, "Post links rebuilt")
+          %{project_id: project.id}
+        end
+      },
+      %{
+        name: "Regenerate Missing Thumbnails",
+        work: fn report ->
+          report.(0.0, "Checking missing thumbnails")
+          result = BDS.Media.regenerate_missing_thumbnails(project.id)
+          report.(1.0, "Missing thumbnails regenerated")
+          Map.put(result, :project_id, project.id)
+        end
+      },
+      %{
+        name: "Rebuild Embedding Index",
+        work: fn report ->
+          report.(0.0, "Rebuilding semantic index")
+          {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id)
+          report.(1.0, "Embedding index rebuilt")
+          %{project_id: project.id, rebuilt_post_ids: rebuilt_post_ids, rebuilt_count: length(rebuilt_post_ids)}
+        end
+      }
+    ]
   end
 
-  defp wait_for_group_phase(group_id, names, timeout \\ 30_000)
+  defp run_rebuild_sequence(_group_id, _attrs, []), do: :ok
+
+  defp run_rebuild_sequence(group_id, attrs, [step | remaining_steps]) do
+    {:ok, _task} = Tasks.submit_task(step.name, step.work, attrs)
+
+    case wait_for_group_phase(group_id, [step.name], @rebuild_phase_timeout) do
+      :ok -> run_rebuild_sequence(group_id, attrs, remaining_steps)
+      _other -> :ok
+    end
+  end
 
   defp wait_for_group_phase(_group_id, _names, timeout) when timeout <= 0, do: :timeout
 

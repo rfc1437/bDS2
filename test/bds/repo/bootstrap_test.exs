@@ -55,6 +55,30 @@ defmodule BDS.Repo.BootstrapTest do
     assert %Project{id: "default", name: "My Blog", is_active: true} = BDS.Projects.get_active_project()
   end
 
+  test "dev repo config disables query logging by default" do
+    config_path = Path.expand("../../../config/config.exs", __DIR__)
+    config = Config.Reader.read!(config_path, env: :dev)
+
+    repo_config =
+      config
+      |> Keyword.fetch!(:bds)
+      |> Keyword.fetch!(BDS.Repo)
+
+    assert repo_config[:log] == false
+  end
+
+  test "dev repo config sets a rebuild-safe sqlite busy timeout" do
+    config_path = Path.expand("../../../config/config.exs", __DIR__)
+    config = Config.Reader.read!(config_path, env: :dev)
+
+    repo_config =
+      config
+      |> Keyword.fetch!(:bds)
+      |> Keyword.fetch!(BDS.Repo)
+
+    assert repo_config[:busy_timeout] == 15_000
+  end
+
   defmodule RepoConfigBackup do
     def put_env do
       Process.put({__MODULE__, :temp_repo_config}, Application.get_env(:bds, TempRepo))

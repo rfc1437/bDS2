@@ -134,6 +134,144 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert Enum.all?(tasks, &(&1.status == :completed))
   end
 
+  test "rebuild_database does not run multiple rebuild writers at once", %{temp_dir: temp_dir} do
+    original = Application.get_env(:bds, :tasks, [])
+
+    Application.put_env(
+      :bds,
+      :tasks,
+      original
+      |> Keyword.put(:max_concurrent, 4)
+      |> Keyword.put(:progress_throttle_ms, 0)
+    )
+
+    on_exit(fn -> Application.put_env(:bds, :tasks, original) end)
+
+    posts_dir = Path.join([temp_dir, "posts", "2026", "04"])
+    media_dir = Path.join([temp_dir, "media", "2026", "04"])
+    scripts_dir = Path.join(temp_dir, "scripts")
+    templates_dir = Path.join(temp_dir, "templates")
+
+    File.mkdir_p!(posts_dir)
+    File.mkdir_p!(media_dir)
+    File.mkdir_p!(scripts_dir)
+    File.mkdir_p!(templates_dir)
+
+    Enum.each(1..80, fn index ->
+      slug = "serial-post-#{index}"
+
+      File.write!(
+        Path.join(posts_dir, "#{slug}.md"),
+        [
+          "---",
+          "id: #{slug}",
+          "title: Serial Post #{index}",
+          "slug: #{slug}",
+          "status: published",
+          "createdAt: 1711843200",
+          "updatedAt: 1711929600",
+          "publishedAt: 1712016000",
+          "tags:",
+          "categories:",
+          "---",
+          "Body #{index}",
+          ""
+        ]
+        |> Enum.join("\n")
+      )
+
+      File.write!(Path.join(media_dir, "asset-#{index}.txt"), "asset #{index}")
+
+      File.write!(
+        Path.join(media_dir, "asset-#{index}.txt.meta"),
+        [
+          "id: serial-media-#{index}",
+          "originalName: asset-#{index}.txt",
+          "mimeType: text/plain",
+          "size: 7",
+          "createdAt: 1711843200",
+          "updatedAt: 1711929600",
+          "tags:",
+          ""
+        ]
+        |> Enum.join("\n")
+      )
+
+      File.write!(
+        Path.join(scripts_dir, "serial-script-#{index}.lua"),
+        [
+          "---",
+          "id: serial-script-#{index}",
+          "slug: serial-script-#{index}",
+          "title: Serial Script #{index}",
+          "kind: utility",
+          "entrypoint: main",
+          "enabled: true",
+          "version: 1",
+          "createdAt: 301",
+          "updatedAt: 404",
+          "---",
+          "function main() return true end",
+          ""
+        ]
+        |> Enum.join("\n")
+      )
+
+      File.write!(
+        Path.join(templates_dir, "serial-template-#{index}.liquid"),
+        [
+          "---",
+          "id: serial-template-#{index}",
+          "slug: serial-template-#{index}",
+          "title: Serial Template #{index}",
+          "kind: list",
+          "enabled: true",
+          "version: 1",
+          "createdAt: 101",
+          "updatedAt: 202",
+          "---",
+          "<section>Template #{index}</section>",
+          ""
+        ]
+        |> Enum.join("\n")
+      )
+    end)
+
+    assert {:ok, _result} = ShellCommands.execute("rebuild_database")
+
+    _posts_task =
+      wait_for_named_task(
+        "Rebuild Posts From Files",
+        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.0 and &1.progress < 1.0),
+        10_000
+      )
+
+    phase_one_tasks =
+      BDS.Tasks.list_tasks()
+      |> Enum.filter(&(&1.name in [
+        "Rebuild Posts From Files",
+        "Rebuild Media From Files",
+        "Rebuild Scripts From Files",
+        "Rebuild Templates From Files"
+      ]))
+
+    assert Enum.count(phase_one_tasks, &(&1.status == :running)) == 1
+
+    assert Enum.find(phase_one_tasks, &(&1.status == :running)).name == "Rebuild Posts From Files"
+
+    tasks = wait_for_tasks_by_name([
+      "Rebuild Posts From Files",
+      "Rebuild Media From Files",
+      "Rebuild Scripts From Files",
+      "Rebuild Templates From Files",
+      "Rebuild Post Links",
+      "Regenerate Missing Thumbnails",
+      "Rebuild Embedding Index"
+    ], &(&1.status == :completed), 20_000)
+
+    assert Enum.all?(tasks, &(&1.status == :completed))
+  end
+
   test "rebuild_database exposes live in-task progress for rebuild work", %{temp_dir: temp_dir} do
     original = Application.get_env(:bds, :tasks, [])
 
