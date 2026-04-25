@@ -62,6 +62,28 @@ invariant TemplateFileLayout {
         t.file_path = format("templates/{slug}.liquid", slug: t.slug)
 }
 
+invariant BundledDefaultTemplatesExistOutsideProjectData {
+    -- The application ships bundled default templates for:
+    --   single-post
+    --   post-list
+    --   not-found
+    -- plus supporting partials and macros.
+    -- These bundled templates are available for rendering even when the project
+    -- has no template files and no Template rows for those defaults.
+}
+
+invariant UserTemplateDirectoryOverridesBundledDefaults {
+    -- When a project template file or published Template row resolves the same slug
+    -- as a bundled template or partial, the project-owned template wins.
+    -- Bundled templates are fallback roots, not copied seed data.
+}
+
+invariant RebuildTemplatesIndexesOnlyProjectTemplates {
+    -- Rebuild-from-files scans only project.effective_data_dir/templates.
+    -- Bundled defaults are render-time fallbacks and are not indexed into Templates
+    -- unless the user has created matching project files.
+}
+
 rule CreateTemplate {
     when: CreateTemplateRequested(title, kind, content)
     let slug = slugify(title)

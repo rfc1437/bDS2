@@ -26,7 +26,7 @@ This document provides context and best practices for GitHub Copilot when workin
 - HEREDOCs don't work most of the time. Don't use them. Use editor tools to create proper scripots
 - we have an allium spec in the specs/ folder. you must weed the specs against built code to make sure you follow the spec.
 - when changing the spec, validate the spec with the available command line tool.
-- test with command line tools at least once to capture compile errors in tests, do not use the integrated testing of vscode, as that blocks on compile errors
+- you MUST run tests with command line tools at least once to capture compile errors in tests, do not use the integrated testing of vscode, as that blocks on compile errors
 
 ---
 

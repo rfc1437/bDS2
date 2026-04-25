@@ -246,7 +246,7 @@ defmodule BDS.TemplatesTest do
     )
 
     assert {:ok, templates} = BDS.Templates.rebuild_templates_from_files(project.id)
-    assert length(templates) == 4
+    assert length(templates) == 1
 
     template = Repo.get!(BDS.Templates.Template, "template-from-file")
     assert template.id == "template-from-file"

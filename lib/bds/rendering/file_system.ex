@@ -1,13 +1,17 @@
 defmodule BDS.Rendering.FileSystem do
   @moduledoc false
 
-  defstruct [:root_path]
+  defstruct [:root_paths]
 
-  def new(root_path) do
-    %__MODULE__{root_path: root_path}
+  def new(root_paths) when is_list(root_paths) do
+    %__MODULE__{root_paths: Enum.uniq(root_paths)}
   end
 
-  def full_path(%__MODULE__{root_path: root_path}, template_path) do
+  def new(root_path) when is_binary(root_path) do
+    new([root_path])
+  end
+
+  def full_path(%__MODULE__{root_paths: root_paths}, template_path) do
     normalized_path = to_string(template_path)
 
     cond do
@@ -21,7 +25,16 @@ defmodule BDS.Rendering.FileSystem do
         raise Liquex.Error, message: "Illegal template path '#{template_path}'"
 
       true ->
-        Path.expand(Path.join(root_path, normalized_path <> ".liquid"))
+        root_paths
+        |> Enum.map(&Path.expand(Path.join(&1, normalized_path <> ".liquid")))
+        |> Enum.find(&File.regular?/1)
+        |> case do
+          nil ->
+            Path.expand(Path.join(List.first(root_paths) || ".", normalized_path <> ".liquid"))
+
+          path ->
+            path
+        end
     end
   end
 end

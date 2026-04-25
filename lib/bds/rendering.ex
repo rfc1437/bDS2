@@ -14,6 +14,7 @@ defmodule BDS.Rendering do
   alias BDS.Rendering.FileSystem
   alias BDS.Rendering.Filters
   alias BDS.Repo
+  alias BDS.StarterTemplates
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
   alias BDS.Tags.Tag
@@ -46,9 +47,14 @@ defmodule BDS.Rendering do
   end
 
   defp load_template_source(project_id, kind, slug) do
+    project = Projects.get_project!(project_id)
+
     case select_template(project_id, kind, slug) do
-      nil -> {:error, :template_not_found}
-      %Template{} = template -> published_template_body(template)
+      %Template{} = template ->
+        published_template_body(template)
+
+      nil ->
+        load_bundled_template_source(project, kind, slug)
     end
   end
 
@@ -60,7 +66,7 @@ defmodule BDS.Rendering do
             template.status == :published and
             template.enabled == true and template.slug == ^slug,
         limit: 1
-    ) || select_template(project_id, kind, nil)
+    )
   end
 
   defp select_template(project_id, kind, nil) do
@@ -97,13 +103,12 @@ defmodule BDS.Rendering do
   defp render_template(project_id, source, assigns) do
     with {:ok, template_ast} <- Liquex.parse(source) do
       project = Projects.get_project!(project_id)
-      template_root = Path.join(Projects.project_data_dir(project), "templates")
 
       context =
         Liquex.Context.new(assigns,
           static_environment: assigns,
           filter_module: Filters,
-          file_system: FileSystem.new(template_root)
+          file_system: FileSystem.new(StarterTemplates.template_roots(project))
         )
 
       {result, _context} = Liquex.render!(template_ast, context)
@@ -112,6 +117,30 @@ defmodule BDS.Rendering do
   rescue
     error -> {:error, error}
   end
+
+  defp load_bundled_template_source(project, kind, slug) do
+    desired_slug = bundled_template_slug(kind, slug)
+
+    if is_binary(desired_slug) do
+      file_system = project |> StarterTemplates.template_roots() |> FileSystem.new()
+      source = Liquex.FileSystem.read_template_file(file_system, desired_slug)
+
+      case Frontmatter.parse_document(source) do
+        {:ok, %{body: body}} -> {:ok, body}
+        {:error, :invalid_frontmatter} -> {:ok, source}
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      {:error, :template_not_found}
+    end
+  rescue
+    error in [Liquex.Error] ->
+      _ = error
+      {:error, :template_not_found}
+  end
+
+  defp bundled_template_slug(_kind, slug) when is_binary(slug) and slug != "", do: slug
+  defp bundled_template_slug(kind, _slug), do: StarterTemplates.default_slug(kind)
 
   defp post_assigns(project_id, assigns) do
     metadata = project_metadata(project_id)

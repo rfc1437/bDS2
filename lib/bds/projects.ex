@@ -6,7 +6,6 @@ defmodule BDS.Projects do
   alias BDS.Persistence
   alias BDS.Projects.Project
   alias BDS.Repo
-  alias BDS.StarterTemplates
   alias BDS.Slug
   alias BDS.Templates
 
@@ -59,7 +58,6 @@ defmodule BDS.Projects do
             })
             |> Repo.insert!()
 
-          :ok = StarterTemplates.install(project)
           {:ok, _templates} = Templates.rebuild_templates_from_files(project.id)
           project
         end)
@@ -94,7 +92,6 @@ defmodule BDS.Projects do
         })
         |> Repo.insert!()
 
-      :ok = StarterTemplates.install(project)
       {:ok, _templates} = Templates.rebuild_templates_from_files(project.id)
       project
     end)

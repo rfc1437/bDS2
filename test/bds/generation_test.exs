@@ -254,6 +254,60 @@ defmodule BDS.GenerationTest do
     assert post_html =~ "Language"
   end
 
+  test "generation falls back to bundled default templates when the project has no template files or template rows",
+       %{project: project, temp_dir: temp_dir} do
+    File.rm_rf!(Path.join(temp_dir, "templates"))
+
+    Repo.delete_all(
+      from template in BDS.Templates.Template,
+        where: template.project_id == ^project.id
+    )
+
+    assert {:ok, _menu} =
+             BDS.Menu.update_menu(project.id, [
+               %{kind: :page, label: "Notes", slug: "notes"}
+             ])
+
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en", "de"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Bundled Rendered Post",
+               content: "**Rendered** body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["Elixir"]
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, _tags} = BDS.Tags.sync_tags_from_posts(project.id)
+
+    assert {:ok, result} = BDS.Generation.generate_site(project.id, [:core, :single])
+
+    post_path = BDS.Generation.post_output_path(published_post)
+    relative_paths = Enum.map(result.generated_files, & &1.relative_path)
+
+    assert "index.html" in relative_paths
+    assert post_path in relative_paths
+
+    index_html = File.read!(Path.join([temp_dir, "html", "index.html"]))
+    assert index_html =~ ~s(<nav class="blog-menu">)
+    assert index_html =~ ~s(/assets/pico.min.css)
+    assert index_html =~ "Bundled Rendered Post"
+
+    post_html = File.read!(Path.join([temp_dir, "html", post_path]))
+    assert post_html =~ ~s(data-template="single-post")
+    assert post_html =~ ~s(<strong>Rendered</strong> body)
+    assert post_html =~ "Taxonomy"
+    assert post_html =~ "Language"
+  end
+
   test "generation expands starter-template markdown macros, rewrites canonical post links, media links, and emits not-found page",
        %{project: project, temp_dir: temp_dir} do
     assert {:ok, _metadata} =

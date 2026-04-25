@@ -73,8 +73,11 @@ rule CreateProject {
         data_path: data_path,
         is_active: false
     )
-    ensures: StarterTemplatesCopied(project)
-        -- Bundled starter templates are copied into the new project
+}
+
+invariant ProjectTemplatesDirectoryReservedForUserTemplates {
+    -- The project templates directory stores only user-managed templates.
+    -- Creating a project does not populate effective_data_dir/templates with bundled defaults.
 }
 
 rule SetActiveProject {

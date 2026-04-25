@@ -123,7 +123,7 @@ defmodule BDS.MaintenanceTest do
     assert length(scripts) == 1
 
     assert {:ok, templates} = BDS.Maintenance.rebuild_from_filesystem(project.id, "template")
-    assert length(templates) == 4
+    assert length(templates) == 1
 
     assert Repo.get(BDS.Posts.Post, "dispatch-post") != nil
     assert Repo.get(BDS.Media.Media, "dispatch-media") != nil
