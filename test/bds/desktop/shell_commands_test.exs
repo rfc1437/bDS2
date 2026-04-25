@@ -8,6 +8,7 @@ defmodule BDS.Desktop.ShellCommandsTest do
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
     :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), Process.whereis(BDS.Preview))
     :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), Process.whereis(BDS.Publishing))
+    :ok = BDS.Tasks.clear_finished()
 
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-shell-commands-#{System.unique_integer([:positive])}")
@@ -17,6 +18,7 @@ defmodule BDS.Desktop.ShellCommandsTest do
     on_exit(fn ->
       File.rm_rf(temp_dir)
       _ = BDS.Preview.stop_preview("default")
+      _ = BDS.Tasks.clear_finished()
     end)
 
     {:ok, project} = BDS.Projects.create_project(%{name: "Shell Commands", data_path: temp_dir})
@@ -53,11 +55,83 @@ defmodule BDS.Desktop.ShellCommandsTest do
 
     assert {:ok, result} = ShellCommands.execute("validate_translations")
 
-    assert result.kind == "open_editor"
-    assert result.route == "translation_validation"
-    assert result.payload.summary.missing_count == 1
+    assert result.kind == "task_queued"
+    assert result.action == "validate_translations"
+    assert is_binary(result.task_id)
+
+    completed = wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)))
+
+    assert completed.group_name == "Validation"
+    assert completed.result.kind == "open_editor"
+    assert completed.result.route == "translation_validation"
+    assert completed.result.payload.summary.missing_count == 1
     post_id = post.id
-    assert [%{"language" => "de", "post_id" => ^post_id}] = result.payload.missing
+    assert [%{"language" => "de", "post_id" => ^post_id}] = completed.result.payload.missing
+  end
+
+  test "validate_site queues a tracked validation task and returns the report as an editor payload" do
+    assert {:ok, result} = ShellCommands.execute("validate_site")
+
+    assert result.kind == "task_queued"
+    assert result.action == "validate_site"
+    assert is_binary(result.task_id)
+
+    completed = wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)))
+
+    assert completed.group_name == "Validation"
+    assert completed.result.kind == "open_editor"
+    assert completed.result.route == "site_validation"
+    assert is_map(completed.result.payload.summary)
+  end
+
+  test "metadata_diff queues a tracked maintenance task and returns the report as an editor payload" do
+    assert {:ok, result} = ShellCommands.execute("metadata_diff")
+
+    assert result.kind == "task_queued"
+    assert result.action == "metadata_diff"
+    assert is_binary(result.task_id)
+
+    completed = wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)))
+
+    assert completed.group_name == "Maintenance"
+    assert completed.result.kind == "open_editor"
+    assert completed.result.route == "metadata_diff"
+    assert is_map(completed.result.payload.summary)
+  end
+
+  test "find_duplicates queues a tracked embeddings task and returns the report as an editor payload" do
+    assert {:ok, result} = ShellCommands.execute("find_duplicates")
+
+    assert result.kind == "task_queued"
+    assert result.action == "find_duplicates"
+    assert is_binary(result.task_id)
+
+    completed = wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)))
+
+    assert completed.group_name == "Embeddings"
+    assert completed.result.kind == "open_editor"
+    assert completed.result.route == "find_duplicates"
+    assert is_map(completed.result.payload.summary)
+  end
+
+  test "rebuild_database fans out tracked maintenance tasks for the active project" do
+    assert {:ok, result} = ShellCommands.execute("rebuild_database")
+
+    assert result.kind == "task_queued"
+    assert result.action == "rebuild_database"
+
+    tasks = wait_for_tasks_by_name([
+      "Rebuild Posts From Files",
+      "Rebuild Media From Files",
+      "Rebuild Scripts From Files",
+      "Rebuild Templates From Files",
+      "Rebuild Post Links",
+      "Regenerate Missing Thumbnails",
+      "Rebuild Embedding Index"
+    ], &(&1.status == :completed))
+
+    assert Enum.all?(tasks, &(&1.group_name == "Maintenance"))
+    assert Enum.all?(tasks, &(&1.status == :completed))
   end
 
   test "reindex_text queues a tracked background task for the active project", %{project: project} do
@@ -67,10 +141,13 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert result.action == "reindex_text"
     assert result.project_id == project.id
     assert is_binary(result.task_id)
+    assert is_binary(result.task_group_id)
 
-    assert task = BDS.Tasks.get_task(result.task_id)
-    assert task.group_name == "Search"
-    assert wait_for_task(result.task_id, &(&1.status in [:completed, :failed])).status == :completed
+    tasks = wait_for_tasks_by_name(["Reindex Search Text", "Reindex Media Search Text"], &(&1.status == :completed))
+
+    assert Enum.all?(tasks, &(&1.group_name == "Search"))
+    assert Enum.all?(tasks, &(&1.group_id == result.task_group_id))
+    assert Enum.all?(tasks, &(&1.status == :completed))
   end
 
   test "missing project schema returns a command error instead of raising" do
@@ -94,6 +171,25 @@ defmodule BDS.Desktop.ShellCommandsTest do
     else
       Process.sleep(50)
       wait_for_task(task_id, matcher, timeout - 50)
+    end
+  end
+
+  defp wait_for_tasks_by_name(names, matcher), do: wait_for_tasks_by_name(names, matcher, 2_000)
+
+  defp wait_for_tasks_by_name(_names, _matcher, timeout) when timeout <= 0 do
+    BDS.Tasks.list_tasks()
+  end
+
+  defp wait_for_tasks_by_name(names, matcher, timeout) do
+    tasks = BDS.Tasks.list_tasks()
+    matching_tasks = Enum.filter(tasks, &(&1.name in names))
+
+    if Enum.all?(names, fn name -> Enum.any?(matching_tasks, &(&1.name == name)) end) and
+         Enum.all?(matching_tasks, matcher) do
+      matching_tasks
+    else
+      Process.sleep(50)
+      wait_for_tasks_by_name(names, matcher, timeout - 50)
     end
   end
 end

@@ -75,12 +75,36 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp dispatch("reindex_text", project, _params) do
-    queue_task(project, "reindex_text", "Reindex Text", "Search", fn report ->
-      report.(0.2, "Clearing and rebuilding text indexes")
-      :ok = Search.reindex_project(project.id)
-      report.(1.0, "Text indexes rebuilt")
-      %{project_id: project.id}
-    end)
+    group_id = task_group_id("reindex_text")
+    attrs = %{group_id: group_id, group_name: "Search"}
+
+    {:ok, posts_task} =
+      Tasks.submit_task("Reindex Search Text", fn report ->
+        report.(0.0, "Clearing and rebuilding post search indexes")
+        :ok = Search.reindex_posts(project.id)
+        report.(1.0, "Post search text reindexed")
+        %{project_id: project.id, entity: "posts"}
+      end, attrs)
+
+    {:ok, _media_task} =
+      Tasks.submit_task("Reindex Media Search Text", fn report ->
+        report.(0.0, "Clearing and rebuilding media search indexes")
+        :ok = Search.reindex_media(project.id)
+        report.(1.0, "Media search text reindexed")
+        %{project_id: project.id, entity: "media"}
+      end, attrs)
+
+    {:ok,
+     %{
+       kind: "task_queued",
+       action: "reindex_text",
+       title: "Reindex Text",
+       message: "Search tasks queued",
+       project_id: project.id,
+       task_id: posts_task.id,
+       task_group_id: group_id,
+       panel_tab: "tasks"
+     }}
   end
 
   defp dispatch("rebuild_embedding_index", project, _params) do
@@ -93,30 +117,63 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp dispatch("rebuild_database", project, _params) do
-    queue_task(project, "rebuild_database", "Rebuild Database", "Maintenance", fn report ->
-      report.(0.1, "Rebuilding posts")
-      {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post")
-      report.(0.3, "Rebuilding media")
-      {:ok, media} = Maintenance.rebuild_from_filesystem(project.id, "media")
-      report.(0.5, "Rebuilding scripts")
-      {:ok, scripts} = Maintenance.rebuild_from_filesystem(project.id, "script")
-      report.(0.7, "Rebuilding templates")
-      {:ok, templates} = Maintenance.rebuild_from_filesystem(project.id, "template")
-      report.(0.9, "Rebuilding embeddings")
-      {:ok, embeddings} = Maintenance.rebuild_from_filesystem(project.id, "embedding")
-      report.(1.0, "Database rebuild complete")
+    group_id = task_group_id("rebuild_database")
+    attrs = %{group_id: group_id, group_name: "Maintenance"}
 
-      %{
-        project_id: project.id,
-        counts: %{
-          posts: length(posts),
-          media: length(media),
-          scripts: length(scripts),
-          templates: length(templates),
-          embeddings: length(embeddings)
-        }
-      }
+    {:ok, posts_task} =
+      Tasks.submit_task("Rebuild Posts From Files", fn report ->
+        report.(0.0, "Scanning post files")
+        {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post")
+        report.(1.0, "Post rebuild complete")
+        %{project_id: project.id, counts: %{posts: length(posts)}}
+      end, attrs)
+
+    {:ok, _media_task} =
+      Tasks.submit_task("Rebuild Media From Files", fn report ->
+        report.(0.0, "Scanning media files")
+        {:ok, media} = Maintenance.rebuild_from_filesystem(project.id, "media")
+        report.(1.0, "Media rebuild complete")
+        %{project_id: project.id, counts: %{media: length(media)}}
+      end, attrs)
+
+    {:ok, _scripts_task} =
+      Tasks.submit_task("Rebuild Scripts From Files", fn report ->
+        report.(0.0, "Scanning script files")
+        {:ok, scripts} = Maintenance.rebuild_from_filesystem(project.id, "script")
+        report.(1.0, "Script rebuild complete")
+        %{project_id: project.id, counts: %{scripts: length(scripts)}}
+      end, attrs)
+
+    {:ok, _templates_task} =
+      Tasks.submit_task("Rebuild Templates From Files", fn report ->
+        report.(0.0, "Scanning template files")
+        {:ok, templates} = Maintenance.rebuild_from_filesystem(project.id, "template")
+        report.(1.0, "Template rebuild complete")
+        %{project_id: project.id, counts: %{templates: length(templates)}}
+      end, attrs)
+
+    Task.start(fn ->
+      wait_for_group_phase(group_id, [
+        "Rebuild Posts From Files",
+        "Rebuild Media From Files",
+        "Rebuild Scripts From Files",
+        "Rebuild Templates From Files"
+      ])
+
+      submit_rebuild_followups(project, attrs)
     end)
+
+    {:ok,
+     %{
+       kind: "task_queued",
+       action: "rebuild_database",
+       title: "Rebuild Database",
+       message: "Maintenance tasks queued",
+       project_id: project.id,
+       task_id: posts_task.id,
+       task_group_id: group_id,
+       panel_tab: "tasks"
+     }}
   end
 
   defp dispatch("generate_sitemap", project, _params) do
@@ -129,78 +186,39 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp dispatch("validate_site", project, _params) do
-    with {:ok, report} <- Generation.validate_site(project.id, @site_sections) do
-      {:ok,
-       %{
-         kind: "open_editor",
-         action: "validate_site",
-         project_id: project.id,
-         route: "site_validation",
-         title: "Site Validation",
-         subtitle: "Generated output checked against expected site files",
-         editorMeta: [
-           %{label: "Missing", value: Integer.to_string(length(report.missing_pages))},
-           %{label: "Extra", value: Integer.to_string(length(report.extra_pages))},
-           %{label: "Stale", value: Integer.to_string(length(report.stale_pages))}
-         ],
-         payload: normalize_site_validation(report)
-       }}
-    end
+    queue_task(project, "validate_site", "Validate Site", "Validation", fn report ->
+      report.(0.2, "Validating generated site output")
+      {:ok, validation} = Generation.validate_site(project.id, @site_sections)
+      report.(1.0, "Site validation complete")
+      site_validation_result(project.id, validation)
+    end)
   end
 
   defp dispatch("metadata_diff", project, _params) do
-    with {:ok, report} <- Maintenance.metadata_diff(project.id) do
-      {:ok,
-       %{
-         kind: "open_editor",
-         action: "metadata_diff",
-         project_id: project.id,
-         route: "metadata_diff",
-         title: "Metadata Diff",
-         subtitle: "Database state compared against filesystem metadata",
-         editorMeta: [
-           %{label: "Diffs", value: Integer.to_string(length(report.diff_reports))},
-           %{label: "Orphans", value: Integer.to_string(length(report.orphan_reports))}
-         ],
-         payload: normalize_metadata_diff(report)
-       }}
-    end
+    queue_task(project, "metadata_diff", "Metadata Diff", "Maintenance", fn report ->
+      report.(0.2, "Comparing database and filesystem metadata")
+      {:ok, metadata_diff} = Maintenance.metadata_diff(project.id)
+      report.(1.0, "Metadata diff complete")
+      metadata_diff_result(project.id, metadata_diff)
+    end)
   end
 
   defp dispatch("validate_translations", project, _params) do
-    with {:ok, report} <- Posts.validate_translations(project.id) do
-      {:ok,
-       %{
-         kind: "open_editor",
-         action: "validate_translations",
-         project_id: project.id,
-         route: "translation_validation",
-         title: "Translation Validation",
-         subtitle: "Published posts checked against required blog languages",
-         editorMeta: [
-           %{label: "Missing", value: Integer.to_string(length(report.missing))},
-           %{label: "Orphans", value: Integer.to_string(length(report.orphan_files))},
-           %{label: "Skipped", value: Integer.to_string(length(report.do_not_translate_posts))}
-         ],
-         payload: normalize_translation_validation(report)
-       }}
-    end
+    queue_task(project, "validate_translations", "Validate Translations", "Validation", fn report ->
+      report.(0.2, "Checking published translations")
+      {:ok, translation_report} = Posts.validate_translations(project.id)
+      report.(1.0, "Translation validation complete")
+      translation_validation_result(project.id, translation_report)
+    end)
   end
 
   defp dispatch("find_duplicates", project, _params) do
-    with {:ok, pairs} <- Embeddings.find_duplicates(project.id) do
-      {:ok,
-       %{
-         kind: "open_editor",
-         action: "find_duplicates",
-         project_id: project.id,
-         route: "find_duplicates",
-         title: "Find Duplicates",
-         subtitle: "Potential duplicate posts found via embeddings",
-         editorMeta: [%{label: "Pairs", value: Integer.to_string(length(pairs))}],
-         payload: normalize_duplicate_pairs(pairs)
-       }}
-    end
+    queue_task(project, "find_duplicates", "Find Duplicate Posts", "Embeddings", fn report ->
+      report.(0.2, "Checking for duplicate posts")
+      {:ok, pairs} = Embeddings.find_duplicates(project.id)
+      report.(1.0, "Duplicate search complete")
+      duplicate_search_result(project.id, pairs)
+    end)
   end
 
   defp dispatch("upload_site", project, _params) do
@@ -244,6 +262,64 @@ defmodule BDS.Desktop.ShellCommands do
      }}
   end
 
+  defp submit_rebuild_followups(project, attrs) do
+    {:ok, _links_task} =
+      Tasks.submit_task("Rebuild Post Links", fn report ->
+        report.(0.0, "Rebuilding link graph")
+        :ok = Posts.rebuild_post_links(project.id)
+        report.(1.0, "Post links rebuilt")
+        %{project_id: project.id}
+      end, attrs)
+
+    {:ok, _thumbs_task} =
+      Tasks.submit_task("Regenerate Missing Thumbnails", fn report ->
+        report.(0.0, "Checking missing thumbnails")
+        result = BDS.Media.regenerate_missing_thumbnails(project.id)
+        report.(1.0, "Missing thumbnails regenerated")
+        Map.put(result, :project_id, project.id)
+      end, attrs)
+
+    {:ok, _embeddings_task} =
+      Tasks.submit_task("Rebuild Embedding Index", fn report ->
+        report.(0.0, "Rebuilding semantic index")
+        {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id)
+        report.(1.0, "Embedding index rebuilt")
+        %{project_id: project.id, rebuilt_post_ids: rebuilt_post_ids, rebuilt_count: length(rebuilt_post_ids)}
+      end, attrs)
+
+    :ok
+  end
+
+  defp wait_for_group_phase(group_id, names, timeout \\ 30_000)
+
+  defp wait_for_group_phase(_group_id, _names, timeout) when timeout <= 0, do: :timeout
+
+  defp wait_for_group_phase(group_id, names, timeout) do
+    tasks =
+      BDS.Tasks.list_tasks()
+      |> Enum.filter(&(&1.group_id == group_id and &1.name in names))
+
+    cond do
+      length(tasks) < length(names) ->
+        Process.sleep(50)
+        wait_for_group_phase(group_id, names, timeout - 50)
+
+      Enum.any?(tasks, &(&1.status == :failed)) ->
+        :failed
+
+      Enum.all?(tasks, &(&1.status == :completed)) ->
+        :ok
+
+      true ->
+        Process.sleep(50)
+        wait_for_group_phase(group_id, names, timeout - 50)
+    end
+  end
+
+  defp task_group_id(action) do
+    action <> "-" <> Integer.to_string(System.unique_integer([:positive, :monotonic]))
+  end
+
   defp active_project do
     case Projects.get_active_project() do
       nil -> {:error, %{message: "No active project selected"}}
@@ -276,6 +352,23 @@ defmodule BDS.Desktop.ShellCommands do
     }
   end
 
+  defp site_validation_result(project_id, report) do
+    %{
+      kind: "open_editor",
+      action: "validate_site",
+      project_id: project_id,
+      route: "site_validation",
+      title: "Site Validation",
+      subtitle: "Generated output checked against expected site files",
+      editorMeta: [
+        %{label: "Missing", value: Integer.to_string(length(report.missing_pages))},
+        %{label: "Extra", value: Integer.to_string(length(report.extra_pages))},
+        %{label: "Stale", value: Integer.to_string(length(report.stale_pages))}
+      ],
+      payload: normalize_site_validation(report)
+    }
+  end
+
   defp normalize_metadata_diff(report) do
     %{
       summary: %{
@@ -284,6 +377,22 @@ defmodule BDS.Desktop.ShellCommands do
       },
       diff_reports: Enum.map(report.diff_reports, &stringify_map/1),
       orphan_reports: Enum.map(report.orphan_reports, &stringify_map/1)
+    }
+  end
+
+  defp metadata_diff_result(project_id, report) do
+    %{
+      kind: "open_editor",
+      action: "metadata_diff",
+      project_id: project_id,
+      route: "metadata_diff",
+      title: "Metadata Diff",
+      subtitle: "Database state compared against filesystem metadata",
+      editorMeta: [
+        %{label: "Diffs", value: Integer.to_string(length(report.diff_reports))},
+        %{label: "Orphans", value: Integer.to_string(length(report.orphan_reports))}
+      ],
+      payload: normalize_metadata_diff(report)
     }
   end
 
@@ -300,10 +409,40 @@ defmodule BDS.Desktop.ShellCommands do
     }
   end
 
+  defp translation_validation_result(project_id, report) do
+    %{
+      kind: "open_editor",
+      action: "validate_translations",
+      project_id: project_id,
+      route: "translation_validation",
+      title: "Translation Validation",
+      subtitle: "Published posts checked against required blog languages",
+      editorMeta: [
+        %{label: "Missing", value: Integer.to_string(length(report.missing))},
+        %{label: "Orphan Files", value: Integer.to_string(length(report.orphan_files))},
+        %{label: "Skipped", value: Integer.to_string(length(report.do_not_translate_posts))}
+      ],
+      payload: normalize_translation_validation(report)
+    }
+  end
+
   defp normalize_duplicate_pairs(pairs) do
     %{
       summary: %{pair_count: length(pairs)},
       pairs: Enum.map(pairs, &stringify_map/1)
+    }
+  end
+
+  defp duplicate_search_result(project_id, pairs) do
+    %{
+      kind: "open_editor",
+      action: "find_duplicates",
+      project_id: project_id,
+      route: "find_duplicates",
+      title: "Find Duplicates",
+      subtitle: "Potential duplicate posts found via embeddings",
+      editorMeta: [%{label: "Pairs", value: Integer.to_string(length(pairs))}],
+      payload: normalize_duplicate_pairs(pairs)
     }
   end
 

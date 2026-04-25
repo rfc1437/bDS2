@@ -4,9 +4,11 @@ defmodule BDS.TasksTest do
   setup do
     original = Application.get_env(:bds, :tasks, [])
     Application.put_env(:bds, :tasks, max_concurrent: 3, progress_throttle_ms: 250)
+    :ok = BDS.Tasks.clear_finished()
 
     on_exit(fn ->
       Application.put_env(:bds, :tasks, original)
+      _ = BDS.Tasks.clear_finished()
     end)
 
     :ok
@@ -146,6 +148,31 @@ defmodule BDS.TasksTest do
 
     assert first_id == first.id
     assert second_id == second.id
+  end
+
+  test "status_snapshot retains recently finished tasks for desktop shell completion state" do
+    assert {:ok, task} =
+             BDS.Tasks.submit_task(
+               "rebuild database",
+               fn report ->
+                 report.(0.4, "rebuilding")
+                 {:ok, %{counts: %{posts: 2}}}
+               end,
+               %{group_id: "maintenance", group_name: "Maintenance"}
+             )
+
+    completed = wait_for_task(task.id, &(&1.status == :completed and &1.result == %{counts: %{posts: 2}}))
+
+    snapshot = BDS.Tasks.status_snapshot()
+
+    assert snapshot.active_count == 0
+    assert snapshot.running_count == 0
+    assert snapshot.pending_count == 0
+    assert snapshot.running_task_message == nil
+
+    assert Enum.any?(snapshot.tasks, fn item ->
+             item.id == completed.id and item.status == :completed and item.result == %{counts: %{posts: 2}}
+           end)
   end
 
   defp receive_started do

@@ -122,18 +122,29 @@ defmodule BDS.Search do
   end
 
   def reindex_project(project_id) do
+    :ok = reindex_posts(project_id)
+    :ok = reindex_media(project_id)
+
+    :ok
+  end
+
+  def reindex_posts(project_id) do
     Repo.query!(
       "DELETE FROM posts_fts WHERE post_id IN (SELECT id FROM posts WHERE project_id = ?)",
       [project_id]
     )
 
+    Repo.all(from post in Post, where: post.project_id == ^project_id)
+    |> Enum.each(&sync_post/1)
+
+    :ok
+  end
+
+  def reindex_media(project_id) do
     Repo.query!(
       "DELETE FROM media_fts WHERE media_id IN (SELECT id FROM media WHERE project_id = ?)",
       [project_id]
     )
-
-    Repo.all(from post in Post, where: post.project_id == ^project_id)
-    |> Enum.each(&sync_post/1)
 
     Repo.all(from media in Media, where: media.project_id == ^project_id)
     |> Enum.each(&sync_media/1)

@@ -5,6 +5,7 @@ defmodule BDS.Tasks do
 
   @default_max_concurrent 3
   @default_progress_throttle_ms 250
+  @default_recent_finished_limit 10
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -33,6 +34,10 @@ defmodule BDS.Tasks do
 
   def clear_completed do
     GenServer.call(__MODULE__, :clear_completed)
+  end
+
+  def clear_finished do
+    GenServer.call(__MODULE__, :clear_finished)
   end
 
   def cancel_task(task_id) when is_binary(task_id) do
@@ -99,6 +104,15 @@ defmodule BDS.Tasks do
     next_tasks =
       state.tasks
       |> Enum.reject(fn {_task_id, task} -> task.status == :completed end)
+      |> Map.new()
+
+    {:reply, :ok, %{state | tasks: next_tasks}}
+  end
+
+  def handle_call(:clear_finished, _from, state) do
+    next_tasks =
+      state.tasks
+      |> Enum.reject(fn {_task_id, task} -> task.status in [:completed, :failed, :cancelled] end)
       |> Map.new()
 
     {:reply, :ok, %{state | tasks: next_tasks}}
@@ -340,14 +354,15 @@ defmodule BDS.Tasks do
   end
 
   defp build_status_snapshot(state) do
-    tasks = active_tasks(state)
+    active = active_tasks(state)
+    tasks = active ++ recent_finished_tasks(state)
 
     %{
-      active_count: length(tasks),
-      running_count: Enum.count(tasks, &(&1.status == :running)),
-      pending_count: Enum.count(tasks, &(&1.status == :pending)),
-      running_task_message: running_task_message(tasks),
-      running_task_overflow: running_task_overflow(tasks),
+      active_count: length(active),
+      running_count: Enum.count(active, &(&1.status == :running)),
+      pending_count: Enum.count(active, &(&1.status == :pending)),
+      running_task_message: running_task_message(active),
+      running_task_overflow: running_task_overflow(active),
       tasks: Enum.map(tasks, &public_task/1)
     }
   end
@@ -357,6 +372,14 @@ defmodule BDS.Tasks do
     |> Map.values()
     |> Enum.filter(&(&1.status in [:running, :pending]))
     |> Enum.sort_by(&task_sort_key/1)
+  end
+
+  defp recent_finished_tasks(state) do
+    state.tasks
+    |> Map.values()
+    |> Enum.filter(&(&1.status in [:completed, :failed, :cancelled]))
+    |> Enum.sort_by(&DateTime.to_unix(&1.finished_at || &1.created_at, :microsecond), :desc)
+    |> Enum.take(recent_finished_limit())
   end
 
   defp all_tasks(state) do
@@ -404,6 +427,11 @@ defmodule BDS.Tasks do
   defp progress_throttle_ms do
     Application.get_env(:bds, :tasks, [])
     |> Keyword.get(:progress_throttle_ms, @default_progress_throttle_ms)
+  end
+
+  defp recent_finished_limit do
+    Application.get_env(:bds, :tasks, [])
+    |> Keyword.get(:recent_finished_limit, @default_recent_finished_limit)
   end
 
   defp attr(attrs, key) do

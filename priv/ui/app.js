@@ -16,6 +16,7 @@ const state = {
   projects: normalizeProjects(bootstrap.projects),
   projectMenuOpen: false,
   taskStatus: normalizeTaskStatus(bootstrap.task_status),
+  handledTaskResults: {},
   outputEntries: [],
   gitLogEntries: [],
   uiLanguage: readStoredUiLanguage(bootstrap.i18n?.ui_language || bootstrap.status.right.ui_language),
@@ -656,10 +657,38 @@ async function fetchTaskStatus() {
     state.taskStatus = next;
     state.status.left.running_task_message = next.running_task_message;
     state.status.left.running_task_overflow = next.running_task_overflow;
+    applyCompletedTaskResults(next.tasks);
     render();
   } catch (_error) {
     // Keep the shell usable if task polling is temporarily unavailable.
   }
+}
+
+function applyCompletedTaskResults(tasks) {
+  pruneHandledTaskResults(tasks);
+
+  tasks.forEach((task) => {
+    if (task.status !== "completed" || state.handledTaskResults[task.id]) {
+      return;
+    }
+
+    if (!task.result || typeof task.result !== "object" || typeof task.result.kind !== "string") {
+      return;
+    }
+
+    state.handledTaskResults[task.id] = true;
+    applyShellCommandResult(task.result);
+  });
+}
+
+function pruneHandledTaskResults(tasks) {
+  const visibleTaskIds = new Set(tasks.map((task) => task.id));
+
+  Object.keys(state.handledTaskResults).forEach((taskId) => {
+    if (!visibleTaskIds.has(taskId)) {
+      delete state.handledTaskResults[taskId];
+    }
+  });
 }
 
 async function fetchProjects() {
