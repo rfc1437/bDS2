@@ -134,7 +134,7 @@ defmodule BDS.Preview do
            :ok <- ensure_get(method) do
         case query_params["post_id"] do
           post_id when is_binary(post_id) ->
-            if String.starts_with?(request_path, "/draft/") do
+            if String.starts_with?(request_path, "/draft/") or query_params["draft"] == "true" do
               resolve_draft_request(project_id, post_id, query_params)
             else
               resolve_request(state.current, request_path, query_params)

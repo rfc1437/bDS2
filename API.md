@@ -1,6 +1,6 @@
 # API Documentation
 
-Contract version: 0.3.1
+Contract version: 0.4.0
 
 This reference documents the Lua runtime API available through `bds` in embedded bDS2 scripts.
 
@@ -31,6 +31,42 @@ local meta = bds.meta.get_project_metadata()
 - [Data Structures](#data-structures)
 
 ## app
+
+### app.copy_to_clipboard
+
+Copy text to the system clipboard.
+
+**Parameters**
+
+- text (string, required)
+
+**Response specification**
+
+- Return type: `boolean`
+
+**Example call**
+
+```lua
+local result = bds.app.copy_to_clipboard("value")
+```
+
+### app.get_blogmark_bookmarklet
+
+Return the Blogmark bookmarklet JavaScript source.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `string`
+
+**Example call**
+
+```lua
+local result = bds.app.get_blogmark_bookmarklet()
+```
 
 ### app.get_data_paths
 
@@ -86,6 +122,60 @@ Return the current UI locale.
 local result = bds.app.get_system_language()
 ```
 
+### app.get_title_bar_metrics
+
+Return desktop title bar inset metrics when available.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table | nil`
+
+**Example call**
+
+```lua
+local result = bds.app.get_title_bar_metrics()
+```
+
+### app.notify_renderer_ready
+
+Notify the host application that the renderer is ready.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `boolean`
+
+**Example call**
+
+```lua
+local result = bds.app.notify_renderer_ready()
+```
+
+### app.open_folder
+
+Open a folder in the system file manager.
+
+**Parameters**
+
+- folder_path (string, required)
+
+**Response specification**
+
+- Return type: `string`
+
+**Example call**
+
+```lua
+local result = bds.app.open_folder("value")
+```
+
 ### app.read_project_metadata
 
 Read project metadata from a project folder path.
@@ -102,6 +192,78 @@ Read project metadata from a project folder path.
 
 ```lua
 local result = bds.app.read_project_metadata("value")
+```
+
+### app.select_folder
+
+Show the native folder picker and return the chosen path.
+
+**Parameters**
+
+- title (string, optional)
+
+**Response specification**
+
+- Return type: `string | nil`
+
+**Example call**
+
+```lua
+local result = bds.app.select_folder("value")
+```
+
+### app.set_preview_post_target
+
+Set the current preview-post target used by desktop integrations.
+
+**Parameters**
+
+- post_id (string, optional)
+
+**Response specification**
+
+- Return type: `boolean`
+
+**Example call**
+
+```lua
+local result = bds.app.set_preview_post_target("value")
+```
+
+### app.show_item_in_folder
+
+Reveal a file or folder in the system file manager.
+
+**Parameters**
+
+- item_path (string, required)
+
+**Response specification**
+
+- Return type: `nil`
+
+**Example call**
+
+```lua
+local result = bds.app.show_item_in_folder("value")
+```
+
+### app.trigger_menu_action
+
+Trigger a native menu action by action id.
+
+**Parameters**
+
+- action (string, required)
+
+**Response specification**
+
+- Return type: `nil`
+
+**Example call**
+
+```lua
+local result = bds.app.trigger_menu_action("value")
 ```
 
 
@@ -356,6 +518,43 @@ local result = bds.embeddings.suggest_tags("value", {})
 
 ## media
 
+### media.delete_translation
+
+Delete a media translation by language.
+
+**Parameters**
+
+- media_id (string, required)
+- language (string, required)
+
+**Response specification**
+
+- Return type: `boolean`
+
+**Example call**
+
+```lua
+local result = bds.media.delete_translation("value", "value")
+```
+
+### media.filter
+
+Filter media using year, month, tags, language, or date range fields.
+
+**Parameters**
+
+- filters (table, required)
+
+**Response specification**
+
+- Return type: `MediaData[]`
+
+**Example call**
+
+```lua
+local result = bds.media.filter({})
+```
+
 ### media.import
 
 Import media into the current project.
@@ -372,6 +571,42 @@ Import media into the current project.
 
 ```lua
 local result = bds.media.import({})
+```
+
+### media.get_by_year_month
+
+Get media counts grouped by year and month.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table[]`
+
+**Example call**
+
+```lua
+local result = bds.media.get_by_year_month()
+```
+
+### media.get_file_path
+
+Return the absolute file path for a media item.
+
+**Parameters**
+
+- media_id (string, required)
+
+**Response specification**
+
+- Return type: `string | nil`
+
+**Example call**
+
+```lua
+local result = bds.media.get_file_path("value")
 ```
 
 ### media.update
@@ -445,6 +680,245 @@ Fetch all media in the current project.
 
 ```lua
 local result = bds.media.get_all()
+```
+
+### media.get_tags
+
+Return tag names used by media in the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `string[]`
+
+**Example call**
+
+```lua
+local result = bds.media.get_tags()
+```
+
+### media.get_tags_with_counts
+
+Return media tags with usage counts.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table[]`
+
+**Example call**
+
+```lua
+local result = bds.media.get_tags_with_counts()
+```
+
+### media.get_thumbnail
+
+Return a media thumbnail as a data URL for the requested size.
+
+**Parameters**
+
+- media_id (string, required)
+- size (string, optional)
+
+**Response specification**
+
+- Return type: `string | nil`
+
+**Example call**
+
+```lua
+local result = bds.media.get_thumbnail("value", "value")
+```
+
+### media.get_translation
+
+Return one media translation by language.
+
+**Parameters**
+
+- media_id (string, required)
+- language (string, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+
+**Example call**
+
+```lua
+local result = bds.media.get_translation("value", "value")
+```
+
+### media.get_translations
+
+Return all translations for a media item.
+
+**Parameters**
+
+- media_id (string, required)
+
+**Response specification**
+
+- Return type: `table[]`
+
+**Example call**
+
+```lua
+local result = bds.media.get_translations("value")
+```
+
+### media.get_url
+
+Return the project-relative public URL path for a media item.
+
+**Parameters**
+
+- media_id (string, required)
+
+**Response specification**
+
+- Return type: `string | nil`
+
+**Example call**
+
+```lua
+local result = bds.media.get_url("value")
+```
+
+### media.rebuild_from_files
+
+Rebuild media records from sidecar files on disk.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `MediaData[] | nil`
+
+**Example call**
+
+```lua
+local result = bds.media.rebuild_from_files()
+```
+
+### media.regenerate_missing_thumbnails
+
+Generate thumbnails for media items that are missing them.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table`
+
+**Example call**
+
+```lua
+local result = bds.media.regenerate_missing_thumbnails()
+```
+
+### media.regenerate_thumbnails
+
+Regenerate all thumbnails for one media item.
+
+**Parameters**
+
+- media_id (string, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+
+**Example call**
+
+```lua
+local result = bds.media.regenerate_thumbnails("value")
+```
+
+### media.reindex_text
+
+Reindex post and media search text for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `boolean`
+
+**Example call**
+
+```lua
+local result = bds.media.reindex_text()
+```
+
+### media.replace_file
+
+Replace the binary file behind an existing media item.
+
+**Parameters**
+
+- media_id (string, required)
+- source_path (string, required)
+
+**Response specification**
+
+- Return type: `MediaData | nil`
+
+**Example call**
+
+```lua
+local result = bds.media.replace_file("value", "value")
+```
+
+### media.search
+
+Search media by free-text query.
+
+**Parameters**
+
+- query (string, required)
+
+**Response specification**
+
+- Return type: `MediaData[] | nil`
+
+**Example call**
+
+```lua
+local result = bds.media.search("value")
+```
+
+### media.upsert_translation
+
+Create or update a media translation.
+
+**Parameters**
+
+- media_id (string, required)
+- language (string, required)
+- data (table, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+
+**Example call**
+
+```lua
+local result = bds.media.upsert_translation("value", "value", {})
 ```
 
 
@@ -648,6 +1122,24 @@ Set publishing preferences for the current project.
 local result = bds.meta.set_publishing_preferences({})
 ```
 
+### meta.sync_on_startup
+
+Synchronize startup metadata state and return tags, categories, and project metadata.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table`
+
+**Example call**
+
+```lua
+local result = bds.meta.sync_on_startup()
+```
+
 ### meta.update_project_metadata
 
 Update metadata for the current project.
@@ -724,6 +1216,61 @@ Delete a post by id.
 local result = bds.posts.delete("value")
 ```
 
+### posts.discard
+
+Discard unpublished post changes and restore the last published version from disk.
+
+**Parameters**
+
+- id (string, required)
+
+**Response specification**
+
+- Return type: `PostData | nil`
+
+**Example call**
+
+```lua
+local result = bds.posts.discard("value")
+```
+
+### posts.filter
+
+Filter posts using status, tags, categories, language, year, month, or date range fields.
+
+**Parameters**
+
+- filters (table, required)
+
+**Response specification**
+
+- Return type: `PostData[] | nil`
+
+**Example call**
+
+```lua
+local result = bds.posts.filter({})
+```
+
+### posts.generate_unique_slug
+
+Generate a unique slug from a title, optionally excluding one post id.
+
+**Parameters**
+
+- title (string, required)
+- exclude_post_id (string, optional)
+
+**Response specification**
+
+- Return type: `string`
+
+**Example call**
+
+```lua
+local result = bds.posts.generate_unique_slug("value", "value")
+```
+
 ### posts.get
 
 Fetch one post by id.
@@ -778,6 +1325,42 @@ Fetch one post by slug.
 local result = bds.posts.get_by_slug("value")
 ```
 
+### posts.get_by_status
+
+Fetch posts filtered by a specific status.
+
+**Parameters**
+
+- status (string, required)
+
+**Response specification**
+
+- Return type: `PostData[]`
+
+**Example call**
+
+```lua
+local result = bds.posts.get_by_status("value")
+```
+
+### posts.get_by_year_month
+
+Get post counts grouped by year and month.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table[]`
+
+**Example call**
+
+```lua
+local result = bds.posts.get_by_year_month()
+```
+
 ### posts.get_categories
 
 Get category names used by posts in the current project.
@@ -812,6 +1395,79 @@ Get post categories with usage counts.
 
 ```lua
 local result = bds.posts.get_categories_with_counts()
+```
+
+### posts.get_dashboard_stats
+
+Return aggregate post dashboard counts for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table`
+
+**Example call**
+
+```lua
+local result = bds.posts.get_dashboard_stats()
+```
+
+### posts.get_linked_by
+
+Return posts that link to the given post.
+
+**Parameters**
+
+- post_id (string, required)
+
+**Response specification**
+
+- Return type: `table[]`
+
+**Example call**
+
+```lua
+local result = bds.posts.get_linked_by("value")
+```
+
+### posts.get_links_to
+
+Return posts linked from the given post.
+
+**Parameters**
+
+- post_id (string, required)
+
+**Response specification**
+
+- Return type: `table[]`
+
+**Example call**
+
+```lua
+local result = bds.posts.get_links_to("value")
+```
+
+### posts.get_preview_url
+
+Return the local preview URL for a post, optionally with draft and language query parameters.
+
+**Parameters**
+
+- post_id (string, required)
+- options (table, optional)
+
+**Response specification**
+
+- Return type: `string | nil`
+
+**Example call**
+
+```lua
+local result = bds.posts.get_preview_url("value", {})
 ```
 
 ### posts.get_tags
@@ -905,6 +1561,25 @@ Check whether a post has a published version.
 local result = bds.posts.has_published_version("value")
 ```
 
+### posts.is_slug_available
+
+Return whether a slug is available in the current project, optionally excluding one post id.
+
+**Parameters**
+
+- slug (string, required)
+- exclude_post_id (string, optional)
+
+**Response specification**
+
+- Return type: `boolean`
+
+**Example call**
+
+```lua
+local result = bds.posts.is_slug_available("value", "value")
+```
+
 ### posts.publish
 
 Publish a post by id.
@@ -923,6 +1598,25 @@ Publish a post by id.
 local result = bds.posts.publish("value")
 ```
 
+### posts.publish_translation
+
+Publish one translation of a post by language.
+
+**Parameters**
+
+- post_id (string, required)
+- language (string, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+
+**Example call**
+
+```lua
+local result = bds.posts.publish_translation("value", "value")
+```
+
 ### posts.rebuild_from_files
 
 Rebuild post records from published files.
@@ -939,6 +1633,24 @@ Rebuild post records from published files.
 
 ```lua
 local result = bds.posts.rebuild_from_files()
+```
+
+### posts.rebuild_links
+
+Rebuild the post link graph for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `boolean`
+
+**Example call**
+
+```lua
+local result = bds.posts.rebuild_links()
 ```
 
 ### posts.reindex_text

@@ -8,6 +8,7 @@ defmodule BDS.Posts do
   alias BDS.Metadata
   alias BDS.Persistence
   alias BDS.PostLinks
+  alias BDS.Posts.Link
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
   alias BDS.Projects
@@ -148,6 +149,28 @@ defmodule BDS.Posts do
     {:ok, posts}
   end
 
+  def discard_post_changes(post_id) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Post{file_path: file_path} when file_path in [nil, ""] ->
+        {:error, :not_found}
+
+      %Post{} = post ->
+        project = Projects.get_project!(post.project_id)
+        full_path = Path.join(Projects.project_data_dir(project), post.file_path)
+
+        if File.exists?(full_path) do
+          restored_post = upsert_post_from_file(post.project_id, project, full_path)
+          :ok = PostLinks.sync_post_links(restored_post)
+          {:ok, restored_post}
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
   def delete_post(post_id) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -192,6 +215,108 @@ defmodule BDS.Posts do
   def get_post!(post_id), do: Repo.get!(Post, post_id)
 
   def get_post_translation!(translation_id), do: Repo.get!(Translation, translation_id)
+
+  def publish_post_translation(post_id, language) do
+    normalized_language = language |> to_string() |> String.trim() |> String.downcase()
+
+    case Repo.get_by(Translation, translation_for: post_id, language: normalized_language) do
+      nil ->
+        {:error, :not_found}
+
+      %Translation{} ->
+        with {:ok, _post} <- publish_post(post_id),
+             %Translation{} = translation <- Repo.get_by(Translation, translation_for: post_id, language: normalized_language) do
+          {:ok, translation}
+        else
+          nil -> {:error, :not_found}
+          error -> error
+        end
+    end
+  end
+
+  def slug_available(project_id, slug, exclude_post_id \\ nil) do
+    normalized_slug = slug |> to_string() |> String.trim()
+
+    query =
+      from(post in Post,
+        where: post.project_id == ^project_id and post.slug == ^normalized_slug,
+        select: post.id,
+        limit: 1
+      )
+
+    case Repo.one(query) do
+      nil -> true
+      ^exclude_post_id -> true
+      _other -> false
+    end
+  end
+
+  def unique_slug_for_title(project_id, title, exclude_post_id \\ nil) do
+    base_slug = title |> default_slug_source() |> Slug.slugify()
+
+    if slug_available(project_id, base_slug, exclude_post_id) do
+      base_slug
+    else
+      Stream.iterate(2, &(&1 + 1))
+      |> Enum.find_value(fn counter ->
+        candidate = "#{base_slug}-#{counter}"
+        if slug_available(project_id, candidate, exclude_post_id), do: candidate, else: nil
+      end)
+    end
+  end
+
+  def dashboard_stats(project_id) do
+    Repo.all(
+      from(post in Post,
+        where: post.project_id == ^project_id,
+        select: post.status
+      )
+    )
+    |> Enum.reduce(
+      %{total_posts: 0, draft_count: 0, published_count: 0, archived_count: 0},
+      fn status, acc ->
+        acc
+        |> Map.update!(:total_posts, &(&1 + 1))
+        |> case do
+          counts when status == :draft -> Map.update!(counts, :draft_count, &(&1 + 1))
+          counts when status == :published -> Map.update!(counts, :published_count, &(&1 + 1))
+          counts when status == :archived -> Map.update!(counts, :archived_count, &(&1 + 1))
+          counts -> counts
+        end
+      end
+    )
+  end
+
+  def post_counts_by_year_month(project_id) do
+    Repo.all(
+      from(post in Post,
+        where: post.project_id == ^project_id,
+        select: post.created_at
+      )
+    )
+    |> Enum.reduce(%{}, fn created_at, acc ->
+      datetime = DateTime.from_unix!(created_at, :millisecond)
+      key = {datetime.year, datetime.month}
+      Map.update(acc, key, 1, &(&1 + 1))
+    end)
+    |> Enum.map(fn {{year, month}, count} -> %{year: year, month: month, count: count} end)
+    |> Enum.sort_by(fn %{year: year, month: month} -> {-year, -month} end)
+  end
+
+  def rebuild_post_links(project_id) do
+    post_ids = Repo.all(from(post in Post, where: post.project_id == ^project_id, select: post.id))
+
+    Repo.delete_all(
+      from(link in Link,
+        where: link.source_post_id in ^post_ids or link.target_post_id in ^post_ids
+      )
+    )
+
+    Repo.all(from(post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at]))
+    |> Enum.each(&PostLinks.sync_post_links/1)
+
+    :ok
+  end
 
   def list_post_translations(post_id) do
     {:ok,

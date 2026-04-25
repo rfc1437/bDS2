@@ -172,6 +172,83 @@ defmodule BDS.Media do
     end
   end
 
+  def delete_media_translation(media_id, language) do
+    normalized_language = language |> to_string() |> String.trim() |> String.downcase()
+
+    case Repo.get(Media, media_id) do
+      nil ->
+        {:error, :not_found}
+
+      media ->
+        case Repo.get_by(Translation, translation_for: media.id, language: normalized_language) do
+          nil ->
+            {:ok, false}
+
+          translation ->
+            project = Projects.get_project!(media.project_id)
+
+            Repo.transaction(fn ->
+              Repo.delete!(translation)
+              delete_file_if_present(media.project_id, translation_sidecar_path(media, normalized_language))
+              :ok = Search.sync_media(media)
+              :ok = write_sidecar(project, media)
+              true
+            end)
+            |> case do
+              {:ok, deleted?} -> {:ok, deleted?}
+              {:error, reason} -> {:error, reason}
+            end
+        end
+    end
+  end
+
+  def replace_media_file(media_id, new_source_path) do
+    case Repo.get(Media, media_id) do
+      nil ->
+        {:error, :not_found}
+
+      media ->
+        project = Projects.get_project!(media.project_id)
+        destination = Path.join(Projects.project_data_dir(project), media.file_path)
+
+        with {:ok, binary} <- File.read(new_source_path),
+             {:ok, stat} <- File.stat(new_source_path) do
+          checksum = Base.encode16(:crypto.hash(:md5, binary), case: :lower)
+
+          if checksum == media.checksum do
+            {:ok, nil}
+          else
+            mime_type = media.mime_type || detect_mime(media.original_name || media.filename)
+            {width, height} = image_dimensions(new_source_path, mime_type)
+
+            Repo.transaction(fn ->
+              :ok = File.cp(new_source_path, destination)
+
+              updated_media =
+                media
+                |> Media.changeset(%{
+                  size: stat.size,
+                  width: width || media.width,
+                  height: height || media.height,
+                  checksum: checksum,
+                  updated_at: Persistence.now_ms()
+                })
+                |> Repo.update!()
+
+              :ok = write_sidecar(project, updated_media)
+              :ok = ensure_thumbnails(project, updated_media)
+              :ok = Search.sync_media(updated_media)
+              updated_media
+            end)
+            |> case do
+              {:ok, updated_media} -> {:ok, updated_media}
+              {:error, reason} -> {:error, reason}
+            end
+          end
+        end
+    end
+  end
+
   def thumbnail_paths(%Media{id: id}) do
     prefix = String.slice(id, 0, 2)
 
@@ -193,6 +270,45 @@ defmodule BDS.Media do
         :ok = ensure_thumbnails(project, media)
         {:ok, media}
     end
+  end
+
+  def regenerate_missing_thumbnails(project_id) do
+    project = Projects.get_project!(project_id)
+
+    Repo.all(
+      from(media in Media,
+        where: media.project_id == ^project_id,
+        order_by: [asc: media.created_at]
+      )
+    )
+    |> Enum.filter(fn media ->
+      String.starts_with?(media.mime_type || "", "image/") and
+        not String.contains?(media.mime_type || "", "svg")
+    end)
+    |> Enum.reduce(%{processed: 0, generated: 0, failed: 0}, fn media, acc ->
+      missing_paths =
+        media
+        |> thumbnail_paths()
+        |> Enum.map(fn {_size, relative_path} -> Path.join(Projects.project_data_dir(project), relative_path) end)
+        |> Enum.reject(&File.exists?/1)
+
+      if missing_paths == [] do
+        %{acc | processed: acc.processed + 1}
+      else
+        try do
+          :ok = ensure_thumbnails(project, media)
+
+          %{
+            processed: acc.processed + 1,
+            generated: acc.generated + length(missing_paths),
+            failed: acc.failed
+          }
+        rescue
+          _error ->
+            %{acc | processed: acc.processed + 1, failed: acc.failed + 1}
+        end
+      end
+    end)
   end
 
   def rebuild_media_from_files(project_id) do
