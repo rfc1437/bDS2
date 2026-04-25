@@ -1,8 +1,8 @@
 # bDS2
 
-bDS2 is the Elixir rewrite of bDS, the offline-first desktop blogging workspace in [../bDS](/Users/gb/Projects/bDS). This repository is the new implementation baseline: Elixir for the application core, Ecto for persistence, and a desktop shell to be selected as the rewrite matures.
+bDS2 is the Elixir rewrite of bDS, the offline-first desktop blogging workspace in [../bDS](/Users/gb/Projects/bDS). The repository now contains a substantial BEAM application: Ecto persistence, filesystem-backed content workflows, rendering/generation/publishing pipelines, AI and MCP integrations, and a bundled desktop shell served by the Elixir runtime.
 
-The repository currently contains a minimal Elixir/OTP foundation plus a set of Allium specifications in [specs/](/Users/gb/Projects/bDS2/specs). Those specs should define application behavior, file contracts, and user-visible workflows without tying the rewrite to a specific implementation stack.
+The Allium specifications in [specs/](/Users/gb/Projects/bDS2/specs) remain the behavioral contract for the rewrite. For current implementation status and the parity roadmap, see [PLAN.md](/Users/gb/Projects/bDS2/PLAN.md).
 
 ## Scope
 
@@ -46,7 +46,7 @@ This keeps the scripting surface lightweight and aligned with the Elixir host ap
 
 ## macOS Development Setup
 
-This machine does not have Elixir installed yet, so start with the toolchain.
+If you are setting up a new macOS machine, start with the toolchain.
 
 ### 1. Install Xcode Command Line Tools
 
@@ -97,70 +97,8 @@ mix ecto.migrate
 mix test
 ```
 
-## Current Elixir Baseline
+## Development Notes
 
-The initial scaffold is intentionally small:
-
-- OTP application startup in [lib/bds/application.ex](/Users/gb/Projects/bDS2/lib/bds/application.ex).
-- Ecto repository in [lib/bds/repo.ex](/Users/gb/Projects/bDS2/lib/bds/repo.ex).
-- Environment config in [config/config.exs](/Users/gb/Projects/bDS2/config/config.exs), [config/dev.exs](/Users/gb/Projects/bDS2/config/dev.exs), [config/test.exs](/Users/gb/Projects/bDS2/config/test.exs), and [config/runtime.exs](/Users/gb/Projects/bDS2/config/runtime.exs).
-- Basic test bootstrap in [test/](/Users/gb/Projects/bDS2/test).
-
-This is not yet the desktop application. It is the base runtime that future work will extend with the domain model, persistence layer, content pipelines, and desktop-facing boundaries.
-
-## MCP Packaging
-
-The MCP server is packaged as its own self-contained release artifact and must not depend on the repository checkout at runtime.
-
-- Build the distributable MCP release with `MIX_ENV=prod mix release bds_mcp`.
-- The packaged artifact is assembled at `_build/prod/rel/bds_mcp`.
-- The distributable executable is exposed as `mcp/bin/bds-mcp` on Unix-like systems and `mcp/bin/bds-mcp.bat` on Windows inside the installed payload.
-- Agent configuration should point to the packaged executable inside the installed application resources, not to `mix`, not to source files, and not to repository-local scripts.
-
-This allows the later UI app to bundle the MCP payload as normal application resources on each supported operating system.
-
-## Release Build Flow
-
-The repository now has a thin platform build flow around Mix releases.
-
-- Unix-like systems: `scripts/release/build_platform.sh [macos|linux]`
-- Windows: `scripts/release/build_platform.bat [windows]`
-
-The scripts do the standard sequence:
-
-1. `mix deps.get`
-2. `mix test` unless `BDS_SKIP_TESTS=1`
-3. `mix dialyzer` unless `BDS_SKIP_DIALYZER=1`
-4. `MIX_ENV=prod mix release bds`
-5. `MIX_ENV=prod mix release bds_mcp`
-6. `MIX_ENV=prod mix bds.package <platform>`
-
-For local CLI validation without packaging, use `mix validate`.
-
-The packaging task creates a clean redistributable payload under `dist/<platform>/` with this layout:
-
-- `app/`: the full main `bds` release
-- `resources/`: the full `bds_mcp` release root
-- `resources/mcp/`: the MCP executable payload used by agent integrations
-- `manifest.json`: packaging metadata for downstream bundling
-
-The task also creates a platform archive alongside the payload:
-
-- macOS and Linux: `.tar.gz`
-- Windows: `.zip`
-
-This is the intermediate redistributable artifact intended to be consumed by the later desktop app bundling layer.
-
-## Spec Hygiene
-
-When editing files in [specs/](/Users/gb/Projects/bDS2/specs):
-
-- Keep user-visible workflows, content formats, and compatibility rules explicit.
-- Keep behavior that affects imported data, generated output, or persisted content.
-- Remove references to Rust, TypeScript, Electron, React, specific crates, specific packages, and other implementation choices unless the choice itself is a product requirement.
-
-## Next Steps
-
-1. Translate the core content and project specs into Ecto schemas and migrations.
-2. Choose the desktop shell and boundary architecture for the Elixir application.
-3. Add executable tests that map directly to the Allium specifications.
+- Use `mix test` for validation during development.
+- The application behavior is defined by the Allium specs in [specs/](/Users/gb/Projects/bDS2/specs).
+- Use [PLAN.md](/Users/gb/Projects/bDS2/PLAN.md) for implementation status and the parity roadmap.
