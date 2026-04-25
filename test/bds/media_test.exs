@@ -1,6 +1,8 @@
 defmodule BDS.MediaTest do
   use ExUnit.Case, async: false
 
+  import Ecto.Query
+
   alias BDS.Repo
 
   setup do
@@ -115,6 +117,49 @@ defmodule BDS.MediaTest do
     Enum.each(Map.values(thumbnail_paths), fn path ->
       refute File.exists?(Path.join(temp_dir, path))
     end)
+  end
+
+  test "deleting a post rewrites linked media sidecars to remove that post id", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    source_path = Path.join(temp_dir, "sample.txt")
+    File.write!(source_path, "hello media")
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Linked Post",
+               content: "Body"
+             })
+
+    now = BDS.Persistence.now_ms()
+
+    Repo.insert_all("post_media", [
+      %{
+        id: Ecto.UUID.generate(),
+        project_id: project.id,
+        post_id: post.id,
+        media_id: media.id,
+        sort_order: 0,
+        created_at: now
+      }
+    ])
+
+    assert {:ok, _updated_media} = BDS.Media.update_media(media.id, %{})
+
+    sidecar_before = File.read!(Path.join(temp_dir, media.sidecar_path))
+    assert sidecar_before =~ "linkedPostIds: [\"#{post.id}\"]\n"
+
+    assert {:ok, :deleted} = BDS.Posts.delete_post(post.id)
+
+    refute Repo.exists?(from row in "post_media", where: field(row, :media_id) == ^media.id)
+
+    sidecar_after = File.read!(Path.join(temp_dir, media.sidecar_path))
+    assert sidecar_after =~ "linkedPostIds: []\n"
   end
 
   test "rebuild_media_from_files recreates media rows from sidecars", %{

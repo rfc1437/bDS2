@@ -101,6 +101,18 @@ defmodule BDS.Media do
     end
   end
 
+  def sync_media_sidecar(media_id) do
+    case Repo.get(Media, media_id) do
+      nil ->
+        {:error, :not_found}
+
+      media ->
+        project = Projects.get_project!(media.project_id)
+        :ok = write_sidecar(project, media)
+        :ok
+    end
+  end
+
   def delete_media(media_id) do
     case Repo.get(Media, media_id) do
       nil ->

@@ -49,8 +49,8 @@ The remaining work needs to proceed from base contracts upward. Later phases sho
 1. Lock compatibility contracts. Completed 2026-04-25.
    Schema, frontmatter, sidecars, template context, generation output, preview behavior, metadata diff, and rebuild behavior are now pinned against the Allium specs and the old bDS application with executable parity tests.
 
-2. Close engine-level behavior gaps.
-   Finish any remaining save/publish/delete side-effects, translation cascades, link graph maintenance, thumbnail regeneration rules, and rebuild notifications so backend behavior is fully spec-complete independent of UI.
+2. Close engine-level behavior gaps. Completed 2026-04-25.
+   Save/publish/delete side-effects, manual-translation source-post reopening, post-to-media sidecar cleanup, auto-translation task cascades, linked-media translation cascades, link graph maintenance, thumbnail regeneration rules, and rebuild notifications are now implemented and covered at the backend layer independent of UI.
 
 3. Finish the desktop shell primitives.
    Complete route state, shell command coverage, panel integration, and menu wiring for every sidebar view and editor route so the shell exposes the entire product surface cleanly.

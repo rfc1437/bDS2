@@ -5,6 +5,8 @@ defmodule BDS.Posts do
 
   alias BDS.Frontmatter
   alias BDS.Embeddings
+  alias BDS.AI
+  alias BDS.Media
   alias BDS.Metadata
   alias BDS.Persistence
   alias BDS.PostLinks
@@ -16,6 +18,7 @@ defmodule BDS.Posts do
   alias BDS.Repo
   alias BDS.Search
   alias BDS.Slug
+  alias BDS.Tasks
 
   def create_post(attrs) do
     now = Persistence.now_ms()
@@ -54,6 +57,7 @@ defmodule BDS.Posts do
       {:ok, post} ->
         :ok = Embeddings.sync_post(post)
         :ok = Search.sync_post(post)
+        :ok = maybe_schedule_auto_translations(post)
         {:ok, post}
 
       error ->
@@ -84,6 +88,7 @@ defmodule BDS.Posts do
               :ok = Embeddings.sync_post(updated_post)
               :ok = PostLinks.sync_post_links(updated_post)
               :ok = Search.sync_post(updated_post)
+              :ok = maybe_schedule_auto_translations(updated_post)
               {:ok, updated_post}
 
             error ->
@@ -210,10 +215,12 @@ defmodule BDS.Posts do
         {:error, :not_found}
 
       %Post{} = post ->
+        linked_media_ids = linked_media_ids(post.id)
         delete_post_file(post)
         :ok = Embeddings.remove_post(post.id)
         :ok = PostLinks.delete_post_links(post.id)
         Repo.delete!(post)
+        Enum.each(linked_media_ids, &sync_deleted_post_media_sidecar/1)
         :ok = Search.delete_post(post.id)
         {:ok, :deleted}
     end
@@ -390,6 +397,7 @@ defmodule BDS.Posts do
         |> Repo.insert_or_update()
         |> case do
           {:ok, saved_translation} ->
+            {:ok, _post} = maybe_reopen_source_post_for_manual_translation(post, attrs)
             :ok = Search.sync_post(post.id)
             {:ok, saved_translation}
 
@@ -931,6 +939,182 @@ defmodule BDS.Posts do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp maybe_reopen_source_post_for_manual_translation(%Post{} = post, attrs) do
+    if attr(attrs, :auto_generated) == true or post.status != :published or post.file_path in [nil, ""] do
+      {:ok, post}
+    else
+      project = Projects.get_project!(post.project_id)
+      full_path = Path.join(Projects.project_data_dir(project), post.file_path)
+      restored_content = published_post_body(post, full_path)
+
+      post
+      |> Post.changeset(%{
+        status: :draft,
+        content: restored_content,
+        updated_at: Persistence.now_ms()
+      })
+      |> Repo.update()
+    end
+  end
+
+  defp maybe_schedule_auto_translations(%Post{do_not_translate: true}), do: :ok
+
+  defp maybe_schedule_auto_translations(%Post{} = post) do
+    with true <- auto_translation_configured?(),
+         {:ok, metadata} <- Metadata.get_project_metadata(post.project_id) do
+      post
+      |> missing_auto_translation_languages(metadata)
+      |> Enum.each(&queue_post_auto_translation(post, &1))
+    else
+      _other -> :ok
+    end
+
+    :ok
+  end
+
+  defp missing_auto_translation_languages(%Post{} = post, metadata) do
+    source_language = normalize_language(post.language || metadata.main_language)
+
+    configured_languages =
+      ([metadata.main_language] ++ (metadata.blog_languages || []))
+      |> Enum.map(&normalize_language/1)
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> Enum.uniq()
+
+    existing_languages =
+      Repo.all(
+        from translation in Translation,
+          where: translation.translation_for == ^post.id,
+          select: translation.language
+      )
+
+    configured_languages
+    |> Enum.reject(&(&1 == source_language or &1 in existing_languages))
+  end
+
+  defp queue_post_auto_translation(%Post{} = post, language) do
+    _ =
+      Tasks.submit_task(
+        "Auto-translate Post to #{language}",
+        fn report ->
+          report.(0.05, "Translating post to #{language}")
+
+          with {:ok, translation} <- AI.translate_post(post.id, language, auto_translation_ai_opts()),
+               {:ok, saved_translation} <-
+                 upsert_post_translation(post.id, language, %{
+                   title: translation.title,
+                   excerpt: translation.excerpt,
+                   content: translation.content,
+                   auto_generated: true
+                 }) do
+            report.(0.85, "Post translation saved")
+            :ok = queue_media_translation_cascade(post, language)
+            report.(1.0, "Post translation complete")
+            %{post_id: post.id, translation_id: saved_translation.id, language: language}
+          else
+            {:error, reason} -> {:error, reason}
+            other -> {:error, other}
+          end
+        end,
+        auto_translation_task_attrs(post)
+      )
+
+    :ok
+  end
+
+  defp queue_media_translation_cascade(%Post{} = post, language) do
+    linked_media_ids(post.id)
+    |> Enum.each(fn media_id ->
+      if media_translation_needed?(media_id, language) do
+        queue_media_translation(post, media_id, language)
+      end
+    end)
+
+    :ok
+  end
+
+  defp queue_media_translation(%Post{} = post, media_id, language) do
+    _ =
+      Tasks.submit_task(
+        "Auto-translate Media to #{language}",
+        fn report ->
+          report.(0.05, "Translating media to #{language}")
+
+          with {:ok, translation} <- AI.translate_media(media_id, language, auto_translation_ai_opts()),
+               {:ok, saved_translation} <-
+                 Media.upsert_media_translation(media_id, language, %{
+                   title: translation.title,
+                   alt: translation.alt,
+                   caption: translation.caption
+                 }) do
+            report.(1.0, "Media translation complete")
+            %{media_id: media_id, translation_id: saved_translation.id, language: language}
+          else
+            {:error, reason} -> {:error, reason}
+            other -> {:error, other}
+          end
+        end,
+        auto_translation_task_attrs(post)
+      )
+
+    :ok
+  end
+
+  defp media_translation_needed?(media_id, language) do
+    case Repo.get(Media.Media, media_id) do
+      %Media.Media{language: source_language} when source_language not in [nil, ""] and source_language != language ->
+        not Repo.exists?(
+          from translation in Media.Translation,
+            where: translation.translation_for == ^media_id and translation.language == ^language
+        )
+
+      _other ->
+        false
+    end
+  end
+
+  defp auto_translation_task_attrs(%Post{} = post) do
+    %{
+      group_id: post.project_id,
+      group_name: "AI"
+    }
+  end
+
+  defp auto_translation_ai_opts do
+    Application.get_env(:bds, :posts, [])
+    |> Keyword.get(:auto_translation_ai_opts, [])
+  end
+
+  defp auto_translation_configured? do
+    mode = if AI.airplane_mode?(), do: :airplane, else: :online
+
+    case AI.get_endpoint(mode) do
+      {:ok, %{url: url, model: model} = endpoint}
+      when is_binary(url) and url != "" and is_binary(model) and model != "" ->
+        mode == :airplane or present?(Map.get(endpoint, :api_key))
+
+      _other ->
+        false
+    end
+  end
+
+  defp linked_media_ids(post_id) do
+    case Repo.query("SELECT media_id FROM post_media WHERE post_id = ? ORDER BY sort_order ASC, media_id ASC", [post_id]) do
+      {:ok, %{rows: rows}} -> Enum.map(rows, fn [media_id] -> media_id end)
+      {:error, _reason} -> []
+    end
+  end
+
+  defp sync_deleted_post_media_sidecar(media_id) do
+    case Media.sync_media_sidecar(media_id) do
+      :ok -> :ok
+      {:error, :not_found} -> :ok
+    end
+  end
+
+  defp present?(value) when is_binary(value), do: String.trim(value) != ""
+  defp present?(value), do: not is_nil(value)
 
   defp orphan_translation_files(project_id) do
     project = Projects.get_project!(project_id)
