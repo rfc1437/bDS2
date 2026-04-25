@@ -200,6 +200,46 @@ defmodule BDS.MediaTest do
     end)
   end
 
+  test "rebuild_media_from_files parses inline empty tag arrays", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    media_dir = Path.join([temp_dir, "media", "2002", "11"])
+    File.mkdir_p!(media_dir)
+
+    binary_path = Path.join(media_dir, "muehle.jpg")
+    sidecar_path = binary_path <> ".meta"
+
+    File.write!(binary_path, tiny_jpeg_binary())
+
+    File.write!(
+      sidecar_path,
+      [
+        "id: 23c69669-678d-4b0b-bb10-c4c31bd427d1",
+        "originalName: muehle.jpg",
+        "mimeType: image/jpeg",
+        "size: #{byte_size(tiny_jpeg_binary())}",
+        "width: 3",
+        "height: 2",
+        "title: Beitrag ohne Titel",
+        "alt: Ein grüner Mühlenbau mit Windmühlen in einem goldgelben Feld",
+        "caption: Ein friedlicher Blick auf eine alte Mühle und die Weizenernte unter einem strahlend blauen Himmel.",
+        "createdAt: '2002-11-17T00:00:00.000Z'",
+        "updatedAt: '2026-03-18T15:31:10.146Z'",
+        "tags: []",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, [media]} = BDS.Media.rebuild_media_from_files(project.id)
+    assert media.id == "23c69669-678d-4b0b-bb10-c4c31bd427d1"
+    assert media.original_name == "muehle.jpg"
+    assert media.tags == []
+    assert media.created_at == 1_037_491_200_000
+    assert media.updated_at == 1_773_847_870_146
+  end
+
   test "import_media generates the four thumbnail files in bucketed thumbnail paths", %{
     project: project,
     temp_dir: temp_dir

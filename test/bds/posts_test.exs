@@ -384,6 +384,51 @@ defmodule BDS.PostsTest do
     assert translation.content == nil
   end
 
+  test "rebuild_posts_from_files parses quoted canonical timestamps and inline empty tag arrays" do
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-rebuild-quoted-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Quoted Rebuild", data_path: temp_dir})
+
+    posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2002", "11"])
+    File.mkdir_p!(posts_dir)
+
+    File.write!(
+      Path.join(posts_dir, "p10.md"),
+      [
+        "---",
+        "id: 1c1ecaeb-c94c-446a-9291-e946cb991637",
+        "title: Chimera",
+        "slug: p10",
+        "status: published",
+        "language: de",
+        "createdAt: '2002-11-05T12:00:00.000Z'",
+        "updatedAt: '2026-03-04T14:11:28.000Z'",
+        "publishedAt: '2002-11-05T12:00:00.000Z'",
+        "tags: []",
+        "categories:",
+        "  - article",
+        "---",
+        "Quelle",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, [post]} = BDS.Posts.rebuild_posts_from_files(project.id)
+    assert post.id == "1c1ecaeb-c94c-446a-9291-e946cb991637"
+    assert post.slug == "p10"
+    assert post.tags == []
+    assert post.categories == ["article"]
+    assert post.created_at == 1_036_497_600_000
+    assert post.updated_at == 1_772_633_488_000
+    assert post.published_at == 1_036_497_600_000
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->

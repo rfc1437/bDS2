@@ -102,13 +102,18 @@ defmodule BDS.Frontmatter do
 
   defp parse_scalar(key, value) when is_binary(key) and is_binary(value) do
     trimmed = String.trim(value)
+    parsed = parse_generic_scalar(trimmed)
 
     cond do
       timestamp_key?(key) ->
-        Persistence.parse_timestamp(trimmed) || parse_generic_scalar(trimmed)
+        if is_binary(parsed) do
+          Persistence.parse_timestamp(parsed) || parsed
+        else
+          parsed
+        end
 
       true ->
-        parse_generic_scalar(trimmed)
+        parsed
     end
   end
 
@@ -120,6 +125,7 @@ defmodule BDS.Frontmatter do
 
   defp parse_generic_scalar("true"), do: true
   defp parse_generic_scalar("false"), do: false
+  defp parse_generic_scalar("[]"), do: []
 
   defp parse_generic_scalar(value) do
     if Regex.match?(~r/^-?\d+$/, value) do
@@ -134,6 +140,14 @@ defmodule BDS.Frontmatter do
     |> String.trim_trailing("\"")
     |> String.replace("\\n", "\n")
     |> String.replace("\\\"", "\"")
+    |> String.replace("\\\\", "\\")
+  end
+
+  defp parse_string("'" <> rest) do
+    rest
+    |> String.trim_trailing("'")
+    |> String.replace("\\n", "\n")
+    |> String.replace("\\'", "'")
     |> String.replace("\\\\", "\\")
   end
 
