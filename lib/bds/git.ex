@@ -117,7 +117,6 @@ defmodule BDS.Git do
       case run_git(project_dir, ["fetch", "--all", "--prune"], opts) do
         {:ok, output} -> {:ok, %{updated: true, output: output}}
         {:error, {:git_failed, message}} -> structured_git_error(project_dir, :fetch, message, opts)
-        other -> other
       end
     end
   end
@@ -209,7 +208,6 @@ defmodule BDS.Git do
     case run_git(project_dir, ["remote", "get-url", "origin"], opts) do
       {:ok, output} -> {:ok, blank_to_nil(output)}
       {:error, {:git_failed, _message}} -> {:ok, nil}
-      other -> other
     end
   end
 
@@ -217,7 +215,6 @@ defmodule BDS.Git do
     case run_git(project_dir, ["lfs", "ls-files"], opts) do
       {:ok, _output} -> {:ok, true}
       {:error, {:git_failed, _message}} -> {:ok, false}
-      other -> other
     end
   end
 
@@ -335,7 +332,6 @@ defmodule BDS.Git do
     provider =
       case remote_url(project_dir, opts) do
         {:ok, remote} -> provider_info(remote)
-        _other -> nil
       end
 
     if auth_error?(message) do
@@ -370,9 +366,8 @@ defmodule BDS.Git do
   end
 
   defp normalize_optional_string({:ok, value}), do: {:ok, blank_to_nil(value)}
-  defp normalize_optional_string(other), do: other
+  defp normalize_optional_string({:error, _reason} = error), do: error
 
-  defp blank_to_nil(nil), do: nil
   defp blank_to_nil(value) when value in ["", "\n"], do: nil
   defp blank_to_nil(value), do: String.trim(value)
 end

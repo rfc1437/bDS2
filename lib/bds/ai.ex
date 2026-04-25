@@ -991,12 +991,14 @@ defmodule BDS.AI do
   end
 
   defp await_chat_task(task) do
+    ref = task.ref
+
     receive do
-      {ref, result} when ref == task.ref ->
+      {^ref, result} ->
         Process.demonitor(task.ref, [:flush])
         result
 
-      {:DOWN, ref, :process, _pid, reason} when ref == task.ref ->
+      {:DOWN, ^ref, :process, _pid, reason} ->
         case reason do
           :normal ->
             receive do

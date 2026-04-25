@@ -213,10 +213,8 @@ defmodule BDS.Desktop.MainWindow do
 
   defp wx_env_undefined? do
     try do
-      case :wx.get_env() do
-        :undefined -> true
-        _ -> false
-      end
+      _ = :wx.get_env()
+      false
     rescue
       ErlangError -> true
     end

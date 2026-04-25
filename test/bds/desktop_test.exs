@@ -121,6 +121,8 @@ defmodule BDS.DesktopTest do
   end
 
   test "desktop router exposes live task status for shell polling" do
+    :ok = BDS.Tasks.clear_finished()
+
     assert {:ok, task} =
              BDS.Tasks.register_external_task("preview build", %{
                group_id: "generation",
@@ -129,6 +131,7 @@ defmodule BDS.DesktopTest do
 
     on_exit(fn ->
       _ = BDS.Tasks.complete_task(task.id)
+      _ = BDS.Tasks.clear_finished()
     end)
 
     assert :ok = BDS.Tasks.report_progress(task.id, 0.5, "halfway")
@@ -146,6 +149,39 @@ defmodule BDS.DesktopTest do
 
     assert Enum.any?(payload["tasks"], fn item ->
              item["id"] == task.id and item["group_name"] == "Generation" and item["progress"] == 0.5
+           end)
+  end
+
+  test "desktop router encodes failed task snapshots even when the task error is a tuple" do
+    :ok = BDS.Tasks.clear_finished()
+
+    assert {:ok, task} =
+             BDS.Tasks.submit_task(
+               "broken rebuild",
+               fn _report ->
+                 {:error, {{:badkey, "slug"}, [{BDS.Posts, :upsert_post_from_file, 3, [line: 644]}]}}
+               end,
+               %{group_id: "maintenance", group_name: "Maintenance"}
+             )
+
+    on_exit(fn ->
+      _ = BDS.Tasks.clear_finished()
+    end)
+
+    failed = wait_for_task(task.id, &(&1.status == :failed and &1.error != nil))
+
+    conn = conn(:get, "/api/tasks?k=#{Desktop.Auth.login_key()}")
+    conn = BDS.Desktop.Router.call(conn, BDS.Desktop.Router.init([]))
+
+    assert conn.status == 200
+    payload = Jason.decode!(conn.resp_body)
+
+    assert Enum.any?(payload["tasks"], fn item ->
+             item["id"] == failed.id and item["status"] == "failed" and is_binary(item["error"])
+           end)
+
+    assert Enum.any?(payload["tasks"], fn item ->
+             item["id"] == failed.id and String.contains?(item["error"], "badkey")
            end)
   end
 
@@ -280,5 +316,22 @@ defmodule BDS.DesktopTest do
     groups
     |> Enum.flat_map(& &1.items)
     |> Enum.find(&Map.get(&1, :id) == id)
+  end
+
+  defp wait_for_task(task_id, matcher, timeout \\ 2_000)
+
+  defp wait_for_task(task_id, _matcher, timeout) when timeout <= 0 do
+    BDS.Tasks.get_task(task_id)
+  end
+
+  defp wait_for_task(task_id, matcher, timeout) do
+    task = BDS.Tasks.get_task(task_id)
+
+    if task && matcher.(task) do
+      task
+    else
+      Process.sleep(50)
+      wait_for_task(task_id, matcher, timeout - 50)
+    end
   end
 end

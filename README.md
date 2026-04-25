@@ -130,9 +130,12 @@ The scripts do the standard sequence:
 
 1. `mix deps.get`
 2. `mix test` unless `BDS_SKIP_TESTS=1`
-3. `MIX_ENV=prod mix release bds`
-4. `MIX_ENV=prod mix release bds_mcp`
-5. `MIX_ENV=prod mix bds.package <platform>`
+3. `mix dialyzer` unless `BDS_SKIP_DIALYZER=1`
+4. `MIX_ENV=prod mix release bds`
+5. `MIX_ENV=prod mix release bds_mcp`
+6. `MIX_ENV=prod mix bds.package <platform>`
+
+For local CLI validation without packaging, use `mix validate`.
 
 The packaging task creates a clean redistributable payload under `dist/<platform>/` with this layout:
 

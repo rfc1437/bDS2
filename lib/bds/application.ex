@@ -3,6 +3,8 @@ defmodule BDS.Application do
 
   use Application
 
+  @compiled_env Application.compile_env(:bds, :current_env, Mix.env())
+
   def desktop_children(env \\ nil)
 
   def desktop_children(:test) do
@@ -41,8 +43,7 @@ defmodule BDS.Application do
   end
 
   defp current_env do
-    Application.get_env(:bds, :current_env_override) ||
-      if(Code.ensure_loaded?(Mix), do: Mix.env(), else: :prod)
+    Application.get_env(:bds, :current_env_override) || @compiled_env
   end
 
   defp desktop_window_children do

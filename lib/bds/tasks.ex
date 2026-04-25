@@ -350,7 +350,10 @@ defmodule BDS.Tasks do
   defp public_task(nil), do: nil
 
   defp public_task(task) do
-    Map.drop(task, [:last_reported_at])
+    task
+    |> Map.drop([:last_reported_at])
+    |> Map.update(:error, nil, &json_safe_value/1)
+    |> Map.update(:result, nil, &json_safe_value/1)
   end
 
   defp build_status_snapshot(state) do
@@ -418,6 +421,29 @@ defmodule BDS.Tasks do
   defp normalize_result({:ok, _value} = result), do: result
   defp normalize_result({:error, _reason} = result), do: result
   defp normalize_result(value), do: {:ok, value}
+
+  defp json_safe_value(value) when is_nil(value), do: nil
+  defp json_safe_value(value) when is_binary(value), do: value
+  defp json_safe_value(value) when is_boolean(value), do: value
+  defp json_safe_value(value) when is_number(value), do: value
+  defp json_safe_value(value) when is_atom(value), do: value
+
+  defp json_safe_value(value) when is_list(value) do
+    Enum.map(value, &json_safe_value/1)
+  end
+
+  defp json_safe_value(value) when is_struct(value), do: inspect(value)
+
+  defp json_safe_value(value) when is_map(value) do
+    Map.new(value, fn {key, item} -> {json_safe_key(key), json_safe_value(item)} end)
+  end
+
+  defp json_safe_value(value) when is_tuple(value), do: inspect(value)
+  defp json_safe_value(value), do: inspect(value)
+
+  defp json_safe_key(key) when is_binary(key), do: key
+  defp json_safe_key(key) when is_atom(key), do: key
+  defp json_safe_key(key), do: inspect(key)
 
   defp max_concurrent do
     Application.get_env(:bds, :tasks, [])

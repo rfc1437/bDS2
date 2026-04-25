@@ -139,12 +139,21 @@ defmodule BDS.Posts do
   def rebuild_posts_from_files(project_id) do
     project = Projects.get_project!(project_id)
 
-    posts =
+    rebuild_files =
       project
       |> Projects.project_data_dir()
       |> Path.join("posts")
       |> list_matching_files("*.md")
-      |> Enum.map(&upsert_post_from_file(project_id, project, &1))
+      |> Enum.map(&parse_rebuild_file(project, &1))
+
+    {translation_files, post_files} = Enum.split_with(rebuild_files, &translation_rebuild_file?/1)
+
+    posts =
+      post_files
+      |> Enum.map(&upsert_post_from_rebuild_file(project_id, &1))
+
+    translation_files
+    |> Enum.map(&upsert_post_translation_from_rebuild_file(project_id, &1))
 
     {:ok, posts}
   end
@@ -632,9 +641,13 @@ defmodule BDS.Posts do
   end
 
   defp upsert_post_from_file(project_id, project, path) do
-    contents = File.read!(path)
-    {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
-    relative_path = Path.relative_to(path, Projects.project_data_dir(project))
+    project
+    |> parse_rebuild_file(path)
+    |> upsert_post_from_rebuild_file(project_id)
+  end
+
+  defp upsert_post_from_rebuild_file(project_id, rebuild_file) do
+    fields = rebuild_file.fields
     now = Persistence.now_ms()
 
     attrs = %{
@@ -649,7 +662,7 @@ defmodule BDS.Posts do
       created_at: Map.get(fields, "created_at", now),
       updated_at: Map.get(fields, "updated_at", now),
       published_at: Map.get(fields, "published_at"),
-      file_path: relative_path,
+      file_path: rebuild_file.relative_path,
       checksum: nil,
       tags: Map.get(fields, "tags", []),
       categories: Map.get(fields, "categories", []),
@@ -672,8 +685,84 @@ defmodule BDS.Posts do
     |> tap(&Embeddings.sync_post/1)
   end
 
+  defp upsert_post_translation_from_rebuild_file(project_id, rebuild_file) do
+    fields = rebuild_file.fields
+    source_post_id = Map.fetch!(fields, "translation_for")
+    source_post = Repo.get!(Post, source_post_id)
+    now = Persistence.now_ms()
+    language = normalize_language(Map.fetch!(fields, "language"))
+
+    translation =
+      Repo.get_by(Translation, translation_for: source_post_id, language: language) || %Translation{}
+
+    attrs = %{
+      id: Map.get(fields, "id") || Ecto.UUID.generate(),
+      project_id: project_id,
+      translation_for: source_post_id,
+      language: language,
+      title: Map.get(fields, "title") || "",
+      excerpt: Map.get(fields, "excerpt"),
+      content: nil,
+      status: parse_translation_status(Map.get(fields, "status", "published")),
+      created_at: Map.get(fields, "created_at", source_post.created_at || now),
+      updated_at: Map.get(fields, "updated_at", source_post.updated_at || source_post.created_at || now),
+      published_at: Map.get(fields, "published_at", source_post.published_at),
+      file_path: rebuild_file.relative_path,
+      checksum: nil
+    }
+
+    translation
+    |> Translation.changeset(attrs)
+    |> Repo.insert_or_update!()
+    |> tap(fn _translation ->
+      :ok = Search.sync_post(source_post_id)
+    end)
+  end
+
   defp parse_post_status(status) when is_atom(status), do: status
   defp parse_post_status(status), do: String.to_existing_atom(status)
+
+  defp parse_translation_status(status) when is_atom(status), do: status
+  defp parse_translation_status(status), do: String.to_existing_atom(status)
+
+  defp parse_rebuild_file(project, path) do
+    contents = File.read!(path)
+    {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
+
+    %{
+      path: path,
+      relative_path: Path.relative_to(path, Projects.project_data_dir(project)),
+      fields: normalize_rebuild_fields(fields)
+    }
+  end
+
+  defp translation_rebuild_file?(%{fields: fields}) do
+    Map.has_key?(fields, "translation_for") and not Map.has_key?(fields, "slug")
+  end
+
+  defp normalize_rebuild_fields(fields) when is_map(fields) do
+    [
+      {"translationFor", "translation_for"},
+      {"doNotTranslate", "do_not_translate"},
+      {"templateSlug", "template_slug"},
+      {"createdAt", "created_at"},
+      {"updatedAt", "updated_at"},
+      {"publishedAt", "published_at"}
+    ]
+    |> Enum.reduce(fields, fn {legacy_key, current_key}, acc ->
+      case Map.fetch(acc, legacy_key) do
+        {:ok, value} -> Map.put_new(acc, current_key, normalize_rebuild_field_value(current_key, value))
+        :error -> acc
+      end
+    end)
+  end
+
+  defp normalize_rebuild_field_value(key, value)
+       when key in ["created_at", "updated_at", "published_at"] do
+    Persistence.parse_timestamp(value) || value
+  end
+
+  defp normalize_rebuild_field_value(_key, value), do: value
 
   defp list_matching_files(dir, pattern) do
     if File.dir?(dir) do

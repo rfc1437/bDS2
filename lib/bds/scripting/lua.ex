@@ -195,9 +195,7 @@ defmodule BDS.Scripting.Lua do
     case values do
       [] -> nil
       [value] -> value
-      _other -> values
+      _values -> values
     end
   end
-
-  defp unwrap_result(values), do: values
 end

@@ -128,7 +128,6 @@ defmodule BDS.Rendering do
       case Frontmatter.parse_document(source) do
         {:ok, %{body: body}} -> {:ok, body}
         {:error, :invalid_frontmatter} -> {:ok, source}
-        {:error, reason} -> {:error, reason}
       end
     else
       {:error, :template_not_found}

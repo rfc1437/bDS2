@@ -23,6 +23,10 @@ if [[ "${BDS_SKIP_TESTS:-0}" != "1" ]]; then
   mix test
 fi
 
+if [[ "${BDS_SKIP_DIALYZER:-0}" != "1" ]]; then
+  mix dialyzer
+fi
+
 MIX_ENV=prod mix release --overwrite bds
 MIX_ENV=prod mix release --overwrite bds_mcp
 MIX_ENV=prod mix bds.package "$PLATFORM"

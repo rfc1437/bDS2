@@ -217,9 +217,6 @@ defmodule BDS.MCP.Server do
 
       {:error, :not_found} ->
         {:error, error_response(id, -32004, "Not found")}
-
-      {:error, reason} ->
-        {:error, error_response(id, -32000, inspect(reason))}
     end
   end
 
@@ -292,9 +289,7 @@ defmodule BDS.MCP.Server do
   defp http_error_response(status, headers \\ %{}), do: http_response(status, reason_body(status), "text/plain", headers)
 
   defp reason_body(400), do: "Bad Request"
-  defp reason_body(403), do: "Forbidden"
   defp reason_body(404), do: "Not Found"
-  defp reason_body(_status), do: "Internal Server Error"
 
   defp maybe_allow_repo(owner_pid) do
     try do

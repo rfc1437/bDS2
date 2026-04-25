@@ -15,6 +15,11 @@ if not "%BDS_SKIP_TESTS%"=="1" (
   if errorlevel 1 goto :error
 )
 
+if not "%BDS_SKIP_DIALYZER%"=="1" (
+  call mix dialyzer
+  if errorlevel 1 goto :error
+)
+
 call set MIX_ENV=prod
 call mix release --overwrite bds
 if errorlevel 1 goto :error

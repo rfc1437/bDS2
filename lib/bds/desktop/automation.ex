@@ -286,8 +286,6 @@ defmodule BDS.Desktop.Automation do
     end
   end
 
-  defp port_os_pid(nil), do: nil
-
   defp port_os_pid(port) do
     case Port.info(port, :os_pid) do
       {:os_pid, pid} when is_integer(pid) -> pid

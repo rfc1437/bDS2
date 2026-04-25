@@ -9,6 +9,7 @@ defmodule BDS.MixProject do
       default_release: :bds,
       releases: releases(),
       start_permanent: Mix.env() == :prod,
+      dialyzer: dialyzer(),
       aliases: aliases(),
       deps: deps()
     ]
@@ -16,7 +17,7 @@ defmodule BDS.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :wx],
+      extra_applications: [:logger, :wx, :inets, :ssl],
       mod: {BDS.Application, []}
     ]
   end
@@ -33,7 +34,8 @@ defmodule BDS.MixProject do
       {:bandit, "~> 1.5"},
       {:desktop, "~> 1.5"},
       {:image, "~> 0.65"},
-      {:stemex, "~> 0.2.1"}
+      {:stemex, "~> 0.2.1"},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -42,7 +44,17 @@ defmodule BDS.MixProject do
       setup: ["deps.get", "ecto.setup"],
       "ecto.setup": ["ecto.create", "ecto.migrate"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"]
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      validate: ["test", "dialyzer"]
+    ]
+  end
+
+  defp dialyzer do
+    env = Mix.env()
+
+    [
+      plt_add_apps: [:mix, :inets, :ssl],
+      paths: ["_build/#{env}/lib/bds/ebin"]
     ]
   end
 

@@ -1,6 +1,5 @@
 defmodule BDS.Scripting.Capabilities do
   @moduledoc false
-  @mix_env Mix.env()
 
   import Ecto.Query
 
@@ -495,7 +494,6 @@ defmodule BDS.Scripting.Capabilities do
   defp rebuild_post_links(project_id) do
     case Posts.rebuild_post_links(project_id) do
       :ok -> true
-      _other -> false
     end
   end
 
@@ -508,7 +506,6 @@ defmodule BDS.Scripting.Capabilities do
   defp reindex_project_search(project_id) do
     case Search.reindex_project(project_id) do
       :ok -> true
-      _other -> false
     end
   end
 
@@ -1018,10 +1015,10 @@ defmodule BDS.Scripting.Capabilities do
   end
 
   defp do_copy_to_clipboard(text) do
-    if @mix_env == :test do
+    if test_mode?() do
       true
     else
-      command = string_or_nil(text) || ""
+      command = string_or_nil(text)
 
       case :os.type() do
         {:unix, :darwin} -> match?({_output, 0}, System.cmd("pbcopy", [], input: command, stderr_to_stdout: true))
@@ -1060,16 +1057,16 @@ defmodule BDS.Scripting.Capabilities do
 
   defp open_folder(folder_path, opts) do
     case Keyword.get(opts, :open_folder) do
-      callback when is_function(callback, 1) -> callback.(string_or_nil(folder_path) || "")
+      callback when is_function(callback, 1) -> callback.(string_or_nil(folder_path))
       _other -> do_open_folder(folder_path)
     end
   end
 
   defp do_open_folder(folder_path) do
-    if @mix_env == :test do
+    if test_mode?() do
       ""
     else
-      case open_system_path(string_or_nil(folder_path) || "") do
+      case shell_open_system_path(string_or_nil(folder_path)) do
         :ok -> ""
         {:error, reason} -> inspect(reason)
       end
@@ -1084,7 +1081,7 @@ defmodule BDS.Scripting.Capabilities do
   end
 
   defp do_select_folder(title) do
-    if @mix_env == :test do
+    if test_mode?() do
       nil
     else
       case FolderPicker.choose_directory(string_or_nil(title) || "Select Folder") do
@@ -1104,9 +1101,9 @@ defmodule BDS.Scripting.Capabilities do
     callback = Keyword.get(opts, :show_item_in_folder)
 
     cond do
-      is_function(callback, 1) -> callback.(string_or_nil(item_path) || "")
-      @mix_env == :test -> :ok
-      true -> _ = reveal_system_path(string_or_nil(item_path) || "")
+      is_function(callback, 1) -> callback.(string_or_nil(item_path))
+      test_mode?() -> :ok
+      true -> _ = shell_reveal_system_path(string_or_nil(item_path))
     end
 
     nil
@@ -1116,9 +1113,9 @@ defmodule BDS.Scripting.Capabilities do
     callback = Keyword.get(opts, :trigger_menu_action)
 
     cond do
-      is_function(callback, 1) -> callback.(string_or_nil(action) || "")
-      @mix_env == :test -> :ok
-      true -> _ = MenuBar.handle_event(string_or_nil(action) || "", nil)
+      is_function(callback, 1) -> callback.(string_or_nil(action))
+      test_mode?() -> :ok
+      true -> _ = MenuBar.handle_event(string_or_nil(action), nil)
     end
 
     nil
@@ -1674,7 +1671,7 @@ defmodule BDS.Scripting.Capabilities do
   end
   defp parse_datetime(_value), do: nil
 
-  defp open_system_path(path) do
+  defp shell_open_system_path(path) do
     {command, args} =
       case :os.type() do
         {:unix, :darwin} -> {"open", [path]}
@@ -1690,7 +1687,7 @@ defmodule BDS.Scripting.Capabilities do
     error -> {:error, error}
   end
 
-  defp reveal_system_path(path) do
+  defp shell_reveal_system_path(path) do
     {command, args} =
       case :os.type() do
         {:unix, :darwin} -> {"open", ["-R", path]}
@@ -1704,5 +1701,9 @@ defmodule BDS.Scripting.Capabilities do
     end
   rescue
     error -> {:error, error}
+  end
+
+  defp test_mode? do
+    Application.get_env(:bds, :test_mode, false)
   end
 end

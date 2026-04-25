@@ -313,6 +313,77 @@ defmodule BDS.PostsTest do
     assert post.content == nil
   end
 
+  test "rebuild_posts_from_files imports legacy old-app translation files alongside canonical posts" do
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-rebuild-legacy-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Legacy Rebuild", data_path: temp_dir})
+
+    posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2026", "04"])
+    File.mkdir_p!(posts_dir)
+
+    File.write!(
+      Path.join(posts_dir, "chimera.md"),
+      [
+        "---",
+        "id: post-from-old-app",
+        "title: Chimera Source",
+        "slug: chimera",
+        "status: published",
+        "language: de",
+        "createdAt: 2024-03-30T21:20:00.000Z",
+        "updatedAt: 2024-03-31T21:20:00.000Z",
+        "publishedAt: 2024-04-01T21:20:00.000Z",
+        "---",
+        "Quelle",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(
+      Path.join(posts_dir, "chimera.en.md"),
+      [
+        "---",
+        "id: translation-from-old-app",
+        "translationFor: post-from-old-app",
+        "language: en",
+        "title: Chimera",
+        "excerpt: Imported translation",
+        "---",
+        "Translated body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, posts} = BDS.Posts.rebuild_posts_from_files(project.id)
+    assert length(posts) == 1
+
+    [post] = posts
+    assert post.id == "post-from-old-app"
+    assert post.slug == "chimera"
+    assert post.language == "de"
+
+    assert {:ok, translations} = BDS.Posts.list_post_translations(post.id)
+    assert length(translations) == 1
+
+    [translation] = translations
+    assert translation.id == "translation-from-old-app"
+    assert translation.translation_for == post.id
+    assert translation.project_id == project.id
+    assert translation.language == "en"
+    assert translation.title == "Chimera"
+    assert translation.excerpt == "Imported translation"
+    assert translation.status == :published
+    assert translation.file_path == "posts/2026/04/chimera.en.md"
+    assert translation.content == nil
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->
