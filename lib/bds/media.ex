@@ -311,8 +311,9 @@ defmodule BDS.Media do
     end)
   end
 
-  def rebuild_media_from_files(project_id) do
+  def rebuild_media_from_files(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
+    on_progress = progress_callback(opts)
 
     canonical_sidecars =
       project
@@ -322,19 +323,36 @@ defmodule BDS.Media do
       |> Enum.filter(&canonical_sidecar?/1)
       |> Enum.filter(&binary_exists_for_sidecar?/1)
 
-    media_items = Enum.map(canonical_sidecars, &upsert_media_from_sidecar(project, &1))
+    translation_sidecars =
+      project
+      |> Projects.project_data_dir()
+      |> Path.join("media")
+      |> list_matching_files("*.meta")
+      |> Enum.filter(&translation_sidecar?/1)
+
+    total_files = length(canonical_sidecars) + length(translation_sidecars)
+    :ok = report_rebuild_started(on_progress, total_files, "media files")
+
+    media_items =
+      canonical_sidecars
+      |> Enum.with_index(1)
+      |> Enum.map(fn {sidecar_path, index} ->
+        media = upsert_media_from_sidecar(project, sidecar_path)
+        :ok = report_rebuild_progress(on_progress, index, total_files, "media files")
+        media
+      end)
 
     canonical_media_by_binary_path =
       Map.new(media_items, fn media ->
         {Path.join(Projects.project_data_dir(project), media.file_path), media}
       end)
 
-    project
-    |> Projects.project_data_dir()
-    |> Path.join("media")
-    |> list_matching_files("*.meta")
-    |> Enum.filter(&translation_sidecar?/1)
-    |> Enum.each(&upsert_translation_from_sidecar(project, canonical_media_by_binary_path, &1))
+    translation_sidecars
+    |> Enum.with_index(length(canonical_sidecars) + 1)
+    |> Enum.each(fn {sidecar_path, index} ->
+      upsert_translation_from_sidecar(project, canonical_media_by_binary_path, sidecar_path)
+      :ok = report_rebuild_progress(on_progress, index, total_files, "media files")
+    end)
 
     {:ok, media_items}
   end
@@ -628,5 +646,32 @@ defmodule BDS.Media do
       Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
       true -> nil
     end
+  end
+
+  defp progress_callback(opts) do
+    case Keyword.get(opts, :on_progress) do
+      callback when is_function(callback, 2) -> callback
+      _other -> nil
+    end
+  end
+
+  defp report_rebuild_started(nil, _total, _label), do: :ok
+
+  defp report_rebuild_started(callback, 0, label) do
+    callback.(1.0, "No #{label} found")
+    :ok
+  end
+
+  defp report_rebuild_started(callback, total, label) do
+    callback.(0.05, "Rebuilding #{label} (0/#{total})")
+    :ok
+  end
+
+  defp report_rebuild_progress(nil, _current, _total, _label), do: :ok
+  defp report_rebuild_progress(_callback, _current, 0, _label), do: :ok
+
+  defp report_rebuild_progress(callback, current, total, label) do
+    callback.(0.05 + 0.95 * (current / total), "Rebuilding #{label} (#{current}/#{total})")
+    :ok
   end
 end

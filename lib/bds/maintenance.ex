@@ -15,12 +15,12 @@ defmodule BDS.Maintenance do
   alias BDS.Sidecar
   alias BDS.Templates.Template
 
-  def rebuild_from_filesystem(project_id, entity_type) do
+  def rebuild_from_filesystem(project_id, entity_type, opts \\ []) do
     case normalize_entity_type(entity_type) do
-      :post -> BDS.Posts.rebuild_posts_from_files(project_id)
-      :media -> BDS.Media.rebuild_media_from_files(project_id)
-      :script -> BDS.Scripts.rebuild_scripts_from_files(project_id)
-      :template -> BDS.Templates.rebuild_templates_from_files(project_id)
+      :post -> BDS.Posts.rebuild_posts_from_files(project_id, opts)
+      :media -> BDS.Media.rebuild_media_from_files(project_id, opts)
+      :script -> BDS.Scripts.rebuild_scripts_from_files(project_id, opts)
+      :template -> BDS.Templates.rebuild_templates_from_files(project_id, opts)
       :embedding -> Embeddings.rebuild_project(project_id)
       :unsupported -> {:error, :unsupported_entity_type}
     end

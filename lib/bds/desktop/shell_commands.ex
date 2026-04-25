@@ -122,32 +122,28 @@ defmodule BDS.Desktop.ShellCommands do
 
     {:ok, posts_task} =
       Tasks.submit_task("Rebuild Posts From Files", fn report ->
-        report.(0.0, "Scanning post files")
-        {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post")
+        {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post", on_progress: report)
         report.(1.0, "Post rebuild complete")
         %{project_id: project.id, counts: %{posts: length(posts)}}
       end, attrs)
 
     {:ok, _media_task} =
       Tasks.submit_task("Rebuild Media From Files", fn report ->
-        report.(0.0, "Scanning media files")
-        {:ok, media} = Maintenance.rebuild_from_filesystem(project.id, "media")
+        {:ok, media} = Maintenance.rebuild_from_filesystem(project.id, "media", on_progress: report)
         report.(1.0, "Media rebuild complete")
         %{project_id: project.id, counts: %{media: length(media)}}
       end, attrs)
 
     {:ok, _scripts_task} =
       Tasks.submit_task("Rebuild Scripts From Files", fn report ->
-        report.(0.0, "Scanning script files")
-        {:ok, scripts} = Maintenance.rebuild_from_filesystem(project.id, "script")
+        {:ok, scripts} = Maintenance.rebuild_from_filesystem(project.id, "script", on_progress: report)
         report.(1.0, "Script rebuild complete")
         %{project_id: project.id, counts: %{scripts: length(scripts)}}
       end, attrs)
 
     {:ok, _templates_task} =
       Tasks.submit_task("Rebuild Templates From Files", fn report ->
-        report.(0.0, "Scanning template files")
-        {:ok, templates} = Maintenance.rebuild_from_filesystem(project.id, "template")
+        {:ok, templates} = Maintenance.rebuild_from_filesystem(project.id, "template", on_progress: report)
         report.(1.0, "Template rebuild complete")
         %{project_id: project.id, counts: %{templates: length(templates)}}
       end, attrs)

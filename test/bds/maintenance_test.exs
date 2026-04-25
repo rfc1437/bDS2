@@ -50,6 +50,7 @@ defmodule BDS.MaintenanceTest do
 
     media_dir = Path.join([temp_dir, "media", "2026", "04"])
     File.mkdir_p!(media_dir)
+
     File.write!(Path.join(media_dir, "asset.txt"), "hello media")
 
     File.write!(
@@ -134,6 +135,197 @@ defmodule BDS.MaintenanceTest do
   test "rebuild_from_filesystem rejects unsupported entity types", %{project: project} do
     assert {:error, :unsupported_entity_type} =
              BDS.Maintenance.rebuild_from_filesystem(project.id, "unknown")
+  end
+
+  test "rebuild_from_filesystem reports incremental progress for file-backed rebuilders", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    parent = self()
+    on_progress = fn value, message -> send(parent, {:rebuild_progress, value, message}) end
+
+    posts_dir = Path.join([temp_dir, "posts", "2026", "04"])
+    File.mkdir_p!(posts_dir)
+
+    File.write!(
+      Path.join(posts_dir, "first-post.md"),
+      [
+        "---",
+        "id: first-post",
+        "title: First Post",
+        "slug: first-post",
+        "status: published",
+        "createdAt: 1711843200",
+        "updatedAt: 1711929600",
+        "publishedAt: 1712016000",
+        "tags:",
+        "categories:",
+        "---",
+        "Body one",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(
+      Path.join(posts_dir, "second-post.md"),
+      [
+        "---",
+        "id: second-post",
+        "title: Second Post",
+        "slug: second-post",
+        "status: published",
+        "createdAt: 1711843200",
+        "updatedAt: 1711929600",
+        "publishedAt: 1712016000",
+        "tags:",
+        "categories:",
+        "---",
+        "Body two",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    media_dir = Path.join([temp_dir, "media", "2026", "04"])
+    File.mkdir_p!(media_dir)
+
+    File.write!(Path.join(media_dir, "first.txt"), "first media")
+    File.write!(Path.join(media_dir, "second.txt"), "second media")
+
+    File.write!(
+      Path.join(media_dir, "first.txt.meta"),
+      [
+        "id: first-media",
+        "originalName: first.txt",
+        "mimeType: text/plain",
+        "size: 11",
+        "createdAt: 1711843200",
+        "updatedAt: 1711929600",
+        "tags:",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(
+      Path.join(media_dir, "second.txt.meta"),
+      [
+        "id: second-media",
+        "originalName: second.txt",
+        "mimeType: text/plain",
+        "size: 12",
+        "createdAt: 1711843200",
+        "updatedAt: 1711929600",
+        "tags:",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    template_dir = Path.join(temp_dir, "templates")
+    File.mkdir_p!(template_dir)
+
+    File.write!(
+      Path.join(template_dir, "first-template.liquid"),
+      [
+        "---",
+        "id: first-template",
+        "slug: first-template",
+        "title: First Template",
+        "kind: list",
+        "enabled: true",
+        "version: 1",
+        "createdAt: 101",
+        "updatedAt: 202",
+        "---",
+        "<section>First</section>",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(
+      Path.join(template_dir, "second-template.liquid"),
+      [
+        "---",
+        "id: second-template",
+        "slug: second-template",
+        "title: Second Template",
+        "kind: post",
+        "enabled: true",
+        "version: 1",
+        "createdAt: 303",
+        "updatedAt: 404",
+        "---",
+        "<section>Second</section>",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    script_dir = Path.join(temp_dir, "scripts")
+    File.mkdir_p!(script_dir)
+
+    File.write!(
+      Path.join(script_dir, "first-script.lua"),
+      [
+        "---",
+        "id: first-script",
+        "slug: first-script",
+        "title: First Script",
+        "kind: utility",
+        "entrypoint: main",
+        "enabled: true",
+        "version: 1",
+        "createdAt: 505",
+        "updatedAt: 606",
+        "---",
+        "function main() return true end",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(
+      Path.join(script_dir, "second-script.lua"),
+      [
+        "---",
+        "id: second-script",
+        "slug: second-script",
+        "title: Second Script",
+        "kind: transform",
+        "entrypoint: main",
+        "enabled: true",
+        "version: 1",
+        "createdAt: 707",
+        "updatedAt: 808",
+        "---",
+        "function main() return true end",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, _posts} =
+             BDS.Maintenance.rebuild_from_filesystem(project.id, "post", on_progress: on_progress)
+
+    assert_incremental_progress(collect_progress_events())
+
+    assert {:ok, _media} =
+             BDS.Maintenance.rebuild_from_filesystem(project.id, "media", on_progress: on_progress)
+
+    assert_incremental_progress(collect_progress_events())
+
+    assert {:ok, _scripts} =
+             BDS.Maintenance.rebuild_from_filesystem(project.id, "script", on_progress: on_progress)
+
+    assert_incremental_progress(collect_progress_events())
+
+    assert {:ok, _templates} =
+             BDS.Maintenance.rebuild_from_filesystem(project.id, "template", on_progress: on_progress)
+
+    assert_incremental_progress(collect_progress_events())
   end
 
   test "maintenance rebuilds and diffs embedding state explicitly", %{project: project} do
@@ -506,5 +698,18 @@ defmodule BDS.MaintenanceTest do
     assert "media/2026/04/orphan.txt.es.meta" in orphan_paths
     assert "scripts/orphan.lua" in orphan_paths
     assert "templates/orphan-view.liquid" in orphan_paths
+  end
+
+  defp collect_progress_events(acc \\ []) do
+    receive do
+      {:rebuild_progress, value, message} -> collect_progress_events([{value, message} | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
+  defp assert_incremental_progress(events) do
+    assert Enum.any?(events, fn {value, _message} -> value > 0.0 and value < 1.0 end)
+    assert Enum.any?(events, fn {value, _message} -> value == 1.0 end)
   end
 end

@@ -136,8 +136,9 @@ defmodule BDS.Posts do
     end
   end
 
-  def rebuild_posts_from_files(project_id) do
+  def rebuild_posts_from_files(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
+    on_progress = progress_callback(opts)
 
     rebuild_files =
       project
@@ -146,14 +147,26 @@ defmodule BDS.Posts do
       |> list_matching_files("*.md")
       |> Enum.map(&parse_rebuild_file(project, &1))
 
+    total_files = length(rebuild_files)
+    :ok = report_rebuild_started(on_progress, total_files, "post files")
+
     {translation_files, post_files} = Enum.split_with(rebuild_files, &translation_rebuild_file?/1)
 
     posts =
       post_files
-      |> Enum.map(&upsert_post_from_rebuild_file(project_id, &1))
+      |> Enum.with_index(1)
+      |> Enum.map(fn {file, index} ->
+        post = upsert_post_from_rebuild_file(project_id, file)
+        :ok = report_rebuild_progress(on_progress, index, total_files, "post files")
+        post
+      end)
 
     translation_files
-    |> Enum.map(&upsert_post_translation_from_rebuild_file(project_id, &1))
+    |> Enum.with_index(length(post_files) + 1)
+    |> Enum.each(fn {file, index} ->
+      upsert_post_translation_from_rebuild_file(project_id, file)
+      :ok = report_rebuild_progress(on_progress, index, total_files, "post files")
+    end)
 
     {:ok, posts}
   end
@@ -940,5 +953,32 @@ defmodule BDS.Posts do
       Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
       true -> nil
     end
+  end
+
+  defp progress_callback(opts) do
+    case Keyword.get(opts, :on_progress) do
+      callback when is_function(callback, 2) -> callback
+      _other -> nil
+    end
+  end
+
+  defp report_rebuild_started(nil, _total, _label), do: :ok
+
+  defp report_rebuild_started(callback, 0, label) do
+    callback.(1.0, "No #{label} found")
+    :ok
+  end
+
+  defp report_rebuild_started(callback, total, label) do
+    callback.(0.05, "Rebuilding #{label} (0/#{total})")
+    :ok
+  end
+
+  defp report_rebuild_progress(nil, _current, _total, _label), do: :ok
+  defp report_rebuild_progress(_callback, _current, 0, _label), do: :ok
+
+  defp report_rebuild_progress(callback, current, total, label) do
+    callback.(0.05 + 0.95 * (current / total), "Rebuilding #{label} (#{current}/#{total})")
+    :ok
   end
 end

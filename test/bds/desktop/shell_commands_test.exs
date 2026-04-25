@@ -134,6 +134,63 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert Enum.all?(tasks, &(&1.status == :completed))
   end
 
+  test "rebuild_database exposes live in-task progress for rebuild work", %{temp_dir: temp_dir} do
+    original = Application.get_env(:bds, :tasks, [])
+
+    Application.put_env(
+      :bds,
+      :tasks,
+      original
+      |> Keyword.put(:max_concurrent, 1)
+      |> Keyword.put(:progress_throttle_ms, 0)
+    )
+
+    on_exit(fn -> Application.put_env(:bds, :tasks, original) end)
+
+    posts_dir = Path.join([temp_dir, "posts", "2026", "04"])
+    File.mkdir_p!(posts_dir)
+
+    Enum.each(1..80, fn index ->
+      slug = "progress-post-#{index}"
+
+      File.write!(
+        Path.join(posts_dir, "#{slug}.md"),
+        [
+          "---",
+          "id: #{slug}",
+          "title: Progress Post #{index}",
+          "slug: #{slug}",
+          "status: published",
+          "createdAt: 1711843200",
+          "updatedAt: 1711929600",
+          "publishedAt: 1712016000",
+          "tags:",
+          "categories:",
+          "---",
+          "Body #{index}",
+          ""
+        ]
+        |> Enum.join("\n")
+      )
+    end)
+
+    assert {:ok, result} = ShellCommands.execute("rebuild_database")
+    assert result.kind == "task_queued"
+
+    progressed =
+      wait_for_named_task(
+        "Rebuild Posts From Files",
+        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.0 and &1.progress < 1.0),
+        5_000
+      )
+
+    assert progressed.group_name == "Maintenance"
+    assert progressed.message =~ "Rebuilding post files"
+
+    assert wait_for_task(progressed.id, &(&1.status == :completed and &1.progress == 1.0), 5_000).status ==
+             :completed
+  end
+
   test "reindex_text queues a tracked background task for the active project", %{project: project} do
     assert {:ok, result} = ShellCommands.execute("reindex_text")
 
@@ -190,6 +247,21 @@ defmodule BDS.Desktop.ShellCommandsTest do
     else
       Process.sleep(50)
       wait_for_tasks_by_name(names, matcher, timeout - 50)
+    end
+  end
+
+  defp wait_for_named_task(_name, _matcher, timeout) when timeout <= 0 do
+    flunk("named task did not reach expected state")
+  end
+
+  defp wait_for_named_task(name, matcher, timeout) do
+    task = Enum.find(BDS.Tasks.list_tasks(), &(&1.name == name))
+
+    if task && matcher.(task) do
+      task
+    else
+      Process.sleep(20)
+      wait_for_named_task(name, matcher, timeout - 20)
     end
   end
 end

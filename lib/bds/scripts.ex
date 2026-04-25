@@ -115,15 +115,27 @@ defmodule BDS.Scripts do
     end
   end
 
-  def rebuild_scripts_from_files(project_id) do
+  def rebuild_scripts_from_files(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
 
-    scripts =
+    script_paths =
       project
       |> Projects.project_data_dir()
       |> Path.join("scripts")
       |> list_matching_files("*.lua")
-      |> Enum.map(&upsert_script_from_file(project_id, project, &1))
+
+    total_files = length(script_paths)
+    on_progress = progress_callback(opts)
+    :ok = report_rebuild_started(on_progress, total_files, "script files")
+
+    scripts =
+      script_paths
+      |> Enum.with_index(1)
+      |> Enum.map(fn {path, index} ->
+        script = upsert_script_from_file(project_id, project, path)
+        :ok = report_rebuild_progress(on_progress, index, total_files, "script files")
+        script
+      end)
 
     {:ok, scripts}
   end
@@ -258,5 +270,32 @@ defmodule BDS.Scripts do
       Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
       true -> nil
     end
+  end
+
+  defp progress_callback(opts) do
+    case Keyword.get(opts, :on_progress) do
+      callback when is_function(callback, 2) -> callback
+      _other -> nil
+    end
+  end
+
+  defp report_rebuild_started(nil, _total, _label), do: :ok
+
+  defp report_rebuild_started(callback, 0, label) do
+    callback.(1.0, "No #{label} found")
+    :ok
+  end
+
+  defp report_rebuild_started(callback, total, label) do
+    callback.(0.05, "Rebuilding #{label} (0/#{total})")
+    :ok
+  end
+
+  defp report_rebuild_progress(nil, _current, _total, _label), do: :ok
+  defp report_rebuild_progress(_callback, _current, 0, _label), do: :ok
+
+  defp report_rebuild_progress(callback, current, total, label) do
+    callback.(0.05 + 0.95 * (current / total), "Rebuilding #{label} (#{current}/#{total})")
+    :ok
   end
 end
