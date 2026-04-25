@@ -216,6 +216,20 @@ defmodule BDS.UI.ShellTest do
     refute js =~ "defaultSidebarFilterState(viewId, state.sidebarContent[viewId])"
   end
 
+  test "sidebar bundle follows the old app header and styling model instead of a subtitle header" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    js = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.js")
+
+    assert js =~ "sidebar-section-header"
+    refute js =~ "sidebar-subtitle"
+
+    assert css =~ "--accent-color: #007acc"
+    assert css =~ "--vscode-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI'"
+    assert css =~ "border-left-color: var(--vscode-focusBorder);"
+    assert css =~ ".sidebar-section-header"
+    refute css =~ ".sidebar-subtitle"
+  end
+
   test "static shell bundle exists for direct browser inspection" do
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/index.html")
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/app.css")

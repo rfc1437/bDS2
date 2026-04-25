@@ -141,28 +141,35 @@ function renderSidebar() {
   const filterState = currentSidebarFilterState(view.id);
 
   root.querySelector(".sidebar").innerHTML = `
-    <div class="sidebar-header">
-      <div class="sidebar-title-row">
-        <strong>${escapeHtml(tText(data.title))}</strong>
-        <span class="sidebar-subtitle">${escapeHtml(tText(data.subtitle))}</span>
-      </div>
-      ${data.filters?.enabled ? `
-        <div class="sidebar-actions">
-          <button class="sidebar-action ${filterState.showFilters ? "active" : ""}" data-sidebar-toggle-filters="${escapeHtmlAttribute(view.id)}" type="button" title="${escapeHtmlAttribute(t(data.filters.toggle_filters_label))}">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M6 12v-1h4v1H6zM4 8v-1h8v1H4zm-2-4v-1h12v1H2z"></path>
-            </svg>
-          </button>
-        </div>
-      ` : ""}
-    </div>
-    ${renderSidebarSearchBox(data, view, filterState)}
-    ${renderSidebarFilterPanel(data, view, filterState)}
-    ${renderSidebarFilterStatus(data, view, filterState)}
     <div class="sidebar-content sidebar-body">
+      ${renderSidebarViewHeader(data, view, filterState)}
+      ${renderSidebarSearchBox(data, view, filterState)}
+      ${renderSidebarFilterPanel(data, view, filterState)}
+      ${renderSidebarFilterStatus(data, view, filterState)}
       ${renderSidebarBody(data, view)}
+      ${renderSidebarLoadMore(data, view)}
     </div>
-    ${renderSidebarLoadMore(data, view)}
+  `;
+}
+
+function renderSidebarViewHeader(data, view, filterState) {
+  const label = String(tText(view.label || data.title || "")).toUpperCase();
+
+  return `
+    <div class="sidebar-section">
+      <div class="sidebar-section-header">
+        <span>${escapeHtml(label)}</span>
+        ${data.filters?.enabled ? `
+          <div class="sidebar-actions">
+            <button class="sidebar-action ${filterState.showFilters ? "active" : ""}" data-sidebar-toggle-filters="${escapeHtmlAttribute(view.id)}" type="button" title="${escapeHtmlAttribute(t(data.filters.toggle_filters_label))}">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M6 12v-1h4v1H6zM4 8v-1h8v1H4zm-2-4v-1h12v1H2z"></path>
+              </svg>
+            </button>
+          </div>
+        ` : ""}
+      </div>
+    </div>
   `;
 }
 
@@ -395,7 +402,7 @@ function renderSidebarPostItem(item, view) {
 
   return `
     <button
-      class="sidebar-item sidebar-post-item post-type-${escapeHtmlAttribute(postType.type)} ${active ? "active" : ""}"
+      class="sidebar-item sidebar-post-item post-type-${escapeHtmlAttribute(postType.type)} ${active ? "selected" : ""}"
       data-open-tab="${escapeHtmlAttribute(tabId)}"
       data-open-route="${escapeHtmlAttribute(itemRoute)}"
       data-open-title="${escapeHtmlAttribute(item.title || routeLabel(itemRoute))}"
@@ -458,7 +465,7 @@ function renderSidebarEntityList(data, view) {
     return renderSidebarEmpty(data.empty_message || "No items");
   }
 
-  return items.map((item) => renderSidebarEntityItem(item, view)).join("");
+  return `<div class="settings-nav-list">${items.map((item) => renderSidebarEntityItem(item, view)).join("")}</div>`;
 }
 
 function renderSidebarEntityItem(item, view) {
