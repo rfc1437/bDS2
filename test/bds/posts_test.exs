@@ -429,6 +429,85 @@ defmodule BDS.PostsTest do
     assert post.published_at == 1_036_497_600_000
   end
 
+  test "rebuild_posts_from_files parses folded multiline title and slug scalars alongside translations" do
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-rebuild-folded-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Folded Rebuild", data_path: temp_dir})
+
+    posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2010", "11"])
+    File.mkdir_p!(posts_dir)
+
+    File.write!(
+      Path.join(
+        posts_dir,
+        "introducing-thirty-ten-my-guide-to-creating-a-twenty-ten-child-theme-aaron-jorb-inaaron-jorb-in.md"
+      ),
+      [
+        "---",
+        "id: 66865ffe-c6d9-4379-a031-0581f33b68b4",
+        "title: >-",
+        "  Introducing Thirty Ten, my guide to creating a Twenty Ten Child Theme |",
+        "  aaron.jorb.inaaron.jorb.in",
+        "slug: >-",
+        "  introducing-thirty-ten-my-guide-to-creating-a-twenty-ten-child-theme-aaron-jorb-inaaron-jorb-in",
+        "status: published",
+        "createdAt: '2010-11-13T12:37:55.000Z'",
+        "updatedAt: '2026-03-03T12:31:37.661Z'",
+        "tags:",
+        "  - wordpress",
+        "categories:",
+        "  - aside",
+        "author: hugo",
+        "language: de",
+        "publishedAt: '2010-11-13T11:37:55.000Z'",
+        "---",
+        "Quelle",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(
+      Path.join(
+        posts_dir,
+        "introducing-thirty-ten-my-guide-to-creating-a-twenty-ten-child-theme-aaron-jorb-inaaron-jorb-in.en.md"
+      ),
+      [
+        "---",
+        "translationFor: 66865ffe-c6d9-4379-a031-0581f33b68b4",
+        "language: en",
+        "title: >-",
+        "  Introducing Thirty Ten, my guide to creating a Twenty Ten Child Theme |",
+        "  aaron.jorb.inaaron.jorb.in",
+        "---",
+        "Translated body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, [post]} = BDS.Posts.rebuild_posts_from_files(project.id)
+    assert post.id == "66865ffe-c6d9-4379-a031-0581f33b68b4"
+
+    assert post.slug ==
+             "introducing-thirty-ten-my-guide-to-creating-a-twenty-ten-child-theme-aaron-jorb-inaaron-jorb-in"
+
+    assert post.title ==
+             "Introducing Thirty Ten, my guide to creating a Twenty Ten Child Theme | aaron.jorb.inaaron.jorb.in"
+
+    assert {:ok, [translation]} = BDS.Posts.list_post_translations(post.id)
+
+    assert translation.translation_for == post.id
+
+    assert translation.title ==
+             "Introducing Thirty Ten, my guide to creating a Twenty Ten Child Theme | aaron.jorb.inaaron.jorb.in"
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->

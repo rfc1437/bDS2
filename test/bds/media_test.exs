@@ -196,7 +196,7 @@ defmodule BDS.MediaTest do
     thumbnail_paths = BDS.Media.thumbnail_paths(media)
 
     Enum.each(Map.values(thumbnail_paths), fn path ->
-      assert File.exists?(Path.join(temp_dir, path))
+      refute File.exists?(Path.join(temp_dir, path))
     end)
   end
 
@@ -238,6 +238,44 @@ defmodule BDS.MediaTest do
     assert media.tags == []
     assert media.created_at == 1_037_491_200_000
     assert media.updated_at == 1_773_847_870_146
+  end
+
+  test "rebuild_media_from_files does not regenerate thumbnails", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    media_dir = Path.join([temp_dir, "media", "2026", "04"])
+    File.mkdir_p!(media_dir)
+
+    binary_path = Path.join(media_dir, "asset.jpg")
+    sidecar_path = binary_path <> ".meta"
+
+    File.write!(binary_path, tiny_jpeg_binary())
+
+    File.write!(
+      sidecar_path,
+      [
+        "id: media-without-thumbnails",
+        "originalName: original.jpg",
+        "mimeType: image/jpeg",
+        "size: #{byte_size(tiny_jpeg_binary())}",
+        "width: 3",
+        "height: 2",
+        "title: Recovered",
+        "createdAt: 2024-03-30T21:20:00.000Z",
+        "updatedAt: 2024-03-31T21:20:00.000Z",
+        "tags:",
+        "  - alpha",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, [media]} = BDS.Media.rebuild_media_from_files(project.id)
+
+    Enum.each(Map.values(BDS.Media.thumbnail_paths(media)), fn path ->
+      refute File.exists?(Path.join(temp_dir, path))
+    end)
   end
 
   test "import_media generates the four thumbnail files in bucketed thumbnail paths", %{

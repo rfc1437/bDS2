@@ -393,7 +393,6 @@ defmodule BDS.Media do
     media
     |> Media.changeset(attrs)
     |> Repo.insert_or_update!()
-    |> tap(fn reloaded_media -> ensure_thumbnails(project, reloaded_media) end)
     |> tap(&Search.sync_media/1)
   end
 

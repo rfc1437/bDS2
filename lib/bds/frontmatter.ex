@@ -4,6 +4,7 @@ defmodule BDS.Frontmatter do
   alias BDS.Persistence
 
   @list_item_prefix "  - "
+  @block_scalar_indent "  "
 
   def serialize_document(fields, body) when is_list(fields) do
     frontmatter =
@@ -82,7 +83,14 @@ defmodule BDS.Frontmatter do
 
       String.contains?(line, ": ") ->
         [key, raw_value] = String.split(line, ": ", parts: 2)
-        parse_lines(rest, Map.put(acc, key, parse_scalar(key, raw_value)))
+
+        if block_scalar_indicator?(raw_value) do
+          {value_lines, remaining} = take_block_scalar_lines(rest, [])
+          value = parse_scalar(key, parse_block_scalar(raw_value, value_lines))
+          parse_lines(remaining, Map.put(acc, key, value))
+        else
+          parse_lines(rest, Map.put(acc, key, parse_scalar(key, raw_value)))
+        end
 
       true ->
         parse_lines(rest, acc)
@@ -99,6 +107,16 @@ defmodule BDS.Frontmatter do
   end
 
   defp take_list_items([], items), do: {items, []}
+
+  defp take_block_scalar_lines([line | rest], lines) do
+    if String.starts_with?(line, @block_scalar_indent) do
+      take_block_scalar_lines(rest, [String.replace_prefix(line, @block_scalar_indent, "") | lines])
+    else
+      {Enum.reverse(lines), [line | rest]}
+    end
+  end
+
+  defp take_block_scalar_lines([], lines), do: {Enum.reverse(lines), []}
 
   defp parse_scalar(key, value) when is_binary(key) and is_binary(value) do
     trimmed = String.trim(value)
@@ -152,6 +170,21 @@ defmodule BDS.Frontmatter do
   end
 
   defp parse_string(value), do: value
+
+  defp block_scalar_indicator?(value) do
+    trimmed = String.trim(value)
+    String.starts_with?(trimmed, ">") or String.starts_with?(trimmed, "|")
+  end
+
+  defp parse_block_scalar(indicator, lines) do
+    trimmed = String.trim(indicator)
+
+    cond do
+      String.starts_with?(trimmed, ">") -> Enum.join(lines, " ")
+      String.starts_with?(trimmed, "|") -> Enum.join(lines, "\n")
+      true -> Enum.join(lines, "\n")
+    end
+  end
 
   defp serialize_scalar(_key, value) when is_boolean(value) do
     if(value, do: "true", else: "false")
