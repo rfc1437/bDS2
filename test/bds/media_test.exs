@@ -42,18 +42,20 @@ defmodule BDS.MediaTest do
     assert File.read!(Path.join(temp_dir, media.file_path)) == "hello media"
 
     sidecar = File.read!(Path.join(temp_dir, media.sidecar_path))
+    assert sidecar =~ "---\n"
     assert sidecar =~ "id: #{media.id}\n"
-    assert sidecar =~ "originalName: sample.txt\n"
+    assert sidecar =~ "originalName: \"sample.txt\"\n"
     assert sidecar =~ "mimeType: text/plain\n"
-    assert sidecar =~ "title: Sample\n"
-    assert sidecar =~ "alt: Alt text\n"
-    assert sidecar =~ "caption: Caption\n"
-    assert sidecar =~ "author: Writer\n"
+    assert sidecar =~ "title: \"Sample\"\n"
+    assert sidecar =~ "alt: \"Alt text\"\n"
+    assert sidecar =~ "caption: \"Caption\"\n"
+    assert sidecar =~ "author: \"Writer\"\n"
     assert sidecar =~ "language: en\n"
-    assert sidecar =~ "tags:\n  - alpha\n"
-    assert sidecar =~ "linkedPostIds:\n"
+    assert sidecar =~ "tags: [\"alpha\"]\n"
+    assert sidecar =~ "linkedPostIds: []\n"
     assert sidecar =~ ~r/createdAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
     assert sidecar =~ ~r/updatedAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert String.ends_with?(sidecar, "\n---")
     refute File.exists?(Path.join(temp_dir, media.sidecar_path <> ".tmp"))
   end
 
@@ -78,10 +80,10 @@ defmodule BDS.MediaTest do
     assert updated.language == "de"
 
     sidecar = File.read!(Path.join(temp_dir, updated.sidecar_path))
-    assert sidecar =~ "title: Updated\n"
-    assert sidecar =~ "alt: Updated alt\n"
+    assert sidecar =~ "title: \"Updated\"\n"
+    assert sidecar =~ "alt: \"Updated alt\"\n"
     assert sidecar =~ "language: de\n"
-    assert sidecar =~ "tags:\n  - beta\n"
+    assert sidecar =~ "tags: [\"beta\"]\n"
   end
 
   test "delete_media removes the binary, sidecar, and database row", %{
@@ -452,11 +454,12 @@ defmodule BDS.MediaTest do
 
     translated_sidecar_path = Path.join(temp_dir, media.file_path <> ".de.meta")
     contents = File.read!(translated_sidecar_path)
+    assert contents =~ "---\n"
     assert contents =~ "translationFor: #{media.id}\n"
     assert contents =~ "language: de\n"
-    assert contents =~ "title: Titel\n"
-    assert contents =~ "alt: Alt text\n"
-    assert contents =~ "caption: Bildunterschrift\n"
+    assert contents =~ "title: \"Titel\"\n"
+    assert contents =~ "alt: \"Alt text\"\n"
+    assert contents =~ "caption: \"Bildunterschrift\"\n---"
   end
 
   defp tiny_jpeg_binary do

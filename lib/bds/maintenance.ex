@@ -367,14 +367,23 @@ defmodule BDS.Maintenance do
   end
 
   defp diff_field(name, db_value, file_value) do
-    db_value = stringify_value(db_value)
-    file_value = stringify_value(file_value)
-
-    if db_value == file_value do
+    if equal_diff_values?(db_value, file_value) do
       nil
     else
-      %{name: name, db_value: db_value, file_value: file_value}
+      %{name: name, db_value: stringify_value(db_value), file_value: stringify_value(file_value)}
     end
+  end
+
+  defp equal_diff_values?(left, right) when is_list(left) and is_list(right) do
+    normalize_list_diff_values(left) == normalize_list_diff_values(right)
+  end
+
+  defp equal_diff_values?(left, right), do: stringify_value(left) == stringify_value(right)
+
+  defp normalize_list_diff_values(values) do
+    values
+    |> Enum.map(&stringify_value/1)
+    |> Enum.sort()
   end
 
   defp stringify_value(nil), do: ""

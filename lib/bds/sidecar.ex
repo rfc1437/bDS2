@@ -4,12 +4,18 @@ defmodule BDS.Sidecar do
   alias BDS.Persistence
 
   @list_item_prefix "  - "
+  @document_marker "---"
+  @always_quoted_keys MapSet.new(["originalName", "title", "alt", "caption", "author"])
 
   def serialize_document(fields) when is_list(fields) do
-    fields
-    |> Enum.flat_map(&serialize_field/1)
+    serialized_fields =
+      fields
+      |> Enum.flat_map(&serialize_field/1)
+      |> Enum.join("\n")
+
+    [@document_marker, serialized_fields, @document_marker]
+    |> Enum.reject(&(&1 == ""))
     |> Enum.join("\n")
-    |> Kernel.<>("\n")
   end
 
   def parse_document(contents) when is_binary(contents) do
@@ -23,7 +29,8 @@ defmodule BDS.Sidecar do
   defp serialize_field({_key, ""}), do: []
 
   defp serialize_field({key, values}) when is_list(values) do
-    ["#{key}:" | Enum.map(values, &"  - #{serialize_scalar(nil, &1)}")]
+    serialized_values = values |> Enum.map(&serialize_inline_list_scalar/1) |> Enum.join(", ")
+    ["#{key}: [#{serialized_values}]"]
   end
 
   defp serialize_field({key, value}) when is_boolean(value) do
@@ -104,6 +111,10 @@ defmodule BDS.Sidecar do
   defp parse_generic_scalar("false"), do: false
   defp parse_generic_scalar("[]"), do: []
 
+  defp parse_generic_scalar("[" <> _rest = value) do
+    parse_inline_list(value)
+  end
+
   defp parse_generic_scalar(value) do
     if Regex.match?(~r/^-?\d+$/, value) do
       String.to_integer(value)
@@ -142,24 +153,75 @@ defmodule BDS.Sidecar do
     end
   end
 
-  defp serialize_scalar(_key, value) do
+  defp serialize_scalar(key, value) do
+    string_value = to_string(value)
+
+    if is_binary(key) and MapSet.member?(@always_quoted_keys, key) do
+      quote_string(string_value)
+    else
+      maybe_quote_string(string_value)
+    end
+  end
+
+  defp serialize_inline_list_scalar(value) when is_binary(value), do: quote_string(value)
+  defp serialize_inline_list_scalar(value), do: serialize_scalar(nil, value)
+
+  defp parse_inline_list(value) do
+    inner =
+      value
+      |> String.trim()
+      |> String.trim_leading("[")
+      |> String.trim_trailing("]")
+      |> String.trim()
+
+    if inner == "" do
+      []
+    else
+      parse_inline_list_items(inner)
+    end
+  end
+
+  defp parse_inline_list_items(inner) do
+    if String.contains?(inner, "\"") or String.contains?(inner, "'") do
+      Regex.scan(~r/"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)'/, inner, capture: :all_but_first)
+      |> Enum.map(fn captures ->
+        captures
+        |> Enum.find(&(&1 != ""))
+        |> parse_inline_string_item()
+      end)
+    else
+      inner
+      |> String.split(",", trim: true)
+      |> Enum.map(&(String.trim(&1) |> parse_scalar(nil)))
+    end
+  end
+
+  defp parse_inline_string_item(nil), do: ""
+
+  defp parse_inline_string_item(value) do
     value
-    |> to_string()
-    |> maybe_quote_string()
+    |> String.replace("\\n", "\n")
+    |> String.replace("\\\"", "\"")
+    |> String.replace("\\'", "'")
+    |> String.replace("\\\\", "\\")
   end
 
   defp maybe_quote_string(value) do
     if Regex.match?(~r/^[\p{L}\p{N} ._\/-]+$/u, value) do
       value
     else
-      escaped =
-        value
-        |> String.replace("\\", "\\\\")
-        |> String.replace("\"", "\\\"")
-        |> String.replace("\n", "\\n")
-
-      "\"#{escaped}\""
+      quote_string(value)
     end
+  end
+
+  defp quote_string(value) do
+    escaped =
+      value
+      |> String.replace("\\", "\\\\")
+      |> String.replace("\"", "\\\"")
+      |> String.replace("\n", "\\n")
+
+    "\"#{escaped}\""
   end
 
   defp timestamp_key?(key) do

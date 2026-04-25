@@ -4,6 +4,7 @@ defmodule BDS.Rendering.Filters do
   use Liquex.Filter
 
   alias BDS.I18n
+  alias BDS.Slug
 
   def i18n(value, language, _context) do
     key = value |> to_string() |> String.trim()
@@ -30,6 +31,12 @@ defmodule BDS.Rendering.Filters do
     |> replace_built_in_macros(language, context)
     |> Earmark.as_html!()
     |> rewrite_rendered_html_urls(canonical_post_paths || %{}, canonical_media_paths || %{})
+  end
+
+  def slugify(value, _context) do
+    value
+    |> to_string()
+    |> Slug.slugify()
   end
 
   defp replace_built_in_macros(content, language, context) do

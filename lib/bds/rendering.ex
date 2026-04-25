@@ -500,6 +500,8 @@ defmodule BDS.Rendering do
     language_prefix <> post_path(post, nil)
   end
 
+  defp post_path(post, ""), do: post_path(post, nil)
+
   defp post_path(post, nil) do
     datetime = Persistence.from_unix_ms!(post.created_at)
 

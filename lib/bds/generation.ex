@@ -238,7 +238,13 @@ defmodule BDS.Generation do
 
     single_outputs =
       if :single in plan.sections do
-        build_single_outputs(plan.project_id, published_posts, published_translations, post_by_id)
+        build_single_outputs(
+          plan.project_id,
+          plan.language,
+          published_posts,
+          published_translations,
+          post_by_id
+        )
       else
         []
       end
@@ -439,7 +445,14 @@ defmodule BDS.Generation do
         Enum.map(languages, fn language ->
           {
             archive_path(route_language(plan.language, language), [year], 1),
-            render_date_archive_page(plan, year, posts, language, pagination)
+            render_date_archive_page(
+              plan,
+              year,
+              %{kind: "year", year: String.to_integer(year)},
+              posts,
+              language,
+              pagination
+            )
           }
         end)
       end)
@@ -451,7 +464,14 @@ defmodule BDS.Generation do
         Enum.map(languages, fn language ->
           {
             archive_path(route_language(plan.language, language), [year, month], 1),
-            render_date_archive_page(plan, "#{year}-#{month}", posts, language, pagination)
+            render_date_archive_page(
+              plan,
+              "#{year}-#{month}",
+              %{kind: "month", year: String.to_integer(year), month: String.to_integer(month)},
+              posts,
+              language,
+              pagination
+            )
           }
         end)
       end)
@@ -505,60 +525,98 @@ defmodule BDS.Generation do
       end)
   end
 
-  defp build_single_outputs(project_id, published_posts, published_translations, post_by_id) do
+  defp build_single_outputs(
+         project_id,
+         main_language,
+         published_posts,
+         published_translations,
+         post_by_id
+       ) do
+    translations_by_post_language =
+      Map.new(published_translations, fn translation ->
+        {{translation.translation_for, translation.language}, translation}
+      end)
+
     post_outputs =
       Enum.map(published_posts, fn post ->
-        body = load_body(project_id, post.file_path, post.content)
+        canonical_variant = Map.get(translations_by_post_language, {post.id, main_language}, post)
+        body = load_body(project_id, canonical_variant.file_path, canonical_variant.content)
 
         {post_output_path(post),
          render_post_output(
            project_id,
            post.template_slug,
            %{
-             id: post.id,
-             title: post.title,
+             id: canonical_variant.id,
+             title: canonical_variant.title,
              content: body,
              slug: post.slug,
-             language: post.language,
-             excerpt: post.excerpt
+             language: canonical_variant.language,
+             excerpt: canonical_variant.excerpt
            },
            fn ->
-             render_post_page(post.title, body, post.slug, post.language)
+             render_post_page(canonical_variant.title, body, post.slug, canonical_variant.language)
            end
          )}
       end)
 
     translation_outputs =
-      Enum.flat_map(published_translations, fn translation ->
-        case post_by_id[translation.translation_for] do
-          nil ->
-            []
-
-          post ->
-            body = load_body(project_id, translation.file_path, translation.content)
-
-            [
-              {post_output_path(post, translation.language),
-               render_post_output(
-                 project_id,
-                 post.template_slug,
-                 %{
-                   id: translation.id,
-                   title: translation.title,
-                   content: body,
-                   slug: post.slug,
-                   language: translation.language,
-                   excerpt: translation.excerpt
-                 },
-                 fn ->
-                   render_post_page(translation.title, body, post.slug, translation.language)
-                 end
-               )}
-            ]
-        end
-      end)
+      post_outputs_for_noncanonical_variants(
+        project_id,
+        main_language,
+        published_posts,
+        published_translations,
+        post_by_id
+      )
 
     post_outputs ++ translation_outputs
+  end
+
+  defp post_outputs_for_noncanonical_variants(
+         project_id,
+         main_language,
+         published_posts,
+         published_translations,
+         post_by_id
+       ) do
+    Enum.flat_map(published_posts, fn post ->
+      post_variant =
+        if post.language == main_language do
+          []
+        else
+          [{post.language, post}]
+        end
+
+      translation_variants =
+        published_translations
+        |> Enum.filter(&(&1.translation_for == post.id and &1.language != main_language))
+        |> Enum.map(&{&1.language, &1})
+
+      (post_variant ++ translation_variants)
+      |> Enum.flat_map(fn {language, variant} ->
+        canonical_post = Map.get(post_by_id, post.id, post)
+        body = load_body(project_id, variant.file_path, variant.content)
+
+        [
+          {post_output_path(canonical_post, language),
+           render_post_output(
+             project_id,
+             canonical_post.template_slug,
+             %{
+               id: variant.id,
+               title: variant.title,
+               content: body,
+               slug: canonical_post.slug,
+               language: variant.language,
+               excerpt: variant.excerpt
+             },
+             fn ->
+               render_post_page(variant.title, body, canonical_post.slug, variant.language)
+             end
+           )}
+        ]
+      end)
+    end)
   end
 
   defp list_published_posts(project_id) do
@@ -778,7 +836,7 @@ defmodule BDS.Generation do
     )
   end
 
-  defp render_date_archive_page(plan, label, posts, language, pagination) do
+  defp render_date_archive_page(plan, label, archive_context, posts, language, pagination) do
     fallback = fn ->
       items =
         posts
@@ -801,18 +859,8 @@ defmodule BDS.Generation do
       plan,
       language,
       label,
-      Enum.map(posts, fn post ->
-        %{
-          id: post.id,
-          slug: post.slug,
-          title: post.title,
-          href: "#",
-          excerpt: post.excerpt,
-          content: nil,
-          language: post.language
-        }
-      end),
-      %{kind: "date", name: label},
+      build_list_posts(plan.base_url, posts, route_language(plan.language, language)),
+      archive_context,
       pagination,
       fallback
     )

@@ -72,8 +72,8 @@ defmodule BDS.ScriptsTest do
     assert contents =~ "entrypoint: main\n"
     assert contents =~ "enabled: true\n"
     assert contents =~ "version: 1\n"
-    assert contents =~ ~r/createdAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
-    assert contents =~ ~r/updatedAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert contents =~ ~r/createdAt: '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'\n/
+    assert contents =~ ~r/updatedAt: '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'\n/
     assert contents =~ "\n---\nfunction main() return 'ok' end\n"
     refute File.exists?(full_path <> ".tmp")
   end

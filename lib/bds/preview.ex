@@ -4,7 +4,9 @@ defmodule BDS.Preview do
   use GenServer
 
   alias BDS.Posts
+  alias BDS.Posts.Translation
   alias BDS.Projects
+  alias BDS.Repo
   alias BDS.Rendering
 
   @host "127.0.0.1"
@@ -34,24 +36,9 @@ defmodule BDS.Preview do
 
   def preview_draft(project_id, request_path, post_id)
       when is_binary(project_id) and is_binary(request_path) and is_binary(post_id) do
-    post = Posts.get_post!(post_id)
     {_path, query_params} = split_request_path(request_path)
 
-    GenServer.call(__MODULE__, {
-      :preview_draft,
-      project_id,
-      query_params,
-      %{
-        id: post.id,
-        title: post.title,
-        content: post.content || "",
-        body: post.content || "",
-        slug: post.slug,
-        language: post.language,
-        excerpt: post.excerpt,
-        template_slug: post.template_slug
-      }
-    })
+    GenServer.call(__MODULE__, {:preview_draft, project_id, query_params, post_id})
   end
 
   @impl true
@@ -108,12 +95,13 @@ defmodule BDS.Preview do
     end
   end
 
-  def handle_call({:preview_draft, project_id, query_params, post}, _from, state) do
-    with :ok <- ensure_running(state.current, project_id) do
+  def handle_call({:preview_draft, project_id, query_params, post_id}, _from, state) do
+    with :ok <- ensure_running(state.current, project_id),
+         {:ok, payload} <- load_draft_preview_payload(project_id, post_id, query_params) do
       body =
-        case Rendering.render_post_page(project_id, Map.get(post, :template_slug), post) do
+        case Rendering.render_post_page(project_id, Map.get(payload, :template_slug), payload) do
           {:ok, rendered} -> rendered
-          {:error, _reason} -> render_draft(post)
+          {:error, _reason} -> render_draft(payload)
         end
         |> apply_preview_overrides(query_params)
 
@@ -124,6 +112,7 @@ defmodule BDS.Preview do
 
       {:reply, {:ok, response}, state}
     else
+      {:error, :not_found} = error -> {:reply, error, state}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
@@ -174,11 +163,50 @@ defmodule BDS.Preview do
   end
 
   defp resolve_draft_request(project_id, post_id, query_params) do
+    with {:ok, payload} <- load_draft_preview_payload(project_id, post_id, query_params) do
+      body =
+        case Rendering.render_post_page(project_id, Map.get(payload, :template_slug), payload) do
+          {:ok, rendered} -> rendered
+          {:error, _reason} -> render_draft(payload)
+        end
+        |> apply_preview_overrides(query_params)
+
+      {:ok, %{content_type: "text/html", body: body}}
+    end
+  end
+
+  defp load_draft_preview_payload(project_id, post_id, query_params) do
     try do
       post = Posts.get_post!(post_id)
 
       if post.project_id == project_id do
-        payload = %{
+        {:ok, draft_preview_payload(post, query_params)}
+      else
+        {:error, :not_found}
+      end
+    rescue
+      Ecto.NoResultsError -> {:error, :not_found}
+    end
+  end
+
+  defp draft_preview_payload(post, query_params) do
+    requested_language = query_params |> Map.get("lang") |> normalize_requested_language()
+
+    case draft_preview_translation(post.id, requested_language, post.language) do
+      %Translation{} = translation ->
+        %{
+          id: translation.id,
+          title: translation.title,
+          content: translation.content || "",
+          body: translation.content || "",
+          slug: post.slug,
+          language: translation.language,
+          excerpt: translation.excerpt,
+          template_slug: post.template_slug
+        }
+
+      nil ->
+        %{
           id: post.id,
           title: post.title,
           content: post.content || "",
@@ -188,22 +216,19 @@ defmodule BDS.Preview do
           excerpt: post.excerpt,
           template_slug: post.template_slug
         }
-
-        body =
-          case Rendering.render_post_page(project_id, post.template_slug, payload) do
-            {:ok, rendered} -> rendered
-            {:error, _reason} -> render_draft(payload)
-          end
-          |> apply_preview_overrides(query_params)
-
-        {:ok, %{content_type: "text/html", body: body}}
-      else
-        {:error, :not_found}
-      end
-    rescue
-      Ecto.NoResultsError -> {:error, :not_found}
     end
   end
+
+  defp draft_preview_translation(_post_id, nil, _post_language), do: nil
+  defp draft_preview_translation(_post_id, requested_language, post_language) when requested_language == post_language, do: nil
+
+  defp draft_preview_translation(post_id, requested_language, _post_language) do
+    Repo.get_by(Translation, translation_for: post_id, language: requested_language)
+  end
+
+  defp normalize_requested_language(nil), do: nil
+  defp normalize_requested_language(""), do: nil
+  defp normalize_requested_language(language), do: language |> String.trim() |> String.downcase()
 
   defp route_request(request_path) do
     normalized = request_path |> URI.parse() |> Map.get(:path, "/")

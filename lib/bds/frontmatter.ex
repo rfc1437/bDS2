@@ -56,7 +56,11 @@ defmodule BDS.Frontmatter do
         Integer.to_string(value)
       end
 
-    ["#{key}: #{rendered}"]
+    if timestamp_key?(key) do
+      ["#{key}: '#{rendered}'"]
+    else
+      ["#{key}: #{rendered}"]
+    end
   end
 
   defp serialize_field({key, value}) do
@@ -196,7 +200,7 @@ defmodule BDS.Frontmatter do
 
   defp serialize_scalar(key, value) when is_integer(value) do
     if is_binary(key) and timestamp_key?(key) do
-      Persistence.timestamp_to_iso8601(value)
+      "'#{Persistence.timestamp_to_iso8601(value)}'"
     else
       Integer.to_string(value)
     end

@@ -151,9 +151,9 @@ defmodule BDS.PostsTest do
     assert file_contents =~ "templateSlug: article\n"
     assert file_contents =~ "tags:\n  - alpha\n"
     assert file_contents =~ "categories:\n  - notes\n"
-    assert file_contents =~ ~r/createdAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
-    assert file_contents =~ ~r/updatedAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
-    assert file_contents =~ ~r/publishedAt: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\n/
+    assert file_contents =~ ~r/createdAt: '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'\n/
+    assert file_contents =~ ~r/updatedAt: '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'\n/
+    assert file_contents =~ ~r/publishedAt: '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'\n/
     assert file_contents =~ "\n---\nHello from markdown\n"
 
     refute File.exists?(full_path <> ".tmp")

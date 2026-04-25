@@ -700,6 +700,55 @@ defmodule BDS.MaintenanceTest do
     assert "templates/orphan-view.liquid" in orphan_paths
   end
 
+  test "metadata_diff ignores tag and category order like old bDS", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Ordered Post",
+               content: "Body",
+               tags: ["alpha", "beta"],
+               categories: ["article", "notes"]
+             })
+
+    assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
+
+    post_path = Path.join(temp_dir, published_post.file_path)
+
+    File.write!(
+      post_path,
+      [
+        "---",
+        "id: #{published_post.id}",
+        "title: #{published_post.title}",
+        "slug: #{published_post.slug}",
+        "status: published",
+        "createdAt: '#{BDS.Persistence.timestamp_to_iso8601(published_post.created_at)}'",
+        "updatedAt: '#{BDS.Persistence.timestamp_to_iso8601(published_post.updated_at)}'",
+        "publishedAt: '#{BDS.Persistence.timestamp_to_iso8601(published_post.published_at)}'",
+        "tags:",
+        "  - beta",
+        "  - alpha",
+        "categories:",
+        "  - notes",
+        "  - article",
+        "---",
+        "Body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, %{diff_reports: diff_reports}} = BDS.Maintenance.metadata_diff(project.id)
+
+    refute Enum.any?(diff_reports, fn report ->
+             report.entity_type == "post" and report.entity_id == published_post.id and
+               Enum.any?(report.differences, &(&1.name in ["tags", "categories"]))
+           end)
+  end
+
   defp collect_progress_events(acc \\ []) do
     receive do
       {:rebuild_progress, value, message} -> collect_progress_events([{value, message} | acc])

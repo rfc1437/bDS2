@@ -125,6 +125,48 @@ defmodule BDS.GenerationTest do
     assert File.read!(Path.join([temp_dir, "html", "sitemap.xml"])) =~ "https://example.com/blog/"
   end
 
+  test "generation writes feed and atom entries with canonical URLs for published posts", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Feed Entry",
+               content: "Feed body",
+               language: "en"
+             })
+
+    created_at = DateTime.to_unix(~U[2026-04-15 12:00:00Z])
+
+    Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^post.id),
+      set: [created_at: created_at, updated_at: created_at]
+    )
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core, :single])
+
+    canonical_url =
+      "https://example.com/blog" <>
+        "/" <> String.trim_trailing(BDS.Generation.post_output_path(published_post), "index.html")
+
+    feed_xml = File.read!(Path.join([temp_dir, "html", "feed.xml"]))
+    atom_xml = File.read!(Path.join([temp_dir, "html", "atom.xml"]))
+
+    assert feed_xml =~ "<rss>"
+    assert feed_xml =~ "<item><title>Feed Entry</title><link>#{canonical_url}</link></item>"
+
+    assert atom_xml =~ "<feed>"
+    assert atom_xml =~ "<entry><title>Feed Entry</title><id>#{canonical_url}</id></entry>"
+  end
+
   test "generation renders published list and post templates for core and single pages", %{
     project: project,
     temp_dir: temp_dir
@@ -377,6 +419,97 @@ defmodule BDS.GenerationTest do
     assert not_found_html =~ "Back to preview home"
   end
 
+  test "generation starter templates render localized archive headings in each output language", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "fr",
+               blog_languages: ["fr", "en"],
+               max_posts_per_page: 10
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Archive Heading",
+               content: "Archive body",
+               language: "fr"
+             })
+
+    created_at = DateTime.to_unix(~U[2026-02-15 12:00:00Z])
+
+    Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^post.id),
+      set: [created_at: created_at, updated_at: created_at]
+    )
+
+    assert {:ok, _published_post} = Posts.publish_post(post.id)
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:date])
+
+    french_html = File.read!(Path.join([temp_dir, "html", "2026", "02", "index.html"]))
+    english_html = File.read!(Path.join([temp_dir, "html", "en", "2026", "02", "index.html"]))
+
+    assert french_html =~ ~s(<html lang="fr")
+    assert french_html =~ "Archives février 2026"
+
+    assert english_html =~ ~s(<html lang="en")
+    assert english_html =~ "Archive February 2026"
+  end
+
+  test "generation rewrites media aliases with suffixes and renders slugged taxonomy links with tag colors",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    source_path = Path.join(temp_dir, "sample.txt")
+    File.write!(source_path, "media body")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Sample"
+             })
+
+    media_source_reference =
+      "/" <> Path.join(Path.dirname(media.file_path), media.original_name) <> "?download=1#preview"
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Taxonomy Colors",
+               content: "![Asset](#{media_source_reference})",
+               language: "en",
+               categories: ["Release Notes"],
+               tags: ["Elixir"]
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, [tag]} = BDS.Tags.sync_tags_from_posts(project.id)
+    assert {:ok, _updated_tag} = BDS.Tags.update_tag(tag.id, %{color: "#112233"})
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:single])
+
+    post_html =
+      File.read!(Path.join([temp_dir, "html", BDS.Generation.post_output_path(published_post)]))
+
+    category_link = ~s(href="/category/release-notes/")
+    tag_link = ~s(href="/tag/elixir/" style="--bubble-accent: #112233;")
+
+    assert post_html =~ category_link
+    assert post_html =~ tag_link
+
+    assert elem(:binary.match(post_html, category_link), 0) <
+             elem(:binary.match(post_html, tag_link), 0)
+
+    assert post_html =~ ~s(src="/#{media.file_path}?download=1#preview")
+  end
+
   test "single generation writes canonical post pages and language-prefixed translation pages", %{
     project: project,
     temp_dir: temp_dir
@@ -415,6 +548,52 @@ defmodule BDS.GenerationTest do
     assert File.read!(Path.join([temp_dir, "html", post_path])) =~ "Hello generated world"
     assert File.read!(Path.join([temp_dir, "html", translation_path])) =~ "Hallo generierte Welt"
     assert File.read!(Path.join([temp_dir, "html", post_path])) =~ ~s(data-pagefind-body)
+  end
+
+  test "single generation renders the canonical route in the project main language when a translation exists",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "fr",
+               blog_languages: ["fr", "en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Hello World",
+               content: "Canonical body",
+               language: "en"
+             })
+
+    assert {:ok, _translation} =
+             Posts.upsert_post_translation(post.id, "fr", %{
+               title: "Bonjour le monde",
+               content: "Corps FR"
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+
+    assert {:ok, result} = BDS.Generation.generate_site(project.id, [:single])
+
+    post_path = BDS.Generation.post_output_path(published_post)
+    translation_path = BDS.Generation.post_output_path(published_post, "en")
+
+    assert Enum.map(result.generated_files, & &1.relative_path) |> Enum.sort() ==
+             Enum.sort([post_path, translation_path])
+
+    canonical_html = File.read!(Path.join([temp_dir, "html", post_path]))
+    english_html = File.read!(Path.join([temp_dir, "html", translation_path]))
+
+    assert canonical_html =~ ~s(<html lang="fr")
+    assert canonical_html =~ "Bonjour le monde"
+    assert canonical_html =~ "Corps FR"
+    refute canonical_html =~ "Canonical body"
+
+    assert english_html =~ ~s(<html lang="en")
+    assert english_html =~ "Hello World"
+    assert english_html =~ "Canonical body"
   end
 
   test "archive generation writes paginated category, tag, and date pages", %{

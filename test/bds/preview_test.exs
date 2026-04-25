@@ -158,6 +158,50 @@ defmodule BDS.PreviewTest do
     assert :ok = BDS.Preview.stop_preview(project.id)
   end
 
+  test "draft preview honors the lang query parameter and falls back to the canonical draft", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en", "de"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Canonical Draft",
+               content: "Canonical body",
+               language: "en"
+             })
+
+    assert {:ok, _translation} =
+             Posts.upsert_post_translation(post.id, "de", %{
+               title: "Deutscher Entwurf",
+               content: "Deutscher Inhalt"
+             })
+
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: german_html, content_type: "text/html"}} =
+             BDS.Preview.preview_draft(project.id, "/draft/canonical-draft?lang=de", post.id)
+
+    assert german_html =~ ~s(<html lang="de")
+    assert german_html =~ "Deutscher Entwurf"
+    assert german_html =~ "Deutscher Inhalt"
+    refute german_html =~ "Canonical body"
+
+    assert {:ok, %{body: fallback_html, content_type: "text/html"}} =
+             BDS.Preview.preview_draft(project.id, "/draft/canonical-draft?lang=fr", post.id)
+
+    assert fallback_html =~ ~s(<html lang="en")
+    assert fallback_html =~ "Canonical Draft"
+    assert fallback_html =~ "Canonical body"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
   test "preview renders not-found template for missing routes and rewrites markdown macros and canonical URLs",
        %{project: project, temp_dir: temp_dir} do
     :inets.start()

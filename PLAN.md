@@ -10,6 +10,7 @@ The rewrite already implements most of the backend and compatibility-critical su
 
 - Foundation and persistence: OTP app startup, Ecto repo, migrations, and persisted tables for projects, posts, translations, media, tags, templates, scripts, settings, chat, AI catalog data, embeddings, imports, publishing jobs, MCP proposals, and CLI notifications.
 - Compatibility-critical file contracts: post frontmatter, media sidecars, thumbnail layout, template and script frontmatter, menu OPML, metadata diff, and rebuild-from-filesystem flows.
+- Compatibility parity locks: executable parity coverage now pins the old-bDS behavior for serializer/file contracts, metadata-diff ordering, canonical generation routes, feed output, localized archive rendering, preview draft language selection, taxonomy archive links, and media URL rewriting.
 - Core editorial domains: projects, posts, post translations, media, media translations, tags, templates, scripts, menu data, and project metadata.
 - Output and infrastructure: search, Liquid rendering, site generation, preview server, publishing, background tasks, i18n, git support, MCP server, AI operations, embeddings, and CLI sync.
 - Desktop shell foundation: native menu definitions, shell HTML/CSS/JS bundle, activity bar, sidebar views, tab/workbench state, task panel, assistant sidebar, project switcher, and shell command routing.
@@ -45,8 +46,8 @@ Ordered from base contracts upward:
 
 The remaining work needs to proceed from base contracts upward. Later phases should not outrun the lower layers they depend on.
 
-1. Lock compatibility contracts.
-   Validate schema, frontmatter, sidecars, template context, generation output, metadata diff, and rebuild behavior against both the Allium specs and the old bDS application using fixture-based parity tests.
+1. Lock compatibility contracts. Completed 2026-04-25.
+   Schema, frontmatter, sidecars, template context, generation output, preview behavior, metadata diff, and rebuild behavior are now pinned against the Allium specs and the old bDS application with executable parity tests.
 
 2. Close engine-level behavior gaps.
    Finish any remaining save/publish/delete side-effects, translation cascades, link graph maintenance, thumbnail regeneration rules, and rebuild notifications so backend behavior is fully spec-complete independent of UI.
