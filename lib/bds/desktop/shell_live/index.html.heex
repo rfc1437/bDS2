@@ -339,6 +339,16 @@
               </button>
             <% end %>
           </div>
+          <button
+            class="panel-close"
+            data-testid="panel-close"
+            type="button"
+            phx-click="toggle_panel"
+            aria-label={translated("Close panel")}
+            title={translated("Close panel")}
+          >
+            ×
+          </button>
         </div>
         <div class="panel-content">
           <%= render_panel_body(assigns) %>

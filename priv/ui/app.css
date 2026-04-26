@@ -766,6 +766,9 @@ button {
   height: 35px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  background-color: var(--vscode-sideBar-background);
   border-bottom: 1px solid var(--vscode-panel-border);
 }
 
@@ -785,6 +788,26 @@ button {
 
 .panel-tab.active {
   color: var(--vscode-tab-activeForeground);
+}
+
+.panel-close {
+  background: transparent;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  font-size: 18px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+}
+
+.panel-close:hover {
+  background-color: var(--vscode-list-hoverBackground);
+  color: var(--vscode-editor-foreground);
 }
 
 .panel-content {

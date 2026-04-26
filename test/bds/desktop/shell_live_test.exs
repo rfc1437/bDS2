@@ -54,6 +54,14 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ ~s(data-region="panel")
     refute html =~ ~s(class="panel-shell is-hidden")
+    assert html =~ ~s(data-testid="panel-close")
+
+    html =
+      view
+      |> element("[data-testid='panel-close']")
+      |> render_click()
+
+    assert html =~ ~s(class="panel-shell is-hidden")
 
     html =
       view
