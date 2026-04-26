@@ -34,6 +34,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  const setMediaThumbnailLoaded = (image, loaded) => {
+    const thumbnail = image?.closest(".media-thumbnail");
+
+    if (!thumbnail) {
+      return;
+    }
+
+    if (loaded) {
+      thumbnail.classList.add("is-loaded");
+    } else {
+      thumbnail.classList.remove("is-loaded");
+    }
+  };
+
+  const syncMediaThumbnailState = (root) => {
+    root.querySelectorAll(".media-thumbnail-image").forEach((image) => {
+      setMediaThumbnailLoaded(image, Boolean(image.complete && image.naturalWidth > 0));
+    });
+  };
+
   const normalizeShortcutKey = (key) => String(key || "").toLowerCase();
 
   const shortcutTargetIsEditable = (event) => {
@@ -264,9 +284,24 @@ document.addEventListener("DOMContentLoaded", () => {
           });
         };
 
+        this.handleThumbnailLoad = (event) => {
+          if (event.target instanceof HTMLImageElement && event.target.classList.contains("media-thumbnail-image")) {
+            setMediaThumbnailLoaded(event.target, true);
+          }
+        };
+
+        this.handleThumbnailError = (event) => {
+          if (event.target instanceof HTMLImageElement && event.target.classList.contains("media-thumbnail-image")) {
+            setMediaThumbnailLoaded(event.target, false);
+          }
+        };
+
         window.addEventListener("bds:native-menu-action", this.handleNativeMenuAction);
         window.addEventListener("keydown", this.handleShortcutKeyDown, true);
+        this.el.addEventListener("load", this.handleThumbnailLoad, true);
+        this.el.addEventListener("error", this.handleThumbnailError, true);
         this.el.addEventListener("change", this.handleChange);
+        syncMediaThumbnailState(this.el);
         this.restoreStoredWorkbenchSession();
       },
 
@@ -281,11 +316,14 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
+        syncMediaThumbnailState(this.el);
         this.persistWorkbenchSession();
       },
 
       destroyed() {
         this.el.removeEventListener("mousedown", this.handleMouseDown);
+        this.el.removeEventListener("load", this.handleThumbnailLoad, true);
+        this.el.removeEventListener("error", this.handleThumbnailError, true);
         this.el.removeEventListener("change", this.handleChange);
         window.removeEventListener("bds:native-menu-action", this.handleNativeMenuAction);
         window.removeEventListener("keydown", this.handleShortcutKeyDown, true);

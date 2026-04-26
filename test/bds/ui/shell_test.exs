@@ -130,6 +130,17 @@ defmodule BDS.UI.ShellTest do
     assert live_ex =~ "encoded_workbench_session"
   end
 
+  test "desktop shell assets reveal loaded media sidebar thumbnails" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
+
+    assert css =~ ".media-thumbnail.is-loaded .media-thumbnail-image"
+    assert css =~ ".media-thumbnail.is-loaded .media-thumbnail-fallback"
+    assert live_js =~ "media-thumbnail-image"
+    assert live_js =~ "classList.add(\"is-loaded\")"
+    assert live_js =~ "classList.remove(\"is-loaded\")"
+  end
+
   test "desktop shell css keeps the status bar and hidden menu alignment rules" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
 
