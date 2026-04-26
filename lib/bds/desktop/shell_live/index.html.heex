@@ -1,4 +1,11 @@
-<div class="app" id="bds-shell-app" phx-hook="AppShell" data-shortcuts={encoded_shortcuts(@client_shortcuts)}>
+<div
+  class="app"
+  id="bds-shell-app"
+  phx-hook="AppShell"
+  data-shortcuts={encoded_shortcuts(@client_shortcuts)}
+  data-project-id={@projects.active_project_id || ""}
+  data-workbench-session={encoded_workbench_session(@workbench)}
+>
   <%= if @is_mac_ui do %>
     <span data-testid="window-title" hidden><%= @page_title %></span>
   <% end %>

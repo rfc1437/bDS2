@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const SIDEBAR_STORAGE_KEY = "bds-panel-sidebar";
   const ASSISTANT_STORAGE_KEY = "bds-panel-assistant-sidebar";
   const UI_LANGUAGE_STORAGE_KEY = "bds-ui-language";
+  const WORKBENCH_SESSION_STORAGE_KEY_PREFIX = "bds-workbench-";
 
   const parseShortcutConfig = (value) => {
     if (!value) {
@@ -17,6 +18,19 @@ document.addEventListener("DOMContentLoaded", () => {
       return Array.isArray(parsed) ? parsed : [];
     } catch (_error) {
       return [];
+    }
+  };
+
+  const parseJsonObject = (value) => {
+    if (!value) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+    } catch (_error) {
+      return null;
     }
   };
 
@@ -125,9 +139,43 @@ document.addEventListener("DOMContentLoaded", () => {
     AppShell: {
       mounted() {
         this.shortcuts = parseShortcutConfig(this.el.dataset.shortcuts);
+        this.currentProjectId = this.el.dataset.projectId || "";
         this.syncStoredLayout();
         this.syncStoredUiLanguage();
         this.destroyOverlaySync = syncTitlebarOverlayInsets();
+
+        this.workbenchStorageKey = (projectId) =>
+          projectId ? `${WORKBENCH_SESSION_STORAGE_KEY_PREFIX}${projectId}` : null;
+
+        this.restoreStoredWorkbenchSession = () => {
+          const projectId = this.el.dataset.projectId || "";
+          const storageKey = this.workbenchStorageKey(projectId);
+
+          if (!storageKey) {
+            return false;
+          }
+
+          const session = parseJsonObject(window.localStorage.getItem(storageKey));
+
+          if (!session) {
+            return false;
+          }
+
+          this.pushEvent("restore_workbench_session", { session });
+          return true;
+        };
+
+        this.persistWorkbenchSession = () => {
+          const projectId = this.el.dataset.projectId || "";
+          const storageKey = this.workbenchStorageKey(projectId);
+          const session = this.el.dataset.workbenchSession;
+
+          if (!storageKey || !session) {
+            return;
+          }
+
+          window.localStorage.setItem(storageKey, session);
+        };
 
         this.handleMouseDown = (event) => {
           const handle = event.target.closest("[data-role='resize-handle']");
@@ -219,6 +267,21 @@ document.addEventListener("DOMContentLoaded", () => {
         window.addEventListener("bds:native-menu-action", this.handleNativeMenuAction);
         window.addEventListener("keydown", this.handleShortcutKeyDown, true);
         this.el.addEventListener("change", this.handleChange);
+        this.restoreStoredWorkbenchSession();
+      },
+
+      updated() {
+        const nextProjectId = this.el.dataset.projectId || "";
+
+        if (nextProjectId !== this.currentProjectId) {
+          this.currentProjectId = nextProjectId;
+
+          if (this.restoreStoredWorkbenchSession()) {
+            return;
+          }
+        }
+
+        this.persistWorkbenchSession();
       },
 
       destroyed() {

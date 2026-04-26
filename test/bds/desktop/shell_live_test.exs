@@ -10,6 +10,7 @@ defmodule BDS.Desktop.ShellLiveTest do
   alias BDS.Projects
   alias BDS.Repo
   alias BDS.Tags
+  alias BDS.UI.{Session, Workbench}
 
   @endpoint BDS.Desktop.Endpoint
 
@@ -203,6 +204,27 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-tab-type="settings")
     assert html =~ ">Settings<"
     refute html =~ ~s(data-testid="window-titlebar-menu-dropdown")
+  end
+
+  test "workbench session restore reopens permanent and transient tabs and selected activity" do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    session_payload =
+      Workbench.new()
+      |> Workbench.click_activity(:media)
+      |> Workbench.open_tab(:post, "post-1", :pin)
+      |> Workbench.open_tab(:media, "media-1", :preview)
+      |> Session.serialize()
+
+    html = render_hook(view, "restore_workbench_session", %{"session" => session_payload})
+
+    assert html =~ ~s(data-view="media")
+    assert html =~ ~s(data-active="true")
+    assert html =~ ~s(data-tab-type="post")
+    assert html =~ ~s(data-tab-id="post-1")
+    assert html =~ ~s(data-tab-type="media")
+    assert html =~ ~s(data-tab-id="media-1")
+    assert html =~ ~s(class="tab active transient")
   end
 
   test "shell live renders the legacy git activity badge from remote behind count" do

@@ -32,18 +32,18 @@ defmodule BDS.UI.Session do
       Workbench.new(
         sidebar_visible: Map.get(payload, "sidebar_visible", true),
         sidebar_width: Map.get(payload, "sidebar_width", 280),
-        active_view: Map.get(payload, "active_view", "posts"),
+        active_view: atomize(Map.get(payload, "active_view"), :posts),
         assistant_sidebar_visible: Map.get(payload, "assistant_sidebar_visible", false),
         assistant_sidebar_width: Map.get(payload, "assistant_sidebar_width", 360),
         panel_visible: get_in(payload, ["panel", "visible"]) || false,
-        panel_tab: atomize(get_in(payload, ["panel", "active_tab"]) || "tasks"),
+        panel_tab: atomize(get_in(payload, ["panel", "active_tab"]) || "tasks", :tasks),
         dirty_tabs: Enum.map(Map.get(payload, "dirty_tabs", []), &decode_tab_ref/1)
       )
 
     tabs =
       Enum.map(Map.get(payload, "tabs", []), fn tab ->
         %{
-          type: atomize(Map.get(tab, "type", "post")),
+          type: atomize(Map.get(tab, "type", "post"), :post),
           id: Map.get(tab, "id"),
           is_transient: Map.get(tab, "is_transient", false)
         }
@@ -58,10 +58,15 @@ defmodule BDS.UI.Session do
   defp encode_tab_ref({type, id}), do: %{"type" => Atom.to_string(type), "id" => id}
 
   defp decode_tab_ref(nil), do: nil
-  defp decode_tab_ref(%{"type" => type, "id" => id}), do: {atomize(type), id}
+  defp decode_tab_ref(%{"type" => type, "id" => id}), do: {atomize(type, :post), id}
 
-  defp atomize(value) when is_atom(value), do: value
-  defp atomize(value) when is_binary(value), do: String.to_atom(value)
+  defp atomize(value, _fallback) when is_atom(value), do: value
+
+  defp atomize(value, fallback) when is_binary(value) do
+    String.to_existing_atom(value)
+  rescue
+    ArgumentError -> fallback
+  end
 
   defp active_route(nil), do: :dashboard
   defp active_route({type, _id}), do: type

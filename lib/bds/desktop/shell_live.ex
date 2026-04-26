@@ -13,7 +13,7 @@ defmodule BDS.Desktop.ShellLive do
   alias BDS.Posts.Post
   alias BDS.Projects
   alias BDS.Repo
-  alias BDS.UI.{Commands, MenuBar, Registry, Workbench}
+  alias BDS.UI.{Commands, MenuBar, Registry, Session, Workbench}
 
   @refresh_interval 1_500
   @output_entry_limit 20
@@ -357,6 +357,10 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("sync_ui_language", %{"language" => language}, socket) do
     {:noreply, set_page_language(socket, language)}
+  end
+
+  def handle_event("restore_workbench_session", %{"session" => session_payload}, socket) when is_map(session_payload) do
+    {:noreply, reload_shell(socket, restore_workbench_session(session_payload))}
   end
 
   def handle_event("native_menu_action", %{"action" => action}, socket) do
@@ -1006,6 +1010,8 @@ defmodule BDS.Desktop.ShellLive do
 
   defp encoded_shortcuts(shortcuts), do: Jason.encode!(shortcuts)
 
+  defp encoded_workbench_session(workbench), do: Jason.encode!(Session.serialize(workbench))
+
   defp panel_tab_label(:tasks), do: translated("Tasks")
   defp panel_tab_label(:output), do: translated("Output")
   defp panel_tab_label(:git_log), do: translated("Git Log")
@@ -1319,7 +1325,7 @@ defmodule BDS.Desktop.ShellLive do
             |> assign(:project_menu_open, false)
             |> assign(:sidebar_filters_by_view, %{})
             |> append_output_entry(title, message_fun.(project))
-            |> reload_shell(Workbench.clear_tabs(socket.assigns.workbench))
+            |> reload_shell(Workbench.new())
 
           {:error, reason} ->
             socket
@@ -1355,6 +1361,12 @@ defmodule BDS.Desktop.ShellLive do
     else
       _other -> append_output_entry(socket, "Menu", "Unsupported shell command", action, "error")
     end
+  end
+
+  defp restore_workbench_session(session_payload) do
+    Session.restore(session_payload)
+  rescue
+    _error -> Workbench.new()
   end
 
   defp safe_existing_atom(action) when is_binary(action) do

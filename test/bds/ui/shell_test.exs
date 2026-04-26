@@ -103,6 +103,7 @@ defmodule BDS.UI.ShellTest do
   test "desktop shell keeps the compact frame metrics and live bootstrap assets" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
     live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
+    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/app.css")
     assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/live.js")
@@ -113,6 +114,20 @@ defmodule BDS.UI.ShellTest do
     assert css =~ "height: 22px"
     assert live_js =~ "LiveView.LiveSocket"
     assert live_js =~ "Phoenix.Socket"
+    assert template =~ "data-project-id={@projects.active_project_id || \"\"}"
+    assert template =~ "data-workbench-session={encoded_workbench_session(@workbench)}"
+  end
+
+  test "desktop shell assets persist workbench layout per project" do
+    live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
+    live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
+
+    assert live_js =~ "bds-workbench-"
+    assert live_js =~ "restore_workbench_session"
+    assert live_js =~ "dataset.workbenchSession"
+    assert live_ex =~ ~s(def handle_event("restore_workbench_session")
+    assert live_ex =~ "Session.restore"
+    assert live_ex =~ "encoded_workbench_session"
   end
 
   test "desktop shell css keeps the status bar and hidden menu alignment rules" do
