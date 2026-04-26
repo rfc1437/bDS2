@@ -64,4 +64,65 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ ~s(data-tab-type="settings")
     assert html =~ ~s(class="tab-bar-empty")
   end
+
+  test "sidebar open supports preview and pin intents for entity tabs" do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "open_sidebar_item", %{
+        "route" => "post",
+        "id" => "post-1",
+        "title" => "First Post",
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-tab-type="post")
+    assert html =~ ~s(data-tab-id="post-1")
+    assert html =~ ~s(class="tab active transient")
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => "post-1",
+        "title" => "First Post",
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-tab-id="post-1")
+    refute html =~ ~s(class="tab active transient")
+
+    html =
+      render_click(view, "open_sidebar_item", %{
+        "route" => "post",
+        "id" => "page-1",
+        "title" => "About Page",
+        "subtitle" => "page"
+      })
+
+    assert html =~ ~s(data-tab-id="post-1")
+    assert html =~ ~s(data-tab-id="page-1")
+    assert String.contains?(html, ">First Post<")
+    assert String.contains?(html, ">About Page<")
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "media",
+        "id" => "media-1",
+        "title" => "hero.png",
+        "subtitle" => "12 KB"
+      })
+
+    html =
+      render_click(view, "open_sidebar_item", %{
+        "route" => "media",
+        "id" => "media-2",
+        "title" => "cover.png",
+        "subtitle" => "8 KB"
+      })
+
+    assert html =~ ~s(data-tab-id="media-1")
+    assert html =~ ~s(data-tab-id="media-2")
+    assert String.contains?(html, ">hero.png<")
+    assert String.contains?(html, ">cover.png<")
+  end
 end

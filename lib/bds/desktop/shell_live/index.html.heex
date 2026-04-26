@@ -93,7 +93,7 @@
       style={"width: #{@workbench.sidebar_width}px;"}
     >
       <div class="sidebar" data-region="sidebar">
-        <div class="sidebar-content sidebar-body">
+        <div id="sidebar-content" class="sidebar-content sidebar-body" phx-hook="SidebarInteractions">
           <div class="sidebar-section">
             <div class="sidebar-section-header">
               <span><%= String.upcase(sidebar_header_label(@sidebar_header)) %></span>

@@ -57,23 +57,12 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, reload_shell(socket, workbench)}
   end
 
-  def handle_event("open_sidebar_item", %{"route" => route, "id" => id} = params, socket) do
-    route_atom = sidebar_route_atom(route)
-    tab_id = tab_id_for_route(route_atom, id)
+  def handle_event("open_sidebar_item", %{"route" => _route, "id" => _id} = params, socket) do
+    {:noreply, open_sidebar_item(socket, params, :preview)}
+  end
 
-    workbench =
-      Workbench.open_tab(socket.assigns.workbench, route_atom, tab_id, tab_intent(route_atom))
-
-    tab_meta =
-      Map.put(socket.assigns.tab_meta, {route_atom, tab_id}, %{
-        title: Map.get(params, "title", ""),
-        subtitle: Map.get(params, "subtitle", "")
-      })
-
-    {:noreply,
-     socket
-     |> assign(:tab_meta, tab_meta)
-     |> reload_shell(workbench)}
+  def handle_event("pin_sidebar_item", %{"route" => _route, "id" => _id} = params, socket) do
+    {:noreply, open_sidebar_item(socket, params, :pin)}
   end
 
   def handle_event("select_tab", %{"type" => type, "id" => id}, socket) do
@@ -181,6 +170,8 @@ defmodule BDS.Desktop.ShellLive do
               data-testid="sidebar-open-item"
               data-route={item.route}
               data-item-id={item.id}
+              data-open-title={item.title}
+              data-open-subtitle={format_sidebar_timestamp(item.meta_timestamp)}
               type="button"
               phx-click="open_sidebar_item"
               phx-value-route={item.route}
@@ -218,6 +209,8 @@ defmodule BDS.Desktop.ShellLive do
             data-testid="sidebar-open-item"
             data-route={item.route}
             data-item-id={item.id}
+            data-open-title={item.title}
+            data-open-subtitle={item.meta}
             type="button"
             title={item.title}
             phx-click="open_sidebar_item"
@@ -259,6 +252,8 @@ defmodule BDS.Desktop.ShellLive do
             data-testid="sidebar-open-item"
             data-route={item.route}
             data-item-id={item.id}
+            data-open-title={item.title}
+            data-open-subtitle={translated(item.meta || "")}
             type="button"
             phx-click="open_sidebar_item"
             phx-value-route={item.route}
@@ -290,6 +285,8 @@ defmodule BDS.Desktop.ShellLive do
           data-testid="sidebar-open-item"
           data-route={item.route}
           data-item-id={item.id}
+          data-open-title={translated(item.title)}
+          data-open-subtitle={translated(Map.get(@sidebar_data, :subtitle, ""))}
           type="button"
           phx-click="open_sidebar_item"
           phx-value-route={item.route}
@@ -433,6 +430,24 @@ defmodule BDS.Desktop.ShellLive do
     Enum.find(tabs, &(&1.type == type and &1.id == id))
   end
 
+  defp open_sidebar_item(socket, params, intent) do
+    route_atom = sidebar_route_atom(Map.fetch!(params, "route"))
+    tab_id = tab_id_for_route(route_atom, Map.fetch!(params, "id"))
+
+    workbench =
+      Workbench.open_tab(socket.assigns.workbench, route_atom, tab_id, tab_intent(route_atom, intent))
+
+    tab_meta =
+      Map.put(socket.assigns.tab_meta, {route_atom, tab_id}, %{
+        title: Map.get(params, "title", ""),
+        subtitle: Map.get(params, "subtitle", "")
+      })
+
+    socket
+    |> assign(:tab_meta, tab_meta)
+    |> reload_shell(workbench)
+  end
+
   defp sidebar_route_atom(route) when is_atom(route), do: route
   defp sidebar_route_atom(route) when is_binary(route), do: String.to_existing_atom(route)
 
@@ -443,10 +458,10 @@ defmodule BDS.Desktop.ShellLive do
     end
   end
 
-  defp tab_intent(route) do
+  defp tab_intent(route, requested_intent) do
     case Registry.editor_route(route) do
       %{singleton: true} -> :pin
-      _other -> :preview
+      _other -> requested_intent
     end
   end
 
