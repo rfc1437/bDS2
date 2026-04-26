@@ -394,11 +394,12 @@ defmodule BDS.Desktop.ShellLive do
   defp reload_shell(socket, workbench) do
     projects = ShellData.project_snapshot()
     dashboard = ShellData.dashboard(projects.active_project_id)
+    git_badge_count = ShellData.git_badge_count(projects.active_project_id)
     active_view_id = Atom.to_string(workbench.active_view)
     sidebar_data = ShellData.sidebar_view(projects.active_project_id, active_view_id, current_sidebar_filters(socket, active_view_id))
     sidebar_data = merge_sidebar_ui_state(socket, active_view_id, sidebar_data)
     task_status = BDS.Tasks.status_snapshot()
-    activity_buttons = Workbench.activity_buttons(workbench, 0)
+    activity_buttons = Workbench.activity_buttons(workbench, git_badge_count)
     page_language = socket.assigns[:page_language] || ShellData.ui_language()
     offline_mode = Map.get(socket.assigns, :offline_mode, true)
 

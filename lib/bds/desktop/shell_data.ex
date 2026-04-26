@@ -1,6 +1,7 @@
 defmodule BDS.Desktop.ShellData do
   @moduledoc false
 
+  alias BDS.Git
   alias BDS.I18n
   alias BDS.Projects
   alias BDS.UI.Dashboard
@@ -100,12 +101,47 @@ defmodule BDS.Desktop.ShellData do
     )
   end
 
+  def git_badge_count(project_id, opts \\ [])
+
+  def git_badge_count(nil, _opts), do: 0
+  def git_badge_count("default", _opts), do: 0
+
+  def git_badge_count(project_id, opts) when is_binary(project_id) do
+    provider = Keyword.get(opts, :provider, git_remote_state_provider())
+
+    try do
+      case provider.(project_id, []) do
+        {:ok, %{behind: behind}} when is_integer(behind) and behind > 0 -> behind
+        {:ok, %{behind: behind}} when is_binary(behind) -> parse_positive_count(behind)
+        _other -> 0
+      end
+    rescue
+      error in [DBConnection.OwnershipError, Exqlite.Error] ->
+        if match?(%Exqlite.Error{}, error) and not String.contains?(Exception.message(error), "no such table") do
+          reraise error, __STACKTRACE__
+        end
+
+        0
+    end
+  end
+
   def panel_tabs(workbench) do
     [:tasks, :output]
     |> maybe_add_panel_tab(workbench.editor_route, :post_links)
     |> maybe_add_panel_tab(workbench.editor_route, :git_log)
     |> Kernel.++([workbench.panel.active_tab])
     |> Enum.uniq()
+  end
+
+  defp git_remote_state_provider do
+    Application.get_env(:bds, :git_remote_state_provider, &Git.remote_state/2)
+  end
+
+  defp parse_positive_count(value) do
+    case Integer.parse(value) do
+      {count, _rest} when count > 0 -> count
+      _other -> 0
+    end
   end
 
   def activity_icon(id) do

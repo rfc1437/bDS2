@@ -136,11 +136,17 @@ defmodule BDS.UI.ShellTest do
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
     assert css =~ "color: var(--vscode-activityBar-foreground)"
+    assert css =~ ".activity-bar-badge"
     assert css =~ ".tab-actions"
     assert css =~ ".tab-dirty-indicator"
     assert css =~ ".tab.dirty .tab-close"
     assert css =~ ".tab:focus-visible"
     assert css =~ ".window-titlebar-action-button:focus"
+    assert css =~ ".panel-tab.active"
+    assert css =~ "border-bottom-color: var(--vscode-focusBorder);"
+    assert css =~ ".sidebar-section-header"
+    assert css =~ "justify-content: space-between"
+    assert css =~ "align-items: center"
     assert css =~ "padding-right: calc(10px + var(--bds-titlebar-overlay-right, 0px));"
     assert live_js =~ "windowControlsOverlay"
     assert live_js =~ "geometrychange"
@@ -150,6 +156,7 @@ defmodule BDS.UI.ShellTest do
     assert live_js =~ "event.preventDefault()"
     assert live_js =~ "this.pushEvent(\"shortcut\""
     assert template =~ "data-shortcuts={encoded_shortcuts(@client_shortcuts)}"
+    assert template =~ "activity-bar-badge"
     assert template =~ "tab-actions"
     assert template =~ "tab-dirty-indicator"
   end

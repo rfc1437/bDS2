@@ -72,6 +72,22 @@ defmodule BDS.GitTest do
     assert repo.current_branch == "main"
   end
 
+  test "remote_state reports upstream ahead and behind counts", %{project: project} do
+    runner = fake_runner(fn
+      "git", ["rev-parse", "--abbrev-ref", "HEAD"], _opts -> {"main\n", 0}
+      "git", ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], _opts -> {"origin/main\n", 0}
+      "git", ["rev-list", "--count", "origin/main..HEAD"], _opts -> {"2\n", 0}
+      "git", ["rev-list", "--count", "HEAD..origin/main"], _opts -> {"5\n", 0}
+    end)
+
+    assert {:ok, remote_state} = Git.remote_state(project.id, runner: runner)
+    assert remote_state.local_branch == "main"
+    assert remote_state.upstream_branch == "origin/main"
+    assert remote_state.has_upstream == true
+    assert remote_state.ahead == 2
+    assert remote_state.behind == 5
+  end
+
   test "fetch, pull, push, commit_all, reconcile, and prune_lfs_cache run non-interactively", %{
     project: project
   } do

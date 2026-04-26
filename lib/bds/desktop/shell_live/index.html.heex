@@ -112,6 +112,9 @@
             aria-label={activity_label(button.label)}
           >
             <%= raw(ShellData.activity_icon(button.id)) %>
+            <%= if button.badge do %>
+              <span class="activity-bar-badge"><%= button.badge.display %></span>
+            <% end %>
           </button>
         <% end %>
       </div>
@@ -129,6 +132,9 @@
             aria-label={activity_label(button.label)}
           >
             <%= raw(ShellData.activity_icon(button.id)) %>
+            <%= if button.badge do %>
+              <span class="activity-bar-badge"><%= button.badge.display %></span>
+            <% end %>
           </button>
         <% end %>
       </div>

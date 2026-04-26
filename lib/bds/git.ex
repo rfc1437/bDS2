@@ -171,6 +171,26 @@ defmodule BDS.Git do
     end
   end
 
+  def remote_state(project_id, opts \\ []) when is_binary(project_id) and is_list(opts) do
+    with {:ok, project_dir} <- project_dir(project_id),
+         {:ok, local_branch} <- current_branch(project_dir, opts) do
+      case upstream_branch(project_dir, opts) do
+        {:ok, nil} ->
+          {:ok, %{local_branch: local_branch, upstream_branch: nil, has_upstream: false, ahead: 0, behind: 0}}
+
+        {:ok, upstream_branch} ->
+          {:ok,
+           %{
+             local_branch: local_branch,
+             upstream_branch: upstream_branch,
+             has_upstream: true,
+             ahead: revision_count(project_dir, "#{upstream_branch}..HEAD", opts),
+             behind: revision_count(project_dir, "HEAD..#{upstream_branch}", opts)
+           }}
+      end
+    end
+  end
+
   defp project_dir(project_id) do
     case Projects.get_project(project_id) do
       nil -> {:error, :not_found}
@@ -274,6 +294,13 @@ defmodule BDS.Git do
     ]
   end
 
+  defp upstream_branch(project_dir, opts) do
+    case run_git(project_dir, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], opts) do
+      {:ok, output} -> {:ok, blank_to_nil(output)}
+      {:error, {:git_failed, _message}} -> {:ok, nil}
+    end
+  end
+
   defp parse_status(output) do
     output
     |> String.split("\n", trim: true)
@@ -331,6 +358,20 @@ defmodule BDS.Git do
     case category_for_path(path) do
       nil -> acc
       category -> Map.update!(acc, category, &Map.update!(&1, key, fn items -> items ++ [value] end))
+    end
+  end
+
+  defp revision_count(project_dir, revision_range, opts) do
+    case run_git(project_dir, ["rev-list", "--count", revision_range], opts) do
+      {:ok, output} -> parse_count(output)
+      {:error, {:git_failed, _message}} -> 0
+    end
+  end
+
+  defp parse_count(value) do
+    case Integer.parse(to_string(value || "")) do
+      {count, _rest} -> count
+      :error -> 0
     end
   end
 
