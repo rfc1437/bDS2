@@ -1388,11 +1388,6 @@ defmodule BDS.Desktop.ShellLive do
         socket
         |> append_output_entry(translated("sidebar.importMedia"), message, nil, "error")
         |> reload_shell(socket.assigns.workbench)
-
-      {:error, reason} ->
-        socket
-        |> append_output_entry(translated("sidebar.importMedia"), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
     end
   end
 

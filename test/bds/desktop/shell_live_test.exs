@@ -64,21 +64,21 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-sidebar-action="media")
     assert html =~ ~s(data-testid="sidebar-filter-toggle")
 
-    _html =
+    html =
       view
       |> element("[data-testid='activity-button'][data-view='scripts']")
       |> render_click()
 
     assert html =~ ~s(data-sidebar-action="script")
 
-    _html =
+    html =
       view
       |> element("[data-testid='activity-button'][data-view='templates']")
       |> render_click()
 
     assert html =~ ~s(data-sidebar-action="template")
 
-    _html =
+    html =
       view
       |> element("[data-testid='activity-button'][data-view='import']")
       |> render_click()
@@ -106,7 +106,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert created_post.content == ""
     refute html =~ ~s(data-tab-type="post")
 
-    html = render_click(view, "select_view", %{"view" => "scripts"})
+    _html = render_click(view, "select_view", %{"view" => "scripts"})
 
     html =
       view
@@ -123,7 +123,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-tab-type="scripts")
     assert html =~ ~s(data-tab-id="#{created_script.id}")
 
-    html = render_click(view, "select_view", %{"view" => "templates"})
+    _html = render_click(view, "select_view", %{"view" => "templates"})
 
     html =
       view
@@ -139,9 +139,12 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-tab-type="templates")
     assert html =~ ~s(data-tab-id="#{created_template.id}")
 
-    html = render_click(view, "select_view", %{"view" => "import"})
+    _html = render_click(view, "select_view", %{"view" => "import"})
 
-    render_click(view, "select_view", %{"view" => "scripts"})
+    html =
+      view
+      |> element("[data-testid='sidebar-create-action'][data-sidebar-action='import']")
+      |> render_click()
 
     assert Repo.aggregate(ImportDefinitions.ImportDefinition, :count, :id) == import_count_before + 1
 
@@ -164,11 +167,30 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-view="media")
     assert html =~ ~s(aria-label="Posts")
 
-    render_click(view, "select_view", %{"view" => "templates"})
+    html = render_click(view, "select_view", %{"view" => "templates"})
+
+    assert html =~ ~s(data-view="templates")
+    assert html =~ ~s(data-active="true")
+    assert html =~ ~s(aria-label="Templates")
+
+    html =
+      view
+      |> element("[data-testid='toggle-sidebar']")
+      |> render_click()
 
     assert html =~ ~s(class="sidebar-shell is-hidden")
 
-    render_click(view, "select_view", %{"view" => "import"})
+    html =
+      view
+      |> element("[data-testid='toggle-sidebar']")
+      |> render_click()
+
+    refute html =~ ~s(class="sidebar-shell is-hidden")
+
+    html =
+      view
+      |> element("[data-testid='toggle-panel']")
+      |> render_click()
 
     assert html =~ ~s(data-region="panel")
     refute html =~ ~s(class="panel-shell is-hidden")

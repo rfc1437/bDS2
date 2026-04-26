@@ -297,7 +297,7 @@ defmodule BDS.UI.Sidebar do
     Repo.all(
       from post in Post,
         where: post.project_id == ^project_id,
-        order_by: [desc: post.updated_at, desc: post.created_at],
+        order_by: [desc: post.created_at],
         select: %{
           id: post.id,
           title: post.title,
@@ -327,7 +327,7 @@ defmodule BDS.UI.Sidebar do
     Repo.all(
       from media in Media,
         where: media.project_id == ^project_id,
-        order_by: [desc: media.updated_at, desc: media.created_at],
+        order_by: [desc: media.created_at],
         select: %{
           id: media.id,
           title: media.title,
