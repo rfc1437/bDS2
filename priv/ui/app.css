@@ -2460,18 +2460,6 @@ button {
   border-color: var(--vscode-focusBorder);
 }
 
-.search-box button,
-.clear-filter,
-.filter-status button,
-.load-more-button,
-.calendar-year-header,
-.calendar-month,
-.filter-header,
-.filter-chip {
-  border: none;
-  cursor: pointer;
-}
-
 .search-box button[type="submit"] {
   position: absolute;
   right: 40px;
@@ -2485,7 +2473,6 @@ button {
 
 .search-box button[type="submit"]:hover {
   opacity: 1;
-  background: transparent;
 }
 
 .search-box .clear-search {
@@ -2502,7 +2489,6 @@ button {
 
 .search-box .clear-search:hover {
   opacity: 1;
-  background: transparent;
 }
 
 .calendar-view {
@@ -2522,42 +2508,29 @@ button {
   margin-bottom: 8px;
 }
 
-.collapsible-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  text-align: left;
-}
-
-.calendar-header.collapsible-header,
-.filter-header.collapsible-header {
+.calendar-header.collapsible-header {
   cursor: pointer;
   padding: 4px 6px;
   margin: 0 -6px 8px -6px;
   border-radius: 3px;
   user-select: none;
-  background: transparent;
 }
 
-.calendar-header.collapsible-header:hover,
-.filter-header.collapsible-header:hover {
+.calendar-header.collapsible-header:hover {
   background-color: var(--vscode-list-hoverBackground);
 }
 
-.calendar-header.collapsible-header.collapsed,
-.filter-header.collapsible-header.collapsed {
+.calendar-header.collapsible-header.collapsed {
   margin-bottom: 0;
 }
 
-.collapse-icon {
+.calendar-header .collapse-icon {
   font-size: 9px;
   margin-right: 4px;
   opacity: 0.7;
-  color: var(--vscode-descriptionForeground);
 }
 
-.calendar-header .clear-filter,
-.filter-header .clear-filter {
+.calendar-header .clear-filter {
   background: transparent;
   border: none;
   color: var(--vscode-descriptionForeground);
@@ -2565,11 +2538,9 @@ button {
   font-size: 10px;
   padding: 2px 4px;
   opacity: 0.7;
-  margin-left: auto;
 }
 
-.calendar-header .clear-filter:hover,
-.filter-header .clear-filter:hover {
+.calendar-header .clear-filter:hover {
   opacity: 1;
 }
 
@@ -2592,13 +2563,11 @@ button {
   text-align: left;
 }
 
-.calendar-year-header:hover,
-.calendar-month:hover {
+.calendar-year-header:hover {
   background-color: var(--vscode-list-hoverBackground);
 }
 
-.calendar-year-header.selected,
-.calendar-month.selected {
+.calendar-year-header.selected {
   background-color: var(--vscode-list-activeSelectionBackground);
 }
 
@@ -2608,8 +2577,7 @@ button {
   width: 10px;
 }
 
-.year-label,
-.month-label {
+.calendar-year-header .year-label {
   flex: 1;
 }
 
@@ -2642,6 +2610,26 @@ button {
   text-align: left;
 }
 
+.calendar-month:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.calendar-month.selected {
+  background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.calendar-month .month-count {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.calendar-empty {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  padding: 8px;
+  text-align: center;
+}
+
 .month-count,
 .sidebar-section-count {
   font-size: 10px;
@@ -2672,6 +2660,43 @@ button {
   margin-bottom: 6px;
 }
 
+.filter-header.collapsible-header {
+  cursor: pointer;
+  padding: 4px 6px;
+  margin: 0 -6px 6px -6px;
+  border-radius: 3px;
+  user-select: none;
+}
+
+.filter-header.collapsible-header:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.filter-header.collapsible-header.collapsed {
+  margin-bottom: 0;
+}
+
+.filter-header .collapse-icon {
+  font-size: 9px;
+  margin-right: 4px;
+  opacity: 0.7;
+}
+
+.filter-header .clear-filter {
+  background: transparent;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 4px;
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.filter-header .clear-filter:hover {
+  opacity: 1;
+}
+
 .filter-chips {
   display: flex;
   flex-wrap: wrap;
@@ -2696,6 +2721,18 @@ button {
 .filter-chip.active {
   background-color: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
+}
+
+.filter-chip.has-color {
+  border: 1px solid transparent;
+}
+
+.filter-chip.has-color:hover {
+  opacity: 0.85;
+}
+
+.filter-chip.has-color.active {
+  box-shadow: 0 0 0 2px var(--vscode-focusBorder, #007fd4);
 }
 
 .filter-status {

@@ -97,6 +97,25 @@
           <div class="sidebar-section">
             <div class="sidebar-section-header">
               <span><%= String.upcase(sidebar_header_label(@sidebar_header)) %></span>
+              <%= if sidebar_filters_enabled?(@sidebar_data) do %>
+                <div class="sidebar-actions">
+                  <button
+                    class={[
+                      "sidebar-action",
+                      if(sidebar_filters_visible?(@sidebar_data), do: "active")
+                    ]}
+                    data-testid="sidebar-filter-toggle"
+                    type="button"
+                    phx-click="toggle_sidebar_filters"
+                    aria-label={translated(Map.get(@sidebar_data.filters, :toggle_filters_label))}
+                    title={translated(Map.get(@sidebar_data.filters, :toggle_filters_label))}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M6 12v-1h4v1H6zM4 8v-1h8v1H4zm-2-4v-1h12v1H2z"/>
+                    </svg>
+                  </button>
+                </div>
+              <% end %>
             </div>
           </div>
           <%= render_sidebar_filters(assigns) %>

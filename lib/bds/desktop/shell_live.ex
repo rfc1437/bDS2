@@ -97,14 +97,38 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("toggle_sidebar_filters", _params, socket) do
-    view_id = Atom.to_string(socket.assigns.workbench.active_view)
-
-    sidebar_filter_panels =
-      Map.update(socket.assigns.sidebar_filter_panels, view_id, false, &not &1)
+    socket =
+      put_sidebar_filter_panel_state(socket, fn state ->
+        if state.visible do
+          %{state | visible: false}
+        else
+          %{default_sidebar_filter_panel_state() | visible: true}
+        end
+      end)
 
     {:noreply,
      socket
-     |> assign(:sidebar_filter_panels, sidebar_filter_panels)
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
+  def handle_event("toggle_sidebar_archive", _params, socket) do
+    {:noreply,
+     socket
+     |> put_sidebar_filter_panel_state(fn state -> %{state | archive_collapsed: not state.archive_collapsed} end)
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
+  def handle_event("toggle_sidebar_tags", _params, socket) do
+    {:noreply,
+     socket
+     |> put_sidebar_filter_panel_state(fn state -> %{state | tags_collapsed: not state.tags_collapsed} end)
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
+  def handle_event("toggle_sidebar_categories", _params, socket) do
+    {:noreply,
+     socket
+     |> put_sidebar_filter_panel_state(fn state -> %{state | categories_collapsed: not state.categories_collapsed} end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
@@ -122,6 +146,20 @@ defmodule BDS.Desktop.ShellLive do
      |> reload_shell(socket.assigns.workbench)}
   end
 
+  def handle_event("clear_sidebar_tags", _params, socket) do
+    {:noreply,
+     socket
+     |> put_sidebar_filters(fn filters -> Map.put(filters, :tags, []) end)
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
+  def handle_event("clear_sidebar_categories", _params, socket) do
+    {:noreply,
+     socket
+     |> put_sidebar_filters(fn filters -> Map.put(filters, :categories, []) end)
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
   def handle_event("toggle_sidebar_tag", %{"tag" => tag}, socket) do
     {:noreply,
      socket
@@ -136,9 +174,31 @@ defmodule BDS.Desktop.ShellLive do
      |> reload_shell(socket.assigns.workbench)}
   end
 
+  def handle_event("select_sidebar_year", %{"year" => year}, socket) do
+    parsed_year = parse_optional_integer(year)
+
+    {:noreply,
+     socket
+     |> put_sidebar_filter_panel_state(fn state ->
+       %{state |
+         archive_collapsed: false,
+         expanded_year: if(state.expanded_year == parsed_year, do: nil, else: parsed_year)
+       }
+     end)
+     |> put_sidebar_filters(fn filters ->
+       filters
+       |> Map.put(:year, parsed_year)
+       |> Map.put(:month, nil)
+     end)
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
   def handle_event("select_sidebar_month", %{"year" => year, "month" => month}, socket) do
     {:noreply,
      socket
+     |> put_sidebar_filter_panel_state(fn state ->
+       %{state | archive_collapsed: false, expanded_year: parse_optional_integer(year)}
+     end)
      |> put_sidebar_filters(fn filters ->
        filters
        |> Map.put(:year, parse_optional_integer(year))
@@ -150,6 +210,7 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("clear_sidebar_month", _params, socket) do
     {:noreply,
      socket
+      |> put_sidebar_filter_panel_state(fn state -> %{state | archive_collapsed: false} end)
      |> put_sidebar_filters(fn filters -> filters |> Map.put(:year, nil) |> Map.put(:month, nil) end)
      |> reload_shell(socket.assigns.workbench)}
   end
@@ -346,34 +407,29 @@ defmodule BDS.Desktop.ShellLive do
         assigns
         |> assign(:sidebar_filters_config, filters)
         |> assign(:selected_filters, selected)
-        |> assign(:filter_panel_visible, Map.get(filters, :filter_panel_visible, true))
+        |> assign(:filter_panel_visible, Map.get(filters, :filter_panel_visible, false))
+        |> assign(:archive_collapsed, Map.get(filters, :archive_collapsed, true))
+        |> assign(:tags_collapsed, Map.get(filters, :tags_collapsed, true))
+        |> assign(:categories_collapsed, Map.get(filters, :categories_collapsed, true))
+        |> assign(:expanded_year, Map.get(filters, :expanded_year))
+        |> assign(:year_groups, group_year_month_counts(Map.get(filters, :year_month_counts, [])))
 
       ~H"""
-      <form class="search-box" data-testid="sidebar-search-form" phx-change="update_sidebar_search">
+      <form class="search-box" data-testid="sidebar-search-form" phx-change="update_sidebar_search" phx-submit="update_sidebar_search">
         <input
           type="text"
           name="sidebar_filters[search]"
           value={Map.get(@selected_filters, :search) || ""}
           placeholder={translated(@sidebar_filters_config.search_placeholder)}
         />
+        <button type="submit" title={translated("sidebar.search")}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M15.7 14.3l-4.2-4.2c-.2-.2-.5-.3-.8-.3.9-1.1 1.5-2.5 1.5-4C12.2 2.6 9.6 0 6.4 0S.6 2.6.6 5.8s2.6 5.8 5.8 5.8c1.5 0 2.9-.5 4-1.4 0 .3.1.6.3.8l4.2 4.2c.2.2.5.3.7.3s.5-.1.7-.3c.4-.4.4-1 0-1.4zm-9.3-4c-2.5 0-4.5-2-4.5-4.5s2-4.5 4.5-4.5 4.5 2 4.5 4.5-2 4.5-4.5 4.5z"/>
+          </svg>
+        </button>
         <%= if Map.get(@selected_filters, :search) do %>
           <button class="clear-search" data-testid="sidebar-clear-search" type="button" phx-click="clear_sidebar_search">×</button>
         <% end %>
-        <div class="sidebar-actions">
-          <button
-            class={[
-              "sidebar-action",
-              if(@filter_panel_visible, do: "active")
-            ]}
-            data-testid="sidebar-filter-toggle"
-            type="button"
-            phx-click="toggle_sidebar_filters"
-            aria-label={translated(@sidebar_filters_config.toggle_filters_label)}
-            title={translated(@sidebar_filters_config.toggle_filters_label)}
-          >
-            ≡
-          </button>
-        </div>
       </form>
 
       <%= if Map.get(@sidebar_filters_config, :has_active_filters) do %>
@@ -388,79 +444,144 @@ defmodule BDS.Desktop.ShellLive do
       <% end %>
 
       <%= if @filter_panel_visible do %>
-        <%= if Enum.any?(Map.get(@sidebar_filters_config, :year_month_counts, [])) do %>
+        <%= if Enum.any?(@year_groups) do %>
           <div class="calendar-view">
-            <div class="calendar-header">
+            <div
+              class={[
+                "calendar-header",
+                "collapsible-header",
+                if(@archive_collapsed, do: "collapsed", else: "expanded")
+              ]}
+              data-testid="sidebar-filter-archive-header"
+              phx-click="toggle_sidebar_archive"
+            >
+              <span class="collapse-icon"><%= if @archive_collapsed, do: "▶", else: "▼" %></span>
               <span><%= translated(@sidebar_filters_config.archive_label) %></span>
               <%= if Map.get(@selected_filters, :year) do %>
-                <button class="clear-filter" type="button" phx-click="clear_sidebar_month">×</button>
+                <button class="clear-filter" type="button" phx-click="clear_sidebar_month" phx-stop-propagation>✕</button>
               <% end %>
             </div>
-            <div class="calendar-years">
-              <%= for entry <- Map.get(@sidebar_filters_config, :year_month_counts, []) do %>
-                <button
-                  class={[
-                    "calendar-month",
-                    if(Map.get(@selected_filters, :year) == entry.year and Map.get(@selected_filters, :month) == entry.month, do: "selected")
-                  ]}
-                  data-testid="sidebar-filter-month"
-                  type="button"
-                  phx-click="select_sidebar_month"
-                  phx-value-year={entry.year}
-                  phx-value-month={entry.month}
-                >
-                  <span class="month-label"><%= ShellData.format_dashboard_month(entry.year, entry.month) %> <%= entry.year %></span>
-                  <span class="month-count"><%= entry.count %></span>
-                </button>
-              <% end %>
-            </div>
+            <%= unless @archive_collapsed do %>
+              <div class="calendar-years">
+                <%= for year_group <- @year_groups do %>
+                  <div class="calendar-year">
+                    <div
+                      class={[
+                        "calendar-year-header",
+                        if(Map.get(@selected_filters, :year) == year_group.year and is_nil(Map.get(@selected_filters, :month)), do: "selected")
+                      ]}
+                      phx-click="select_sidebar_year"
+                      phx-value-year={year_group.year}
+                    >
+                      <span class="expand-icon"><%= if @expanded_year == year_group.year, do: "▼", else: "▶" %></span>
+                      <span class="year-label"><%= year_group.year %></span>
+                      <span class="year-count"><%= year_group.count %></span>
+                    </div>
+                    <%= if @expanded_year == year_group.year do %>
+                      <div class="calendar-months">
+                        <%= for month_entry <- year_group.months do %>
+                          <button
+                            class={[
+                              "calendar-month",
+                              if(Map.get(@selected_filters, :year) == year_group.year and Map.get(@selected_filters, :month) == month_entry.month, do: "selected")
+                            ]}
+                            data-testid="sidebar-filter-month"
+                            type="button"
+                            phx-click="select_sidebar_month"
+                            phx-value-year={year_group.year}
+                            phx-value-month={month_entry.month}
+                          >
+                            <span class="month-label"><%= ShellData.format_dashboard_month(year_group.year, month_entry.month) %></span>
+                            <span class="month-count"><%= month_entry.count %></span>
+                          </button>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
           </div>
         <% end %>
 
         <div class="filter-panel">
           <%= if Enum.any?(Map.get(@sidebar_filters_config, :available_tags, [])) do %>
             <section class="filter-section">
-              <div class="filter-header"><%= translated(@sidebar_filters_config.tags_label) %></div>
-              <div class="filter-chips">
-                <%= for tag <- Map.get(@sidebar_filters_config, :available_tags, []) do %>
-                  <button
-                    class={[
-                      "filter-chip",
-                      if(tag in Map.get(@selected_filters, :tags, []), do: "active")
-                    ]}
-                    data-testid="sidebar-filter-tag"
-                    data-filter-tag={tag}
-                    type="button"
-                    phx-click="toggle_sidebar_tag"
-                    phx-value-tag={tag}
-                  >
-                    <%= tag %>
-                  </button>
+              <div
+                class={[
+                  "filter-header",
+                  "collapsible-header",
+                  if(@tags_collapsed, do: "collapsed", else: "expanded")
+                ]}
+                data-testid="sidebar-filter-tags-header"
+                phx-click="toggle_sidebar_tags"
+              >
+                <span class="collapse-icon"><%= if @tags_collapsed, do: "▶", else: "▼" %></span>
+                <span><%= translated(@sidebar_filters_config.tags_label) %></span>
+                <%= if Enum.any?(Map.get(@selected_filters, :tags, [])) do %>
+                  <button class="clear-filter" type="button" phx-click="clear_sidebar_tags" phx-stop-propagation title={translated(@sidebar_filters_config.clear_tags_label)}>✕</button>
                 <% end %>
               </div>
+              <%= unless @tags_collapsed do %>
+                <div class="filter-chips">
+                  <%= for tag <- Map.get(@sidebar_filters_config, :available_tags, []) do %>
+                    <button
+                      class={[
+                        "filter-chip",
+                        if(tag in Map.get(@selected_filters, :tags, []), do: "active"),
+                        if(sidebar_filter_tag_color(@sidebar_filters_config, tag), do: "has-color")
+                      ]}
+                      style={sidebar_filter_chip_style(@sidebar_filters_config, tag)}
+                      data-testid="sidebar-filter-tag"
+                      data-filter-tag={tag}
+                      type="button"
+                      phx-click="toggle_sidebar_tag"
+                      phx-value-tag={tag}
+                    >
+                      <%= tag %>
+                    </button>
+                  <% end %>
+                </div>
+              <% end %>
             </section>
           <% end %>
 
           <%= if Enum.any?(Map.get(@sidebar_filters_config, :available_categories, [])) do %>
             <section class="filter-section">
-              <div class="filter-header"><%= translated(@sidebar_filters_config.categories_label) %></div>
-              <div class="filter-chips">
-                <%= for category <- Map.get(@sidebar_filters_config, :available_categories, []) do %>
-                  <button
-                    class={[
-                      "filter-chip",
-                      if(category in Map.get(@selected_filters, :categories, []), do: "active")
-                    ]}
-                    data-testid="sidebar-filter-category"
-                    data-filter-category={category}
-                    type="button"
-                    phx-click="toggle_sidebar_category"
-                    phx-value-category={category}
-                  >
-                    <%= category %>
-                  </button>
+              <div
+                class={[
+                  "filter-header",
+                  "collapsible-header",
+                  if(@categories_collapsed, do: "collapsed", else: "expanded")
+                ]}
+                data-testid="sidebar-filter-categories-header"
+                phx-click="toggle_sidebar_categories"
+              >
+                <span class="collapse-icon"><%= if @categories_collapsed, do: "▶", else: "▼" %></span>
+                <span><%= translated(@sidebar_filters_config.categories_label) %></span>
+                <%= if Enum.any?(Map.get(@selected_filters, :categories, [])) do %>
+                  <button class="clear-filter" type="button" phx-click="clear_sidebar_categories" phx-stop-propagation title={translated(@sidebar_filters_config.clear_categories_label)}>✕</button>
                 <% end %>
               </div>
+              <%= unless @categories_collapsed do %>
+                <div class="filter-chips">
+                  <%= for category <- Map.get(@sidebar_filters_config, :available_categories, []) do %>
+                    <button
+                      class={[
+                        "filter-chip",
+                        if(category in Map.get(@selected_filters, :categories, []), do: "active")
+                      ]}
+                      data-testid="sidebar-filter-category"
+                      data-filter-category={category}
+                      type="button"
+                      phx-click="toggle_sidebar_category"
+                      phx-value-category={category}
+                    >
+                      <%= category %>
+                    </button>
+                  <% end %>
+                </div>
+              <% end %>
             </section>
           <% end %>
         </div>
@@ -925,11 +1046,44 @@ defmodule BDS.Desktop.ShellLive do
     filters = Map.get(sidebar_data, :filters)
 
     if is_map(filters) and Map.get(filters, :enabled) do
-      filter_panel_visible = Map.get(socket.assigns.sidebar_filter_panels, view_id, true)
-      Map.put(sidebar_data, :filters, Map.put(filters, :filter_panel_visible, filter_panel_visible))
+      panel_state = sidebar_filter_panel_state(socket, view_id)
+
+      Map.put(sidebar_data, :filters, Map.merge(filters, %{
+        filter_panel_visible: panel_state.visible,
+        archive_collapsed: panel_state.archive_collapsed,
+        tags_collapsed: panel_state.tags_collapsed,
+        categories_collapsed: panel_state.categories_collapsed,
+        expanded_year: panel_state.expanded_year
+      }))
     else
       sidebar_data
     end
+  end
+
+  defp sidebar_filter_panel_state(socket, view_id) do
+    default_state = default_sidebar_filter_panel_state()
+
+    case Map.get(socket.assigns.sidebar_filter_panels, view_id) do
+      state when is_map(state) -> Map.merge(default_state, state)
+      visible when is_boolean(visible) -> Map.put(default_state, :visible, visible)
+      _other -> default_state
+    end
+  end
+
+  defp put_sidebar_filter_panel_state(socket, updater) do
+    view_id = Atom.to_string(socket.assigns.workbench.active_view)
+    state = socket |> sidebar_filter_panel_state(view_id) |> updater.()
+    assign(socket, :sidebar_filter_panels, Map.put(socket.assigns.sidebar_filter_panels, view_id, state))
+  end
+
+  defp default_sidebar_filter_panel_state do
+    %{
+      visible: false,
+      archive_collapsed: true,
+      tags_collapsed: true,
+      categories_collapsed: true,
+      expanded_year: nil
+    }
   end
 
   defp current_sidebar_filters(socket, view_id) do
@@ -968,6 +1122,65 @@ defmodule BDS.Desktop.ShellLive do
       end
 
     Map.put(filters, key, next_values)
+  end
+
+  defp group_year_month_counts(entries) do
+    entries
+    |> Enum.group_by(& &1.year)
+    |> Enum.map(fn {year, months} ->
+      %{
+        year: year,
+        count: Enum.reduce(months, 0, fn entry, acc -> acc + (entry.count || 0) end),
+        months: Enum.sort_by(months, &-&1.month)
+      }
+    end)
+    |> Enum.sort_by(&-&1.year)
+  end
+
+  defp sidebar_filter_tag_color(filters_config, tag) do
+    filters_config
+    |> Map.get(:available_tag_colors, %{})
+    |> Map.get(tag)
+    |> normalize_sidebar_filter_color()
+  end
+
+  defp sidebar_filter_chip_style(filters_config, tag) do
+    case sidebar_filter_tag_color(filters_config, tag) do
+      nil -> nil
+      color -> "background-color: #{color}; color: #{sidebar_filter_contrast_color(color)}; border-color: #{color};"
+    end
+  end
+
+  defp normalize_sidebar_filter_color(nil), do: nil
+  defp normalize_sidebar_filter_color(""), do: nil
+
+  defp normalize_sidebar_filter_color("#" <> rest = color) when byte_size(rest) == 6 do
+    if String.match?(rest, ~r/\A[0-9a-fA-F]{6}\z/), do: color, else: nil
+  end
+
+  defp normalize_sidebar_filter_color(_color), do: nil
+
+  defp sidebar_filter_contrast_color("#" <> rgb) do
+    <<r::binary-size(2), g::binary-size(2), b::binary-size(2)>> = rgb
+    {red, _} = Integer.parse(r, 16)
+    {green, _} = Integer.parse(g, 16)
+    {blue, _} = Integer.parse(b, 16)
+    luminance = (red * 299 + green * 587 + blue * 114) / 1000
+    if luminance > 150, do: "#1e1e1e", else: "#ffffff"
+  end
+
+  defp sidebar_filter_contrast_color(_color), do: "#ffffff"
+
+  defp sidebar_filters_enabled?(sidebar_data) do
+    sidebar_data
+    |> Map.get(:filters)
+    |> then(&(is_map(&1) and Map.get(&1, :enabled, false)))
+  end
+
+  defp sidebar_filters_visible?(sidebar_data) do
+    sidebar_data
+    |> Map.get(:filters, %{})
+    |> Map.get(:filter_panel_visible, false)
   end
 
   defp normalize_filter_string(nil), do: nil

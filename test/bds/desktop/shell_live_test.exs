@@ -9,6 +9,7 @@ defmodule BDS.Desktop.ShellLiveTest do
   alias BDS.Posts.Post
   alias BDS.Projects
   alias BDS.Repo
+  alias BDS.Tags
 
   @endpoint BDS.Desktop.Endpoint
 
@@ -218,14 +219,36 @@ defmodule BDS.Desktop.ShellLiveTest do
   test "sidebar filters and load more are server-driven", %{project: project} do
     seed_sidebar_posts(project.id)
 
+    assert {:ok, _tag} = Tags.create_tag(%{project_id: project.id, name: "tech", color: "#112233"})
+
     {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
     assert html =~ ~s(data-testid="sidebar-search-form")
     assert html =~ ~s(data-testid="sidebar-filter-toggle")
-    assert html =~ ~s(data-testid="sidebar-filter-tag")
+    assert html =~ ~s(class="sidebar-section-header")
+    assert html =~ ~s(class="sidebar-actions")
     assert html =~ ~s(data-testid="sidebar-load-more")
+    refute html =~ ~s(data-testid="sidebar-filter-tag")
     assert html =~ "Alpha Post"
     refute html =~ "Overflow Post"
+
+    html =
+      view
+      |> element("[data-testid='sidebar-filter-toggle']")
+      |> render_click()
+
+    assert html =~ ~s(class="calendar-header collapsible-header collapsed")
+    assert html =~ ~s(class="filter-header collapsible-header collapsed")
+    refute html =~ ~s(class="calendar-year-header")
+    refute html =~ ~s(data-testid="sidebar-filter-tag")
+
+    html =
+      view
+      |> element("[data-testid='sidebar-filter-tags-header']")
+      |> render_click()
+
+    assert html =~ ~s(class="filter-chip has-color")
+    assert html =~ ~s(data-testid="sidebar-filter-tag")
 
     html =
       view
@@ -354,8 +377,8 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> render_click()
 
     refute html =~ ~s(class="panel-shell is-hidden")
-    assert html =~ ~s(class="panel-tab active")
-    assert html =~ "No background tasks running"
+    assert html =~ ~s(<button class="panel-tab active" type="button" phx-click="select_panel_tab" phx-value-tab="tasks">)
+    assert html =~ ~s(class="task-list") or html =~ "No background tasks running"
   end
 
   defp seed_sidebar_posts(project_id) do

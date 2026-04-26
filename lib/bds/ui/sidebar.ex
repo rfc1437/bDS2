@@ -69,9 +69,9 @@ defmodule BDS.UI.Sidebar do
     }
   end
 
-  defp empty_view("posts"), do: posts_view_data([], [], %{}, false, empty_filter_params())
-  defp empty_view("pages"), do: posts_view_data([], [], %{}, true, empty_filter_params())
-  defp empty_view("media"), do: media_view_data([], [], empty_filter_params())
+  defp empty_view("posts"), do: posts_view_data([], [], %{}, false, empty_filter_params(), %{})
+  defp empty_view("pages"), do: posts_view_data([], [], %{}, true, empty_filter_params(), %{})
+  defp empty_view("media"), do: media_view_data([], [], empty_filter_params(), %{})
   defp empty_view("scripts"), do: entity_list_view("Scripts", "Automation helpers", "scripts", [])
   defp empty_view("templates"), do: entity_list_view("Templates", "Site rendering", "templates", [])
   defp empty_view("tags"), do: tags_nav_view([])
@@ -84,16 +84,19 @@ defmodule BDS.UI.Sidebar do
   defp posts_view(project_id, params, pages?) do
     posts = list_posts(project_id)
     translation_counts = translation_counts(project_id)
+    tag_colors = tag_color_map(project_id)
     filters = normalize_filter_params(params)
     base_posts = Enum.filter(posts, &(page_post?(&1) == pages?))
     filtered_posts = apply_post_filters(base_posts, filters)
 
-    posts_view_data(base_posts, filtered_posts, translation_counts, pages?, filters)
+    posts_view_data(base_posts, filtered_posts, translation_counts, pages?, filters, tag_colors)
   end
 
-  defp posts_view_data(base_posts, filtered_posts, translation_counts, pages?, filters) do
+  defp posts_view_data(base_posts, filtered_posts, translation_counts, pages?, filters, tag_colors) do
     limited_posts = Enum.take(filtered_posts, filters.display_limit)
     grouped_posts = group_posts(limited_posts)
+    available_tags = available_tags(base_posts, & &1.tags)
+    available_categories = available_categories(base_posts, pages?)
 
     %{
       title: if(pages?, do: "Pages", else: "Posts"),
@@ -114,8 +117,9 @@ defmodule BDS.UI.Sidebar do
         results_for_label: "sidebar.resultsFor",
         no_results_label: "sidebar.noMatchingPosts",
         year_month_counts: year_month_counts(base_posts, &post_filter_timestamp/1),
-        available_tags: available_tags(base_posts, & &1.tags),
-        available_categories: available_categories(base_posts, pages?),
+        available_tags: available_tags,
+        available_tag_colors: Map.take(tag_colors, available_tags),
+        available_categories: available_categories,
         max_items: @default_page_size,
         display_limit: filters.display_limit,
         loaded_count: length(limited_posts),
@@ -140,14 +144,16 @@ defmodule BDS.UI.Sidebar do
 
   defp media_view(project_id, params) do
     media_items = list_media(project_id)
+    tag_colors = tag_color_map(project_id)
     filters = normalize_filter_params(params)
     filtered_media = apply_media_filters(media_items, filters)
 
-    media_view_data(media_items, filtered_media, filters)
+    media_view_data(media_items, filtered_media, filters, tag_colors)
   end
 
-  defp media_view_data(base_media, filtered_media, filters) do
+  defp media_view_data(base_media, filtered_media, filters, tag_colors) do
     limited_media = Enum.take(filtered_media, filters.display_limit)
+    available_tags = available_tags(base_media, & &1.tags)
 
     %{
       title: "Media",
@@ -166,7 +172,8 @@ defmodule BDS.UI.Sidebar do
         results_for_label: "sidebar.resultsFor",
         no_results_label: "sidebar.noMediaFiles",
         year_month_counts: year_month_counts(base_media, &Map.get(&1, :updated_at)),
-        available_tags: available_tags(base_media, & &1.tags),
+        available_tags: available_tags,
+        available_tag_colors: Map.take(tag_colors, available_tags),
         available_categories: [],
         max_items: @default_page_size,
         display_limit: filters.display_limit,
@@ -491,6 +498,16 @@ defmodule BDS.UI.Sidebar do
     |> Enum.reject(&(&1 == ""))
     |> Enum.uniq_by(&String.downcase/1)
     |> Enum.sort_by(&String.downcase/1)
+  end
+
+  defp tag_color_map(project_id) do
+    Repo.all(from tag in Tag, where: tag.project_id == ^project_id, select: {tag.name, tag.color})
+    |> Enum.reduce(%{}, fn {name, color}, acc ->
+      case String.trim(to_string(color || "")) do
+        "" -> acc
+        trimmed -> Map.put(acc, to_string(name), trimmed)
+      end
+    end)
   end
 
   defp filtered_categories(categories) do
