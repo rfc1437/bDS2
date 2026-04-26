@@ -13,7 +13,7 @@ The rewrite already implements most of the backend and compatibility-critical su
 - Compatibility parity locks: executable parity coverage now pins the old-bDS behavior for serializer/file contracts, metadata-diff ordering, canonical generation routes, feed output, localized archive rendering, preview draft language selection, taxonomy archive links, and media URL rewriting.
 - Core editorial domains: projects, posts, post translations, media, media translations, tags, templates, scripts, menu data, and project metadata.
 - Output and infrastructure: search, Liquid rendering, site generation, preview server, publishing, background tasks, i18n, git support, MCP server, AI operations, embeddings, and CLI sync.
-- Desktop shell foundation: native menu definitions, LiveView shell endpoint, activity bar, sidebar views, tab/workbench state, task panel, assistant sidebar, status bar, project switcher, shell command routing, template-backed shell rendering, sidebar search/filter/load-more controls, dashboard recent-post opening, UI language switching, project dropdown actions, output/post-link/git lower-panel content, and browser-native menu bridging.
+- Desktop shell foundation: native menu definitions, LiveView shell endpoint, activity bar, sidebar views, tab/workbench state, task panel, assistant sidebar, status bar, project switcher, shell command routing, template-backed shell rendering, sidebar search/filter/load-more controls, dashboard recent-post opening, UI language switching, project dropdown actions, output/post-link/git lower-panel content, browser-native menu bridging, and the shared modal/overlay layer for AI suggestions, picker flows, confirmations, and gallery/lightbox interactions.
 
 ### Implemented But Not Yet At Parity
 
@@ -24,7 +24,6 @@ The rewrite already implements most of the backend and compatibility-critical su
 
 ### Missing Or Materially Incomplete
 
-- Shared modal and overlay system: AI suggestions modal, confirm-delete variants, merge confirmation, pickers, and gallery-style overlays.
 - Rich route-specific editors for post, media, settings, tags, chat, script, template, and misc surfaces.
 - Full UI wiring for create/import/publish/preview/edit-menu flows described by the editor specs.
 - Full parity validation against the old application for every spec-defined edge case in editor behavior, media processing details, and cross-feature action chains.
@@ -40,7 +39,7 @@ Ordered from base contracts upward:
 | Integrations | `git`, `mcp`, `ai`, `embedding`, `cli_sync`, `metadata_diff` | Implemented | Service layer and test coverage exist for these domains. |
 | Desktop shell primitives | `layout`, `tabs`, `sidebar_views` | Implemented | Route state, registry-backed sidebar/editor coverage, panel fallback rules, menu/native-command wiring, and a LiveView-owned shell frame are in place; route bodies remain generic until the editor UX phase. |
 | Cross-cutting flows | `ui_data_flow`, `engine_side_effects`, `action_patterns`, `media_processing` | Partial | Most backend behavior exists, but UI coordination, explicit engine event modeling, and some parity details are still incomplete. |
-| Editor UX layer | `editor_post`, `editor_media`, `editor_settings`, `editor_tags`, `editor_chat`, `editor_script`, `editor_template`, `editor_misc`, `modals` | Partial to missing | Route registration exists, but feature-complete editors and modal workflows are not done. |
+| Editor UX layer | `editor_post`, `editor_media`, `editor_settings`, `editor_tags`, `editor_chat`, `editor_script`, `editor_template`, `editor_misc`, `modals` | Partial | Shared modal workflows are implemented; route registration exists, but feature-complete editors are not done. |
 
 ## Plan To Full Feature Parity
 
@@ -55,8 +54,8 @@ The remaining work needs to proceed from base contracts upward. Later phases sho
 3. Finish the desktop shell primitives. Completed 2026-04-26.
    Route state, registry-backed shell command coverage, panel fallback integration, menu/native-command wiring, template-backed LiveView rendering, sidebar search/filter/load-more controls, dashboard recent-post opening, project dropdown actions, UI language switching, real output/post-link/git lower-panel content, and native-menu event bridging now cover the old shell frame behavior while preserving the legacy layout and styling.
 
-4. Implement the shared modal and confirmation layer.
-   Add the modal/overlay system required by the specs: AI suggestions, delete confirmations, merge confirmation, picker overlays, and gallery flows.
+4. Implement the shared modal and confirmation layer. Completed 2026-04-26.
+   The LiveView shell now owns the shared modal/overlay system required by the specs: AI suggestions, delete confirmations, merge confirmation, picker overlays, and gallery/lightbox flows, with overlay state isolated in a pure module and covered by focused tests.
 
 5. Build feature-complete editors.
    Replace generic editor bodies with real editors for posts, media, settings, tags, chat, scripts, templates, and misc maintenance views, including save/discard/publish/delete/import flows.

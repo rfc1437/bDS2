@@ -560,6 +560,99 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="task-list") or html =~ "No background tasks running"
   end
 
+  test "post tabs render a real editor and drive save publish discard flows", %{project: project} do
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Draft Shell Post",
+        content: "Initial body",
+        excerpt: "Initial excerpt"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => post.id,
+        "title" => post.title,
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-testid="post-editor")
+    assert html =~ ~s(data-testid="post-editor-form")
+    assert html =~ ~s(name="post_editor[title]")
+    assert html =~ ~s(name="post_editor[content]")
+    assert html =~ ~s(name="post_editor[excerpt]")
+    assert html =~ ~s(data-testid="post-publish-button")
+    assert html =~ ~s(data-testid="post-discard-button")
+    refute html =~ "Desktop workbench content routed through the Elixir shell."
+
+    html =
+      view
+      |> form("[data-testid='post-editor-form']", %{
+        post_editor: %{
+          title: "Updated Shell Post",
+          content: "Updated body",
+          excerpt: "Updated excerpt",
+          tags: "alpha, beta",
+          categories: "notes, guides",
+          author: "Ada Lovelace",
+          language: "de",
+          do_not_translate: "false",
+          template_slug: ""
+        }
+      })
+      |> render_change()
+
+    assert html =~ ~s(class="tab active dirty")
+    assert html =~ "Updated Shell Post"
+
+    _html = render_click(view, "save_post_editor", %{"id" => post.id})
+
+    saved_post = Posts.get_post!(post.id)
+    assert saved_post.title == "Updated Shell Post"
+    assert saved_post.content == "Updated body"
+    assert saved_post.excerpt == "Updated excerpt"
+    assert saved_post.tags == ["alpha", "beta"]
+    assert saved_post.categories == ["notes", "guides"]
+    assert saved_post.author == "Ada Lovelace"
+    assert saved_post.language == "de"
+
+    html = render_click(view, "publish_post_editor", %{"id" => post.id})
+
+    assert html =~ ~s(data-testid="post-status-badge")
+    assert Posts.get_post!(post.id).status == :published
+
+    _html =
+      view
+      |> form("[data-testid='post-editor-form']", %{
+        post_editor: %{
+          title: "Published Shell Post",
+          content: "Draft changes after publish",
+          excerpt: "Changed after publish",
+          tags: "alpha, beta",
+          categories: "notes, guides",
+          author: "Ada Lovelace",
+          language: "de",
+          do_not_translate: "false",
+          template_slug: ""
+        }
+      })
+      |> render_change()
+
+    _html = render_click(view, "save_post_editor", %{"id" => post.id})
+    assert Posts.get_post!(post.id).status == :draft
+
+    html = render_click(view, "discard_post_editor", %{"id" => post.id})
+
+    discarded_post = Posts.get_post!(post.id)
+    assert html =~ "Updated Shell Post"
+    assert discarded_post.status == :published
+    assert discarded_post.content == nil
+    assert discarded_post.title == "Updated Shell Post"
+  end
+
   defp seed_sidebar_posts(project_id) do
     now = Persistence.now_ms()
 

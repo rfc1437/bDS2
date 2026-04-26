@@ -274,19 +274,22 @@ defmodule BDS.UI.ShellTest do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
+    overlay_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/overlay_components.ex")
+    overlay_template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex")
 
     assert template =~ "render_editor_toolbar(assigns)"
-    assert template =~ "render_shell_overlay(assigns)"
+    assert template =~ "<ShellOverlayComponents.shell_overlay"
 
     assert live_ex =~ ~s(def handle_event("open_overlay")
     assert live_ex =~ ~s(def handle_event("close_overlay")
     assert live_ex =~ ~s(def handle_event("overlay_keydown")
-    assert live_ex =~ "ai-suggestions-modal"
-    assert live_ex =~ "confirm-delete-modal"
-    assert live_ex =~ "insert-modal"
-    assert live_ex =~ "language-picker-modal"
-    assert live_ex =~ "gallery-overlay"
-    assert live_ex =~ "lightbox-overlay"
+    assert overlay_ex =~ "def context(assigns, tab_title, tab_subtitle)"
+    assert overlay_template =~ "ai-suggestions-modal"
+    assert overlay_template =~ "confirm-delete-modal"
+    assert overlay_template =~ "insert-modal"
+    assert overlay_template =~ "language-picker-modal"
+    assert overlay_template =~ "gallery-overlay"
+    assert overlay_template =~ "lightbox-overlay"
 
     assert css =~ ".shell-overlay-backdrop"
     assert css =~ ".ai-suggestions-modal-backdrop"

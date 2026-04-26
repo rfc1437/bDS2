@@ -3,18 +3,18 @@ defmodule BDS.Desktop.ShellLive do
 
   use Phoenix.LiveView
 
-  import Ecto.Query
   import Phoenix.HTML
 
   alias BDS.Desktop.{FolderPicker, Overlay, ShellCommands, ShellData}
+  alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
+  alias BDS.Desktop.ShellLive.PostEditor
   alias BDS.Desktop.MenuBar, as: DesktopMenuBar
-  alias BDS.{Git, I18n, Metadata}
+  alias BDS.{Git, Posts}
   alias BDS.Media.Media
   alias BDS.PostLinks
-  alias BDS.Posts.{Post, Translation}
+  alias BDS.Posts.Post
   alias BDS.Projects
   alias BDS.Repo
-  alias BDS.Tags.Tag
   alias BDS.UI.{Commands, MenuBar, Registry, Session, Workbench}
 
   @refresh_interval 1_500
@@ -59,6 +59,11 @@ defmodule BDS.Desktop.ShellLive do
       |> assign(:project_menu_open, false)
       |> assign(:sidebar_filters_by_view, %{})
       |> assign(:sidebar_filter_panels, %{})
+        |> assign(:post_editor_drafts, %{})
+        |> assign(:post_editor_active_languages, %{})
+        |> assign(:post_editor_modes, %{})
+        |> assign(:post_editor_expanded, %{})
+        |> assign(:post_editor_save_states, %{})
         |> assign(:shell_overlay, nil)
       |> assign(:output_entries, [])
      |> reload_shell(workbench)}
@@ -309,11 +314,62 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, reload_shell(socket, workbench)}
   end
 
+  def handle_event("change_post_editor", %{"post_editor" => params}, socket) do
+    {:noreply, update_post_editor(socket, params)}
+  end
+
+  def handle_event("save_post_editor", %{"id" => post_id}, socket) do
+    {:noreply, persist_post_editor(socket, post_id, :save)}
+  end
+
+  def handle_event("publish_post_editor", %{"id" => post_id}, socket) do
+    {:noreply, persist_post_editor(socket, post_id, :publish)}
+  end
+
+  def handle_event("discard_post_editor", %{"id" => post_id}, socket) do
+    {:noreply, discard_post_editor(socket, post_id)}
+  end
+
+  def handle_event("delete_post_editor", %{"id" => post_id}, socket) do
+    {:noreply, delete_post_editor(socket, post_id)}
+  end
+
+  def handle_event("set_post_editor_mode", %{"id" => post_id, "mode" => mode}, socket) do
+    {:noreply,
+     socket
+      |> assign(:post_editor_modes, Map.put(socket.assigns.post_editor_modes, post_id, PostEditor.normalize_mode(mode)))
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
+  def handle_event("toggle_post_metadata", %{"id" => post_id}, socket) do
+    {:noreply,
+     socket
+     |> update_post_editor_expanded(post_id, fn expanded -> Map.update!(expanded, :metadata, &not &1) end)
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
+  def handle_event("toggle_post_excerpt", %{"id" => post_id}, socket) do
+    {:noreply,
+     socket
+     |> update_post_editor_expanded(post_id, fn expanded -> Map.update!(expanded, :excerpt, &not &1) end)
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
+  def handle_event("select_post_editor_language", %{"id" => post_id, "language" => language}, socket) do
+    {:noreply,
+     socket
+      |> assign(:post_editor_active_languages, Map.put(socket.assigns.post_editor_active_languages, post_id, PostEditor.normalize_language(language, language)))
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
   def handle_event("open_overlay", %{"kind" => kind}, socket) do
     overlay =
-      with overlay_kind when not is_nil(overlay_kind) <- overlay_kind(kind),
+      with overlay_kind when not is_nil(overlay_kind) <- ShellOverlayComponents.kind(kind),
            %{type: route} <- socket.assigns[:current_tab] do
-        Overlay.open(route, overlay_kind, overlay_context(socket))
+        tab = socket.assigns.current_tab
+        title = tab_title(tab, socket.assigns.tab_meta)
+        subtitle = tab_subtitle(tab, socket.assigns.tab_meta)
+        Overlay.open(route, overlay_kind, ShellOverlayComponents.context(socket.assigns, title, subtitle))
       end
 
     {:noreply, assign(socket, :shell_overlay, overlay)}
@@ -345,7 +401,7 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("overlay_set_tab", %{"tab" => tab}, socket) do
-    {:noreply, update_shell_overlay(socket, &Overlay.set_active_tab(&1, overlay_tab(tab)))}
+    {:noreply, update_shell_overlay(socket, &Overlay.set_active_tab(&1, ShellOverlayComponents.tab(tab)))}
   end
 
   def handle_event("overlay_update_form", %{"overlay" => params}, socket) do
@@ -365,7 +421,7 @@ defmodule BDS.Desktop.ShellLive do
         %{kind: :insert_link} ->
           case Overlay.insert_link_result(overlay, id) do
             nil -> socket
-            result -> close_overlay_with_output(socket, overlay.title, markdown_link(result.title, result.canonical_url))
+            result -> close_overlay_with_output(socket, overlay.title, ShellOverlayComponents.markdown_link(result.title, result.canonical_url))
           end
 
         %{kind: :insert_media} ->
@@ -397,7 +453,7 @@ defmodule BDS.Desktop.ShellLive do
             case {overlay.external_url, String.trim(overlay.external_text || "")} do
               {"", _text} -> nil
               {url, ""} -> url
-              {url, text} -> markdown_link(text, url)
+              {url, text} -> ShellOverlayComponents.markdown_link(text, url)
             end
 
           if details do
@@ -617,6 +673,7 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:menu_groups, socket.assigns[:menu_groups] || titlebar_menu_groups())
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
     |> assign(:current_tab, current_tab(workbench))
+    |> assign_post_editor()
   end
 
   defp render_sidebar_filters(assigns) do
@@ -1041,263 +1098,6 @@ defmodule BDS.Desktop.ShellLive do
     """
   end
 
-  defp render_shell_overlay(%{shell_overlay: nil} = assigns) do
-    ~H"""
-    """
-  end
-
-  defp render_shell_overlay(assigns) do
-    case assigns.shell_overlay.kind do
-      :ai_suggestions -> render_ai_suggestions_overlay(assigns)
-      :insert_link -> render_insert_link_overlay(assigns)
-      :insert_media -> render_insert_media_overlay(assigns)
-      :language_picker -> render_language_picker_overlay(assigns)
-      :confirm_delete -> render_confirm_delete_overlay(assigns)
-      :confirm_dialog -> render_confirm_dialog_overlay(assigns)
-      :gallery -> render_gallery_overlay(assigns)
-      _other -> ~H"""
-      """
-    end
-  end
-
-  defp render_ai_suggestions_overlay(assigns) do
-    ~H"""
-    <div class="shell-overlay-backdrop ai-suggestions-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-      <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
-      <div class="ai-suggestions-modal" role="dialog" aria-modal="true">
-        <div class="ai-suggestions-modal-header">
-          <h2><%= @shell_overlay.title %></h2>
-          <button class="ai-suggestions-modal-close" type="button" phx-click="close_overlay">×</button>
-        </div>
-        <div class="ai-suggestions-modal-body">
-          <div class="ai-suggestions-list">
-            <%= for field <- @shell_overlay.fields do %>
-              <div class="ai-suggestion-item">
-                <label class="ai-suggestion-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={field.accepted}
-                    disabled={field.locked}
-                    phx-click="overlay_toggle_ai_field"
-                    phx-value-key={field.key}
-                  />
-                  <span class="checkmark"></span>
-                </label>
-                <div class="ai-suggestion-content">
-                  <div class="ai-suggestion-label"><%= field.label %></div>
-                  <div class="ai-suggestion-current"><%= field.current_value %></div>
-                  <div class="ai-suggestion-value"><%= field.suggested_value %></div>
-                </div>
-              </div>
-            <% end %>
-          </div>
-        </div>
-        <div class="ai-suggestions-modal-footer">
-          <button class="button-cancel" type="button" phx-click="close_overlay"><%= translated("Cancel") %></button>
-          <button class="button-apply" type="button" phx-click="overlay_confirm"><%= translated("Apply Selected") %></button>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  defp render_insert_link_overlay(assigns) do
-    ~H"""
-    <div class="shell-overlay-backdrop insert-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-      <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
-      <div class="insert-modal" role="dialog" aria-modal="true">
-        <div class="insert-modal-header">
-          <h2 class="insert-modal-title"><%= @shell_overlay.title %></h2>
-          <div class="insert-modal-tabs">
-            <button class={["insert-modal-tab", if(@shell_overlay.active_tab == :internal, do: "active")]} type="button" phx-click="overlay_set_tab" phx-value-tab="internal"><%= translated("Internal") %></button>
-            <button class={["insert-modal-tab", if(@shell_overlay.active_tab == :external, do: "active")]} type="button" phx-click="overlay_set_tab" phx-value-tab="external"><%= translated("External") %></button>
-          </div>
-        </div>
-
-        <%= if @shell_overlay.active_tab == :internal do %>
-          <form class="insert-modal-search" phx-change="overlay_set_search">
-            <input class="insert-modal-input" type="text" name="overlay[query]" value={@shell_overlay.search_query} placeholder={translated("sidebar.searchPostsPlaceholder")} />
-          </form>
-          <div class="insert-modal-results">
-            <%= for result <- if(String.length(@shell_overlay.search_query) >= 2, do: @shell_overlay.results, else: @shell_overlay.related_posts) do %>
-              <button class="insert-modal-result-item" type="button" phx-click="overlay_select_result" phx-value-id={result.post_id}>
-                <div class="insert-modal-result-title"><%= result.title %></div>
-                <div class="insert-modal-result-meta"><%= result.canonical_url %></div>
-              </button>
-            <% end %>
-            <%= if Enum.empty?(if(String.length(@shell_overlay.search_query) >= 2, do: @shell_overlay.results, else: @shell_overlay.related_posts)) do %>
-              <div class="insert-modal-status"><%= translated("No items") %></div>
-            <% end %>
-          </div>
-        <% else %>
-          <form class="insert-modal-external" phx-change="overlay_update_form">
-            <label class="insert-modal-field">
-              <span class="insert-modal-label"><%= translated("URL") %></span>
-              <input class="insert-modal-input" type="text" name="overlay[url]" value={@shell_overlay.external_url} />
-            </label>
-            <label class="insert-modal-field">
-              <span class="insert-modal-label"><%= translated("Display Text") %></span>
-              <input class="insert-modal-input" type="text" name="overlay[text]" value={@shell_overlay.external_text} />
-            </label>
-            <button class="insert-modal-submit" type="button" phx-click="overlay_insert_external"><%= translated("Insert") %></button>
-          </form>
-        <% end %>
-      </div>
-    </div>
-    """
-  end
-
-  defp render_insert_media_overlay(assigns) do
-    ~H"""
-    <div class="shell-overlay-backdrop insert-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-      <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
-      <div class="insert-modal" role="dialog" aria-modal="true">
-        <div class="insert-modal-header">
-          <h2 class="insert-modal-title"><%= @shell_overlay.title %></h2>
-        </div>
-        <form class="insert-modal-search" phx-change="overlay_set_search">
-          <input class="insert-modal-input" type="text" name="overlay[query]" value={@shell_overlay.search_query} placeholder={translated("sidebar.searchMediaPlaceholder")} />
-        </form>
-        <div class="insert-modal-results insert-modal-media-grid">
-          <%= for result <- @shell_overlay.results do %>
-            <button class="insert-modal-media-item" type="button" phx-click="overlay_select_result" phx-value-id={result.media_id}>
-              <%= if result.thumbnail_url do %>
-                <img class="insert-modal-media-thumb" src={result.thumbnail_url} alt="" loading="lazy" />
-              <% else %>
-                <span class="insert-modal-media-fallback"><%= result.original_name %></span>
-              <% end %>
-              <span class="insert-modal-media-title"><%= result.title %></span>
-            </button>
-          <% end %>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  defp render_language_picker_overlay(assigns) do
-    ~H"""
-    <div class="shell-overlay-backdrop language-picker-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-      <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
-      <div class="language-picker-modal" role="dialog" aria-modal="true">
-        <div class="language-picker-modal-header">
-          <h2><%= @shell_overlay.title %></h2>
-          <button class="language-picker-modal-close" type="button" phx-click="close_overlay">×</button>
-        </div>
-        <div class="language-picker-modal-body">
-          <div class="language-picker-label"><%= translated("Available languages") %></div>
-          <div class="language-picker-options">
-            <%= for target <- @shell_overlay.available_targets do %>
-              <button class="language-picker-option" type="button" phx-click="overlay_select_language" phx-value-code={target.code}>
-                <span class="language-picker-flag"><%= target.flag_emoji %></span>
-                <span class="language-picker-name"><%= target.name %></span>
-                <%= if target.has_existing_translation do %>
-                  <span class="language-picker-status"><%= target.existing_status %></span>
-                <% end %>
-              </button>
-            <% end %>
-          </div>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  defp render_confirm_delete_overlay(assigns) do
-    ~H"""
-    <div class="shell-overlay-backdrop confirm-delete-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-      <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
-      <div class="confirm-delete-modal" role="dialog" aria-modal="true">
-        <div class="confirm-delete-modal-header">
-          <h2><%= @shell_overlay.title %></h2>
-          <button class="confirm-delete-modal-close" type="button" phx-click="close_overlay">×</button>
-        </div>
-        <div class="confirm-delete-modal-body">
-          <div class="confirm-delete-message"><strong><%= @shell_overlay.entity_name %></strong></div>
-          <%= if @shell_overlay.reference_count > 0 do %>
-            <div class="confirm-delete-warning">
-              <div class="warning-content">
-                <strong><%= translated("This item is referenced by:") %></strong>
-                <ul class="reference-list">
-                  <%= for title <- @shell_overlay.reference_list do %>
-                    <li><span class="reference-title"><%= title %></span></li>
-                  <% end %>
-                </ul>
-              </div>
-            </div>
-          <% end %>
-        </div>
-        <div class="confirm-delete-modal-footer">
-          <button class="button-cancel" type="button" phx-click="close_overlay"><%= translated("Cancel") %></button>
-          <button class="button-delete" type="button" phx-click="overlay_confirm"><%= translated("Delete") %></button>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  defp render_confirm_dialog_overlay(assigns) do
-    ~H"""
-    <div class="shell-overlay-backdrop confirm-delete-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-      <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
-      <div class="confirm-delete-modal" role="dialog" aria-modal="true">
-        <div class="confirm-delete-modal-header">
-          <h2><%= @shell_overlay.title %></h2>
-          <button class="confirm-delete-modal-close" type="button" phx-click="close_overlay">×</button>
-        </div>
-        <div class="confirm-delete-modal-body">
-          <div class="confirm-delete-message"><%= @shell_overlay.message %></div>
-        </div>
-        <div class="confirm-delete-modal-footer">
-          <button class="button-cancel" type="button" phx-click="close_overlay"><%= translated("Cancel") %></button>
-          <button class="button-apply" type="button" phx-click="overlay_confirm"><%= translated("Confirm") %></button>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  defp render_gallery_overlay(assigns) do
-    ~H"""
-    <div class="shell-overlay-backdrop gallery-overlay-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-      <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
-      <div class="gallery-overlay" role="dialog" aria-modal="true">
-        <div class="gallery-overlay-header">
-          <h2><%= translated("Gallery") %></h2>
-          <button class="gallery-overlay-close" type="button" phx-click="close_overlay">×</button>
-        </div>
-        <div class="gallery-overlay-grid">
-          <%= for image <- @shell_overlay.images do %>
-            <button class="gallery-overlay-item" type="button" phx-click="overlay_select_gallery_image" phx-value-id={image.media_id}>
-              <img src={image.thumbnail_url} alt={image.alt_text || ""} loading="lazy" />
-            </button>
-          <% end %>
-        </div>
-      </div>
-
-      <%= if @shell_overlay.lightbox do %>
-        <div class="lightbox-overlay">
-          <button class="shell-overlay-dismiss" type="button" phx-click="overlay_close_lightbox" aria-label={translated("Cancel")}></button>
-          <div class="lightbox-container">
-            <button class="lightbox-close" type="button" phx-click="overlay_close_lightbox">×</button>
-            <%= if @shell_overlay.lightbox.total_count > 1 do %>
-              <button class="lightbox-nav lightbox-prev" type="button" phx-click="overlay_lightbox_previous">‹</button>
-              <button class="lightbox-nav lightbox-next" type="button" phx-click="overlay_lightbox_next">›</button>
-            <% end %>
-            <div class="lightbox-image-container">
-              <img class="lightbox-image" src={@shell_overlay.lightbox.image_url} alt={@shell_overlay.lightbox.alt_text || ""} />
-            </div>
-            <div class="lightbox-footer">
-              <div class="lightbox-caption"><%= @shell_overlay.lightbox.title %></div>
-              <div class="lightbox-counter"><%= @shell_overlay.lightbox.current_index + 1 %> / <%= @shell_overlay.lightbox.total_count %></div>
-            </div>
-          </div>
-        </div>
-      <% end %>
-    </div>
-    """
-  end
-
   defp render_task_entries(assigns) do
     ~H"""
     <%= if Enum.empty?(Map.get(@task_status, :tasks, [])) do %>
@@ -1493,6 +1293,167 @@ defmodule BDS.Desktop.ShellLive do
   defp current_tab(%{tabs: tabs, active_tab: {type, id}}) do
     Enum.find(tabs, &(&1.type == type and &1.id == id))
   end
+
+  defp assign_post_editor(socket) do
+    assigns = Map.put(socket.assigns, :project_metadata, ShellOverlayComponents.project_metadata(socket.assigns.projects.active_project_id))
+    assign(socket, :post_editor, PostEditor.build(assigns))
+  end
+
+  defp update_post_editor(socket, params) do
+    case socket.assigns.current_tab do
+      %{type: :post, id: post_id} ->
+        case Repo.get(Post, post_id) do
+          nil ->
+            socket
+
+          %Post{} = post ->
+            metadata = ShellOverlayComponents.project_metadata(post.project_id)
+            canonical_language = PostEditor.normalize_language(post.language, metadata.main_language || "en")
+            current_language = Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
+            requested_language = PostEditor.normalize_language(Map.get(params, "language"), current_language)
+
+            next_language =
+              if current_language == canonical_language do
+                requested_language
+              else
+                current_language
+              end
+
+            draft = PostEditor.normalize_params(params, current_language, next_language)
+            workbench = Workbench.mark_dirty(socket.assigns.workbench, :post, post_id)
+
+            socket
+            |> assign(:workbench, workbench)
+            |> assign(:post_editor_drafts, put_nested_map(socket.assigns.post_editor_drafts, post_id, next_language, draft))
+            |> assign(:post_editor_active_languages, Map.put(socket.assigns.post_editor_active_languages, post_id, next_language))
+            |> assign(:post_editor_save_states, Map.put(socket.assigns.post_editor_save_states, post_id, :dirty))
+            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: draft["title"], subtitle: Atom.to_string(post.status || :draft)}))
+            |> maybe_drop_old_language_draft(post_id, current_language, next_language)
+            |> reload_shell(workbench)
+        end
+
+      _other ->
+        socket
+    end
+  end
+
+  defp maybe_drop_old_language_draft(socket, _post_id, current_language, next_language) when current_language == next_language,
+    do: socket
+
+  defp maybe_drop_old_language_draft(socket, post_id, current_language, _next_language) do
+    assign(socket, :post_editor_drafts, delete_nested_map(socket.assigns.post_editor_drafts, post_id, current_language))
+  end
+
+  defp persist_post_editor(socket, post_id, action) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        metadata = ShellOverlayComponents.project_metadata(post.project_id)
+        canonical_language = PostEditor.normalize_language(post.language, metadata.main_language || "en")
+        active_language = Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
+        draft = PostEditor.current_draft(socket.assigns, post, metadata, active_language)
+
+        result = PostEditor.persist(post, draft, active_language, metadata, action)
+
+        case result do
+          {:ok, record} ->
+            workbench = Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
+            normalized_form = PostEditor.persisted_form(Repo.get!(Post, post_id), metadata, active_language)
+
+            socket
+            |> assign(:workbench, workbench)
+            |> assign(:post_editor_drafts, put_nested_map(socket.assigns.post_editor_drafts, post_id, active_language, normalized_form))
+            |> assign(:post_editor_save_states, Map.put(socket.assigns.post_editor_save_states, post_id, PostEditor.save_state_for_action(action)))
+            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: PostEditor.record_title(record, Repo.get!(Post, post_id)), subtitle: Atom.to_string(PostEditor.record_status(record))}))
+            |> reload_shell(workbench)
+
+          {:error, reason} ->
+            socket
+            |> append_output_entry(translated("Post"), inspect(reason), nil, "error")
+            |> reload_shell(socket.assigns.workbench)
+        end
+    end
+  end
+
+  defp discard_post_editor(socket, post_id) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        metadata = ShellOverlayComponents.project_metadata(post.project_id)
+        canonical_language = PostEditor.normalize_language(post.language, metadata.main_language || "en")
+        active_language = Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
+        restored_result = PostEditor.discard(post, active_language, metadata)
+
+        case restored_result do
+          {:ok, restored_post} ->
+            workbench = Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
+
+            socket
+            |> assign(:workbench, workbench)
+            |> assign(:post_editor_drafts, delete_nested_map(socket.assigns.post_editor_drafts, post_id, active_language))
+            |> assign(:post_editor_save_states, Map.put(socket.assigns.post_editor_save_states, post_id, :discarded))
+            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: restored_post.title || restored_post.slug || restored_post.id, subtitle: Atom.to_string(restored_post.status || :draft)}))
+            |> reload_shell(workbench)
+
+          {:error, reason} ->
+            socket
+            |> append_output_entry(translated("Post"), inspect(reason), nil, "error")
+            |> reload_shell(socket.assigns.workbench)
+        end
+    end
+  end
+
+  defp delete_post_editor(socket, post_id) do
+    case Posts.delete_post(post_id) do
+      {:ok, :deleted} ->
+        workbench = Workbench.close_tab(socket.assigns.workbench, :post, post_id)
+
+        socket
+        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:post, post_id}))
+        |> assign(:post_editor_drafts, Map.delete(socket.assigns.post_editor_drafts, post_id))
+        |> assign(:post_editor_active_languages, Map.delete(socket.assigns.post_editor_active_languages, post_id))
+        |> assign(:post_editor_modes, Map.delete(socket.assigns.post_editor_modes, post_id))
+        |> assign(:post_editor_expanded, Map.delete(socket.assigns.post_editor_expanded, post_id))
+        |> assign(:post_editor_save_states, Map.delete(socket.assigns.post_editor_save_states, post_id))
+        |> reload_shell(workbench)
+
+      {:error, reason} ->
+        socket
+        |> append_output_entry(translated("Post"), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp update_post_editor_expanded(socket, post_id, updater) do
+    expanded =
+      socket.assigns.post_editor_expanded
+      |> Map.get(post_id, %{metadata: false, excerpt: false})
+      |> Map.put_new(:metadata, false)
+      |> Map.put_new(:excerpt, false)
+      |> updater.()
+
+    assign(socket, :post_editor_expanded, Map.put(socket.assigns.post_editor_expanded, post_id, expanded))
+  end
+
+  defp put_nested_map(map, key, nested_key, value) do
+    Map.update(map, key, %{nested_key => value}, &Map.put(&1, nested_key, value))
+  end
+
+  defp delete_nested_map(map, key, nested_key) do
+    case Map.get(map, key) do
+      nil -> map
+      nested ->
+        case Map.delete(nested, nested_key) do
+          emptied when map_size(emptied) == 0 -> Map.delete(map, key)
+          remaining -> Map.put(map, key, remaining)
+        end
+    end
+  end
+
 
   defp sync_layout(workbench, params) do
     workbench
@@ -2178,249 +2139,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp assistant_message_testid(role), do: "assistant-message-#{role}"
 
-  defp overlay_context(socket) do
-    project_id = socket.assigns.projects.active_project_id
-    metadata = overlay_project_metadata(project_id)
-    current_tab = socket.assigns.current_tab
-    page_language = socket.assigns.page_language
-    tab_title = tab_title(current_tab, socket.assigns.tab_meta)
-    tab_subtitle = tab_subtitle(current_tab, socket.assigns.tab_meta)
-    posts = overlay_posts(project_id)
-    media = overlay_media(project_id)
-
-    %{
-      current_tab: %{type: current_tab.type, id: current_tab.id, title: tab_title, subtitle: tab_subtitle},
-      current_post_language: overlay_source_language(current_tab, metadata),
-      current_media_language: overlay_source_language(current_tab, metadata),
-      posts: posts,
-      media: media,
-      post_media_ids: overlay_post_media_ids(current_tab),
-      blog_languages: overlay_blog_languages(metadata),
-      language_names: overlay_language_names(),
-      language_flags: overlay_language_flags(),
-      existing_translations: overlay_existing_translations(current_tab),
-      ai_title: ShellData.translate("AI Suggestions", %{}, page_language),
-      insert_link_title: ShellData.translate("Insert Link", %{}, page_language),
-      insert_media_title: ShellData.translate("Insert Media", %{}, page_language),
-      language_picker_title: ShellData.translate("Translate", %{}, page_language),
-      gallery_title: tab_title,
-      ai_fields: overlay_ai_fields(current_tab, tab_title, tab_subtitle, page_language),
-      delete_details: overlay_delete_details(current_tab, page_language),
-      merge_details: overlay_merge_details(project_id, page_language)
-    }
-  end
-
-  defp overlay_project_metadata(nil), do: %{main_language: "en", blog_languages: []}
-
-  defp overlay_project_metadata(project_id) do
-    {:ok, metadata} = Metadata.get_project_metadata(project_id)
-    metadata
-  rescue
-    _error -> %{main_language: "en", blog_languages: []}
-  end
-
-  defp overlay_posts(nil), do: []
-
-  defp overlay_posts(project_id) do
-    Repo.all(
-      from post in Post,
-        where: post.project_id == ^project_id,
-        order_by: [desc: post.updated_at, desc: post.created_at],
-        select: %{id: post.id, title: post.title, slug: post.slug, status: post.status, published_at: post.published_at, updated_at: post.updated_at, language: post.language}
-    )
-    |> Enum.map(fn post ->
-      %{
-        id: post.id,
-        title: post.title || post.slug || post.id,
-        status: Atom.to_string(post.status || :draft),
-        canonical_url: canonical_post_url(post)
-      }
-    end)
-  end
-
-  defp overlay_media(nil), do: []
-
-  defp overlay_media(project_id) do
-    Repo.all(
-      from media in Media,
-        where: media.project_id == ^project_id,
-        order_by: [desc: media.updated_at, desc: media.created_at],
-        select: %{id: media.id, title: media.title, original_name: media.original_name, mime_type: media.mime_type, alt: media.alt, caption: media.caption}
-    )
-    |> Enum.map(fn media ->
-      %{
-        id: media.id,
-        title: media.title || media.original_name || media.id,
-        original_name: media.original_name || media.id,
-        is_image: String.starts_with?(to_string(media.mime_type || ""), "image/"),
-        thumbnail_url: "/media-thumbnail/#{media.id}",
-        image_url: "/media-thumbnail/#{media.id}?size=large",
-        alt_text: media.alt || media.caption || media.title
-      }
-    end)
-  end
-
-  defp overlay_post_media_ids(%{type: :post, id: post_id}) do
-    case Repo.query("SELECT media_id FROM post_media WHERE post_id = ? ORDER BY sort_order ASC, media_id ASC", [post_id]) do
-      {:ok, %{rows: rows}} -> Enum.map(rows, fn [media_id] -> media_id end)
-      _other -> []
-    end
-  rescue
-    _error -> []
-  end
-
-  defp overlay_post_media_ids(_tab), do: []
-
-  defp overlay_existing_translations(%{type: :post, id: post_id}) do
-    Repo.all(
-      from translation in Translation,
-        where: translation.translation_for == ^post_id,
-        select: {translation.language, translation.status}
-    )
-    |> Map.new(fn {language, status} -> {language, Atom.to_string(status || :draft)} end)
-  rescue
-    _error -> %{}
-  end
-
-  defp overlay_existing_translations(_tab), do: %{}
-
-  defp overlay_blog_languages(metadata) do
-    ([metadata.main_language || "en"] ++ (metadata.blog_languages || []))
-    |> Enum.reject(&is_nil/1)
-    |> Enum.uniq()
-  end
-
-  defp overlay_source_language(%{type: :post, id: post_id}, metadata) do
-    case Repo.get(Post, post_id) do
-      %Post{language: language} when is_binary(language) and language != "" -> language
-      _other -> metadata.main_language || "en"
-    end
-  rescue
-    _error -> metadata.main_language || "en"
-  end
-
-  defp overlay_source_language(_tab, metadata), do: metadata.main_language || "en"
-
-  defp overlay_language_names do
-    %{
-      "en" => "English",
-      "de" => "Deutsch",
-      "fr" => "Francais",
-      "it" => "Italiano",
-      "es" => "Espanol"
-    }
-  end
-
-  defp overlay_language_flags do
-    I18n.supported_languages()
-    |> Enum.into(%{}, fn language -> {language.code, I18n.flag(language.code)} end)
-  end
-
-  defp overlay_ai_fields(%{type: :post, id: post_id}, title, subtitle, page_language) do
-    case Repo.get(Post, post_id) do
-      %Post{} = post ->
-        [
-          %{key: "title", label: ShellData.translate("Title", %{}, page_language), current_value: post.title || title, suggested_value: refine_title(post.title || title), locked: false},
-          %{key: "excerpt", label: ShellData.translate("Excerpt", %{}, page_language), current_value: post.excerpt || subtitle, suggested_value: refine_excerpt(post.title || title, post.excerpt || subtitle), locked: false},
-          %{key: "slug", label: ShellData.translate("Slug", %{}, page_language), current_value: post.slug || slugify(post.title || title), suggested_value: refine_slug(post.slug || slugify(post.title || title)), locked: post.status == :published}
-        ]
-
-      _other ->
-        []
-    end
-  rescue
-    _error -> []
-  end
-
-  defp overlay_ai_fields(%{type: :media, id: media_id}, title, _subtitle, page_language) do
-    case Repo.get(Media, media_id) do
-      %Media{} = media ->
-        [
-          %{key: "title", label: ShellData.translate("Title", %{}, page_language), current_value: media.title || title, suggested_value: refine_title(media.title || title), locked: false},
-          %{key: "alt", label: ShellData.translate("Alt Text", %{}, page_language), current_value: media.alt || "", suggested_value: media.alt || title, locked: false},
-          %{key: "caption", label: ShellData.translate("Caption", %{}, page_language), current_value: media.caption || "", suggested_value: refine_excerpt(title, media.caption || title), locked: false}
-        ]
-
-      _other ->
-        []
-    end
-  rescue
-    _error -> []
-  end
-
-  defp overlay_ai_fields(_tab, _title, _subtitle, _page_language), do: []
-
-  defp overlay_delete_details(%{type: :media, id: media_id}, page_language) do
-    entity_name =
-      case Repo.get(Media, media_id) do
-        %Media{} = media -> media.title || media.original_name || media.id
-        _other -> media_id
-      end
-
-    reference_list =
-      case Repo.query("SELECT posts.title FROM posts JOIN post_media ON posts.id = post_media.post_id WHERE post_media.media_id = ? ORDER BY post_media.sort_order ASC, posts.updated_at DESC", [media_id]) do
-        {:ok, %{rows: rows}} -> Enum.map(rows, fn [title] -> title || media_id end)
-        _other -> []
-      end
-
-    %{
-      title: ShellData.translate("Delete Media", %{}, page_language),
-      entity_name: entity_name,
-      entity_type: "media",
-      reference_list: reference_list
-    }
-  rescue
-    _error -> %{title: ShellData.translate("Delete Media", %{}, page_language), entity_name: media_id, entity_type: "media", reference_list: []}
-  end
-
-  defp overlay_delete_details(%{type: :tags}, page_language) do
-    tag_name =
-      Repo.one(from tag in Tag, order_by: [asc: tag.name], limit: 1, select: tag.name)
-      |> Kernel.||("tag")
-
-    %{
-      title: ShellData.translate("Delete Tag", %{}, page_language),
-      entity_name: tag_name,
-      entity_type: "tag",
-      reference_list: []
-    }
-  rescue
-    _error -> %{title: ShellData.translate("Delete Tag", %{}, page_language), entity_name: "tag", entity_type: "tag", reference_list: []}
-  end
-
-  defp overlay_delete_details(_tab, page_language) do
-    %{title: ShellData.translate("Delete", %{}, page_language), entity_name: "", entity_type: "item", reference_list: []}
-  end
-
-  defp overlay_merge_details(project_id, page_language) do
-    tags =
-      Repo.all(from tag in Tag, where: tag.project_id == ^project_id, order_by: [asc: tag.name], limit: 3, select: tag.name)
-
-    target = List.first(tags) || "tag"
-
-    %{
-      target: target,
-      count: max(length(tags), 1),
-      title: ShellData.translate("Merge Tags", %{}, page_language),
-      message: ShellData.translate("Cannot be undone.", %{}, page_language)
-    }
-  rescue
-    _error -> %{target: "tag", count: 1, title: ShellData.translate("Merge Tags", %{}, page_language), message: ShellData.translate("Cannot be undone.", %{}, page_language)}
-  end
-
-  defp overlay_kind("ai_suggestions"), do: :ai_suggestions
-  defp overlay_kind("insert_link"), do: :insert_link
-  defp overlay_kind("insert_media"), do: :insert_media
-  defp overlay_kind("language_picker"), do: :language_picker
-  defp overlay_kind("confirm_delete"), do: :confirm_delete
-  defp overlay_kind("confirm_merge"), do: :confirm_merge
-  defp overlay_kind("gallery"), do: :gallery
-  defp overlay_kind(_kind), do: nil
-
-  defp overlay_tab("internal"), do: :internal
-  defp overlay_tab("external"), do: :external
-  defp overlay_tab(_tab), do: :internal
-
   defp update_shell_overlay(socket, updater) do
     case socket.assigns[:shell_overlay] do
       nil -> socket
@@ -2432,34 +2150,6 @@ defmodule BDS.Desktop.ShellLive do
     socket
     |> append_output_entry(title, translated("Command completed"), details)
     |> assign(:shell_overlay, nil)
-  end
-
-  defp markdown_link(text, url), do: "[#{text}](#{url})"
-
-  defp canonical_post_url(post) do
-    timestamp = post.published_at || post.updated_at || System.system_time(:millisecond)
-    date = DateTime.from_unix!(timestamp, :millisecond)
-    "/#{date.year}/#{pad2(date.month)}/#{pad2(date.day)}/#{post.slug || post.id}"
-  end
-
-  defp pad2(value), do: value |> Integer.to_string() |> String.pad_leading(2, "0")
-
-  defp refine_title(nil), do: ""
-  defp refine_title(title), do: String.trim(title <> " Notes")
-
-  defp refine_excerpt(title, excerpt) do
-    base = excerpt |> to_string() |> String.trim()
-    if base == "", do: "#{title} overview", else: base <> "."
-  end
-
-  defp refine_slug(slug), do: slug |> to_string() |> String.trim_trailing("-") |> Kernel.<>("-updated")
-
-  defp slugify(value) do
-    value
-    |> to_string()
-    |> String.downcase()
-    |> String.replace(~r/[^a-z0-9]+/u, "-")
-    |> String.trim("-")
   end
 
   defp media_thumbnail_glyph(mime_type) do

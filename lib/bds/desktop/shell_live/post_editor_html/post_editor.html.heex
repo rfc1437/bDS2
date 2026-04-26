@@ -1,0 +1,227 @@
+<div class="post-editor" data-testid="post-editor">
+  <div class="post-editor-header">
+    <div class="post-editor-heading">
+      <div class="editor-kicker"><%= translated("Post") %></div>
+      <div class="post-editor-title-row">
+        <h1 class="editor-title" data-testid="editor-title"><%= @post_editor.display_title %></h1>
+        <%= if @post_editor.dirty? do %>
+          <span class="post-editor-dirty-dot">●</span>
+        <% end %>
+      </div>
+      <p class="editor-subtitle"><%= @post_editor.subtitle %></p>
+    </div>
+
+    <div class="post-editor-actions">
+      <span class={["post-status-badge", "status-#{@post_editor.status}"]} data-testid="post-status-badge">
+        <%= post_status_label(@post_editor.status) %>
+      </span>
+      <span class="post-save-state"><%= post_editor_save_state_label(@post_editor.save_state) %></span>
+      <button class="editor-toolbar-button" type="button" phx-click="save_post_editor" phx-value-id={@post_editor.id}>
+        <%= translated("Save") %>
+      </button>
+      <button class="editor-toolbar-button" data-testid="post-publish-button" type="button" phx-click="publish_post_editor" phx-value-id={@post_editor.id}>
+        <%= translated("Publish") %>
+      </button>
+      <button class="editor-toolbar-button" data-testid="post-discard-button" type="button" phx-click="discard_post_editor" phx-value-id={@post_editor.id}>
+        <%= translated("Discard") %>
+      </button>
+      <button class="editor-toolbar-button is-destructive" data-testid="post-delete-button" type="button" phx-click="delete_post_editor" phx-value-id={@post_editor.id}>
+        <%= translated("Delete") %>
+      </button>
+    </div>
+  </div>
+
+  <div class="post-editor-flags-bar">
+    <button class="post-editor-section-toggle" type="button" phx-click="toggle_post_metadata" phx-value-id={@post_editor.id}>
+      <span><%= if @post_editor.metadata_expanded, do: "▼", else: "▶" %></span>
+      <span><%= translated("Metadata") %></span>
+    </button>
+
+    <div class="post-editor-flags">
+      <%= for flag <- @post_editor.translation_flags do %>
+        <button
+          class={[
+            "translation-flag-button",
+            if(flag.active, do: "is-active"),
+            "status-#{flag.status}"
+          ]}
+          type="button"
+          phx-click="select_post_editor_language"
+          phx-value-id={@post_editor.id}
+          phx-value-language={flag.language}
+          title={flag.label}
+        >
+          <span><%= flag.flag %></span>
+          <span><%= String.upcase(flag.language) %></span>
+        </button>
+      <% end %>
+    </div>
+  </div>
+
+  <%= editor_toolbar(assigns) %>
+
+  <form class="post-editor-form" data-testid="post-editor-form" phx-change="change_post_editor">
+    <div class={["post-editor-metadata-grid", if(not @post_editor.metadata_expanded, do: "is-collapsed")]}> 
+      <div class="post-editor-column">
+        <label class="post-editor-field">
+          <span><%= translated("Title") %></span>
+          <input class="post-editor-input" type="text" name="post_editor[title]" value={@post_editor.form["title"]} />
+        </label>
+
+        <label class="post-editor-field">
+          <span><%= translated("Tags") %></span>
+          <input class="post-editor-input" type="text" name="post_editor[tags]" value={@post_editor.form["tags"]} list={"post-editor-tags-#{@post_editor.id}"} />
+          <datalist id={"post-editor-tags-#{@post_editor.id}"}>
+            <%= for tag_name <- @post_editor.tag_options do %>
+              <option value={tag_name}></option>
+            <% end %>
+          </datalist>
+        </label>
+
+        <label class="post-editor-field">
+          <span><%= translated("Author") %></span>
+          <input class="post-editor-input" type="text" name="post_editor[author]" value={@post_editor.form["author"]} />
+        </label>
+
+        <label class="post-editor-field">
+          <span><%= translated("Language") %></span>
+          <select class="post-editor-input" name="post_editor[language]" disabled={not @post_editor.editing_canonical?}>
+            <%= for language <- @post_editor.languages do %>
+              <option value={language} selected={language == @post_editor.form["language"]}><%= String.upcase(language) %></option>
+            <% end %>
+          </select>
+        </label>
+
+        <label class="post-editor-field post-editor-checkbox-field">
+          <input type="hidden" name="post_editor[do_not_translate]" value="false" />
+          <input type="checkbox" name="post_editor[do_not_translate]" value="true" checked={@post_editor.form["do_not_translate"]} disabled={not @post_editor.editing_canonical?} />
+          <span><%= translated("Do Not Translate") %></span>
+        </label>
+
+        <label class="post-editor-field">
+          <span><%= translated("Slug") %></span>
+          <input class="post-editor-input is-readonly" type="text" readonly value={@post_editor.slug} />
+        </label>
+
+        <label class="post-editor-field">
+          <span><%= translated("Categories") %></span>
+          <input class="post-editor-input" type="text" name="post_editor[categories]" value={@post_editor.form["categories"]} list={"post-editor-categories-#{@post_editor.id}"} disabled={not @post_editor.editing_canonical?} />
+          <datalist id={"post-editor-categories-#{@post_editor.id}"}>
+            <%= for category <- @post_editor.category_options do %>
+              <option value={category}></option>
+            <% end %>
+          </datalist>
+        </label>
+
+        <label class="post-editor-field">
+          <span><%= translated("Template") %></span>
+          <select class="post-editor-input" name="post_editor[template_slug]" disabled={not @post_editor.editing_canonical?}>
+            <option value=""><%= translated("Default") %></option>
+            <%= for template <- @post_editor.template_options do %>
+              <option value={template.slug} selected={template.slug == @post_editor.form["template_slug"]}><%= template.title %></option>
+            <% end %>
+          </select>
+        </label>
+
+        <div class="post-editor-links-panel">
+          <strong><%= translated("Post Links") %></strong>
+          <div class="post-editor-links-columns">
+            <div>
+              <span class="post-editor-links-label"><%= translated("Backlinks") %></span>
+              <%= if Enum.any?(@post_editor.post_links.backlinks) do %>
+                <ul class="editor-list compact">
+                  <%= for item <- @post_editor.post_links.backlinks do %>
+                    <li><%= item.title %></li>
+                  <% end %>
+                </ul>
+              <% else %>
+                <span class="post-editor-empty"><%= translated("No items") %></span>
+              <% end %>
+            </div>
+            <div>
+              <span class="post-editor-links-label"><%= translated("Links To") %></span>
+              <%= if Enum.any?(@post_editor.post_links.outlinks) do %>
+                <ul class="editor-list compact">
+                  <%= for item <- @post_editor.post_links.outlinks do %>
+                    <li><%= item.title %></li>
+                  <% end %>
+                </ul>
+              <% else %>
+                <span class="post-editor-empty"><%= translated("No items") %></span>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="post-editor-column post-editor-side-panel">
+        <div class="post-editor-side-panel-header">
+          <strong><%= translated("Linked Media") %></strong>
+          <div class="post-editor-side-actions">
+            <button class="editor-toolbar-button" type="button" phx-click="open_overlay" phx-value-kind="insert_media"><%= translated("Insert Media") %></button>
+            <button class="editor-toolbar-button" type="button" phx-click="open_overlay" phx-value-kind="gallery"><%= translated("Gallery") %></button>
+          </div>
+        </div>
+
+        <%= if Enum.any?(@post_editor.linked_media) do %>
+          <ul class="post-editor-media-list">
+            <%= for item <- @post_editor.linked_media do %>
+              <li class="post-editor-media-item">
+                <span class="post-editor-media-title"><%= item.name %></span>
+                <span class="post-editor-media-meta"><%= translated("Order") %>: <%= item.sort_order %></span>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <div class="post-editor-empty"><%= translated("No linked media") %></div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="post-editor-excerpt-header">
+      <button class="post-editor-section-toggle" type="button" phx-click="toggle_post_excerpt" phx-value-id={@post_editor.id}>
+        <span><%= if @post_editor.excerpt_expanded, do: "▼", else: "▶" %></span>
+        <span><%= translated("Excerpt") %></span>
+      </button>
+    </div>
+
+    <%= if @post_editor.excerpt_expanded do %>
+      <label class="post-editor-field">
+        <textarea class="post-editor-textarea post-editor-excerpt" name="post_editor[excerpt]" rows="4"><%= @post_editor.form["excerpt"] %></textarea>
+      </label>
+    <% end %>
+
+    <div class="post-editor-body-header">
+      <span class="post-editor-body-label"><%= translated("Content") %></span>
+      <div class="post-editor-mode-toggle">
+        <%= for mode <- [:visual, :markdown, :preview] do %>
+          <button
+            class={["post-editor-mode-button", if(@post_editor.mode == mode, do: "is-active")]}
+            type="button"
+            phx-click="set_post_editor_mode"
+            phx-value-id={@post_editor.id}
+            phx-value-mode={mode}
+          >
+            <%= post_editor_mode_label(mode) %>
+          </button>
+        <% end %>
+      </div>
+    </div>
+
+    <%= if @post_editor.mode == :preview do %>
+      <div class="post-editor-preview" data-testid="post-editor-preview"><%= raw(Earmark.as_html!(@post_editor.form["content"] || "")) %></div>
+    <% else %>
+      <label class="post-editor-field post-editor-content-field">
+        <textarea class="post-editor-textarea post-editor-content" data-testid="post-editor-content" name="post_editor[content]" rows="18"><%= @post_editor.form["content"] %></textarea>
+      </label>
+    <% end %>
+  </form>
+
+  <div class="post-editor-footer">
+    <span><strong><%= translated("Created") %>:</strong> <%= @post_editor.footer.created_at %></span>
+    <span><strong><%= translated("Updated") %>:</strong> <%= @post_editor.footer.updated_at %></span>
+    <%= if @post_editor.footer.published_at do %>
+      <span><strong><%= translated("Published") %>:</strong> <%= @post_editor.footer.published_at %></span>
+    <% end %>
+  </div>
+</div>

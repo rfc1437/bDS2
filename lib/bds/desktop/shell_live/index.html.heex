@@ -364,29 +364,33 @@
             </div>
           </div>
         <% else %>
-          <div class="editor-frame">
-            <section class="editor-main">
-              <div class="editor-kicker"><%= tab_route_label(@current_tab) %></div>
-              <h1 class="editor-title" data-testid="editor-title"><%= tab_title(@current_tab, @tab_meta) %></h1>
-              <p class="editor-subtitle"><%= tab_subtitle(@current_tab, @tab_meta) %></p>
+          <%= if @current_tab.type == :post and @post_editor do %>
+            <PostEditor.post_editor post_editor={@post_editor} toolbar_buttons={editor_toolbar_buttons(@current_tab)} />
+          <% else %>
+            <div class="editor-frame">
+              <section class="editor-main">
+                <div class="editor-kicker"><%= tab_route_label(@current_tab) %></div>
+                <h1 class="editor-title" data-testid="editor-title"><%= tab_title(@current_tab, @tab_meta) %></h1>
+                <p class="editor-subtitle"><%= tab_subtitle(@current_tab, @tab_meta) %></p>
 
-              <%= render_editor_toolbar(assigns) %>
+                <%= render_editor_toolbar(assigns) %>
 
-              <div class="editor-section">
-                <h2><%= tab_title(@current_tab, @tab_meta) %></h2>
-                <p>Desktop workbench content routed through the Elixir shell.</p>
-              </div>
-            </section>
+                <div class="editor-section">
+                  <h2><%= tab_title(@current_tab, @tab_meta) %></h2>
+                  <p>Desktop workbench content routed through the Elixir shell.</p>
+                </div>
+              </section>
 
-            <aside class="editor-meta">
-              <%= for item <- @editor_meta do %>
-                <section class="editor-meta-row">
-                  <strong data-testid="editor-meta-label"><%= translated(item.label) %></strong>
-                  <span><%= translated(item.value) %></span>
-                </section>
-              <% end %>
-            </aside>
-          </div>
+              <aside class="editor-meta">
+                <%= for item <- @editor_meta do %>
+                  <section class="editor-meta-row">
+                    <strong data-testid="editor-meta-label"><%= translated(item.label) %></strong>
+                    <span><%= translated(item.value) %></span>
+                  </section>
+                <% end %>
+              </aside>
+            </div>
+          <% end %>
         <% end %>
       </section>
 
@@ -624,5 +628,5 @@
     </div>
   </footer>
 
-  <%= render_shell_overlay(assigns) %>
+  <ShellOverlayComponents.shell_overlay shell_overlay={@shell_overlay} />
 </div>

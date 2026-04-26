@@ -835,6 +835,238 @@ button {
   border-bottom: 1px solid var(--vscode-panel-border);
 }
 
+.post-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 18px;
+}
+
+.post-editor-header,
+.post-editor-title-row,
+.post-editor-actions,
+.post-editor-flags-bar,
+.post-editor-links-columns,
+.post-editor-side-panel-header,
+.post-editor-side-actions,
+.post-editor-excerpt-header,
+.post-editor-body-header,
+.post-editor-mode-toggle,
+.post-editor-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.post-editor-header,
+.post-editor-flags-bar,
+.post-editor-body-header,
+.post-editor-footer,
+.post-editor-side-panel-header {
+  justify-content: space-between;
+}
+
+.post-editor-heading,
+.post-editor-column,
+.post-editor-links-panel,
+.post-editor-side-panel {
+  min-width: 0;
+}
+
+.post-editor-title-row {
+  gap: 8px;
+}
+
+.post-editor-dirty-dot {
+  color: var(--vscode-editorWarning-foreground, #e2c08d);
+  font-size: 12px;
+}
+
+.post-status-badge,
+.translation-flag-button,
+.post-editor-mode-button,
+.post-editor-section-toggle {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+}
+
+.post-status-badge {
+  padding: 4px 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.post-save-state {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.post-editor-flags-bar {
+  flex-wrap: wrap;
+}
+
+.post-editor-flags,
+.post-editor-side-actions,
+.post-editor-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.translation-flag-button,
+.post-editor-mode-button,
+.post-editor-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.translation-flag-button.is-active,
+.post-editor-mode-button.is-active,
+.post-editor-section-toggle:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.post-editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.post-editor-metadata-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.85fr);
+  gap: 16px;
+}
+
+.post-editor-metadata-grid.is-collapsed {
+  display: none;
+}
+
+.post-editor-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.post-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.post-editor-input,
+.post-editor-textarea {
+  width: 100%;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  background: var(--vscode-input-background, rgba(255, 255, 255, 0.03));
+  color: var(--vscode-input-foreground, var(--vscode-foreground));
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.post-editor-input.is-readonly {
+  color: var(--vscode-descriptionForeground);
+}
+
+.post-editor-textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.post-editor-checkbox-field {
+  flex-direction: row;
+  align-items: center;
+}
+
+.post-editor-links-panel,
+.post-editor-side-panel {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.post-editor-links-columns {
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 18px;
+  margin-top: 10px;
+}
+
+.post-editor-links-columns > div,
+.post-editor-side-panel {
+  flex: 1;
+}
+
+.post-editor-links-label,
+.post-editor-body-label,
+.post-editor-media-meta,
+.post-editor-empty {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.post-editor-media-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.post-editor-media-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.post-editor-content-field {
+  margin: 0;
+}
+
+.post-editor-content {
+  min-height: 360px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.post-editor-preview {
+  min-height: 240px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  padding: 14px;
+  line-height: 1.6;
+}
+
+.post-editor-footer {
+  flex-wrap: wrap;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+@media (max-width: 980px) {
+  .post-editor-header,
+  .post-editor-flags-bar,
+  .post-editor-body-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .post-editor-metadata-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .panel-shell {
   height: 200px;
   border-top: 1px solid var(--vscode-panel-border);
