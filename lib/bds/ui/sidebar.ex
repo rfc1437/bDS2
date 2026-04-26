@@ -4,6 +4,7 @@ defmodule BDS.UI.Sidebar do
   import Ecto.Query
 
   alias BDS.AI.ChatConversation
+  alias BDS.ImportDefinitions
   alias BDS.Media.Media
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
@@ -26,7 +27,7 @@ defmodule BDS.UI.Sidebar do
       "templates" => view(project_id, "templates"),
       "tags" => view(project_id, "tags"),
       "chat" => view(project_id, "chat"),
-      "import" => entity_list_view("Import", "Import definitions", "import", []),
+      "import" => entity_list_view("Import", "Import definitions", "import", list_import_definitions(project_id)),
       "git" => git_view(),
       "settings" => settings_nav_view()
     }
@@ -47,7 +48,7 @@ defmodule BDS.UI.Sidebar do
       "templates" -> entity_list_view("Templates", "Site rendering", "templates", list_templates(project_id))
       "tags" -> tags_nav_view(list_tags(project_id))
       "chat" -> entity_list_view("Chat", "AI conversations", "chat", list_conversations())
-      "import" -> entity_list_view("Import", "Import definitions", "import", [])
+      "import" -> entity_list_view("Import", "Import definitions", "import", list_import_definitions(project_id))
       "git" -> git_view()
       "settings" -> settings_nav_view()
       _other -> empty_view(normalized_view)
@@ -357,6 +358,10 @@ defmodule BDS.UI.Sidebar do
         order_by: [desc: template.updated_at, desc: template.created_at],
         select: %{id: template.id, title: template.title, updated_at: template.updated_at}
     )
+  end
+
+  defp list_import_definitions(project_id) do
+    ImportDefinitions.list_definitions(project_id)
   end
 
   defp list_tags(project_id) do

@@ -5,7 +5,7 @@ defmodule BDS.Desktop.ShellLive do
 
   import Phoenix.HTML
 
-  alias BDS.Desktop.{FolderPicker, Overlay, ShellCommands, ShellData}
+  alias BDS.Desktop.{FilePicker, FolderPicker, Overlay, ShellCommands, ShellData}
   alias BDS.Desktop.ShellLive.{ChatEditor, CodeEntityEditor, MediaEditor, MiscEditor, SettingsEditor, TagsEditor}
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
   alias BDS.Desktop.ShellLive.PostEditor
@@ -13,11 +13,13 @@ defmodule BDS.Desktop.ShellLive do
   alias BDS.Desktop.ShellLive.SidebarState, as: ShellSidebarState
   alias BDS.Desktop.MenuBar, as: DesktopMenuBar
   alias BDS.Git
+  alias BDS.ImportDefinitions
   alias BDS.Media.Media
   alias BDS.PostLinks
   alias BDS.Posts.Post
   alias BDS.Projects
   alias BDS.Repo
+  alias BDS.Scripts
   alias BDS.Templates
   alias BDS.UI.{Commands, MenuBar, Registry, Session, Workbench}
 
@@ -280,6 +282,10 @@ defmodule BDS.Desktop.ShellLive do
        Map.update(filters, :display_limit, ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data), &(&1 + ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data)))
      end)
      |> reload_shell(socket.assigns.workbench)}
+  end
+
+  def handle_event("create_sidebar_item", %{"kind" => kind}, socket) do
+    {:noreply, create_sidebar_item(socket, kind)}
   end
 
   def handle_event("shortcut", params, socket) do
@@ -1345,6 +1351,102 @@ defmodule BDS.Desktop.ShellLive do
       Map.get(params, :tag) in ["INPUT", "TEXTAREA", "SELECT"]
   end
 
+  defp create_sidebar_item(socket, kind) do
+    case socket.assigns.projects.active_project_id do
+      project_id when is_binary(project_id) -> create_sidebar_item(socket, project_id, kind)
+      _other -> reload_shell(socket, socket.assigns.workbench)
+    end
+  end
+
+  defp create_sidebar_item(socket, project_id, "post") do
+    case BDS.Posts.create_post(%{project_id: project_id, title: "", content: "", tags: [], categories: []}) do
+      {:ok, _post} -> reload_shell(socket, socket.assigns.workbench)
+
+      {:error, reason} ->
+        socket
+        |> append_output_entry(translated("sidebar.newPost"), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp create_sidebar_item(socket, project_id, "media") do
+    case FilePicker.choose_file(translated("sidebar.importMedia")) do
+      {:ok, source_path} ->
+        case BDS.Media.import_media(%{project_id: project_id, source_path: source_path}) do
+          {:ok, _media} -> reload_shell(socket, socket.assigns.workbench)
+
+          {:error, reason} ->
+            socket
+            |> append_output_entry(translated("sidebar.importMedia"), inspect(reason), nil, "error")
+            |> reload_shell(socket.assigns.workbench)
+        end
+
+      :cancel ->
+        reload_shell(socket, socket.assigns.workbench)
+
+      {:error, %{message: message}} ->
+        socket
+        |> append_output_entry(translated("sidebar.importMedia"), message, nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+
+      {:error, reason} ->
+        socket
+        |> append_output_entry(translated("sidebar.importMedia"), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp create_sidebar_item(socket, project_id, "script") do
+    case Scripts.create_script(%{
+           project_id: project_id,
+           title: translated("sidebar.scripts.newScript"),
+           kind: :utility,
+           content: "print(\"new script\")",
+           entrypoint: "main",
+           enabled: true
+         }) do
+      {:ok, script} ->
+        open_sidebar_item(socket, %{"route" => "scripts", "id" => script.id, "title" => script.title, "subtitle" => "Automation helpers"}, :pin)
+
+      {:error, reason} ->
+        socket
+        |> append_output_entry(translated("sidebar.scripts.newScript"), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp create_sidebar_item(socket, project_id, "template") do
+    case Templates.create_template(%{
+           project_id: project_id,
+           title: translated("sidebar.templates.newTemplate"),
+           kind: :post,
+           content: "",
+           enabled: true
+         }) do
+      {:ok, template} ->
+        open_sidebar_item(socket, %{"route" => "templates", "id" => template.id, "title" => template.title, "subtitle" => "Site rendering"}, :pin)
+
+      {:error, reason} ->
+        socket
+        |> append_output_entry(translated("sidebar.templates.newTemplate"), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp create_sidebar_item(socket, project_id, "import") do
+    case ImportDefinitions.create_definition(%{project_id: project_id, name: translated("sidebar.import.newDefinition")}) do
+      {:ok, definition} ->
+        open_sidebar_item(socket, %{"route" => "import", "id" => definition.id, "title" => definition.name, "subtitle" => "Import definitions"}, :pin)
+
+      {:error, reason} ->
+        socket
+        |> append_output_entry(translated("sidebar.import.newDefinition"), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp create_sidebar_item(socket, _project_id, _kind), do: reload_shell(socket, socket.assigns.workbench)
+
   defp open_sidebar_item(socket, params, intent) do
     route_atom = sidebar_route_atom(Map.fetch!(params, "route"))
     tab_id = tab_id_for_route(route_atom, Map.fetch!(params, "id"))
@@ -1363,6 +1465,13 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:tab_meta, tab_meta)
     |> reload_shell(workbench)
   end
+
+  defp sidebar_create_action(:posts), do: %{kind: "post", label: "sidebar.newPost"}
+  defp sidebar_create_action(:media), do: %{kind: "media", label: "sidebar.importMedia"}
+  defp sidebar_create_action(:scripts), do: %{kind: "script", label: "sidebar.scripts.newScript"}
+  defp sidebar_create_action(:templates), do: %{kind: "template", label: "sidebar.templates.newTemplate"}
+  defp sidebar_create_action(:import), do: %{kind: "import", label: "sidebar.import.newDefinition"}
+  defp sidebar_create_action(_view), do: nil
 
   defp set_page_language(socket, language) do
     codes = Enum.map(socket.assigns[:supported_ui_languages] || ShellData.supported_ui_languages(), & &1.code)

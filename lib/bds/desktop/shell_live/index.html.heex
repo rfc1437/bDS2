@@ -164,25 +164,44 @@
       <div class="sidebar" data-region="sidebar">
         <div id="sidebar-content" class="sidebar-content sidebar-body" phx-hook="SidebarInteractions">
           <div class="sidebar-section">
+            <% create_action = sidebar_create_action(@workbench.active_view) %>
             <div class="sidebar-section-header">
               <span><%= String.upcase(sidebar_header_label(@sidebar_header)) %></span>
-              <%= if ShellSidebarComponents.filters_enabled?(@sidebar_data) do %>
+              <%= if create_action || ShellSidebarComponents.filters_enabled?(@sidebar_data) do %>
                 <div class="sidebar-actions">
-                  <button
-                    class={[
-                      "sidebar-action",
-                      if(ShellSidebarComponents.filters_visible?(@sidebar_data), do: "active")
-                    ]}
-                    data-testid="sidebar-filter-toggle"
-                    type="button"
-                    phx-click="toggle_sidebar_filters"
-                    aria-label={translated(Map.get(@sidebar_data.filters, :toggle_filters_label))}
-                    title={translated(Map.get(@sidebar_data.filters, :toggle_filters_label))}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M6 12v-1h4v1H6zM4 8v-1h8v1H4zm-2-4v-1h12v1H2z"/>
-                    </svg>
-                  </button>
+                  <%= if ShellSidebarComponents.filters_enabled?(@sidebar_data) do %>
+                    <button
+                      class={[
+                        "sidebar-action",
+                        if(ShellSidebarComponents.filters_visible?(@sidebar_data), do: "active")
+                      ]}
+                      data-testid="sidebar-filter-toggle"
+                      type="button"
+                      phx-click="toggle_sidebar_filters"
+                      aria-label={translated(Map.get(@sidebar_data.filters, :toggle_filters_label))}
+                      title={translated(Map.get(@sidebar_data.filters, :toggle_filters_label))}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M6 12v-1h4v1H6zM4 8v-1h8v1H4zm-2-4v-1h12v1H2z"/>
+                      </svg>
+                    </button>
+                  <% end %>
+                  <%= if create_action do %>
+                    <button
+                      class="sidebar-action"
+                      data-testid="sidebar-create-action"
+                      data-sidebar-action={create_action.kind}
+                      type="button"
+                      phx-click="create_sidebar_item"
+                      phx-value-kind={create_action.kind}
+                      aria-label={translated(create_action.label)}
+                      title={translated(create_action.label)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M14 7v1H8v6H7V8H1V7h6V1h1v6h6z"/>
+                      </svg>
+                    </button>
+                  <% end %>
                 </div>
               <% end %>
             </div>

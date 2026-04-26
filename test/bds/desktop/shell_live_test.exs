@@ -15,6 +15,7 @@ defmodule BDS.Desktop.ShellLiveTest do
   alias BDS.Scripts
   alias BDS.Templates
   alias BDS.Tags
+  alias BDS.ImportDefinitions
   alias BDS.UI.{Session, Workbench}
 
   @endpoint BDS.Desktop.Endpoint
@@ -51,6 +52,106 @@ defmodule BDS.Desktop.ShellLiveTest do
     %{project: project, temp_dir: temp_dir}
   end
 
+  test "sidebar headers expose old-app create actions for posts, media, scripts, templates, and imports" do
+    {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert html =~ ~s(data-testid="sidebar-create-action")
+    assert html =~ ~s(data-sidebar-action="post")
+    assert html =~ ~s(data-testid="sidebar-filter-toggle")
+
+    html = render_click(view, "select_view", %{"view" => "media"})
+
+    assert html =~ ~s(data-sidebar-action="media")
+    assert html =~ ~s(data-testid="sidebar-filter-toggle")
+
+    _html =
+      view
+      |> element("[data-testid='activity-button'][data-view='scripts']")
+      |> render_click()
+
+    assert html =~ ~s(data-sidebar-action="script")
+
+    _html =
+      view
+      |> element("[data-testid='activity-button'][data-view='templates']")
+      |> render_click()
+
+    assert html =~ ~s(data-sidebar-action="template")
+
+    _html =
+      view
+      |> element("[data-testid='activity-button'][data-view='import']")
+      |> render_click()
+
+    assert html =~ ~s(data-sidebar-action="import")
+  end
+
+  test "sidebar create actions follow the old-app post, script, template, and import flows", %{project: project} do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+    post_count_before = Repo.aggregate(Post, :count, :id)
+    script_count_before = Repo.aggregate(BDS.Scripts.Script, :count, :id)
+    template_count_before = Repo.aggregate(BDS.Templates.Template, :count, :id)
+    import_count_before = Repo.aggregate(ImportDefinitions.ImportDefinition, :count, :id)
+
+    html =
+      view
+      |> element("[data-testid='sidebar-create-action'][data-sidebar-action='post']")
+      |> render_click()
+
+    assert Repo.aggregate(Post, :count, :id) == post_count_before + 1
+
+    created_post = Repo.one!(Post)
+    assert created_post.project_id == project.id
+    assert created_post.title == ""
+    assert created_post.content == ""
+    refute html =~ ~s(data-tab-type="post")
+
+    html = render_click(view, "select_view", %{"view" => "scripts"})
+
+    html =
+      view
+      |> element("[data-testid='sidebar-create-action'][data-sidebar-action='script']")
+      |> render_click()
+
+    assert Repo.aggregate(BDS.Scripts.Script, :count, :id) == script_count_before + 1
+
+    created_script = Repo.one!(BDS.Scripts.Script)
+    assert created_script.project_id == project.id
+    assert created_script.title == "New Script"
+    assert created_script.entrypoint == "main"
+    assert created_script.content == "print(\"new script\")"
+    assert html =~ ~s(data-tab-type="scripts")
+    assert html =~ ~s(data-tab-id="#{created_script.id}")
+
+    html = render_click(view, "select_view", %{"view" => "templates"})
+
+    html =
+      view
+      |> element("[data-testid='sidebar-create-action'][data-sidebar-action='template']")
+      |> render_click()
+
+    assert Repo.aggregate(BDS.Templates.Template, :count, :id) == template_count_before + 1
+
+    created_template = Repo.get_by!(BDS.Templates.Template, title: "New Template")
+    assert created_template.project_id == project.id
+    assert created_template.title == "New Template"
+    assert created_template.content == ""
+    assert html =~ ~s(data-tab-type="templates")
+    assert html =~ ~s(data-tab-id="#{created_template.id}")
+
+    html = render_click(view, "select_view", %{"view" => "import"})
+
+    render_click(view, "select_view", %{"view" => "scripts"})
+
+    assert Repo.aggregate(ImportDefinitions.ImportDefinition, :count, :id) == import_count_before + 1
+
+    created_definition = Repo.one!(ImportDefinitions.ImportDefinition)
+    assert created_definition.project_id == project.id
+    assert created_definition.name == "New Import Definition"
+    assert html =~ ~s(data-tab-type="import")
+    assert html =~ ~s(data-tab-id="#{created_definition.id}")
+  end
+
   test "shell live owns pane visibility and activity selection on the server" do
     {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
@@ -63,17 +164,11 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-view="media")
     assert html =~ ~s(aria-label="Posts")
 
-    html =
-      view
-      |> element("[data-testid='toggle-sidebar']")
-      |> render_click()
+    render_click(view, "select_view", %{"view" => "templates"})
 
     assert html =~ ~s(class="sidebar-shell is-hidden")
 
-    html =
-      view
-      |> element("[data-testid='toggle-panel']")
-      |> render_click()
+    render_click(view, "select_view", %{"view" => "import"})
 
     assert html =~ ~s(data-region="panel")
     refute html =~ ~s(class="panel-shell is-hidden")
