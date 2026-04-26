@@ -300,6 +300,46 @@ defmodule BDS.UI.ShellTest do
     assert css =~ ".lightbox-overlay"
   end
 
+  test "desktop shell keeps post editor logic in the feature slice" do
+    live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
+    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
+    post_editor_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor.ex")
+
+    assert template =~ "<PostEditor.post_editor"
+    assert post_editor_ex =~ "def build(%{current_tab: %{type: :post, id: post_id}} = assigns)"
+
+    refute live_ex =~ "defp update_post_editor("
+    refute live_ex =~ "defp persist_post_editor("
+    refute live_ex =~ "defp discard_post_editor("
+    refute live_ex =~ "defp delete_post_editor("
+    refute live_ex =~ "defp update_post_editor_expanded("
+  end
+
+  test "desktop shell keeps sidebar logic in its own slice" do
+    live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
+    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
+    sidebar_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/sidebar_components.ex")
+    sidebar_state_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/sidebar_state.ex")
+
+    assert template =~ "<ShellSidebarComponents.sidebar_content"
+    assert sidebar_ex =~ "def sidebar_content(assigns)"
+    assert sidebar_state_ex =~ "def current_filters(socket, view_id)"
+
+    refute live_ex =~ "defp render_sidebar_filters("
+    refute live_ex =~ "defp render_sidebar_load_more("
+    refute live_ex =~ "defp render_sidebar_body("
+    refute live_ex =~ "defp render_post_sidebar("
+    refute live_ex =~ "defp render_media_sidebar("
+    refute live_ex =~ "defp render_entity_sidebar("
+    refute live_ex =~ "defp render_nav_sidebar("
+    refute live_ex =~ "defp render_default_sidebar("
+    refute live_ex =~ "defp merge_sidebar_ui_state("
+    refute live_ex =~ "defp sidebar_filter_panel_state("
+    refute live_ex =~ "defp put_sidebar_filter_panel_state("
+    refute live_ex =~ "defp current_sidebar_filters("
+    refute live_ex =~ "defp put_sidebar_filters("
+  end
+
   test "desktop shell css keeps the old assistant sidebar panel styling" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
 

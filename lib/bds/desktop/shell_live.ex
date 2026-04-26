@@ -8,8 +8,10 @@ defmodule BDS.Desktop.ShellLive do
   alias BDS.Desktop.{FolderPicker, Overlay, ShellCommands, ShellData}
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
   alias BDS.Desktop.ShellLive.PostEditor
+  alias BDS.Desktop.ShellLive.SidebarComponents, as: ShellSidebarComponents
+  alias BDS.Desktop.ShellLive.SidebarState, as: ShellSidebarState
   alias BDS.Desktop.MenuBar, as: DesktopMenuBar
-  alias BDS.{Git, Posts}
+  alias BDS.Git
   alias BDS.Media.Media
   alias BDS.PostLinks
   alias BDS.Posts.Post
@@ -114,11 +116,11 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("toggle_sidebar_filters", _params, socket) do
     socket =
-      put_sidebar_filter_panel_state(socket, fn state ->
+      ShellSidebarState.put_filter_panel_state(socket, fn state ->
         if state.visible do
           %{state | visible: false}
         else
-          %{default_sidebar_filter_panel_state() | visible: true}
+          %{visible: true, archive_collapsed: true, tags_collapsed: true, categories_collapsed: true, expanded_year: nil}
         end
       end)
 
@@ -130,78 +132,78 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("toggle_sidebar_archive", _params, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filter_panel_state(fn state -> %{state | archive_collapsed: not state.archive_collapsed} end)
+      |> ShellSidebarState.put_filter_panel_state(fn state -> %{state | archive_collapsed: not state.archive_collapsed} end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("toggle_sidebar_tags", _params, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filter_panel_state(fn state -> %{state | tags_collapsed: not state.tags_collapsed} end)
+      |> ShellSidebarState.put_filter_panel_state(fn state -> %{state | tags_collapsed: not state.tags_collapsed} end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("toggle_sidebar_categories", _params, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filter_panel_state(fn state -> %{state | categories_collapsed: not state.categories_collapsed} end)
+      |> ShellSidebarState.put_filter_panel_state(fn state -> %{state | categories_collapsed: not state.categories_collapsed} end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("update_sidebar_search", %{"sidebar_filters" => params}, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filters(fn filters -> Map.put(filters, :search, normalize_filter_string(Map.get(params, "search"))) end)
+      |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :search, ShellSidebarState.normalize_filter_string(Map.get(params, "search"))) end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("clear_sidebar_search", _params, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filters(fn filters -> Map.put(filters, :search, nil) end)
+      |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :search, nil) end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("clear_sidebar_tags", _params, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filters(fn filters -> Map.put(filters, :tags, []) end)
+      |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :tags, []) end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("clear_sidebar_categories", _params, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filters(fn filters -> Map.put(filters, :categories, []) end)
+      |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :categories, []) end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("toggle_sidebar_tag", %{"tag" => tag}, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filters(fn filters -> toggle_filter_value(filters, :tags, tag) end)
+      |> ShellSidebarState.put_filters(fn filters -> ShellSidebarState.toggle_filter_value(filters, :tags, tag) end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("toggle_sidebar_category", %{"category" => category}, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filters(fn filters -> toggle_filter_value(filters, :categories, category) end)
+     |> ShellSidebarState.put_filters(fn filters -> ShellSidebarState.toggle_filter_value(filters, :categories, category) end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("select_sidebar_year", %{"year" => year}, socket) do
-    parsed_year = parse_optional_integer(year)
+    parsed_year = ShellSidebarState.parse_optional_integer(year)
 
     {:noreply,
      socket
-     |> put_sidebar_filter_panel_state(fn state ->
+     |> ShellSidebarState.put_filter_panel_state(fn state ->
        %{state |
          archive_collapsed: false,
          expanded_year: if(state.expanded_year == parsed_year, do: nil, else: parsed_year)
        }
      end)
-     |> put_sidebar_filters(fn filters ->
+     |> ShellSidebarState.put_filters(fn filters ->
        filters
        |> Map.put(:year, parsed_year)
        |> Map.put(:month, nil)
@@ -212,13 +214,13 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("select_sidebar_month", %{"year" => year, "month" => month}, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filter_panel_state(fn state ->
-       %{state | archive_collapsed: false, expanded_year: parse_optional_integer(year)}
+     |> ShellSidebarState.put_filter_panel_state(fn state ->
+       %{state | archive_collapsed: false, expanded_year: ShellSidebarState.parse_optional_integer(year)}
      end)
-     |> put_sidebar_filters(fn filters ->
+     |> ShellSidebarState.put_filters(fn filters ->
        filters
-       |> Map.put(:year, parse_optional_integer(year))
-       |> Map.put(:month, parse_optional_integer(month))
+       |> Map.put(:year, ShellSidebarState.parse_optional_integer(year))
+       |> Map.put(:month, ShellSidebarState.parse_optional_integer(month))
      end)
      |> reload_shell(socket.assigns.workbench)}
   end
@@ -226,22 +228,22 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("clear_sidebar_month", _params, socket) do
     {:noreply,
      socket
-      |> put_sidebar_filter_panel_state(fn state -> %{state | archive_collapsed: false} end)
-     |> put_sidebar_filters(fn filters -> filters |> Map.put(:year, nil) |> Map.put(:month, nil) end)
+      |> ShellSidebarState.put_filter_panel_state(fn state -> %{state | archive_collapsed: false} end)
+      |> ShellSidebarState.put_filters(fn filters -> filters |> Map.put(:year, nil) |> Map.put(:month, nil) end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("clear_sidebar_filters", _params, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filters(fn filters ->
+     |> ShellSidebarState.put_filters(fn filters ->
        filters
        |> Map.put(:search, nil)
        |> Map.put(:year, nil)
        |> Map.put(:month, nil)
        |> Map.put(:tags, [])
        |> Map.put(:categories, [])
-       |> Map.put(:display_limit, sidebar_page_size(socket.assigns.sidebar_data))
+       |> Map.put(:display_limit, ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data))
      end)
      |> reload_shell(socket.assigns.workbench)}
   end
@@ -249,8 +251,8 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("load_more_sidebar", _params, socket) do
     {:noreply,
      socket
-     |> put_sidebar_filters(fn filters ->
-       Map.update(filters, :display_limit, sidebar_page_size(socket.assigns.sidebar_data), &(&1 + sidebar_page_size(socket.assigns.sidebar_data)))
+     |> ShellSidebarState.put_filters(fn filters ->
+       Map.update(filters, :display_limit, ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data), &(&1 + ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data)))
      end)
      |> reload_shell(socket.assigns.workbench)}
   end
@@ -315,51 +317,39 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("change_post_editor", %{"post_editor" => params}, socket) do
-    {:noreply, update_post_editor(socket, params)}
+    {:noreply, PostEditor.update(socket, params, &reload_shell/2)}
   end
 
   def handle_event("save_post_editor", %{"id" => post_id}, socket) do
-    {:noreply, persist_post_editor(socket, post_id, :save)}
+    {:noreply, PostEditor.persist_socket(socket, post_id, :save, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("publish_post_editor", %{"id" => post_id}, socket) do
-    {:noreply, persist_post_editor(socket, post_id, :publish)}
+    {:noreply, PostEditor.persist_socket(socket, post_id, :publish, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("discard_post_editor", %{"id" => post_id}, socket) do
-    {:noreply, discard_post_editor(socket, post_id)}
+    {:noreply, PostEditor.discard_socket(socket, post_id, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("delete_post_editor", %{"id" => post_id}, socket) do
-    {:noreply, delete_post_editor(socket, post_id)}
+    {:noreply, PostEditor.delete_socket(socket, post_id, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("set_post_editor_mode", %{"id" => post_id, "mode" => mode}, socket) do
-    {:noreply,
-     socket
-      |> assign(:post_editor_modes, Map.put(socket.assigns.post_editor_modes, post_id, PostEditor.normalize_mode(mode)))
-     |> reload_shell(socket.assigns.workbench)}
+    {:noreply, PostEditor.set_mode(socket, post_id, mode, &reload_shell/2)}
   end
 
   def handle_event("toggle_post_metadata", %{"id" => post_id}, socket) do
-    {:noreply,
-     socket
-     |> update_post_editor_expanded(post_id, fn expanded -> Map.update!(expanded, :metadata, &not &1) end)
-     |> reload_shell(socket.assigns.workbench)}
+    {:noreply, PostEditor.toggle_section(socket, post_id, :metadata, &reload_shell/2)}
   end
 
   def handle_event("toggle_post_excerpt", %{"id" => post_id}, socket) do
-    {:noreply,
-     socket
-     |> update_post_editor_expanded(post_id, fn expanded -> Map.update!(expanded, :excerpt, &not &1) end)
-     |> reload_shell(socket.assigns.workbench)}
+    {:noreply, PostEditor.toggle_section(socket, post_id, :excerpt, &reload_shell/2)}
   end
 
   def handle_event("select_post_editor_language", %{"id" => post_id, "language" => language}, socket) do
-    {:noreply,
-     socket
-      |> assign(:post_editor_active_languages, Map.put(socket.assigns.post_editor_active_languages, post_id, PostEditor.normalize_language(language, language)))
-     |> reload_shell(socket.assigns.workbench)}
+    {:noreply, PostEditor.select_language(socket, post_id, language, &reload_shell/2)}
   end
 
   def handle_event("open_overlay", %{"kind" => kind}, socket) do
@@ -639,8 +629,8 @@ defmodule BDS.Desktop.ShellLive do
     dashboard = ShellData.dashboard(projects.active_project_id)
     git_badge_count = ShellData.git_badge_count(projects.active_project_id)
     active_view_id = Atom.to_string(workbench.active_view)
-    sidebar_data = ShellData.sidebar_view(projects.active_project_id, active_view_id, current_sidebar_filters(socket, active_view_id))
-    sidebar_data = merge_sidebar_ui_state(socket, active_view_id, sidebar_data)
+    sidebar_data = ShellData.sidebar_view(projects.active_project_id, active_view_id, ShellSidebarState.current_filters(socket, active_view_id))
+    sidebar_data = ShellSidebarState.merge_ui_state(socket, active_view_id, sidebar_data)
     task_status = BDS.Tasks.status_snapshot()
     activity_buttons = Workbench.activity_buttons(workbench, git_badge_count)
     page_language = socket.assigns[:page_language] || ShellData.ui_language()
@@ -674,395 +664,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
     |> assign(:current_tab, current_tab(workbench))
     |> assign_post_editor()
-  end
-
-  defp render_sidebar_filters(assigns) do
-    filters = Map.get(assigns.sidebar_data, :filters)
-
-    if is_map(filters) and Map.get(filters, :enabled) do
-      selected = Map.get(filters, :selected, %{})
-
-      assigns =
-        assigns
-        |> assign(:sidebar_filters_config, filters)
-        |> assign(:selected_filters, selected)
-        |> assign(:filter_panel_visible, Map.get(filters, :filter_panel_visible, false))
-        |> assign(:archive_collapsed, Map.get(filters, :archive_collapsed, true))
-        |> assign(:tags_collapsed, Map.get(filters, :tags_collapsed, true))
-        |> assign(:categories_collapsed, Map.get(filters, :categories_collapsed, true))
-        |> assign(:expanded_year, Map.get(filters, :expanded_year))
-        |> assign(:year_groups, group_year_month_counts(Map.get(filters, :year_month_counts, [])))
-
-      ~H"""
-      <form class="search-box" data-testid="sidebar-search-form" phx-change="update_sidebar_search" phx-submit="update_sidebar_search">
-        <input
-          type="text"
-          name="sidebar_filters[search]"
-          value={Map.get(@selected_filters, :search) || ""}
-          placeholder={translated(@sidebar_filters_config.search_placeholder)}
-        />
-        <button type="submit" title={translated("sidebar.search")}>
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M15.7 14.3l-4.2-4.2c-.2-.2-.5-.3-.8-.3.9-1.1 1.5-2.5 1.5-4C12.2 2.6 9.6 0 6.4 0S.6 2.6.6 5.8s2.6 5.8 5.8 5.8c1.5 0 2.9-.5 4-1.4 0 .3.1.6.3.8l4.2 4.2c.2.2.5.3.7.3s.5-.1.7-.3c.4-.4.4-1 0-1.4zm-9.3-4c-2.5 0-4.5-2-4.5-4.5s2-4.5 4.5-4.5 4.5 2 4.5 4.5-2 4.5-4.5 4.5z"/>
-          </svg>
-        </button>
-        <%= if Map.get(@selected_filters, :search) do %>
-          <button class="clear-search" data-testid="sidebar-clear-search" type="button" phx-click="clear_sidebar_search">×</button>
-        <% end %>
-      </form>
-
-      <%= if Map.get(@sidebar_filters_config, :has_active_filters) do %>
-        <div class="filter-status">
-          <span>
-            <%= translated(@sidebar_filters_config.results_label) %>: <%= @sidebar_filters_config.loaded_count %>/<%= @sidebar_filters_config.total_count %>
-          </span>
-          <button data-testid="sidebar-clear-filters" type="button" phx-click="clear_sidebar_filters">
-            <%= translated(@sidebar_filters_config.clear_filters_label) %>
-          </button>
-        </div>
-      <% end %>
-
-      <%= if @filter_panel_visible do %>
-        <%= if Enum.any?(@year_groups) do %>
-          <div class="calendar-view">
-            <div
-              class={[
-                "calendar-header",
-                "collapsible-header",
-                if(@archive_collapsed, do: "collapsed", else: "expanded")
-              ]}
-              data-testid="sidebar-filter-archive-header"
-              phx-click="toggle_sidebar_archive"
-            >
-              <span class="collapse-icon"><%= if @archive_collapsed, do: "▶", else: "▼" %></span>
-              <span><%= translated(@sidebar_filters_config.archive_label) %></span>
-              <%= if Map.get(@selected_filters, :year) do %>
-                <button class="clear-filter" type="button" phx-click="clear_sidebar_month" phx-stop-propagation>✕</button>
-              <% end %>
-            </div>
-            <%= unless @archive_collapsed do %>
-              <div class="calendar-years">
-                <%= for year_group <- @year_groups do %>
-                  <div class="calendar-year">
-                    <div
-                      class={[
-                        "calendar-year-header",
-                        if(Map.get(@selected_filters, :year) == year_group.year and is_nil(Map.get(@selected_filters, :month)), do: "selected")
-                      ]}
-                      phx-click="select_sidebar_year"
-                      phx-value-year={year_group.year}
-                    >
-                      <span class="expand-icon"><%= if @expanded_year == year_group.year, do: "▼", else: "▶" %></span>
-                      <span class="year-label"><%= year_group.year %></span>
-                      <span class="year-count"><%= year_group.count %></span>
-                    </div>
-                    <%= if @expanded_year == year_group.year do %>
-                      <div class="calendar-months">
-                        <%= for month_entry <- year_group.months do %>
-                          <button
-                            class={[
-                              "calendar-month",
-                              if(Map.get(@selected_filters, :year) == year_group.year and Map.get(@selected_filters, :month) == month_entry.month, do: "selected")
-                            ]}
-                            data-testid="sidebar-filter-month"
-                            type="button"
-                            phx-click="select_sidebar_month"
-                            phx-value-year={year_group.year}
-                            phx-value-month={month_entry.month}
-                          >
-                            <span class="month-label"><%= ShellData.format_dashboard_month(year_group.year, month_entry.month) %></span>
-                            <span class="month-count"><%= month_entry.count %></span>
-                          </button>
-                        <% end %>
-                      </div>
-                    <% end %>
-                  </div>
-                <% end %>
-              </div>
-            <% end %>
-          </div>
-        <% end %>
-
-        <div class="filter-panel">
-          <%= if Enum.any?(Map.get(@sidebar_filters_config, :available_tags, [])) do %>
-            <section class="filter-section">
-              <div
-                class={[
-                  "filter-header",
-                  "collapsible-header",
-                  if(@tags_collapsed, do: "collapsed", else: "expanded")
-                ]}
-                data-testid="sidebar-filter-tags-header"
-                phx-click="toggle_sidebar_tags"
-              >
-                <span class="collapse-icon"><%= if @tags_collapsed, do: "▶", else: "▼" %></span>
-                <span><%= translated(@sidebar_filters_config.tags_label) %></span>
-                <%= if Enum.any?(Map.get(@selected_filters, :tags, [])) do %>
-                  <button class="clear-filter" type="button" phx-click="clear_sidebar_tags" phx-stop-propagation title={translated(@sidebar_filters_config.clear_tags_label)}>✕</button>
-                <% end %>
-              </div>
-              <%= unless @tags_collapsed do %>
-                <div class="filter-chips">
-                  <%= for tag <- Map.get(@sidebar_filters_config, :available_tags, []) do %>
-                    <button
-                      class={[
-                        "filter-chip",
-                        if(tag in Map.get(@selected_filters, :tags, []), do: "active"),
-                        if(sidebar_filter_tag_color(@sidebar_filters_config, tag), do: "has-color")
-                      ]}
-                      style={sidebar_filter_chip_style(@sidebar_filters_config, tag)}
-                      data-testid="sidebar-filter-tag"
-                      data-filter-tag={tag}
-                      type="button"
-                      phx-click="toggle_sidebar_tag"
-                      phx-value-tag={tag}
-                    >
-                      <%= tag %>
-                    </button>
-                  <% end %>
-                </div>
-              <% end %>
-            </section>
-          <% end %>
-
-          <%= if Enum.any?(Map.get(@sidebar_filters_config, :available_categories, [])) do %>
-            <section class="filter-section">
-              <div
-                class={[
-                  "filter-header",
-                  "collapsible-header",
-                  if(@categories_collapsed, do: "collapsed", else: "expanded")
-                ]}
-                data-testid="sidebar-filter-categories-header"
-                phx-click="toggle_sidebar_categories"
-              >
-                <span class="collapse-icon"><%= if @categories_collapsed, do: "▶", else: "▼" %></span>
-                <span><%= translated(@sidebar_filters_config.categories_label) %></span>
-                <%= if Enum.any?(Map.get(@selected_filters, :categories, [])) do %>
-                  <button class="clear-filter" type="button" phx-click="clear_sidebar_categories" phx-stop-propagation title={translated(@sidebar_filters_config.clear_categories_label)}>✕</button>
-                <% end %>
-              </div>
-              <%= unless @categories_collapsed do %>
-                <div class="filter-chips">
-                  <%= for category <- Map.get(@sidebar_filters_config, :available_categories, []) do %>
-                    <button
-                      class={[
-                        "filter-chip",
-                        if(category in Map.get(@selected_filters, :categories, []), do: "active")
-                      ]}
-                      data-testid="sidebar-filter-category"
-                      data-filter-category={category}
-                      type="button"
-                      phx-click="toggle_sidebar_category"
-                      phx-value-category={category}
-                    >
-                      <%= category %>
-                    </button>
-                  <% end %>
-                </div>
-              <% end %>
-            </section>
-          <% end %>
-        </div>
-      <% end %>
-
-      """
-    else
-      ~H"""
-      """
-    end
-  end
-
-  defp render_sidebar_load_more(assigns) do
-    filters = Map.get(assigns.sidebar_data, :filters, %{})
-
-    if Map.get(filters, :has_more) do
-      ~H"""
-      <div class="sidebar-load-more">
-        <button class="load-more-button" data-testid="sidebar-load-more" type="button" phx-click="load_more_sidebar">
-          <%= translated("Load more") %>
-        </button>
-      </div>
-      """
-    else
-      ~H"""
-      """
-    end
-  end
-
-  defp render_sidebar_body(assigns) do
-    case assigns.sidebar_data.layout do
-      "post_list" -> render_post_sidebar(assigns)
-      "media_grid" -> render_media_sidebar(assigns)
-      "entity_list" -> render_entity_sidebar(assigns)
-      "nav_list" -> render_nav_sidebar(assigns)
-      _other -> render_default_sidebar(assigns)
-    end
-  end
-
-  defp render_post_sidebar(assigns) do
-    ~H"""
-    <%= for section <- Map.get(@sidebar_data, :sections, []) do %>
-      <section class="sidebar-section">
-        <div class="sidebar-section-title">
-          <span class={"section-icon status-#{Map.get(section, :status, "draft")}"}>●</span>
-          <span data-testid="sidebar-section-title"><%= translated(section.title) %></span>
-          <span class="sidebar-section-count"><%= Map.get(section, :count, length(Map.get(section, :items, []))) %></span>
-        </div>
-        <div class="sidebar-list">
-          <%= for item <- Map.get(section, :items, []) do %>
-            <button
-              class={["sidebar-item", "sidebar-post-item", "post-type-post", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "selected")]}
-              data-testid="sidebar-open-item"
-              data-route={item.route}
-              data-item-id={item.id}
-              data-open-title={item.title}
-              data-open-subtitle={format_sidebar_timestamp(item.meta_timestamp)}
-              type="button"
-              phx-click="open_sidebar_item"
-              phx-value-route={item.route}
-              phx-value-id={item.id}
-              phx-value-title={item.title}
-              phx-value-subtitle={format_sidebar_timestamp(item.meta_timestamp)}
-            >
-              <span class="post-type-icon" title="post">●</span>
-              <span class="sidebar-item-content">
-                <span class="sidebar-item-title-row">
-                  <span class="sidebar-item-title"><%= item.title %></span>
-                </span>
-                <span class="sidebar-item-meta"><%= format_sidebar_timestamp(item.meta_timestamp) %></span>
-              </span>
-            </button>
-          <% end %>
-        </div>
-      </section>
-    <% end %>
-    <%= if Enum.empty?(Map.get(@sidebar_data, :sections, [])) do %>
-      <div class="sidebar-empty">
-        <p><%= translated(Map.get(@sidebar_data, :empty_message, "No items")) %></p>
-      </div>
-    <% end %>
-    """
-  end
-
-  defp render_media_sidebar(assigns) do
-    ~H"""
-    <%= if Enum.any?(Map.get(@sidebar_data, :items, [])) do %>
-      <div class="sidebar-list media-grid">
-        <%= for item <- Map.get(@sidebar_data, :items, []) do %>
-          <button
-            class={["media-item", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "selected")]}
-            data-testid="sidebar-open-item"
-            data-route={item.route}
-            data-item-id={item.id}
-            data-open-title={item.title}
-            data-open-subtitle={item.meta}
-            type="button"
-            title={item.title}
-            phx-click="open_sidebar_item"
-            phx-value-route={item.route}
-            phx-value-id={item.id}
-            phx-value-title={item.title}
-            phx-value-subtitle={item.meta}
-          >
-            <span class={media_thumbnail_class(item)}>
-              <%= if image_media?(item) do %>
-                <span class="media-thumbnail-fallback"><%= media_thumbnail_glyph(item.mime_type) %></span>
-                <img class="media-thumbnail-image" src={"/media-thumbnail/#{item.id}"} alt="" loading="lazy" decoding="async" />
-              <% else %>
-                <span class="media-thumbnail-fallback"><%= media_thumbnail_glyph(item.mime_type) %></span>
-              <% end %>
-            </span>
-            <span class="media-item-info">
-              <span class="media-item-name"><%= item.title %></span>
-              <span class="media-item-size"><%= item.meta %></span>
-            </span>
-          </button>
-        <% end %>
-      </div>
-    <% else %>
-      <div class="sidebar-empty">
-        <p><%= translated(Map.get(@sidebar_data, :empty_message, "No items")) %></p>
-      </div>
-    <% end %>
-    """
-  end
-
-  defp render_entity_sidebar(assigns) do
-    ~H"""
-    <%= if Enum.any?(Map.get(@sidebar_data, :items, [])) do %>
-      <div class="settings-nav-list">
-        <%= for item <- Map.get(@sidebar_data, :items, []) do %>
-          <button
-            class={["chat-list-item", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "active")]}
-            data-testid="sidebar-open-item"
-            data-route={item.route}
-            data-item-id={item.id}
-            data-open-title={item.title}
-            data-open-subtitle={translated(item.meta || "")}
-            type="button"
-            phx-click="open_sidebar_item"
-            phx-value-route={item.route}
-            phx-value-id={item.id}
-            phx-value-title={item.title}
-            phx-value-subtitle={translated(item.meta || "")}
-          >
-            <span class="chat-item-content">
-              <span class="chat-item-title"><%= item.title %></span>
-              <span class="chat-item-date"><%= translated(item.meta || "") %></span>
-            </span>
-          </button>
-        <% end %>
-      </div>
-    <% else %>
-      <div class="sidebar-empty">
-        <p><%= translated(Map.get(@sidebar_data, :empty_message, "No items")) %></p>
-      </div>
-    <% end %>
-    """
-  end
-
-  defp render_nav_sidebar(assigns) do
-    ~H"""
-    <div class="settings-nav-list">
-      <%= for item <- Map.get(@sidebar_data, :items, []) do %>
-        <button
-          class="settings-nav-entry"
-          data-testid="sidebar-open-item"
-          data-route={item.route}
-          data-item-id={item.id}
-          data-open-title={translated(item.title)}
-          data-open-subtitle={translated(Map.get(@sidebar_data, :subtitle, ""))}
-          type="button"
-          phx-click="open_sidebar_item"
-          phx-value-route={item.route}
-          phx-value-id={item.id}
-          phx-value-title={translated(item.title)}
-          phx-value-subtitle={translated(Map.get(@sidebar_data, :subtitle, ""))}
-        >
-          <span class="settings-nav-entry-icon"><%= Map.get(item, :icon, "") %></span>
-          <span><%= translated(item.title) %></span>
-        </button>
-      <% end %>
-    </div>
-    """
-  end
-
-  defp render_default_sidebar(assigns) do
-    ~H"""
-    <%= for section <- Map.get(@sidebar_data, :sections, []) do %>
-      <section class="sidebar-section">
-        <div class="sidebar-section-header">
-          <span data-testid="sidebar-section-title"><%= translated(section.title) %></span>
-        </div>
-        <div class="sidebar-section-items">
-          <%= for item <- Map.get(section, :items, []) do %>
-            <div class="sidebar-list-item"><%= item.title || "" %></div>
-          <% end %>
-        </div>
-      </section>
-    <% end %>
-    """
   end
 
   defp render_panel_body(assigns) do
@@ -1274,20 +875,6 @@ defmodule BDS.Desktop.ShellLive do
     max(4, ((entry.count || 0) / max_count) * 100)
   end
 
-  defp format_sidebar_timestamp(nil), do: ""
-
-  defp format_sidebar_timestamp(timestamp) do
-    timestamp
-    |> DateTime.from_unix!(:millisecond)
-    |> Calendar.strftime("%x")
-  end
-
-  defp image_media?(item), do: String.starts_with?(to_string(item.mime_type || ""), "image/")
-
-  defp media_thumbnail_class(item) do
-    if image_media?(item), do: "media-thumbnail has-image", else: "media-thumbnail"
-  end
-
   defp current_tab(%{active_tab: nil}), do: nil
 
   defp current_tab(%{tabs: tabs, active_tab: {type, id}}) do
@@ -1295,163 +882,7 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp assign_post_editor(socket) do
-    assigns = Map.put(socket.assigns, :project_metadata, ShellOverlayComponents.project_metadata(socket.assigns.projects.active_project_id))
-    assign(socket, :post_editor, PostEditor.build(assigns))
-  end
-
-  defp update_post_editor(socket, params) do
-    case socket.assigns.current_tab do
-      %{type: :post, id: post_id} ->
-        case Repo.get(Post, post_id) do
-          nil ->
-            socket
-
-          %Post{} = post ->
-            metadata = ShellOverlayComponents.project_metadata(post.project_id)
-            canonical_language = PostEditor.normalize_language(post.language, metadata.main_language || "en")
-            current_language = Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
-            requested_language = PostEditor.normalize_language(Map.get(params, "language"), current_language)
-
-            next_language =
-              if current_language == canonical_language do
-                requested_language
-              else
-                current_language
-              end
-
-            draft = PostEditor.normalize_params(params, current_language, next_language)
-            workbench = Workbench.mark_dirty(socket.assigns.workbench, :post, post_id)
-
-            socket
-            |> assign(:workbench, workbench)
-            |> assign(:post_editor_drafts, put_nested_map(socket.assigns.post_editor_drafts, post_id, next_language, draft))
-            |> assign(:post_editor_active_languages, Map.put(socket.assigns.post_editor_active_languages, post_id, next_language))
-            |> assign(:post_editor_save_states, Map.put(socket.assigns.post_editor_save_states, post_id, :dirty))
-            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: draft["title"], subtitle: Atom.to_string(post.status || :draft)}))
-            |> maybe_drop_old_language_draft(post_id, current_language, next_language)
-            |> reload_shell(workbench)
-        end
-
-      _other ->
-        socket
-    end
-  end
-
-  defp maybe_drop_old_language_draft(socket, _post_id, current_language, next_language) when current_language == next_language,
-    do: socket
-
-  defp maybe_drop_old_language_draft(socket, post_id, current_language, _next_language) do
-    assign(socket, :post_editor_drafts, delete_nested_map(socket.assigns.post_editor_drafts, post_id, current_language))
-  end
-
-  defp persist_post_editor(socket, post_id, action) do
-    case Repo.get(Post, post_id) do
-      nil ->
-        socket
-
-      %Post{} = post ->
-        metadata = ShellOverlayComponents.project_metadata(post.project_id)
-        canonical_language = PostEditor.normalize_language(post.language, metadata.main_language || "en")
-        active_language = Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
-        draft = PostEditor.current_draft(socket.assigns, post, metadata, active_language)
-
-        result = PostEditor.persist(post, draft, active_language, metadata, action)
-
-        case result do
-          {:ok, record} ->
-            workbench = Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
-            normalized_form = PostEditor.persisted_form(Repo.get!(Post, post_id), metadata, active_language)
-
-            socket
-            |> assign(:workbench, workbench)
-            |> assign(:post_editor_drafts, put_nested_map(socket.assigns.post_editor_drafts, post_id, active_language, normalized_form))
-            |> assign(:post_editor_save_states, Map.put(socket.assigns.post_editor_save_states, post_id, PostEditor.save_state_for_action(action)))
-            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: PostEditor.record_title(record, Repo.get!(Post, post_id)), subtitle: Atom.to_string(PostEditor.record_status(record))}))
-            |> reload_shell(workbench)
-
-          {:error, reason} ->
-            socket
-            |> append_output_entry(translated("Post"), inspect(reason), nil, "error")
-            |> reload_shell(socket.assigns.workbench)
-        end
-    end
-  end
-
-  defp discard_post_editor(socket, post_id) do
-    case Repo.get(Post, post_id) do
-      nil ->
-        socket
-
-      %Post{} = post ->
-        metadata = ShellOverlayComponents.project_metadata(post.project_id)
-        canonical_language = PostEditor.normalize_language(post.language, metadata.main_language || "en")
-        active_language = Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
-        restored_result = PostEditor.discard(post, active_language, metadata)
-
-        case restored_result do
-          {:ok, restored_post} ->
-            workbench = Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
-
-            socket
-            |> assign(:workbench, workbench)
-            |> assign(:post_editor_drafts, delete_nested_map(socket.assigns.post_editor_drafts, post_id, active_language))
-            |> assign(:post_editor_save_states, Map.put(socket.assigns.post_editor_save_states, post_id, :discarded))
-            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: restored_post.title || restored_post.slug || restored_post.id, subtitle: Atom.to_string(restored_post.status || :draft)}))
-            |> reload_shell(workbench)
-
-          {:error, reason} ->
-            socket
-            |> append_output_entry(translated("Post"), inspect(reason), nil, "error")
-            |> reload_shell(socket.assigns.workbench)
-        end
-    end
-  end
-
-  defp delete_post_editor(socket, post_id) do
-    case Posts.delete_post(post_id) do
-      {:ok, :deleted} ->
-        workbench = Workbench.close_tab(socket.assigns.workbench, :post, post_id)
-
-        socket
-        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:post, post_id}))
-        |> assign(:post_editor_drafts, Map.delete(socket.assigns.post_editor_drafts, post_id))
-        |> assign(:post_editor_active_languages, Map.delete(socket.assigns.post_editor_active_languages, post_id))
-        |> assign(:post_editor_modes, Map.delete(socket.assigns.post_editor_modes, post_id))
-        |> assign(:post_editor_expanded, Map.delete(socket.assigns.post_editor_expanded, post_id))
-        |> assign(:post_editor_save_states, Map.delete(socket.assigns.post_editor_save_states, post_id))
-        |> reload_shell(workbench)
-
-      {:error, reason} ->
-        socket
-        |> append_output_entry(translated("Post"), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp update_post_editor_expanded(socket, post_id, updater) do
-    expanded =
-      socket.assigns.post_editor_expanded
-      |> Map.get(post_id, %{metadata: false, excerpt: false})
-      |> Map.put_new(:metadata, false)
-      |> Map.put_new(:excerpt, false)
-      |> updater.()
-
-    assign(socket, :post_editor_expanded, Map.put(socket.assigns.post_editor_expanded, post_id, expanded))
-  end
-
-  defp put_nested_map(map, key, nested_key, value) do
-    Map.update(map, key, %{nested_key => value}, &Map.put(&1, nested_key, value))
-  end
-
-  defp delete_nested_map(map, key, nested_key) do
-    case Map.get(map, key) do
-      nil -> map
-      nested ->
-        case Map.delete(nested, nested_key) do
-          emptied when map_size(emptied) == 0 -> Map.delete(map, key)
-          remaining -> Map.put(map, key, remaining)
-        end
-    end
+    PostEditor.assign_socket(socket)
   end
 
 
@@ -1517,177 +948,6 @@ defmodule BDS.Desktop.ShellLive do
     socket
     |> assign(:tab_meta, tab_meta)
     |> reload_shell(workbench)
-  end
-
-  defp merge_sidebar_ui_state(socket, view_id, sidebar_data) do
-    filters = Map.get(sidebar_data, :filters)
-
-    if is_map(filters) and Map.get(filters, :enabled) do
-      panel_state = sidebar_filter_panel_state(socket, view_id)
-
-      Map.put(sidebar_data, :filters, Map.merge(filters, %{
-        filter_panel_visible: panel_state.visible,
-        archive_collapsed: panel_state.archive_collapsed,
-        tags_collapsed: panel_state.tags_collapsed,
-        categories_collapsed: panel_state.categories_collapsed,
-        expanded_year: panel_state.expanded_year
-      }))
-    else
-      sidebar_data
-    end
-  end
-
-  defp sidebar_filter_panel_state(socket, view_id) do
-    default_state = default_sidebar_filter_panel_state()
-
-    case Map.get(socket.assigns.sidebar_filter_panels, view_id) do
-      state when is_map(state) -> Map.merge(default_state, state)
-      visible when is_boolean(visible) -> Map.put(default_state, :visible, visible)
-      _other -> default_state
-    end
-  end
-
-  defp put_sidebar_filter_panel_state(socket, updater) do
-    view_id = Atom.to_string(socket.assigns.workbench.active_view)
-    state = socket |> sidebar_filter_panel_state(view_id) |> updater.()
-    assign(socket, :sidebar_filter_panels, Map.put(socket.assigns.sidebar_filter_panels, view_id, state))
-  end
-
-  defp default_sidebar_filter_panel_state do
-    %{
-      visible: false,
-      archive_collapsed: true,
-      tags_collapsed: true,
-      categories_collapsed: true,
-      expanded_year: nil
-    }
-  end
-
-  defp current_sidebar_filters(socket, view_id) do
-    socket.assigns.sidebar_filters_by_view
-    |> Map.get(view_id, %{})
-    |> normalize_sidebar_filters(socket.assigns[:sidebar_data])
-  end
-
-  defp normalize_sidebar_filters(filters, sidebar_data) do
-    max_items = sidebar_page_size(sidebar_data)
-
-    %{
-      search: normalize_filter_string(Map.get(filters, :search)),
-      year: Map.get(filters, :year),
-      month: Map.get(filters, :month),
-      tags: Map.get(filters, :tags, []),
-      categories: Map.get(filters, :categories, []),
-      display_limit: max(Map.get(filters, :display_limit, max_items) || max_items, max_items)
-    }
-  end
-
-  defp put_sidebar_filters(socket, updater) do
-    view_id = Atom.to_string(socket.assigns.workbench.active_view)
-    filters = current_sidebar_filters(socket, view_id) |> updater.() |> normalize_sidebar_filters(socket.assigns.sidebar_data)
-    assign(socket, :sidebar_filters_by_view, Map.put(socket.assigns.sidebar_filters_by_view, view_id, filters))
-  end
-
-  defp toggle_filter_value(filters, key, value) do
-    values = Map.get(filters, key, [])
-
-    next_values =
-      if value in values do
-        List.delete(values, value)
-      else
-        values ++ [value]
-      end
-
-    Map.put(filters, key, next_values)
-  end
-
-  defp group_year_month_counts(entries) do
-    entries
-    |> Enum.group_by(& &1.year)
-    |> Enum.map(fn {year, months} ->
-      %{
-        year: year,
-        count: Enum.reduce(months, 0, fn entry, acc -> acc + (entry.count || 0) end),
-        months: Enum.sort_by(months, &-&1.month)
-      }
-    end)
-    |> Enum.sort_by(&-&1.year)
-  end
-
-  defp sidebar_filter_tag_color(filters_config, tag) do
-    filters_config
-    |> Map.get(:available_tag_colors, %{})
-    |> Map.get(tag)
-    |> normalize_sidebar_filter_color()
-  end
-
-  defp sidebar_filter_chip_style(filters_config, tag) do
-    case sidebar_filter_tag_color(filters_config, tag) do
-      nil -> nil
-      color -> "background-color: #{color}; color: #{sidebar_filter_contrast_color(color)}; border-color: #{color};"
-    end
-  end
-
-  defp normalize_sidebar_filter_color(nil), do: nil
-  defp normalize_sidebar_filter_color(""), do: nil
-
-  defp normalize_sidebar_filter_color("#" <> rest = color) when byte_size(rest) == 6 do
-    if String.match?(rest, ~r/\A[0-9a-fA-F]{6}\z/), do: color, else: nil
-  end
-
-  defp normalize_sidebar_filter_color(_color), do: nil
-
-  defp sidebar_filter_contrast_color("#" <> rgb) do
-    <<r::binary-size(2), g::binary-size(2), b::binary-size(2)>> = rgb
-    {red, _} = Integer.parse(r, 16)
-    {green, _} = Integer.parse(g, 16)
-    {blue, _} = Integer.parse(b, 16)
-    luminance = (red * 299 + green * 587 + blue * 114) / 1000
-    if luminance > 150, do: "#1e1e1e", else: "#ffffff"
-  end
-
-  defp sidebar_filter_contrast_color(_color), do: "#ffffff"
-
-  defp sidebar_filters_enabled?(sidebar_data) do
-    sidebar_data
-    |> Map.get(:filters)
-    |> then(&(is_map(&1) and Map.get(&1, :enabled, false)))
-  end
-
-  defp sidebar_filters_visible?(sidebar_data) do
-    sidebar_data
-    |> Map.get(:filters, %{})
-    |> Map.get(:filter_panel_visible, false)
-  end
-
-  defp normalize_filter_string(nil), do: nil
-
-  defp normalize_filter_string(value) do
-    value
-    |> to_string()
-    |> String.trim()
-    |> case do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp parse_optional_integer(nil), do: nil
-  defp parse_optional_integer(value) when is_integer(value), do: value
-
-  defp parse_optional_integer(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {parsed, _rest} -> parsed
-      :error -> nil
-    end
-  end
-
-  defp sidebar_page_size(nil), do: 500
-
-  defp sidebar_page_size(sidebar_data) do
-    sidebar_data
-    |> Map.get(:filters, %{})
-    |> Map.get(:max_items, 500)
   end
 
   defp set_page_language(socket, language) do
@@ -2043,11 +1303,6 @@ defmodule BDS.Desktop.ShellLive do
     end
   end
 
-  defp sidebar_item_selected?(workbench, route, id) do
-    route_atom = sidebar_route_atom(route)
-    workbench.active_tab == {route_atom, tab_id_for_route(route_atom, id)}
-  end
-
   defp tab_title(nil, _tab_meta), do: translated("Dashboard")
 
   defp tab_title(tab, tab_meta) do
@@ -2152,13 +1407,4 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:shell_overlay, nil)
   end
 
-  defp media_thumbnail_glyph(mime_type) do
-    case String.split(to_string(mime_type || ""), "/", parts: 2) do
-      ["image", _rest] -> "IMG"
-      ["video", _rest] -> "VID"
-      ["audio", _rest] -> "AUD"
-      ["application", _rest] -> "DOC"
-      _other -> "FILE"
-    end
-  end
 end

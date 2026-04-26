@@ -166,12 +166,12 @@
           <div class="sidebar-section">
             <div class="sidebar-section-header">
               <span><%= String.upcase(sidebar_header_label(@sidebar_header)) %></span>
-              <%= if sidebar_filters_enabled?(@sidebar_data) do %>
+              <%= if ShellSidebarComponents.filters_enabled?(@sidebar_data) do %>
                 <div class="sidebar-actions">
                   <button
                     class={[
                       "sidebar-action",
-                      if(sidebar_filters_visible?(@sidebar_data), do: "active")
+                      if(ShellSidebarComponents.filters_visible?(@sidebar_data), do: "active")
                     ]}
                     data-testid="sidebar-filter-toggle"
                     type="button"
@@ -187,9 +187,7 @@
               <% end %>
             </div>
           </div>
-          <%= render_sidebar_filters(assigns) %>
-          <%= render_sidebar_body(assigns) %>
-          <%= render_sidebar_load_more(assigns) %>
+          <ShellSidebarComponents.sidebar_content sidebar_data={@sidebar_data} workbench={@workbench} page_language={@page_language} />
         </div>
       </div>
       <div class="resizable-panel-divider sidebar-divider" data-resize="sidebar" data-role="resize-handle"></div>

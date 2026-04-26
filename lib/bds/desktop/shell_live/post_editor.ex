@@ -7,12 +7,160 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   import Phoenix.HTML
 
   alias BDS.Desktop.ShellData
-  alias BDS.{I18n, PostLinks, Posts, Repo, Tags, Templates}
+  alias BDS.{I18n, Metadata, PostLinks, Posts, Repo, Tags, Templates}
   alias BDS.Media.Media
   alias BDS.Posts.{Post, Translation}
   alias BDS.UI.Workbench
 
   embed_templates "post_editor_html/*"
+
+  def assign_socket(socket) do
+    assigns = Map.put(socket.assigns, :project_metadata, project_metadata(socket.assigns.projects.active_project_id))
+    assign(socket, :post_editor, build(assigns))
+  end
+
+  def update(socket, params, reload) do
+    case socket.assigns.current_tab do
+      %{type: :post, id: post_id} ->
+        case Repo.get(Post, post_id) do
+          nil ->
+            socket
+
+          %Post{} = post ->
+            metadata = project_metadata(post.project_id)
+            canonical_language = canonical_language(post, metadata)
+            current_language = Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
+            requested_language = normalize_language(Map.get(params, "language"), current_language)
+
+            next_language =
+              if current_language == canonical_language do
+                requested_language
+              else
+                current_language
+              end
+
+            draft = normalize_params(params, current_language, next_language)
+            workbench = Workbench.mark_dirty(socket.assigns.workbench, :post, post_id)
+
+            socket
+            |> assign(:workbench, workbench)
+            |> assign(:post_editor_drafts, put_nested_map(socket.assigns.post_editor_drafts, post_id, next_language, draft))
+            |> assign(:post_editor_active_languages, Map.put(socket.assigns.post_editor_active_languages, post_id, next_language))
+            |> assign(:post_editor_save_states, Map.put(socket.assigns.post_editor_save_states, post_id, :dirty))
+            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: draft["title"], subtitle: Atom.to_string(post.status || :draft)}))
+            |> maybe_drop_old_language_draft(post_id, current_language, next_language)
+            |> reload.(workbench)
+        end
+
+      _other ->
+        socket
+    end
+  end
+
+  def persist_socket(socket, post_id, action, reload, append_output) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        metadata = project_metadata(post.project_id)
+        canonical_language = canonical_language(post, metadata)
+        active_language = Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
+        draft = current_draft(socket.assigns, post, metadata, active_language)
+
+        case persist(post, draft, active_language, metadata, action) do
+          {:ok, record} ->
+            workbench = Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
+            normalized_form = persisted_form(Repo.get!(Post, post_id), metadata, active_language)
+
+            socket
+            |> assign(:workbench, workbench)
+            |> assign(:post_editor_drafts, put_nested_map(socket.assigns.post_editor_drafts, post_id, active_language, normalized_form))
+            |> assign(:post_editor_save_states, Map.put(socket.assigns.post_editor_save_states, post_id, save_state_for_action(action)))
+            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: record_title(record, Repo.get!(Post, post_id)), subtitle: Atom.to_string(record_status(record))}))
+            |> reload.(workbench)
+
+          {:error, reason} ->
+            socket
+            |> append_output.(translated("Post"), inspect(reason), nil, "error")
+            |> reload.(socket.assigns.workbench)
+        end
+    end
+  end
+
+  def discard_socket(socket, post_id, reload, append_output) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        metadata = project_metadata(post.project_id)
+        canonical_language = canonical_language(post, metadata)
+        active_language = Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
+
+        case discard(post, active_language, metadata) do
+          {:ok, restored_post} ->
+            workbench = Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
+
+            socket
+            |> assign(:workbench, workbench)
+            |> assign(:post_editor_drafts, delete_nested_map(socket.assigns.post_editor_drafts, post_id, active_language))
+            |> assign(:post_editor_save_states, Map.put(socket.assigns.post_editor_save_states, post_id, :discarded))
+            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: restored_post.title || restored_post.slug || restored_post.id, subtitle: Atom.to_string(restored_post.status || :draft)}))
+            |> reload.(workbench)
+
+          {:error, reason} ->
+            socket
+            |> append_output.(translated("Post"), inspect(reason), nil, "error")
+            |> reload.(socket.assigns.workbench)
+        end
+    end
+  end
+
+  def delete_socket(socket, post_id, reload, append_output) do
+    case Posts.delete_post(post_id) do
+      {:ok, :deleted} ->
+        workbench = Workbench.close_tab(socket.assigns.workbench, :post, post_id)
+
+        socket
+        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:post, post_id}))
+        |> assign(:post_editor_drafts, Map.delete(socket.assigns.post_editor_drafts, post_id))
+        |> assign(:post_editor_active_languages, Map.delete(socket.assigns.post_editor_active_languages, post_id))
+        |> assign(:post_editor_modes, Map.delete(socket.assigns.post_editor_modes, post_id))
+        |> assign(:post_editor_expanded, Map.delete(socket.assigns.post_editor_expanded, post_id))
+        |> assign(:post_editor_save_states, Map.delete(socket.assigns.post_editor_save_states, post_id))
+        |> reload.(workbench)
+
+      {:error, reason} ->
+        socket
+        |> append_output.(translated("Post"), inspect(reason), nil, "error")
+        |> reload.(socket.assigns.workbench)
+    end
+  end
+
+  def set_mode(socket, post_id, mode, reload) do
+    workbench = socket.assigns.workbench
+
+    socket
+    |> assign(:post_editor_modes, Map.put(socket.assigns.post_editor_modes, post_id, normalize_mode(mode)))
+    |> reload.(workbench)
+  end
+
+  def toggle_section(socket, post_id, section, reload) when section in [:metadata, :excerpt] do
+    workbench = socket.assigns.workbench
+
+    socket
+    |> assign(:post_editor_expanded, Map.put(socket.assigns.post_editor_expanded, post_id, toggled_sections(socket.assigns.post_editor_expanded, post_id, section)))
+    |> reload.(workbench)
+  end
+
+  def select_language(socket, post_id, language, reload) do
+    workbench = socket.assigns.workbench
+
+    socket
+    |> assign(:post_editor_active_languages, Map.put(socket.assigns.post_editor_active_languages, post_id, normalize_language(language, language)))
+    |> reload.(workbench)
+  end
 
   def build(%{current_tab: %{type: :post, id: post_id}} = assigns) do
     case Repo.get(Post, post_id) do
@@ -20,7 +168,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
         nil
 
       %Post{} = post ->
-        metadata = project_metadata(assigns)
+        metadata = assigned_project_metadata(assigns)
         canonical_language = canonical_language(post, metadata)
         active_language = Map.get(assigns.post_editor_active_languages, post.id, canonical_language)
         translations = translations(post.id)
@@ -165,6 +313,15 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
 
+  def project_metadata(nil), do: %{main_language: "en", blog_languages: []}
+
+  def project_metadata(project_id) do
+    {:ok, metadata} = Metadata.get_project_metadata(project_id)
+    metadata
+  rescue
+    _error -> %{main_language: "en", blog_languages: []}
+  end
+
   defp editor_toolbar(assigns) do
     ~H"""
     <%= if Enum.any?(@toolbar_buttons) do %>
@@ -185,7 +342,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     """
   end
 
-  defp project_metadata(assigns), do: Map.get(assigns, :project_metadata, %{})
+  defp assigned_project_metadata(assigns), do: Map.get(assigns, :project_metadata, %{})
 
   defp current_status(post_status, active_language, canonical_language, current_translation) do
     if active_language == canonical_language, do: post_status, else: translation_status(current_translation)
@@ -401,4 +558,34 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   defp maybe_publish_translation({:ok, _translation}, post_id, language, :publish), do: Posts.publish_post_translation(post_id, language)
   defp maybe_publish_translation(result, _post_id, _language, _action), do: result
+
+  defp maybe_drop_old_language_draft(socket, _post_id, current_language, next_language) when current_language == next_language,
+    do: socket
+
+  defp maybe_drop_old_language_draft(socket, post_id, current_language, _next_language) do
+    assign(socket, :post_editor_drafts, delete_nested_map(socket.assigns.post_editor_drafts, post_id, current_language))
+  end
+
+  defp toggled_sections(expanded_by_post, post_id, section) do
+    expanded_by_post
+    |> Map.get(post_id, %{metadata: false, excerpt: false})
+    |> Map.put_new(:metadata, false)
+    |> Map.put_new(:excerpt, false)
+    |> Map.update!(section, &not &1)
+  end
+
+  defp put_nested_map(map, key, nested_key, value) do
+    Map.update(map, key, %{nested_key => value}, &Map.put(&1, nested_key, value))
+  end
+
+  defp delete_nested_map(map, key, nested_key) do
+    case Map.get(map, key) do
+      nil -> map
+      nested ->
+        case Map.delete(nested, nested_key) do
+          emptied when map_size(emptied) == 0 -> Map.delete(map, key)
+          remaining -> Map.put(map, key, remaining)
+        end
+    end
+  end
 end
