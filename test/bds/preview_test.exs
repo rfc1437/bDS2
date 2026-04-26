@@ -134,7 +134,7 @@ defmodule BDS.PreviewTest do
              Posts.create_post(%{
                project_id: project.id,
                title: "Draft Post",
-               content: "Draft preview body",
+               content: "**Draft** preview body",
                language: "en",
                template_slug: published_template.slug
              })
@@ -146,7 +146,29 @@ defmodule BDS.PreviewTest do
 
     assert draft_html =~ "preview-template"
     assert draft_html =~ "Draft Post"
-    assert draft_html =~ "Draft preview body"
+    assert draft_html =~ ~s(<strong>Draft</strong> preview body)
+    refute draft_html =~ "**Draft** preview body"
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+
+    published_datetime = DateTime.from_unix!(published_post.created_at, :millisecond)
+    published_path =
+      "/#{published_datetime.year}/#{String.pad_leading(Integer.to_string(published_datetime.month), 2, "0")}/#{String.pad_leading(Integer.to_string(published_datetime.day), 2, "0")}/#{published_post.slug}"
+
+    :inets.start()
+
+    assert {:ok, server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, {{_version, 200, _reason}, _headers, published_html}} =
+             :httpc.request(
+               :get,
+               {to_charlist("http://#{server.host}:#{server.port}#{published_path}?draft=true&post_id=#{published_post.id}"), []},
+               [],
+               body_format: :binary
+             )
+
+    assert published_html =~ ~s(<strong>Draft</strong> preview body)
+    refute published_html =~ "**Draft** preview body"
 
     assert :ok = BDS.Preview.stop_preview(project.id)
   end

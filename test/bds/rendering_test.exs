@@ -311,6 +311,59 @@ defmodule BDS.RenderingTest do
     assert rendered =~ "range=1711843200-1711929600"
   end
 
+  test "render_post_page falls back to bundled starter template when the published default template file is missing", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Broken Default Post Template",
+               kind: :post,
+               content: "this custom template should not be used"
+             })
+
+    assert {:ok, published_template} = BDS.Templates.publish_template(template.id)
+
+    BDS.Repo.update_all(
+      from(template in BDS.Templates.Template,
+        where: template.id == ^published_template.id
+      ),
+      set: [slug: "single-post", file_path: "templates/single-post.liquid", content: nil]
+    )
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Fallback Body",
+               content: "**Rendered** body",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
+
+    assert {:ok, rendered} =
+             Rendering.render_post_page(project.id, nil, %{
+               id: published_post.id,
+               title: published_post.title,
+               content: BDS.Posts.editor_body(published_post),
+               slug: published_post.slug,
+               language: published_post.language,
+               excerpt: published_post.excerpt,
+               template_slug: published_post.template_slug
+             })
+
+    assert rendered =~ ~s(data-template="single-post")
+    assert rendered =~ ~s(<strong>Rendered</strong> body)
+    refute rendered =~ "this custom template should not be used"
+  end
+
   defp canonical_post_href(post) do
     datetime = DateTime.from_unix!(post.created_at, :millisecond)
 

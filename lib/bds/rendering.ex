@@ -52,7 +52,13 @@ defmodule BDS.Rendering do
 
     case select_template(project_id, kind, slug) do
       %Template{} = template ->
-        published_template_body(template)
+        case published_template_body(template) do
+          {:ok, _source} = ok ->
+            ok
+
+          {:error, reason} = error ->
+            maybe_load_bundled_template_source(project, kind, slug, template, reason, error)
+        end
 
       nil ->
         load_bundled_template_source(project, kind, slug)
@@ -68,6 +74,23 @@ defmodule BDS.Rendering do
             template.enabled == true and template.slug == ^slug,
         limit: 1
     )
+  end
+
+  defp select_template(project_id, :post, nil) do
+    case StarterTemplates.default_slug(:post) do
+      nil ->
+        nil
+
+      default_slug ->
+        Repo.one(
+          from template in Template,
+            where:
+              template.project_id == ^project_id and template.kind == :post and
+                template.status == :published and
+                template.enabled == true and template.slug == ^default_slug,
+            limit: 1
+        )
+    end
   end
 
   defp select_template(project_id, kind, nil) do
@@ -139,11 +162,24 @@ defmodule BDS.Rendering do
       {:error, :template_not_found}
   end
 
+  defp maybe_load_bundled_template_source(project, kind, slug, template, reason, error)
+       when reason in [:enoent, :template_not_found] do
+    if template.content in [nil, ""] and StarterTemplates.default_template?(kind, template.slug) do
+      load_bundled_template_source(project, kind, slug)
+    else
+      error
+    end
+  end
+
+  defp maybe_load_bundled_template_source(_project, _kind, _slug, _template, _reason, error),
+    do: error
+
   defp bundled_template_slug(_kind, slug) when is_binary(slug) and slug != "", do: slug
   defp bundled_template_slug(kind, _slug), do: StarterTemplates.default_slug(kind)
 
   defp post_assigns(project_id, assigns) do
     metadata = project_metadata(project_id)
+    template_context = template_render_context(project_id)
 
     language =
       Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
@@ -156,8 +192,15 @@ defmodule BDS.Rendering do
     post_tags = Map.get(post_record || %{}, :tags, []) || []
     canonical_post_paths = canonical_post_path_by_slug(project_id, main_language)
     canonical_media_paths = canonical_media_path_by_source_path(project_id)
+    raw_content = Map.get(assigns, :content, Map.get(assigns, "content"))
+    rendered_content = render_post_content(raw_content, canonical_post_paths, canonical_media_paths, language, template_context)
     incoming_links = link_contexts(project_id, post_id, :incoming, main_language)
     outgoing_links = link_contexts(project_id, post_id, :outgoing, main_language)
+
+    post_assigns =
+      assigns
+      |> Map.put(:content, rendered_content)
+      |> Map.put(:raw_content, raw_content)
 
     %{
       language: language,
@@ -196,26 +239,35 @@ defmodule BDS.Rendering do
       backlinks: backlinks(incoming_links),
       canonical_post_path_by_slug: canonical_post_paths,
       canonical_media_path_by_source_path: canonical_media_paths,
-      post_data_json_by_id: post_data_json(assigns, post_record),
-      post: build_post_context(assigns, post_record, incoming_links, outgoing_links)
+      post_data_json_by_id: post_data_json(post_assigns, post_record),
+      post: build_post_context(post_assigns, post_record, incoming_links, outgoing_links)
     }
   end
 
   defp list_assigns(project_id, assigns) do
     metadata = project_metadata(project_id)
+    template_context = template_render_context(project_id)
 
     language =
       Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
 
     main_language = metadata.main_language || language
-    posts = normalize_list_posts(Map.get(assigns, :posts, Map.get(assigns, "posts", [])))
     archive_context = Map.get(assigns, :archive_context, Map.get(assigns, "archive_context", %{}))
+
+    canonical_post_paths = canonical_post_path_by_slug(project_id, main_language)
+    canonical_media_paths = canonical_media_path_by_source_path(project_id)
+    posts =
+      normalize_list_posts(
+        Map.get(assigns, :posts, Map.get(assigns, "posts", [])),
+        canonical_post_paths,
+        canonical_media_paths,
+        language,
+        template_context
+      )
 
     pagination =
       normalize_pagination(Map.get(assigns, :pagination, Map.get(assigns, "pagination")), posts)
 
-    canonical_post_paths = canonical_post_path_by_slug(project_id, main_language)
-    canonical_media_paths = canonical_media_path_by_source_path(project_id)
     day_blocks = build_day_blocks(posts)
     min_date = min_date(posts)
     max_date = max_date(posts)
@@ -551,20 +603,29 @@ defmodule BDS.Rendering do
     post_path(post, prefix)
   end
 
-  defp normalize_list_posts(posts) do
+  defp normalize_list_posts(posts, canonical_post_paths, canonical_media_paths, language, template_context) do
     Enum.map(posts, fn post ->
       post_record = load_post_record(post)
+      raw_content =
+        Map.get(
+          post,
+          :content,
+          Map.get(post, "content", Map.get(post, :excerpt, Map.get(post, "excerpt", "")))
+        )
 
       %{
         id: Map.get(post, :id, Map.get(post, "id")),
         slug: Map.get(post, :slug, Map.get(post, "slug")),
         title: Map.get(post, :title, Map.get(post, "title")),
         content:
-          Map.get(
-            post,
-            :content,
-            Map.get(post, "content", Map.get(post, :excerpt, Map.get(post, "excerpt", "")))
+          render_post_content(
+            raw_content,
+            canonical_post_paths,
+            canonical_media_paths,
+            language,
+            template_context
           ),
+        raw_content: raw_content,
         excerpt:
           Map.get(post, :excerpt, Map.get(post, "excerpt", Map.get(post_record || %{}, :excerpt))),
         author: Map.get(post, :author, Map.get(post, "author", Map.get(post_record || %{}, :author))),
@@ -602,6 +663,7 @@ defmodule BDS.Rendering do
       slug: Map.get(assigns, :slug, Map.get(assigns, "slug")),
       title: Map.get(assigns, :title, Map.get(assigns, "title")),
       content: Map.get(assigns, :content, Map.get(assigns, "content")),
+      raw_content: Map.get(assigns, :raw_content, Map.get(assigns, "raw_content")),
       excerpt:
         Map.get(
           assigns,
@@ -632,6 +694,20 @@ defmodule BDS.Rendering do
       outgoing_links: outgoing_links,
       incoming_links: incoming_links
     }
+  end
+
+  defp render_post_content(content, canonical_post_paths, canonical_media_paths, language, template_context) do
+    Filters.render_markdown(content, canonical_post_paths, canonical_media_paths, language, template_context)
+  end
+
+  defp template_render_context(project_id) do
+    project = Projects.get_project!(project_id)
+
+    Liquex.Context.new(%{},
+      static_environment: %{},
+      filter_module: Filters,
+      file_system: FileSystem.new(StarterTemplates.template_roots(project))
+    )
   end
 
   defp normalize_pagination(nil, posts) do

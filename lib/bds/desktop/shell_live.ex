@@ -17,6 +17,7 @@ defmodule BDS.Desktop.ShellLive do
   alias BDS.Posts.Post
   alias BDS.Projects
   alias BDS.Repo
+  alias BDS.Templates
   alias BDS.UI.{Commands, MenuBar, Registry, Session, Workbench}
 
   @refresh_interval 1_500
@@ -284,6 +285,34 @@ defmodule BDS.Desktop.ShellLive do
      socket
      |> assign(:tab_meta, tab_meta)
      |> reload_shell(workbench)}
+  end
+
+  def handle_event("delete_sidebar_template", %{"id" => template_id}, socket) do
+    case Repo.get(Templates.Template, template_id) do
+      %Templates.Template{project_id: project_id} when project_id == socket.assigns.projects.active_project_id ->
+        case Templates.delete_template(template_id) do
+          {:ok, :deleted} ->
+            workbench = Workbench.close_tab(socket.assigns.workbench, :templates, template_id)
+            tab_meta = Map.delete(socket.assigns.tab_meta, {:templates, template_id})
+
+            {:noreply,
+             socket
+             |> assign(:tab_meta, tab_meta)
+             |> reload_shell(workbench)}
+
+          {:error, reason} ->
+            {:noreply,
+             socket
+             |> append_output_entry(translated("Delete") <> " " <> translated("Template"), inspect(reason), nil, "error")
+             |> reload_shell(socket.assigns.workbench)}
+        end
+
+      _other ->
+        {:noreply,
+         socket
+         |> append_output_entry(translated("Delete") <> " " <> translated("Template"), inspect(:not_found), nil, "error")
+         |> reload_shell(socket.assigns.workbench)}
+    end
   end
 
   def handle_event("toggle_offline_mode", _params, socket) do

@@ -26,6 +26,10 @@ defmodule BDS.Rendering.Filters do
         _language_prefix,
         context
       ) do
+    render_markdown(value, canonical_post_paths, canonical_media_paths, language, context)
+  end
+
+  def render_markdown(value, canonical_post_paths, canonical_media_paths, language, context) do
     value
     |> to_string()
     |> replace_built_in_macros(language, context)

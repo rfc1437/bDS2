@@ -263,4 +263,32 @@ defmodule BDS.TemplatesTest do
     assert template.created_at == 101
     assert template.updated_at == 202
   end
+
+  test "rebuild_templates_from_files removes stale published default templates when no local template files exist", %{
+    project: project
+  } do
+    now = BDS.Persistence.now_ms()
+
+    stale_template =
+      %BDS.Templates.Template{}
+      |> BDS.Templates.Template.changeset(%{
+        id: Ecto.UUID.generate(),
+        project_id: project.id,
+        slug: "single-post",
+        title: "Single Post",
+        kind: :post,
+        enabled: true,
+        version: 1,
+        file_path: "templates/single-post.liquid",
+        status: :published,
+        content: nil,
+        created_at: now,
+        updated_at: now
+      })
+      |> Repo.insert!()
+
+    assert {:ok, templates} = BDS.Templates.rebuild_templates_from_files(project.id)
+    assert templates == []
+    assert Repo.get(BDS.Templates.Template, stale_template.id) == nil
+  end
 end

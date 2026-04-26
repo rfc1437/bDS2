@@ -53,7 +53,7 @@ version: 1
                       {% endif %}
                       <h2 class="post-title"><a href="{{ canonical_post_href }}">{{ post.title }}</a></h2>
                     {% endif %}
-                    {{ post.content | markdown: post.id, post_data_json_by_id, canonical_post_path_by_slug, canonical_media_path_by_source_path, language, language_prefix }}
+                      {{ post.content }}
                   </div>
                 {% endfor %}
               </div>
@@ -68,7 +68,7 @@ version: 1
                   {% endif %}
                   <h2 class="post-title"><a href="{{ canonical_post_href }}">{{ post.title }}</a></h2>
                 {% endif %}
-                {{ post.content | markdown: post.id, post_data_json_by_id, canonical_post_path_by_slug, canonical_media_path_by_source_path, language, language_prefix }}
+                {{ post.content }}
               </div>
             {% endfor %}
           {% endif %}

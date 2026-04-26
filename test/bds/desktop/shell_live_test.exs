@@ -727,6 +727,44 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ ~s(phx-value-mode="visual")
   end
 
+  test "template sidebar exposes old-app style delete control and removes template rows", %{project: project} do
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Sidebar Template",
+               kind: :post,
+               content: "<article>{{ post.content }}</article>"
+             })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      view
+      |> element("[data-testid='activity-button'][data-view='templates']")
+      |> render_click()
+
+    assert html =~ "Sidebar Template"
+    assert html =~ ~s(data-testid="sidebar-delete-template")
+
+    html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='#{template.id}']")
+      |> render_click()
+
+    assert html =~ ~s(data-tab-type="templates")
+    assert html =~ ~s(data-tab-id="#{template.id}")
+
+    html =
+      view
+      |> element("[data-testid='sidebar-delete-template'][data-item-id='#{template.id}']")
+      |> render_click()
+
+    assert BDS.Repo.get(BDS.Templates.Template, template.id) == nil
+    refute html =~ "Sidebar Template"
+    refute html =~ ~s(data-tab-type="templates")
+    refute html =~ ~s(data-tab-id="#{template.id}")
+  end
+
   defp seed_sidebar_posts(project_id) do
     now = Persistence.now_ms()
 

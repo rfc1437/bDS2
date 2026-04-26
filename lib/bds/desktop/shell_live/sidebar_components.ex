@@ -350,27 +350,65 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
   defp render_entity_sidebar(assigns) do
     ~H"""
     <%= if Enum.any?(Map.get(@sidebar_data, :items, [])) do %>
-      <div class="settings-nav-list">
+      <div class={if(template_sidebar?(@sidebar_data), do: "chat-list-items", else: "settings-nav-list")}>
         <%= for item <- Map.get(@sidebar_data, :items, []) do %>
-          <button
-            class={["chat-list-item", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "active")]}
-            data-testid="sidebar-open-item"
-            data-route={item.route}
-            data-item-id={item.id}
-            data-open-title={item.title}
-            data-open-subtitle={translated(item.meta || "")}
-            type="button"
-            phx-click="open_sidebar_item"
-            phx-value-route={item.route}
-            phx-value-id={item.id}
-            phx-value-title={item.title}
-            phx-value-subtitle={translated(item.meta || "")}
-          >
-            <span class="chat-item-content">
-              <span class="chat-item-title"><%= item.title %></span>
-              <span class="chat-item-date"><%= translated(item.meta || "") %></span>
-            </span>
-          </button>
+          <%= if item.route == "templates" do %>
+            <div
+              class={["chat-list-item", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "active")]}
+              data-item-id={item.id}
+            >
+              <button
+                class="chat-item-open"
+                data-testid="sidebar-open-item"
+                data-route={item.route}
+                data-item-id={item.id}
+                data-open-title={item.title}
+                data-open-subtitle={translated(item.meta || "")}
+                type="button"
+                phx-click="open_sidebar_item"
+                phx-value-route={item.route}
+                phx-value-id={item.id}
+                phx-value-title={item.title}
+                phx-value-subtitle={translated(item.meta || "")}
+              >
+                <span class="chat-item-content">
+                  <span class="chat-item-title"><%= item.title %></span>
+                  <span class="chat-item-date"><%= translated(item.meta || "") %></span>
+                </span>
+              </button>
+              <button
+                class="chat-item-delete"
+                data-testid="sidebar-delete-template"
+                data-item-id={item.id}
+                type="button"
+                title={translated("Delete") <> " " <> translated("Template")}
+                phx-click="delete_sidebar_template"
+                phx-value-id={item.id}
+              >
+                ×
+              </button>
+            </div>
+          <% else %>
+            <button
+              class={["chat-list-item", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "active")]}
+              data-testid="sidebar-open-item"
+              data-route={item.route}
+              data-item-id={item.id}
+              data-open-title={item.title}
+              data-open-subtitle={translated(item.meta || "")}
+              type="button"
+              phx-click="open_sidebar_item"
+              phx-value-route={item.route}
+              phx-value-id={item.id}
+              phx-value-title={item.title}
+              phx-value-subtitle={translated(item.meta || "")}
+            >
+              <span class="chat-item-content">
+                <span class="chat-item-title"><%= item.title %></span>
+                <span class="chat-item-date"><%= translated(item.meta || "") %></span>
+              </span>
+            </button>
+          <% end %>
         <% end %>
       </div>
     <% else %>
@@ -425,6 +463,8 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
   end
 
   defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+
+  defp template_sidebar?(sidebar_data), do: Map.get(sidebar_data, :title) == "Templates"
 
   defp group_year_month_counts(entries) do
     entries

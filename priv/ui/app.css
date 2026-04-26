@@ -4246,9 +4246,11 @@ button svg * {
 
 .chat-list-item {
   display: flex;
+  align-items: center;
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border: none;
+  border-bottom: 1px solid var(--vscode-sideBar-border);
   background: transparent;
   color: inherit;
   text-align: left;
@@ -4271,6 +4273,26 @@ button svg * {
   gap: 2px;
 }
 
+.chat-item-open {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.chat-item-open:hover {
+  background: transparent;
+}
+
+.chat-item-open:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
 .chat-item-title {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4280,6 +4302,27 @@ button svg * {
 .chat-item-date {
   color: var(--vscode-descriptionForeground);
   font-size: 12px;
+}
+
+.chat-item-delete {
+  background: transparent;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.chat-list-item:hover .chat-item-delete,
+.chat-list-item.active .chat-item-delete {
+  opacity: 1;
+}
+
+.chat-item-delete:hover {
+  color: var(--vscode-errorForeground);
 }
 
 .settings-nav-list {

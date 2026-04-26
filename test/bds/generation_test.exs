@@ -259,7 +259,7 @@ defmodule BDS.GenerationTest do
              Posts.create_post(%{
                project_id: project.id,
                title: "Rendered Post",
-               content: "Rendered body",
+               content: "**Rendered** body",
                language: "en",
                template_slug: published_post_template.slug
              })
@@ -280,7 +280,8 @@ defmodule BDS.GenerationTest do
 
     post_html = File.read!(Path.join([temp_dir, "html", post_path]))
     assert post_html =~ "post-template"
-    assert post_html =~ "Rendered body"
+    assert post_html =~ ~s(<strong>Rendered</strong> body)
+    refute post_html =~ "**Rendered** body"
 
     assert "pagefind/index.json" in relative_paths
     assert "pagefind/pagefind-ui.js" in relative_paths

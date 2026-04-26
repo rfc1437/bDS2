@@ -155,6 +155,8 @@ defmodule BDS.Templates do
         template
       end)
 
+    remove_stale_published_templates(project_id, project, template_paths)
+
     {:ok, templates}
   end
 
@@ -378,6 +380,29 @@ defmodule BDS.Templates do
     template
     |> Template.changeset(attrs)
     |> Repo.insert_or_update!()
+  end
+
+  defp remove_stale_published_templates(project_id, project, template_paths) do
+    tracked_paths =
+      template_paths
+      |> Enum.map(&Path.relative_to(&1, Projects.project_data_dir(project)))
+      |> MapSet.new()
+
+    Repo.all(
+      from template in Template,
+        where:
+          template.project_id == ^project_id and
+            template.status == :published and
+            template.file_path != "" and
+            not is_nil(template.file_path)
+    )
+    |> Enum.reject(&(MapSet.member?(tracked_paths, &1.file_path) or File.exists?(full_file_path(project_id, &1.file_path))))
+    |> Enum.each(fn template ->
+      clear_template_references(template)
+      Repo.delete!(template)
+    end)
+
+    :ok
   end
 
   defp parse_template_kind(kind) when is_atom(kind), do: kind
