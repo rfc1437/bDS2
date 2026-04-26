@@ -90,7 +90,7 @@
     <section
       class={["sidebar-shell", if(not @workbench.sidebar_visible, do: "is-hidden")]}
       data-testid="sidebar-shell"
-      style={"width: #{@workbench.sidebar_width}px;"}
+      style={"width: #{if(@workbench.sidebar_visible, do: @workbench.sidebar_width, else: 0)}px;"}
     >
       <div class="sidebar" data-region="sidebar">
         <div id="sidebar-content" class="sidebar-content sidebar-body" phx-hook="SidebarInteractions">
@@ -307,7 +307,7 @@
     <section
       class={["assistant-sidebar-shell", if(not @workbench.assistant_sidebar_visible, do: "is-hidden")]}
       data-testid="assistant-shell"
-      style={"width: #{@workbench.assistant_sidebar_width}px;"}
+      style={"width: #{if(@workbench.assistant_sidebar_visible, do: @workbench.assistant_sidebar_width, else: 0)}px;"}
     >
       <div class="resizable-panel-divider assistant-divider" data-resize="assistant" data-role="resize-handle"></div>
       <aside class="assistant-sidebar" data-region="assistant-sidebar">

@@ -154,4 +154,19 @@ defmodule BDS.Desktop.ShellLiveTest do
     html = render_keydown(view, "shortcut", %{key: "w", meta: true})
     refute html =~ ~s(data-tab-id="media-1")
   end
+
+  test "hiding the sidebar collapses its width to zero" do
+    {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert html =~ ~s(data-testid="sidebar-shell")
+    assert html =~ ~s(style="width: 280px;")
+
+    html =
+      view
+      |> element("[data-testid='toggle-sidebar']")
+      |> render_click()
+
+    assert html =~ ~s(class="sidebar-shell is-hidden")
+    assert html =~ ~s(style="width: 0px;")
+  end
 end
