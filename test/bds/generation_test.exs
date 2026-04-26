@@ -6,6 +6,7 @@ defmodule BDS.GenerationTest do
   alias BDS.Media
   alias BDS.Metadata
   alias BDS.Posts
+  alias BDS.PreviewAssets
   alias BDS.Repo
 
   setup do
@@ -113,7 +114,7 @@ defmodule BDS.GenerationTest do
       "de/pagefind/index.json",
       "de/pagefind/pagefind-ui.css",
       "de/pagefind/pagefind-ui.js"
-    ]
+    ] ++ Enum.map(PreviewAssets.generated_outputs(), &elem(&1, 0))
 
     assert Enum.sort(Enum.map(result.generated_files, & &1.relative_path)) ==
              Enum.sort(expected_paths)
@@ -123,6 +124,60 @@ defmodule BDS.GenerationTest do
     end
 
     assert File.read!(Path.join([temp_dir, "html", "sitemap.xml"])) =~ "https://example.com/blog/"
+  end
+
+  test "core generation writes local macro and preview assets for static html", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"],
+               pico_theme: "green"
+             })
+
+    assert {:ok, result} = BDS.Generation.generate_site(project.id, [:core])
+
+    expected_assets = [
+      "assets/pico.min.css",
+      "assets/pico.green.min.css",
+      "assets/lightbox.min.css",
+      "assets/lightbox.min.js",
+      "assets/highlight.min.css",
+      "assets/highlight.min.js",
+      "assets/code-enhancements.js",
+      "assets/d3.layout.cloud.js",
+      "assets/tag-cloud.js",
+      "assets/vanilla-calendar.min.css",
+      "assets/vanilla-calendar.min.js",
+      "assets/calendar-runtime.js",
+      "assets/search-runtime.js",
+      "assets/bds.css",
+      "images/prev.png",
+      "images/next.png",
+      "images/close.png",
+      "images/loading.gif"
+    ]
+
+    generated_paths = Enum.map(result.generated_files, & &1.relative_path)
+
+    for relative_path <- expected_assets do
+      assert relative_path in generated_paths
+      assert File.exists?(Path.join([temp_dir, "html", relative_path]))
+    end
+
+    assert File.read!(Path.join([temp_dir, "html", "assets", "calendar-runtime.js"])) =~
+             "loadCalendarData"
+
+    assert File.read!(Path.join([temp_dir, "html", "assets", "tag-cloud.js"])) =~
+             "data-tag-cloud-words"
+
+    assert File.read!(Path.join([temp_dir, "html", "assets", "bds.css"])) =~ ".blog-menu"
+
+    assert File.read!(Path.join([temp_dir, "html", "assets", "pico.green.min.css"])) =~
+             "color-scheme"
   end
 
   test "generation writes feed and atom entries with canonical URLs for published posts", %{

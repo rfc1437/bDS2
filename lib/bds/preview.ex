@@ -466,27 +466,38 @@ defmodule BDS.Preview do
   end
 
   defp apply_preview_overrides(body, query_params) when is_binary(body) and is_map(query_params) do
+    theme_override = normalize_pico_theme_override(query_params["theme"])
+    mode_override = normalize_mode_override(query_params["mode"])
+
     body
-    |> override_pico_stylesheet_href(normalize_override(query_params["theme"]))
-    |> override_html_attribute("data-theme", normalize_override(query_params["theme"]))
-    |> override_html_attribute("data-mode", normalize_override(query_params["mode"]))
+    |> override_pico_stylesheet_href(theme_override)
+    |> override_html_attribute("data-theme", mode_override)
+    |> override_html_attribute("data-mode", mode_override)
   end
 
   defp override_pico_stylesheet_href(body, nil), do: body
 
   defp override_pico_stylesheet_href(body, theme) do
-    replacement =
-      case theme do
-        "default" -> "/assets/pico.min.css"
-        value -> "/assets/pico.#{value}.min.css"
-      end
-
-    Regex.replace(~r{/assets/pico(?:\.[a-z]+)?\.min\.css}, body, replacement, global: false)
+    Regex.replace(
+      ~r{/assets/pico(?:\.[a-z]+)?\.min\.css},
+      body,
+      PreviewAssets.stylesheet_href(theme),
+      global: false
+    )
   end
 
   defp normalize_override(nil), do: nil
   defp normalize_override(""), do: nil
   defp normalize_override(value), do: String.trim(value)
+
+  defp normalize_pico_theme_override(value), do: normalize_override(value)
+
+  defp normalize_mode_override(value) do
+    case normalize_override(value) do
+      mode when mode in ["dark", "light"] -> mode
+      _other -> nil
+    end
+  end
 
   defp override_html_attribute(body, _attribute, nil), do: body
 
@@ -509,8 +520,7 @@ defmodule BDS.Preview do
 
   defp not_found_assigns(query_params) do
     %{}
-    |> maybe_put_assign("html_theme_attribute", query_params["theme"], fn value -> ~s(data-theme="#{value}") end)
-    |> maybe_put_assign("html_mode_attribute", query_params["mode"], fn value -> ~s(data-mode="#{value}") end)
+    |> maybe_put_assign("pico_stylesheet_href", normalize_pico_theme_override(query_params["theme"]), &PreviewAssets.stylesheet_href/1)
   end
 
   defp maybe_put_assign(assigns, _key, nil, _mapper), do: assigns

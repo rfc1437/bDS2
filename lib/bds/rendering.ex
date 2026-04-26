@@ -8,6 +8,7 @@ defmodule BDS.Rendering do
   alias BDS.Media.Media, as: MediaAsset
   alias BDS.Menu
   alias BDS.Metadata
+  alias BDS.PreviewAssets
   alias BDS.PostLinks
   alias BDS.Projects
   alias BDS.I18n
@@ -182,7 +183,7 @@ defmodule BDS.Rendering do
         Map.get(
           assigns,
           :html_theme_attribute,
-          Map.get(assigns, "html_theme_attribute", html_theme_attribute(metadata.pico_theme))
+          Map.get(assigns, "html_theme_attribute")
         ),
       blog_languages: blog_languages(metadata, language),
       alternate_links: alternate_links(canonical_post, project_id, main_language),
@@ -240,7 +241,7 @@ defmodule BDS.Rendering do
         Map.get(
           assigns,
           :html_theme_attribute,
-          Map.get(assigns, "html_theme_attribute", html_theme_attribute(metadata.pico_theme))
+          Map.get(assigns, "html_theme_attribute")
         ),
       blog_languages: blog_languages(metadata, language),
       alternate_links: [],
@@ -297,7 +298,7 @@ defmodule BDS.Rendering do
         Map.get(
           assigns,
           :html_theme_attribute,
-          Map.get(assigns, "html_theme_attribute", html_theme_attribute(metadata.pico_theme))
+          Map.get(assigns, "html_theme_attribute")
         ),
       blog_languages: blog_languages(metadata, language),
       menu_items: menu_items(project_id),
@@ -723,15 +724,7 @@ defmodule BDS.Rendering do
   defp show_archive_range_heading?(%{kind: "date"}, _day_blocks), do: true
   defp show_archive_range_heading?(_archive_context, _day_blocks), do: false
 
-  defp html_theme_attribute(nil), do: nil
-  defp html_theme_attribute(""), do: nil
-  defp html_theme_attribute("default"), do: nil
-  defp html_theme_attribute(theme), do: ~s(data-theme="#{theme}")
-
-  defp default_pico_stylesheet_href(nil), do: "/assets/pico.min.css"
-  defp default_pico_stylesheet_href(""), do: "/assets/pico.min.css"
-  defp default_pico_stylesheet_href("default"), do: "/assets/pico.min.css"
-  defp default_pico_stylesheet_href(theme), do: "/assets/pico.#{theme}.min.css"
+  defp default_pico_stylesheet_href(theme), do: PreviewAssets.stylesheet_href(theme)
 
   defp href_for_language(""), do: "/"
   defp href_for_language(prefix), do: prefix <> "/"

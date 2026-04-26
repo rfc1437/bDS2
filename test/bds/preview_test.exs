@@ -88,6 +88,23 @@ defmodule BDS.PreviewTest do
 
     assert bds_css =~ ".blog-menu"
 
+        assert {:ok, %{body: calendar_runtime, content_type: "application/javascript"}} =
+           BDS.Preview.request(project.id, "/assets/calendar-runtime.js")
+
+        assert calendar_runtime =~ "loadCalendarData"
+        assert calendar_runtime =~ "window.location.assign"
+
+        assert {:ok, %{body: tag_cloud_runtime, content_type: "application/javascript"}} =
+           BDS.Preview.request(project.id, "/assets/tag-cloud.js")
+
+        assert tag_cloud_runtime =~ "data-tag-cloud-words"
+
+        assert {:ok, %{body: _prev_png, content_type: "image/png"}} =
+           BDS.Preview.request(project.id, "/images/prev.png")
+
+        assert {:ok, %{body: _loading_gif, content_type: "image/gif"}} =
+           BDS.Preview.request(project.id, "/images/loading.gif")
+
     assert {:ok, %{body: "media body", content_type: "text/plain"}} =
              BDS.Preview.request(project.id, "/media/2026/04/image.txt")
 
@@ -405,14 +422,14 @@ defmodule BDS.PreviewTest do
     assert {:ok, %{body: generated_html, content_type: "text/html"}} =
              BDS.Preview.request(project.id, "/?theme=amber&mode=dark")
 
-    assert generated_html =~ ~s(data-theme="amber")
+    assert generated_html =~ ~s(data-theme="dark")
     assert generated_html =~ ~s(data-mode="dark")
     assert generated_html =~ ~s(/assets/pico.amber.min.css)
 
     assert {:ok, %{body: draft_html, content_type: "text/html"}} =
              BDS.Preview.preview_draft(project.id, "/draft/theme-draft?theme=amber&mode=dark", post.id)
 
-    assert draft_html =~ ~s(data-theme="amber")
+    assert draft_html =~ ~s(data-theme="dark")
     assert draft_html =~ ~s(data-mode="dark")
     assert draft_html =~ ~s(/assets/pico.amber.min.css)
 

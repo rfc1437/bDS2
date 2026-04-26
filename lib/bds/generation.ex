@@ -6,6 +6,7 @@ defmodule BDS.Generation do
   alias BDS.Generation.GeneratedFileHash
   alias BDS.Metadata
   alias BDS.Persistence
+  alias BDS.PreviewAssets
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
   alias BDS.Projects
@@ -272,7 +273,14 @@ defmodule BDS.Generation do
         []
       end
 
-    core_outputs ++ single_outputs ++ archive_outputs ++ sitemap ++ pagefind_outputs
+    asset_outputs =
+      if :core in plan.sections do
+        PreviewAssets.generated_outputs()
+      else
+        []
+      end
+
+    core_outputs ++ single_outputs ++ archive_outputs ++ sitemap ++ pagefind_outputs ++ asset_outputs
   end
 
   defp disk_generated_files(project_id) do

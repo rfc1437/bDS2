@@ -31,7 +31,7 @@
 
     try {
       return document.execCommand('copy');
-    } catch (_) {
+    } catch {
       return false;
     } finally {
       document.body.removeChild(textarea);
@@ -43,7 +43,7 @@
       try {
         await navigator.clipboard.writeText(value);
         return true;
-      } catch (_) {
+      } catch {
         return fallbackCopy(value);
       }
     }
@@ -105,7 +105,7 @@
     try {
       highlighter.highlightElement(codeElement);
       codeElement.setAttribute('data-code-highlighted', 'true');
-    } catch (_) {
+    } catch {
     }
   }
 
