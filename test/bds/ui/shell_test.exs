@@ -174,7 +174,7 @@ defmodule BDS.UI.ShellTest do
     assert live_js =~ "--bds-titlebar-menu-left"
     refute live_js =~ "handleTitlebarMenuKeyDown"
     refute live_js =~ "keyboardMenuIndex"
-    assert template =~ "phx-window-keydown={if(@titlebar_menu_group, do: \"titlebar_menu_keydown\")}" 
+    assert template =~ "phx-window-keydown={if(@titlebar_menu_group, do: \"titlebar_menu_keydown\")}"
     assert live_ex =~ ~s(def handle_event("titlebar_menu_keydown")
     assert live_ex =~ "titlebar_menu_item_index"
   end
