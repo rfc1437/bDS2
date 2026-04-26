@@ -847,6 +847,113 @@ button {
   display: none;
 }
 
+.editor-toolbar-button.is-destructive {
+  color: #f48771;
+}
+
+.shell-overlay-backdrop,
+.gallery-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 10000;
+}
+
+.shell-overlay-dismiss {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.gallery-overlay {
+  position: relative;
+  width: min(980px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 1;
+}
+
+.insert-modal-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.insert-modal-media-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  background: #252526;
+  color: inherit;
+  padding: 10px;
+  text-align: left;
+}
+
+.insert-modal-media-thumb {
+  width: 100%;
+  min-height: 112px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.insert-modal-media-title {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.language-picker-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.language-picker-option {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  border: none;
+  border-radius: 4px;
+  padding: 12px 16px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.language-picker-label,
+.language-picker-status,
+.lightbox-counter {
+  color: #9d9d9d;
+  font-size: 12px;
+}
+
+.lightbox-counter {
+  margin-top: 4px;
+}
+
+@media (max-width: 720px) {
+  .insert-modal-media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .panel-header {
   height: 35px;
   display: flex;

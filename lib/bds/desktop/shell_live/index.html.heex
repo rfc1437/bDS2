@@ -370,11 +370,7 @@
               <h1 class="editor-title" data-testid="editor-title"><%= tab_title(@current_tab, @tab_meta) %></h1>
               <p class="editor-subtitle"><%= tab_subtitle(@current_tab, @tab_meta) %></p>
 
-              <div class="editor-toolbar">
-                <button class="editor-toolbar-button" type="button">Open</button>
-                <button class="editor-toolbar-button" type="button">Preview</button>
-                <button class="editor-toolbar-button" type="button">Metadata</button>
-              </div>
+              <%= render_editor_toolbar(assigns) %>
 
               <div class="editor-section">
                 <h2><%= tab_title(@current_tab, @tab_meta) %></h2>
@@ -627,4 +623,6 @@
       <span class="status-bar-item brand"><%= @status.right.brand %></span>
     </div>
   </footer>
+
+  <%= render_shell_overlay(assigns) %>
 </div>

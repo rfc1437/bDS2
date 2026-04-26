@@ -270,6 +270,33 @@ defmodule BDS.UI.ShellTest do
     assert template =~ "assistant-sidebar-transcript"
   end
 
+  test "desktop shell assets expose the shared overlay render contract" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
+    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
+
+    assert template =~ "render_editor_toolbar(assigns)"
+    assert template =~ "render_shell_overlay(assigns)"
+
+    assert live_ex =~ ~s(def handle_event("open_overlay")
+    assert live_ex =~ ~s(def handle_event("close_overlay")
+    assert live_ex =~ ~s(def handle_event("overlay_keydown")
+    assert live_ex =~ "ai-suggestions-modal"
+    assert live_ex =~ "confirm-delete-modal"
+    assert live_ex =~ "insert-modal"
+    assert live_ex =~ "language-picker-modal"
+    assert live_ex =~ "gallery-overlay"
+    assert live_ex =~ "lightbox-overlay"
+
+    assert css =~ ".shell-overlay-backdrop"
+    assert css =~ ".ai-suggestions-modal-backdrop"
+    assert css =~ ".confirm-delete-modal-backdrop"
+    assert css =~ ".insert-modal-backdrop"
+    assert css =~ ".language-picker-modal-backdrop"
+    assert css =~ ".gallery-overlay"
+    assert css =~ ".lightbox-overlay"
+  end
+
   test "desktop shell css keeps the old assistant sidebar panel styling" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
 
