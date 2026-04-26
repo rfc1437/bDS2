@@ -50,11 +50,52 @@ document.addEventListener("DOMContentLoaded", () => {
     window.localStorage.setItem(key, String(width));
   };
 
+  const syncTitlebarOverlayInsets = () => {
+    const rootStyle = document.documentElement.style;
+    const setInsets = (left, right) => {
+      rootStyle.setProperty("--bds-titlebar-overlay-left", `${left}px`);
+      rootStyle.setProperty("--bds-titlebar-overlay-right", `${right}px`);
+    };
+
+    const overlay = navigator.windowControlsOverlay;
+
+    if (!overlay) {
+      setInsets(0, 0);
+      return () => {};
+    }
+
+    const updateInsets = () => {
+      if (!overlay.visible) {
+        setInsets(0, 0);
+        return;
+      }
+
+      const titlebarRect = overlay.getTitlebarAreaRect();
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || titlebarRect.right;
+      const leftInset = Math.max(0, Math.round(titlebarRect.left));
+      const rightInset = Math.max(0, Math.round(viewportWidth - titlebarRect.right));
+      setInsets(leftInset, rightInset);
+    };
+
+    const onGeometryChange = () => updateInsets();
+    const onResize = () => updateInsets();
+
+    updateInsets();
+    overlay.addEventListener("geometrychange", onGeometryChange);
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      overlay.removeEventListener("geometrychange", onGeometryChange);
+      window.removeEventListener("resize", onResize);
+    };
+  };
+
   const Hooks = {
     AppShell: {
       mounted() {
         this.syncStoredLayout();
         this.syncStoredUiLanguage();
+        this.destroyOverlaySync = syncTitlebarOverlayInsets();
 
         this.handleMouseDown = (event) => {
           const handle = event.target.closest("[data-role='resize-handle']");
@@ -126,6 +167,9 @@ document.addEventListener("DOMContentLoaded", () => {
         this.el.removeEventListener("mousedown", this.handleMouseDown);
         this.el.removeEventListener("change", this.handleChange);
         window.removeEventListener("bds:native-menu-action", this.handleNativeMenuAction);
+        if (this.destroyOverlaySync) {
+          this.destroyOverlaySync();
+        }
       },
 
       syncStoredLayout() {

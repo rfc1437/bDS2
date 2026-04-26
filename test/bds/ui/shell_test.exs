@@ -126,4 +126,23 @@ defmodule BDS.UI.ShellTest do
     assert css =~ ".status-bar-item.language-badge"
     assert css =~ ".status-bar-item.offline-badge"
   end
+
+  test "desktop shell assets keep old activity, tab, focus, and titlebar overlay parity rules" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
+    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
+
+    assert css =~ "color: var(--vscode-activityBar-foreground)"
+    assert css =~ ".tab-actions"
+    assert css =~ ".tab-dirty-indicator"
+    assert css =~ ".tab.dirty .tab-close"
+    assert css =~ ".tab:focus-visible"
+    assert css =~ ".window-titlebar-action-button:focus"
+    assert css =~ "padding-right: calc(10px + var(--bds-titlebar-overlay-right, 0px));"
+    assert live_js =~ "windowControlsOverlay"
+    assert live_js =~ "geometrychange"
+    assert live_js =~ "--bds-titlebar-overlay-left"
+    assert template =~ "tab-actions"
+    assert template =~ "tab-dirty-indicator"
+  end
 end
