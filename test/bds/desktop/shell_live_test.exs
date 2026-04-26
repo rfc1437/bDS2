@@ -228,6 +228,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="sidebar-section-header")
     assert html =~ ~s(class="sidebar-actions")
     assert html =~ ~s(data-testid="sidebar-load-more")
+    assert html_position(html, ~s(data-testid="sidebar-load-more")) > html_position(html, ">Archived<")
     refute html =~ ~s(data-testid="sidebar-filter-tag")
     assert html =~ "Alpha Post"
     refute html =~ "Overflow Post"
@@ -396,6 +397,13 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     {count, _rows} = Repo.insert_all(Post, entries)
     assert count == length(entries)
+  end
+
+  defp html_position(html, needle) do
+    case :binary.match(html, needle) do
+      {index, _length} -> index
+      :nomatch -> -1
+    end
   end
 
   defp sidebar_post(project_id, slug, title, timestamp, tags, categories) do

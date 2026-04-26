@@ -587,13 +587,23 @@ defmodule BDS.Desktop.ShellLive do
         </div>
       <% end %>
 
-      <%= if Map.get(@sidebar_filters_config, :has_more) do %>
-        <div class="sidebar-load-more">
-          <button class="load-more-button" data-testid="sidebar-load-more" type="button" phx-click="load_more_sidebar">
-            <%= translated("Load more") %>
-          </button>
-        </div>
-      <% end %>
+      """
+    else
+      ~H"""
+      """
+    end
+  end
+
+  defp render_sidebar_load_more(assigns) do
+    filters = Map.get(assigns.sidebar_data, :filters, %{})
+
+    if Map.get(filters, :has_more) do
+      ~H"""
+      <div class="sidebar-load-more">
+        <button class="load-more-button" data-testid="sidebar-load-more" type="button" phx-click="load_more_sidebar">
+          <%= translated("Load more") %>
+        </button>
+      </div>
       """
     else
       ~H"""
