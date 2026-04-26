@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive do
   import Phoenix.HTML
 
   alias BDS.Desktop.{FolderPicker, Overlay, ShellCommands, ShellData}
+  alias BDS.Desktop.ShellLive.{ChatEditor, CodeEntityEditor, MediaEditor, MiscEditor, SettingsEditor, TagsEditor}
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
   alias BDS.Desktop.ShellLive.PostEditor
   alias BDS.Desktop.ShellLive.SidebarComponents, as: ShellSidebarComponents
@@ -70,6 +71,26 @@ defmodule BDS.Desktop.ShellLive do
         |> assign(:post_editor_modes, %{})
         |> assign(:post_editor_expanded, %{})
         |> assign(:post_editor_save_states, %{})
+        |> assign(:media_editor_drafts, %{})
+        |> assign(:media_editor_quick_actions_open, %{})
+        |> assign(:media_editor_post_pickers_open, %{})
+        |> assign(:media_editor_post_picker_queries, %{})
+        |> assign(:media_editor_save_states, %{})
+        |> assign(:media_editor_translation_forms, %{})
+        |> assign(:settings_editor_search, "")
+        |> assign(:settings_editor_project_draft, %{})
+        |> assign(:settings_editor_publishing_draft, %{})
+        |> assign(:settings_editor_new_category, "")
+        |> assign(:style_editor_theme, nil)
+        |> assign(:style_editor_preview_mode, "auto")
+        |> assign(:tags_editor_selected, [])
+        |> assign(:tags_editor_new_tag, %{"name" => "", "color" => ""})
+        |> assign(:tags_editor_edit_draft, %{})
+        |> assign(:tags_editor_merge_target, "")
+        |> assign(:script_editor_drafts, %{})
+        |> assign(:template_editor_drafts, %{})
+        |> assign(:chat_editor_inputs, %{})
+        |> assign(:misc_editor_selected_pairs, %{})
         |> assign(:shell_overlay, nil)
       |> assign(:output_entries, [])
      |> reload_shell(workbench)}
@@ -408,11 +429,252 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, PostEditor.remove_list_value(socket, post_id, :categories, category, &reload_shell/2)}
   end
 
+  def handle_event("change_media_editor", %{"media_editor" => params}, socket) do
+    {:noreply, MediaEditor.update(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("save_media_editor", %{"id" => media_id}, socket) do
+    {:noreply, MediaEditor.persist_socket(socket, media_id, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("toggle_media_editor_quick_actions", %{"id" => media_id}, socket) do
+    {:noreply, MediaEditor.toggle_quick_actions(socket, media_id, &reload_shell/2)}
+  end
+
+  def handle_event("replace_media_editor_file", %{"id" => media_id}, socket) do
+    {:noreply, MediaEditor.replace_file(socket, media_id, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("detect_media_editor_language", %{"id" => media_id}, socket) do
+    {:noreply, MediaEditor.detect_language(socket, media_id, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("toggle_media_post_picker", %{"id" => media_id}, socket) do
+    {:noreply, MediaEditor.toggle_post_picker(socket, media_id, &reload_shell/2)}
+  end
+
+  def handle_event("change_media_post_picker", %{"id" => media_id, "media_post_picker" => %{"query" => query}}, socket) do
+    {:noreply, MediaEditor.set_post_picker_query(socket, media_id, query, &reload_shell/2)}
+  end
+
+  def handle_event("link_media_to_post", %{"id" => media_id, "post-id" => post_id}, socket) do
+    {:noreply, MediaEditor.link_post(socket, media_id, post_id, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("unlink_media_from_post", %{"id" => media_id, "post-id" => post_id}, socket) do
+    {:noreply, MediaEditor.unlink_post(socket, media_id, post_id, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("edit_media_translation", %{"id" => media_id, "language" => language}, socket) do
+    {:noreply, MediaEditor.edit_translation(socket, media_id, language, &reload_shell/2)}
+  end
+
+  def handle_event("change_media_translation", %{"media_translation" => params}, socket) do
+    case socket.assigns.current_tab do
+      %{type: :media, id: media_id} -> {:noreply, MediaEditor.update_translation(socket, media_id, params, &reload_shell/2)}
+      _other -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("save_media_translation", %{"id" => media_id}, socket) do
+    {:noreply, MediaEditor.save_translation(socket, media_id, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("refresh_media_translation", %{"id" => media_id, "language" => language}, socket) do
+    {:noreply, MediaEditor.refresh_translation(socket, media_id, language, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("delete_media_translation", %{"id" => media_id, "language" => language}, socket) do
+    {:noreply, MediaEditor.delete_translation(socket, media_id, language, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("close_media_translation_editor", _params, socket) do
+    case socket.assigns.current_tab do
+      %{type: :media, id: media_id} ->
+        {:noreply,
+         socket
+         |> assign(:media_editor_translation_forms, Map.delete(socket.assigns.media_editor_translation_forms, media_id))
+         |> reload_shell(socket.assigns.workbench)}
+
+      _other ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("change_settings_search", %{"query" => query}, socket) do
+    {:noreply, SettingsEditor.update_search(socket, query, &reload_shell/2)}
+  end
+
+  def handle_event("change_settings_project", %{"settings_project" => params}, socket) do
+    {:noreply, SettingsEditor.update_project_draft(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("save_settings_project", _params, socket) do
+    {:noreply, SettingsEditor.save_project(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("change_settings_publishing", %{"settings_publishing" => params}, socket) do
+    {:noreply, SettingsEditor.update_publishing_draft(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("save_settings_publishing", _params, socket) do
+    {:noreply, SettingsEditor.save_publishing(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("clear_settings_publishing", _params, socket) do
+    {:noreply, SettingsEditor.clear_publishing(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("change_settings_new_category", %{"name" => name}, socket) do
+    {:noreply, SettingsEditor.update_new_category(socket, name, &reload_shell/2)}
+  end
+
+  def handle_event("add_settings_category", _params, socket) do
+    {:noreply, SettingsEditor.add_category(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("save_settings_category", %{"category_settings" => params}, socket) do
+    {:noreply, SettingsEditor.save_category(socket, params, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("remove_settings_category", %{"category" => category}, socket) do
+    {:noreply, SettingsEditor.remove_category(socket, category, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("settings_shell_command", %{"action" => action}, socket) do
+    {:noreply, apply_shell_command(socket, action)}
+  end
+
+  def handle_event("select_style_theme", %{"theme" => theme}, socket) do
+    {:noreply, SettingsEditor.select_style_theme(socket, theme, &reload_shell/2)}
+  end
+
+  def handle_event("change_style_preview_mode", %{"mode" => mode}, socket) do
+    {:noreply, SettingsEditor.change_style_preview_mode(socket, mode, &reload_shell/2)}
+  end
+
+  def handle_event("apply_style_theme", _params, socket) do
+    {:noreply, SettingsEditor.apply_style_theme(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("toggle_tag_selection", %{"name" => tag_name}, socket) do
+    {:noreply, TagsEditor.toggle_selection(socket, tag_name, &reload_shell/2)}
+  end
+
+  def handle_event("change_new_tag_editor", %{"new_tag" => params}, socket) do
+    {:noreply, TagsEditor.update_new_tag(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("create_tag_editor", _params, socket) do
+    {:noreply, TagsEditor.create_tag(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("change_edit_tag_editor", %{"edit_tag" => params}, socket) do
+    {:noreply, TagsEditor.update_edit_tag(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("save_tag_editor", _params, socket) do
+    {:noreply, TagsEditor.save_tag(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("delete_tag_editor", _params, socket) do
+    {:noreply, TagsEditor.delete_selected(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("change_merge_target", %{"target" => target}, socket) do
+    {:noreply, TagsEditor.update_merge_target(socket, target, &reload_shell/2)}
+  end
+
+  def handle_event("merge_tags_editor", _params, socket) do
+    {:noreply, TagsEditor.merge_selected(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("sync_tags_editor", _params, socket) do
+    {:noreply, TagsEditor.sync(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("change_script_editor", %{"script_editor" => params}, socket) do
+    {:noreply, CodeEntityEditor.update_script(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("save_script_editor", _params, socket) do
+    {:noreply, CodeEntityEditor.save_script(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("run_script_editor", _params, socket) do
+    {:noreply, CodeEntityEditor.run_script(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("check_script_editor", _params, socket) do
+    {:noreply, CodeEntityEditor.check_script(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("delete_script_editor", _params, socket) do
+    {:noreply, CodeEntityEditor.delete_script(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("change_template_editor", %{"template_editor" => params}, socket) do
+    {:noreply, CodeEntityEditor.update_template(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("save_template_editor", _params, socket) do
+    {:noreply, CodeEntityEditor.save_template(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("validate_template_editor", _params, socket) do
+    {:noreply, CodeEntityEditor.validate_template(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("delete_template_editor", _params, socket) do
+    {:noreply, CodeEntityEditor.delete_template(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("change_chat_editor_input", %{"message" => message}, socket) do
+    {:noreply, ChatEditor.update_input(socket, message, &reload_shell/2)}
+  end
+
+  def handle_event("send_chat_editor_message", _params, socket) do
+    {:noreply, ChatEditor.send_message(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("rerun_misc_editor", _params, socket) do
+    case MiscEditor.rerun(socket) do
+      {:command, action} -> {:noreply, apply_shell_command(socket, action)}
+      {:noop, next_socket} -> {:noreply, next_socket}
+    end
+  end
+
+  def handle_event("apply_site_validation", _params, socket) do
+    case MiscEditor.apply_site_validation(socket, &append_output_entry/5) do
+      {:rerun, next_socket} -> {:noreply, apply_shell_command(next_socket, "validate_site")}
+      {:socket, next_socket} -> {:noreply, next_socket}
+    end
+  end
+
+  def handle_event("toggle_duplicate_pair", %{"pair-id" => pair_id}, socket) do
+    {:noreply, MiscEditor.toggle_duplicate(socket, pair_id, &reload_shell/2)}
+  end
+
+  def handle_event("dismiss_duplicate_pair", %{"post-id-a" => post_id_a, "post-id-b" => post_id_b}, socket) do
+    {:noreply, MiscEditor.dismiss_duplicate(socket, post_id_a, post_id_b, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("dismiss_selected_duplicates", _params, socket) do
+    {:noreply, MiscEditor.dismiss_selected(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("open_duplicate_post", %{"id" => id, "title" => title}, socket) do
+    {:noreply, open_sidebar_item(socket, %{"route" => "post", "id" => id, "title" => title, "subtitle" => "draft"}, :preview)}
+  end
+
   def handle_event("open_overlay", %{"kind" => kind}, socket) do
     socket =
       case socket.assigns[:current_tab] do
         %{type: :post, id: post_id} when kind in ["ai_suggestions", "language_picker"] ->
           assign(socket, :post_editor_quick_actions_open, Map.put(socket.assigns.post_editor_quick_actions_open, post_id, false))
+
+        %{type: :media, id: media_id} when kind in ["ai_suggestions", "language_picker", "confirm_delete"] ->
+          assign(socket, :media_editor_quick_actions_open, Map.put(socket.assigns.media_editor_quick_actions_open, media_id, false))
 
         _other ->
           socket
@@ -535,6 +797,9 @@ defmodule BDS.Desktop.ShellLive do
         {%{kind: :language_picker}, %{type: :post, id: post_id}} ->
           PostEditor.translate(socket, post_id, code, &reload_shell/2, &append_output_entry/5)
 
+        {%{kind: :language_picker}, %{type: :media, id: media_id}} ->
+          MediaEditor.translate(socket, media_id, code, &reload_shell/2, &append_output_entry/5)
+
         _other -> socket
       end
 
@@ -554,6 +819,18 @@ defmodule BDS.Desktop.ShellLive do
             &reload_shell/2,
             &append_output_entry/5
           )
+
+        {%{kind: :ai_suggestions} = overlay, %{type: :media, id: media_id}} ->
+          MediaEditor.apply_ai_suggestions(
+            socket,
+            media_id,
+            Overlay.selected_ai_fields(overlay),
+            &reload_shell/2,
+            &append_output_entry/5
+          )
+
+        {%{kind: :confirm_delete}, %{type: :media, id: media_id}} ->
+          MediaEditor.delete_socket(socket, media_id, &reload_shell/2, &append_output_entry/5)
 
         {%{kind: :confirm_delete, title: title, entity_name: entity_name}, _tab} ->
           close_overlay_with_output(socket, title, entity_name)
@@ -742,6 +1019,12 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
     |> assign(:current_tab, current_tab(workbench))
     |> assign_post_editor()
+    |> assign_media_editor()
+    |> assign_settings_editor()
+    |> assign_tags_editor()
+    |> assign_code_entity_editor()
+    |> assign_chat_editor()
+    |> assign_misc_editor()
   end
 
   defp render_panel_body(assigns) do
@@ -963,6 +1246,30 @@ defmodule BDS.Desktop.ShellLive do
     PostEditor.assign_socket(socket)
   end
 
+  defp assign_media_editor(socket) do
+    MediaEditor.assign_socket(socket)
+  end
+
+  defp assign_settings_editor(socket) do
+    SettingsEditor.assign_socket(socket)
+  end
+
+  defp assign_tags_editor(socket) do
+    TagsEditor.assign_socket(socket)
+  end
+
+  defp assign_code_entity_editor(socket) do
+    CodeEntityEditor.assign_socket(socket)
+  end
+
+  defp assign_chat_editor(socket) do
+    ChatEditor.assign_socket(socket)
+  end
+
+  defp assign_misc_editor(socket) do
+    MiscEditor.assign_socket(socket)
+  end
+
 
   defp sync_layout(workbench, params) do
     workbench
@@ -1136,11 +1443,20 @@ defmodule BDS.Desktop.ShellLive do
     append_output_entry(socket, title, message, url)
   end
 
-  defp apply_shell_command_result(socket, %{kind: "open_editor", route: route, title: title, subtitle: subtitle}) do
+  defp apply_shell_command_result(socket, %{kind: "open_editor", route: route, title: title, subtitle: subtitle} = result) do
     route_atom = String.to_existing_atom(route)
     tab_id = tab_id_for_route(route_atom, route)
     workbench = Workbench.open_tab(socket.assigns.workbench, route_atom, tab_id, :pin)
-    tab_meta = Map.put(socket.assigns.tab_meta, {route_atom, tab_id}, %{title: title, subtitle: subtitle})
+
+    tab_meta =
+      Map.put(socket.assigns.tab_meta, {route_atom, tab_id}, %{
+        title: title,
+        subtitle: subtitle,
+        action: Map.get(result, :action),
+        payload: Map.get(result, :payload),
+        project_id: Map.get(result, :project_id),
+        editor_meta: Map.get(result, :editorMeta, [])
+      })
 
     socket
     |> assign(:tab_meta, tab_meta)
@@ -1171,6 +1487,22 @@ defmodule BDS.Desktop.ShellLive do
       end
     end)
     |> elem(0)
+  end
+
+  defp titlebar_menu_item_active?(group, item, current_index) do
+    cond do
+      is_nil(current_index) ->
+        false
+
+      Map.get(item, :separator, false) ->
+        false
+
+      true ->
+        group.items
+        |> Enum.reject(&Map.get(&1, :separator, false))
+        |> Enum.find_index(&(&1.id == item.id))
+        |> Kernel.==(current_index)
+    end
   end
 
   defp active_titlebar_menu_group(assigns) do

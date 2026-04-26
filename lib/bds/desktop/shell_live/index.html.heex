@@ -43,12 +43,12 @@
               >
                 <%= for item <- titlebar_menu_dropdown_items(group) do %>
                   <%= if item.separator do %>
-                    <div class="window-titlebar-menu-separator"></div>
+                    <div class="window-titlebar-menu-separator" role="separator"></div>
                   <% else %>
                     <button
                       class={[
                         "window-titlebar-menu-item",
-                        if(@titlebar_menu_item_index == item.keyboard_index, do: "is-keyboard-active")
+                        if(titlebar_menu_item_active?(group, item, @titlebar_menu_item_index), do: "is-keyboard-active")
                       ]}
                       data-testid="window-titlebar-menu-item"
                       data-menu-action={item.id}
@@ -362,32 +362,58 @@
             </div>
           </div>
         <% else %>
-          <%= if @current_tab.type == :post and @post_editor do %>
-            <PostEditor.post_editor post_editor={@post_editor} toolbar_buttons={editor_toolbar_buttons(@current_tab)} />
-          <% else %>
-            <div class="editor-frame">
-              <section class="editor-main">
-                <div class="editor-kicker"><%= tab_route_label(@current_tab) %></div>
-                <h1 class="editor-title" data-testid="editor-title"><%= tab_title(@current_tab, @tab_meta) %></h1>
-                <p class="editor-subtitle"><%= tab_subtitle(@current_tab, @tab_meta) %></p>
+          <%= cond do %>
+            <% @current_tab.type == :post and @post_editor -> %>
+              <PostEditor.post_editor post_editor={@post_editor} toolbar_buttons={editor_toolbar_buttons(@current_tab)} />
 
-                <%= render_editor_toolbar(assigns) %>
+            <% @current_tab.type == :media and @media_editor -> %>
+              <MediaEditor.media_editor media_editor={@media_editor} />
 
-                <div class="editor-section">
-                  <h2><%= tab_title(@current_tab, @tab_meta) %></h2>
-                  <p>Desktop workbench content routed through the Elixir shell.</p>
-                </div>
-              </section>
+            <% @current_tab.type == :settings and @settings_editor -> %>
+              <SettingsEditor.settings_editor settings_editor={@settings_editor} />
 
-              <aside class="editor-meta">
-                <%= for item <- @editor_meta do %>
-                  <section class="editor-meta-row">
-                    <strong data-testid="editor-meta-label"><%= translated(item.label) %></strong>
-                    <span><%= translated(item.value) %></span>
-                  </section>
-                <% end %>
-              </aside>
-            </div>
+            <% @current_tab.type == :style and @style_editor -> %>
+              <SettingsEditor.style_editor style_editor={@style_editor} />
+
+            <% @current_tab.type == :tags and @tags_editor -> %>
+              <TagsEditor.tags_editor tags_editor={@tags_editor} />
+
+            <% @current_tab.type == :scripts and @script_editor -> %>
+              <CodeEntityEditor.script_editor script_editor={@script_editor} />
+
+            <% @current_tab.type == :templates and @template_editor -> %>
+              <CodeEntityEditor.template_editor template_editor={@template_editor} />
+
+            <% @current_tab.type == :chat and @chat_editor -> %>
+              <ChatEditor.chat_editor chat_editor={@chat_editor} />
+
+            <% @current_tab.type in [:site_validation, :metadata_diff, :translation_validation, :find_duplicates, :git_diff] and @misc_editor -> %>
+              <MiscEditor.misc_editor misc_editor={@misc_editor} />
+
+            <% true -> %>
+              <div class="editor-frame">
+                <section class="editor-main">
+                  <div class="editor-kicker"><%= tab_route_label(@current_tab) %></div>
+                  <h1 class="editor-title" data-testid="editor-title"><%= tab_title(@current_tab, @tab_meta) %></h1>
+                  <p class="editor-subtitle"><%= tab_subtitle(@current_tab, @tab_meta) %></p>
+
+                  <%= render_editor_toolbar(assigns) %>
+
+                  <div class="editor-section">
+                    <h2><%= tab_title(@current_tab, @tab_meta) %></h2>
+                    <p>Desktop workbench content routed through the Elixir shell.</p>
+                  </div>
+                </section>
+
+                <aside class="editor-meta">
+                  <%= for item <- @editor_meta do %>
+                    <section class="editor-meta-row">
+                      <strong data-testid="editor-meta-label"><%= translated(item.label) %></strong>
+                      <span><%= translated(item.value) %></span>
+                    </section>
+                  <% end %>
+                </aside>
+              </div>
           <% end %>
         <% end %>
       </section>

@@ -1,0 +1,29 @@
+<div class="templates-view-shell" data-testid="template-editor">
+  <div class="editor-header templates-header">
+    <div class="editor-tabs"><div class="editor-tab active"><span class="editor-tab-title"><%= @template_editor.title %></span></div></div>
+    <div class="editor-actions">
+      <button class="templates-save-button" type="button" phx-click="save_template_editor"><%= translated("Save") %></button>
+      <button class="templates-validate-button" type="button" phx-click="validate_template_editor"><%= translated("Validate") %></button>
+      <button class="secondary danger" type="button" phx-click="delete_template_editor"><%= translated("Delete") %></button>
+    </div>
+  </div>
+  <form class="editor-content templates-view" phx-change="change_template_editor">
+    <div class="editor-header-row templates-meta-row">
+      <div class="editor-meta">
+        <div class="editor-field-row">
+          <div class="editor-field"><label><%= translated("Title") %></label><input type="text" name="template_editor[title]" value={@template_editor.title} /></div>
+          <div class="editor-field"><label><%= translated("Slug") %></label><input type="text" name="template_editor[slug]" value={@template_editor.slug} /></div>
+        </div>
+        <div class="editor-field-row">
+          <div class="editor-field"><label><%= translated("Kind") %></label><select name="template_editor[kind]"><option value="post" selected={@template_editor.kind == :post or @template_editor.kind == "post"}>post</option><option value="list" selected={@template_editor.kind == :list or @template_editor.kind == "list"}>list</option><option value="not-found" selected={@template_editor.kind == :"not-found" or @template_editor.kind == "not-found"}>not-found</option><option value="partial" selected={@template_editor.kind == :partial or @template_editor.kind == "partial"}>partial</option></select></div>
+          <div class="editor-field templates-enabled-field"><label><input type="checkbox" name="template_editor[enabled]" checked={@template_editor.enabled} /> <%= translated("Enabled") %></label></div>
+        </div>
+      </div>
+    </div>
+    <div class="editor-body templates-editor">
+      <div class="editor-toolbar templates-toolbar"><div class="editor-toolbar-left"><label><%= translated("Content") %></label></div></div>
+      <div class="templates-monaco"><textarea class="code-editor-textarea" name="template_editor[content]" spellcheck="false"><%= @template_editor.content %></textarea></div>
+    </div>
+    <div class="editor-footer"><span class="text-muted text-small"><%= translated("Created") %>: <%= format_timestamp(@template_editor.created_at) %></span><span class="text-muted text-small"><%= translated("Updated") %>: <%= format_timestamp(@template_editor.updated_at) %></span></div>
+  </form>
+</div>

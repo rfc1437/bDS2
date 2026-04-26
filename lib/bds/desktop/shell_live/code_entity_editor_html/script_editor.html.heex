@@ -1,0 +1,31 @@
+<div class="scripts-view-shell" data-testid="script-editor">
+  <div class="editor-header scripts-header">
+    <div class="editor-tabs"><div class="editor-tab active"><span class="editor-tab-title"><%= @script_editor.title %></span></div></div>
+    <div class="editor-actions">
+      <button class="scripts-save-button" type="button" phx-click="save_script_editor"><%= translated("Save") %></button>
+      <button class="scripts-run-button" type="button" phx-click="run_script_editor"><%= translated("Run") %></button>
+      <button class="scripts-check-button" type="button" phx-click="check_script_editor"><%= translated("Check Syntax") %></button>
+      <button class="secondary danger" type="button" phx-click="delete_script_editor"><%= translated("Delete") %></button>
+    </div>
+  </div>
+  <form class="editor-content scripts-view" phx-change="change_script_editor">
+    <div class="editor-header-row scripts-meta-row">
+      <div class="editor-meta">
+        <div class="editor-field-row">
+          <div class="editor-field"><label><%= translated("Title") %></label><input type="text" name="script_editor[title]" value={@script_editor.title} /></div>
+          <div class="editor-field"><label><%= translated("Slug") %></label><input type="text" name="script_editor[slug]" value={@script_editor.slug} /></div>
+        </div>
+        <div class="editor-field-row">
+          <div class="editor-field"><label><%= translated("Kind") %></label><select name="script_editor[kind]"><option value="utility" selected={@script_editor.kind == "utility"}>utility</option><option value="macro" selected={@script_editor.kind == "macro"}>macro</option><option value="transform" selected={@script_editor.kind == "transform"}>transform</option></select></div>
+          <div class="editor-field"><label><%= translated("Entrypoint") %></label><select name="script_editor[entrypoint]"><%= for entrypoint <- @script_editor.entrypoints do %><option value={entrypoint} selected={entrypoint == @script_editor.entrypoint}><%= entrypoint %></option><% end %></select></div>
+          <div class="editor-field scripts-enabled-field"><label><input type="checkbox" name="script_editor[enabled]" checked={@script_editor.enabled} /> <%= translated("Enabled") %></label></div>
+        </div>
+      </div>
+    </div>
+    <div class="editor-body scripts-editor">
+      <div class="editor-toolbar scripts-toolbar"><div class="editor-toolbar-left"><label><%= translated("Content") %></label></div></div>
+      <div class="scripts-monaco"><textarea class="code-editor-textarea" name="script_editor[content]"><%= @script_editor.content %></textarea></div>
+    </div>
+    <div class="editor-footer"><span class="text-muted text-small"><%= translated("Created") %>: <%= format_timestamp(@script_editor.created_at) %></span><span class="text-muted text-small"><%= translated("Updated") %>: <%= format_timestamp(@script_editor.updated_at) %></span></div>
+  </form>
+</div>

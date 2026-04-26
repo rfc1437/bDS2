@@ -1,0 +1,38 @@
+<div class="chat-panel" data-testid="chat-editor">
+  <div class="chat-panel-header">
+    <div class="chat-panel-title"><%= @chat_editor.title %></div>
+  </div>
+
+  <div class="chat-messages">
+    <%= if Enum.empty?(@chat_editor.messages) do %>
+      <div class="chat-welcome">
+        <div class="chat-welcome-icon">🤖</div>
+        <h2><%= translated("New Chat") %></h2>
+        <p><%= translated("Ask the assistant about the active project.") %></p>
+        <ul>
+          <li><%= translated("Search posts and media") %></li>
+          <li><%= translated("Inspect metadata") %></li>
+          <li><%= translated("Open related tabs") %></li>
+          <li><%= translated("Review generated output") %></li>
+          <li><%= translated("Navigate settings") %></li>
+        </ul>
+      </div>
+    <% else %>
+      <%= for message <- @chat_editor.messages do %>
+        <div class={["chat-message", to_string(message.role || "assistant")]}>
+          <div class="chat-message-content">
+            <div class="chat-message-header"><span class="chat-message-role"><%= String.capitalize(to_string(message.role || "assistant")) %></span></div>
+            <div class="chat-message-text"><%= message.content || "" %></div>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div class="chat-input-container">
+    <form class="chat-input-wrapper" phx-change="change_chat_editor_input">
+      <textarea class="chat-input chat-surface-input" name="message" rows="1" placeholder={translated("Send a message")}><%= @chat_editor.input %></textarea>
+      <button class="chat-send-button" type="button" phx-click="send_chat_editor_message" disabled={String.trim(@chat_editor.input || "") == "" or @chat_editor.offline?}>↑</button>
+    </form>
+  </div>
+</div>

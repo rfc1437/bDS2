@@ -1,0 +1,145 @@
+<div class="settings-view-shell" data-testid="settings-editor">
+  <div class="settings-view">
+    <div class="settings-header">
+      <h2 data-testid="editor-title"><%= translated("Settings") %></h2>
+      <form class="settings-search" phx-change="change_settings_search">
+        <input type="text" name="query" value={@settings_editor.search_query} placeholder={translated("Search settings")} />
+      </form>
+    </div>
+
+    <div class="settings-content">
+      <%= if not @settings_editor.project_visible? and not @settings_editor.content_visible? and not @settings_editor.publishing_visible? and not @settings_editor.data_visible? do %>
+        <div class="settings-no-results">
+          <p><%= translated("No settings match the current search") %></p>
+        </div>
+      <% end %>
+
+      <%= if @settings_editor.project_visible? do %>
+        <div class="setting-section" id="settings-section-project">
+          <div class="setting-section-header">
+            <h3><%= translated("Project") %></h3>
+          </div>
+          <form class="setting-section-content" phx-change="change_settings_project">
+            <div class="setting-row">
+              <div class="setting-info">
+                <label class="setting-label"><%= translated("Project Name") %></label>
+              </div>
+              <div class="setting-control"><input type="text" name="settings_project[name]" value={@settings_editor.project["name"]} /></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Description") %></label></div>
+              <div class="setting-control"><textarea name="settings_project[description]" rows="3"><%= @settings_editor.project["description"] %></textarea></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Public URL") %></label></div>
+              <div class="setting-control"><input type="url" name="settings_project[public_url]" value={@settings_editor.project["public_url"]} /></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Main Language") %></label></div>
+              <div class="setting-control">
+                <select name="settings_project[main_language]">
+                  <%= for language <- @settings_editor.supported_languages do %>
+                    <option value={language} selected={language == @settings_editor.project["main_language"]}><%= String.upcase(language) %></option>
+                  <% end %>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Blog Languages") %></label></div>
+              <div class="setting-control">
+                <div class="setting-input-group">
+                  <%= for language <- @settings_editor.supported_languages do %>
+                    <label>
+                      <input type="checkbox" name="settings_project[blog_languages][]" value={language} checked={language in @settings_editor.project["blog_languages"]} />
+                      <%= String.upcase(language) %>
+                    </label>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Default Author") %></label></div>
+              <div class="setting-control"><input type="text" name="settings_project[default_author]" value={@settings_editor.project["default_author"]} /></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Max Posts Per Page") %></label></div>
+              <div class="setting-control"><input type="number" min="1" max="500" name="settings_project[max_posts_per_page]" value={@settings_editor.project["max_posts_per_page"]} /></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Blogmark Category") %></label></div>
+              <div class="setting-control">
+                <select name="settings_project[blogmark_category]">
+                  <%= for category <- Enum.map(@settings_editor.categories, & &1.name) do %>
+                    <option value={category} selected={category == @settings_editor.project["blogmark_category"]}><%= category %></option>
+                  <% end %>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Semantic Similarity") %></label></div>
+              <div class="setting-control">
+                <label><input type="checkbox" name="settings_project[semantic_similarity_enabled]" checked={@settings_editor.project["semantic_similarity_enabled"]} /> <%= translated("Enable semantic similarity") %></label>
+              </div>
+            </div>
+          </form>
+          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_project"><%= translated("Save") %></button></div>
+        </div>
+      <% end %>
+
+      <%= if @settings_editor.content_visible? do %>
+        <div class="setting-section" id="settings-section-content">
+          <div class="setting-section-header"><h3><%= translated("Content Categories") %></h3></div>
+          <div class="setting-section-content">
+            <%= for category <- @settings_editor.categories do %>
+              <form class="setting-row" phx-change="save_settings_category">
+                <input type="hidden" name="category_settings[category]" value={category.name} />
+                <div class="setting-info"><label class="setting-label"><%= category.name %></label></div>
+                <div class="setting-control">
+                  <div class="setting-input-group">
+                    <input type="text" name="category_settings[title]" value={category.title} />
+                    <label><input type="checkbox" name="category_settings[render_in_lists]" checked={category.render_in_lists} /> <%= translated("Render in Lists") %></label>
+                    <label><input type="checkbox" name="category_settings[show_title]" checked={category.show_title} /> <%= translated("Show Titles") %></label>
+                    <button class="secondary" type="button" phx-click="remove_settings_category" phx-value-category={category.name} disabled={category.protected?}><%= translated("Remove") %></button>
+                  </div>
+                </div>
+              </form>
+            <% end %>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Add Category") %></label></div>
+              <div class="setting-control">
+                <div class="setting-input-group">
+                  <input type="text" value={@settings_editor.new_category} phx-change="change_settings_new_category" name="name" />
+                  <button class="primary" type="button" phx-click="add_settings_category"><%= translated("Add") %></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <%= if @settings_editor.publishing_visible? do %>
+        <div class="setting-section" id="settings-section-publishing">
+          <div class="setting-section-header"><h3><%= translated("Publishing") %></h3></div>
+          <form class="setting-section-content" phx-change="change_settings_publishing">
+            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= translated("SSH Mode") %></label></div><div class="setting-control"><select name="settings_publishing[ssh_mode]"><option value="scp" selected={@settings_editor.publishing["ssh_mode"] == "scp"}>scp</option><option value="rsync" selected={@settings_editor.publishing["ssh_mode"] == "rsync"}>rsync</option></select></div></div>
+            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= translated("Host") %></label></div><div class="setting-control"><input type="text" name="settings_publishing[ssh_host]" value={@settings_editor.publishing["ssh_host"]} /></div></div>
+            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= translated("Username") %></label></div><div class="setting-control"><input type="text" name="settings_publishing[ssh_user]" value={@settings_editor.publishing["ssh_user"]} /></div></div>
+            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= translated("Remote Path") %></label></div><div class="setting-control"><input type="text" name="settings_publishing[ssh_remote_path]" value={@settings_editor.publishing["ssh_remote_path"]} /></div></div>
+          </form>
+          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_publishing"><%= translated("Save") %></button><button class="secondary" type="button" phx-click="clear_settings_publishing"><%= translated("Clear") %></button></div>
+        </div>
+      <% end %>
+
+      <%= if @settings_editor.data_visible? do %>
+        <div class="setting-section" id="settings-section-data">
+          <div class="setting-section-header"><h3><%= translated("Data Maintenance") %></h3></div>
+          <div class="setting-actions">
+            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_database"><%= translated("Rebuild Database") %></button>
+            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_embedding_index"><%= translated("Rebuild Embedding Index") %></button>
+            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="open_data_folder"><%= translated("Open Data Folder") %></button>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

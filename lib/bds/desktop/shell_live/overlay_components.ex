@@ -8,6 +8,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   alias BDS.Desktop.ShellData
   alias BDS.{I18n, Metadata, Repo}
   alias BDS.Media.Media
+  alias BDS.Media.Translation, as: MediaTranslation
   alias BDS.Posts.{Post, Translation}
   alias BDS.Tags.Tag
 
@@ -132,6 +133,17 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     _error -> %{}
   end
 
+  defp existing_translations(%{type: :media, id: media_id}) do
+    Repo.all(
+      from translation in MediaTranslation,
+        where: translation.translation_for == ^media_id,
+        select: {translation.language, "draft"}
+    )
+    |> Map.new(fn {language, status} -> {language, status} end)
+  rescue
+    _error -> %{}
+  end
+
   defp existing_translations(_tab), do: %{}
 
   defp blog_languages(metadata) do
@@ -143,6 +155,15 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   defp source_language(%{type: :post, id: post_id}, metadata) do
     case Repo.get(Post, post_id) do
       %Post{language: language} when is_binary(language) and language != "" -> language
+      _other -> metadata.main_language || "en"
+    end
+  rescue
+    _error -> metadata.main_language || "en"
+  end
+
+  defp source_language(%{type: :media, id: media_id}, metadata) do
+    case Repo.get(Media, media_id) do
+      %Media{language: language} when is_binary(language) and language != "" -> language
       _other -> metadata.main_language || "en"
     end
   rescue

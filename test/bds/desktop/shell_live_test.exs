@@ -5,11 +5,15 @@ defmodule BDS.Desktop.ShellLiveTest do
   import Phoenix.LiveViewTest
 
   alias BDS.Persistence
+  alias BDS.AI
+  alias BDS.Media
   alias BDS.Metadata
   alias BDS.Posts
   alias BDS.Posts.Post
   alias BDS.Projects
   alias BDS.Repo
+  alias BDS.Scripts
+  alias BDS.Templates
   alias BDS.Tags
   alias BDS.UI.{Session, Workbench}
 
@@ -725,6 +729,240 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert Regex.match?(~r/name="post_editor\[content\]"[^>]*># Heading\s+```elixir\s+IO\.puts\(:ok\)\s+```/s, html)
     assert html =~ "post-editor-markdown-surface"
     refute html =~ ~s(phx-value-mode="visual")
+  end
+
+  test "media tabs render a real editor and drive explicit save flows", %{project: project, temp_dir: temp_dir} do
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Linked Shell Post",
+        content: "Body"
+      })
+
+    source_path = Path.join(temp_dir, "cover.txt")
+    File.write!(source_path, "media body")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Manual Cover",
+               alt: "Cover alt",
+               caption: "Cover caption",
+               author: "Initial Author",
+               language: "en",
+               tags: ["cover", "hero"]
+             })
+
+    assert {:ok, _translation} =
+             Media.upsert_media_translation(media.id, "de", %{
+               title: "Titelbild",
+               alt: "Alt DE",
+               caption: "Beschriftung DE"
+             })
+
+    assert {:ok, _result} =
+             Repo.query(
+               "INSERT INTO post_media (id, project_id, post_id, media_id, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+               [Ecto.UUID.generate(), project.id, post.id, media.id, 0, Persistence.now_ms()]
+             )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "media",
+        "id" => media.id,
+        "title" => media.title,
+        "subtitle" => media.original_name
+      })
+
+    assert html =~ ~s(data-testid="media-editor")
+    assert html =~ ~s(data-testid="media-editor-form")
+    assert html =~ ~s(name="media_editor[title]")
+    assert html =~ ~s(name="media_editor[alt]")
+    assert html =~ ~s(name="media_editor[caption]")
+    assert html =~ ~s(name="media_editor[tags]")
+    assert html =~ ~s(data-testid="media-save-button")
+    assert html =~ ~s(data-testid="media-delete-button")
+    assert html =~ "quick-actions-wrapper"
+    assert html =~ "media-translations-section"
+    assert html =~ "linked-posts-section"
+    assert html =~ "Manual Cover"
+    assert html =~ "Linked Shell Post"
+    assert html =~ "Titelbild"
+    refute html =~ "Desktop workbench content routed through the Elixir shell."
+
+    html = render_click(view, "toggle_media_editor_quick_actions", %{"id" => media.id})
+
+    assert html =~ "quick-actions-menu"
+    assert html =~ "Detect Language"
+    assert html =~ "Translate"
+
+    html =
+      view
+      |> form("[data-testid='media-editor-form']", %{
+        media_editor: %{
+          title: "Updated Cover",
+          alt: "Updated alt",
+          caption: "Updated caption",
+          tags: "cover, feature",
+          author: "Ada Lovelace",
+          language: "fr"
+        }
+      })
+      |> render_change()
+
+    assert html =~ "Updated Cover"
+
+    _html = render_click(view, "save_media_editor", %{"id" => media.id})
+
+    saved_media = Repo.get!(BDS.Media.Media, media.id)
+    assert saved_media.title == "Updated Cover"
+    assert saved_media.alt == "Updated alt"
+    assert saved_media.caption == "Updated caption"
+    assert saved_media.tags == ["cover", "feature"]
+    assert saved_media.author == "Ada Lovelace"
+    assert saved_media.language == "fr"
+  end
+
+  test "media editor follows the old-app translation editing flow", %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "hero.txt")
+    File.write!(source_path, "media body")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Legacy Cover",
+               alt: "Legacy alt",
+               caption: "Legacy caption",
+               language: "en"
+             })
+
+    assert {:ok, _translation} =
+             Media.upsert_media_translation(media.id, "de", %{
+               title: "Titelbild",
+               alt: "Alt DE",
+               caption: "Beschriftung DE"
+             })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "media",
+        "id" => media.id,
+        "title" => media.title,
+        "subtitle" => media.original_name
+      })
+
+    assert html =~ ~s(class="editor-content media-editor")
+    assert html =~ ~s(class="quick-actions-wrapper")
+    refute html =~ ~s(class="media-editor-form")
+
+    html = render_click(view, "edit_media_translation", %{"id" => media.id, "language" => "de"})
+
+    assert html =~ ~s(class="translation-modal-backdrop")
+    assert html =~ ~s(class="translation-modal")
+    assert html =~ ~s(name="media_translation[title]")
+    assert html =~ ~s(name="media_translation[alt]")
+    assert html =~ ~s(name="media_translation[caption]")
+  end
+
+  test "remaining step-5 routes render dedicated editors instead of the generic shell placeholder", %{project: project} do
+    assert {:ok, script} =
+             Scripts.create_script(%{
+               project_id: project.id,
+               title: "Sync Script",
+               kind: :utility,
+               content: "def main():\n    return 'ok'\n"
+             })
+
+    assert {:ok, template} =
+             Templates.create_template(%{
+               project_id: project.id,
+               title: "Post Template",
+               kind: :post,
+               content: "<article>{{ post.title }}</article>"
+             })
+
+    assert {:ok, _tag} = Tags.create_tag(%{project_id: project.id, name: "feature"})
+    assert {:ok, conversation} = AI.start_chat(%{title: "Editor Chat"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    settings_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "settings",
+        "id" => "settings",
+        "title" => "Settings",
+        "subtitle" => "Project settings"
+      })
+
+    assert settings_html =~ ~s(class="settings-view-shell")
+    assert settings_html =~ ~s(class="setting-section")
+    refute settings_html =~ "Desktop workbench content routed through the Elixir shell."
+
+    tags_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "tags",
+        "id" => "tags",
+        "title" => "Tags",
+        "subtitle" => "Manage tags"
+      })
+
+    assert tags_html =~ ~s(class="tags-view-shell")
+    assert tags_html =~ ~s(class="tags-section")
+    refute tags_html =~ "Desktop workbench content routed through the Elixir shell."
+
+    style_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "style",
+        "id" => "style",
+        "title" => "Style",
+        "subtitle" => "Theme preview"
+      })
+
+    assert style_html =~ ~s(class="style-view")
+    assert style_html =~ ~s(class="style-theme-picker")
+    refute style_html =~ "Desktop workbench content routed through the Elixir shell."
+
+    script_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "scripts",
+        "id" => script.id,
+        "title" => script.title,
+        "subtitle" => script.slug
+      })
+
+    assert script_html =~ ~s(class="scripts-view-shell")
+    assert script_html =~ ~s(class="scripts-monaco")
+    refute script_html =~ "Desktop workbench content routed through the Elixir shell."
+
+    template_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "templates",
+        "id" => template.id,
+        "title" => template.title,
+        "subtitle" => template.slug
+      })
+
+    assert template_html =~ ~s(class="templates-view-shell")
+    assert template_html =~ ~s(class="templates-monaco")
+    refute template_html =~ "Desktop workbench content routed through the Elixir shell."
+
+    chat_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert chat_html =~ ~s(class="chat-panel")
+    assert chat_html =~ ~s(class="chat-input-container")
+    refute chat_html =~ "Desktop workbench content routed through the Elixir shell."
   end
 
   test "template sidebar exposes old-app style delete control and removes template rows", %{project: project} do

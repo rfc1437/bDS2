@@ -1,0 +1,65 @@
+<div class={["misc-editor-shell", misc_class(@misc_editor.kind)]} data-testid="misc-editor">
+  <div class="misc-editor-header">
+    <div>
+      <h2><%= @misc_editor.title %></h2>
+      <p><%= @misc_editor.subtitle %></p>
+    </div>
+    <div class="misc-editor-actions">
+      <button class="secondary" type="button" phx-click="rerun_misc_editor"><%= translated("Refresh") %></button>
+      <%= if @misc_editor.kind == :site_validation do %>
+        <button class="primary" type="button" phx-click="apply_site_validation" disabled={Enum.empty?(@misc_editor.missing_pages) and Enum.empty?(@misc_editor.extra_pages) and Enum.empty?(@misc_editor.stale_pages)}><%= translated("Apply") %></button>
+      <% end %>
+      <%= if @misc_editor.kind == :find_duplicates do %>
+        <button class="secondary" type="button" phx-click="dismiss_selected_duplicates" disabled={MapSet.size(@misc_editor.selected_pairs) == 0}><%= translated("Dismiss Checked") %></button>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="misc-editor-summary">
+    <%= for {label, value} <- summary_items(@misc_editor) do %>
+      <div class="misc-summary-pill"><span><%= label %></span><strong><%= value %></strong></div>
+    <% end %>
+  </div>
+
+  <div class="misc-editor-content">
+    <%= case @misc_editor.kind do %>
+      <% :site_validation -> %>
+        <div class="misc-columns">
+          <section class="misc-card"><h3><%= translated("Missing URLs") %></h3><%= if Enum.empty?(@misc_editor.missing_pages) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.missing_pages do %><li><%= path %></li><% end %></ul></section>
+          <section class="misc-card"><h3><%= translated("Extra URLs") %></h3><%= if Enum.empty?(@misc_editor.extra_pages) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.extra_pages do %><li><%= path %></li><% end %></ul></section>
+          <section class="misc-card"><h3><%= translated("Updated URLs") %></h3><%= if Enum.empty?(@misc_editor.stale_pages) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.stale_pages do %><li><%= path %></li><% end %></ul></section>
+        </div>
+
+      <% :metadata_diff -> %>
+        <div class="misc-columns">
+          <section class="misc-card"><h3><%= translated("Field Summary") %></h3><div class="misc-summary-grid"><%= for field <- @misc_editor.field_summaries do %><span class="misc-summary-pill"><%= field.field_name %> <strong><%= field.diff_count %></strong></span><% end %></div></section>
+          <section class="misc-card"><h3><%= translated("Diff Items") %></h3><div class="misc-list"><%= for item <- @misc_editor.items do %><article class="misc-list-item"><header><strong><%= Map.get(item, :entity_type) || Map.get(item, "entity_type") %></strong> <span><%= Map.get(item, :entity_id) || Map.get(item, "entity_id") %></span></header><ul><%= for diff <- Map.get(item, :differences) || Map.get(item, "differences") || [] do %><li><strong><%= Map.get(diff, :field) || Map.get(diff, "field") %></strong><span><%= inspect(Map.get(diff, :db_value) || Map.get(diff, "db_value")) %></span><span><%= inspect(Map.get(diff, :file_value) || Map.get(diff, "file_value")) %></span></li><% end %></ul></article><% end %></div></section>
+          <section class="misc-card"><h3><%= translated("Orphan Files") %></h3><ul><%= for orphan <- @misc_editor.orphan_files do %><li><%= inspect(orphan) %></li><% end %></ul></section>
+        </div>
+
+      <% :translation_validation -> %>
+        <div class="misc-columns">
+          <section class="misc-card"><h3><%= translated("Missing") %></h3><ul><%= for issue <- @misc_editor.missing do %><li><%= inspect(issue) %></li><% end %></ul></section>
+          <section class="misc-card"><h3><%= translated("Orphan Files") %></h3><ul><%= for file <- @misc_editor.orphan_files do %><li><%= file %></li><% end %></ul></section>
+          <section class="misc-card"><h3><%= translated("Do Not Translate") %></h3><ul><%= for post <- @misc_editor.do_not_translate_posts do %><li><%= inspect(post) %></li><% end %></ul></section>
+        </div>
+
+      <% :find_duplicates -> %>
+        <div class="misc-list">
+          <%= for pair <- @misc_editor.pairs do %>
+            <article class="misc-list-item duplicate-pair-row">
+              <label><input type="checkbox" checked={duplicate_checked?(@misc_editor, pair_id_from_pair(pair))} phx-click="toggle_duplicate_pair" phx-value-pair-id={pair_id_from_pair(pair)} /> <span></span></label>
+              <button class="linkish" type="button" phx-click="open_duplicate_post" phx-value-id={Map.get(pair, :post_id_a) || Map.get(pair, "post_id_a")} phx-value-title={Map.get(pair, :title_a) || Map.get(pair, "title_a") }><%= Map.get(pair, :title_a) || Map.get(pair, "title_a") %></button>
+              <span>→</span>
+              <button class="linkish" type="button" phx-click="open_duplicate_post" phx-value-id={Map.get(pair, :post_id_b) || Map.get(pair, "post_id_b")} phx-value-title={Map.get(pair, :title_b) || Map.get(pair, "title_b") }><%= Map.get(pair, :title_b) || Map.get(pair, "title_b") %></button>
+              <span class="misc-summary-pill"><%= if(Map.get(pair, :exact_match) || Map.get(pair, "exact_match"), do: translated("Exact Match"), else: "#{Float.round((Map.get(pair, :similarity) || Map.get(pair, "similarity") || 0.0) * 100, 1)}%") %></span>
+              <button class="secondary" type="button" phx-click="dismiss_duplicate_pair" phx-value-post-id-a={Map.get(pair, :post_id_a) || Map.get(pair, "post_id_a")} phx-value-post-id-b={Map.get(pair, :post_id_b) || Map.get(pair, "post_id_b")}><%= translated("Dismiss") %></button>
+            </article>
+          <% end %>
+        </div>
+
+      <% :git_diff -> %>
+        <div class="misc-card misc-code-card"><pre><code><%= @misc_editor.diff_text %></code></pre></div>
+    <% end %>
+  </div>
+</div>
