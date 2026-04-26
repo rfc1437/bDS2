@@ -66,6 +66,14 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, open_sidebar_item(socket, params, :pin)}
   end
 
+  def handle_event("sync_layout", params, socket) do
+    {:noreply, reload_shell(socket, sync_layout(socket.assigns.workbench, params))}
+  end
+
+  def handle_event("resize_panel", %{"target" => target, "width" => width}, socket) do
+    {:noreply, reload_shell(socket, resize_panel(socket.assigns.workbench, target, width))}
+  end
+
   def handle_event("shortcut", params, socket) do
     if ignore_shortcut?(params) do
       {:noreply, socket}
@@ -437,6 +445,44 @@ defmodule BDS.Desktop.ShellLive do
 
   defp current_tab(%{tabs: tabs, active_tab: {type, id}}) do
     Enum.find(tabs, &(&1.type == type and &1.id == id))
+  end
+
+  defp sync_layout(workbench, params) do
+    workbench
+    |> maybe_set_sidebar_width(Map.get(params, "sidebar_width"))
+    |> maybe_set_assistant_width(Map.get(params, "assistant_sidebar_width"))
+  end
+
+  defp resize_panel(workbench, "sidebar", width) do
+    workbench
+    |> Workbench.set_sidebar_width(parse_width(width))
+    |> Map.put(:sidebar_visible, true)
+  end
+
+  defp resize_panel(workbench, "assistant", width) do
+    workbench
+    |> Workbench.set_assistant_sidebar_width(parse_width(width))
+    |> Map.put(:assistant_sidebar_visible, true)
+  end
+
+  defp resize_panel(workbench, _target, _width), do: workbench
+
+  defp maybe_set_sidebar_width(workbench, nil), do: workbench
+  defp maybe_set_sidebar_width(workbench, width), do: Workbench.set_sidebar_width(workbench, parse_width(width))
+
+  defp maybe_set_assistant_width(workbench, nil), do: workbench
+
+  defp maybe_set_assistant_width(workbench, width) do
+    Workbench.set_assistant_sidebar_width(workbench, parse_width(width))
+  end
+
+  defp parse_width(width) when is_integer(width), do: width
+
+  defp parse_width(width) when is_binary(width) do
+    case Integer.parse(width) do
+      {parsed, _rest} -> parsed
+      :error -> 0
+    end
   end
 
   defp ignore_shortcut?(params) do

@@ -43,7 +43,9 @@ for await (const line of rl) {
           window_title: text("[data-testid='window-title']"),
           active_view: document.querySelector("[data-testid='activity-button'][data-active='true']")?.dataset.view ?? null,
           sidebar_visible: !hasClass("[data-testid='sidebar-shell']", "is-hidden"),
+          sidebar_width: document.querySelector("[data-testid='sidebar-shell']")?.getBoundingClientRect().width ?? 0,
           assistant_visible: !hasClass("[data-testid='assistant-shell']", "is-hidden"),
+          assistant_width: document.querySelector("[data-testid='assistant-shell']")?.getBoundingClientRect().width ?? 0,
           panel_visible: !hasClass(".panel-shell", "is-hidden"),
           editor_title: text("[data-testid='editor-title']"),
           activity_labels: texts("[data-testid='activity-button']", (node) => node.getAttribute("aria-label")),
@@ -66,6 +68,33 @@ for await (const line of rl) {
     if (message.command === "press") {
       await page.keyboard.press(message.shortcut);
       await page.waitForTimeout(50);
+      console.log(JSON.stringify({ ref, status: "ok", result: "ok" }));
+      continue;
+    }
+
+    if (message.command === "drag") {
+      const locator = page.locator(message.selector);
+      const box = await locator.boundingBox();
+
+      if (!box) {
+        throw new Error(`unable to drag missing element: ${message.selector}`);
+      }
+
+      const startX = box.x + box.width / 2;
+      const startY = box.y + box.height / 2;
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + message.deltaX, startY, { steps: 10 });
+      await page.mouse.up();
+      await page.waitForTimeout(50);
+      console.log(JSON.stringify({ ref, status: "ok", result: "ok" }));
+      continue;
+    }
+
+    if (message.command === "reload") {
+      await page.reload({ waitUntil: "networkidle" });
+      await page.locator("#bds-shell-app").waitFor({ state: "visible" });
+      await page.waitForTimeout(100);
       console.log(JSON.stringify({ ref, status: "ok", result: "ok" }));
       continue;
     }

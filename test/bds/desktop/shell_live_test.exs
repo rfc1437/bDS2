@@ -169,4 +169,28 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="sidebar-shell is-hidden")
     assert html =~ ~s(style="width: 0px;")
   end
+
+  test "layout hooks sync persisted widths and apply drag resizing" do
+    {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert html =~ ~s(style="width: 280px;")
+
+    html = render_hook(view, "sync_layout", %{"sidebar_width" => 420, "assistant_sidebar_width" => 480})
+
+    assert html =~ ~s(data-testid="sidebar-shell")
+    assert html =~ ~s(style="width: 420px;")
+
+    html =
+      view
+      |> element("[data-testid='toggle-assistant']")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="assistant-shell")
+    assert html =~ ~s(style="width: 480px;")
+
+    html = render_hook(view, "resize_panel", %{"target" => "sidebar", "width" => 460})
+
+    assert html =~ ~s(data-testid="sidebar-shell")
+    assert html =~ ~s(style="width: 460px;")
+  end
 end

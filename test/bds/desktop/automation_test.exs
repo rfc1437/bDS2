@@ -72,6 +72,34 @@ defmodule BDS.Desktop.AutomationTest do
   end
 
   @tag timeout: 120_000
+  test "automation drags sidebar resize handle and restores width after reload" do
+    {:ok, session} = Automation.start_session()
+
+    on_exit(fn ->
+      Automation.stop_session(session)
+    end)
+
+    snapshot = Automation.snapshot(session)
+    assert snapshot.sidebar_width >= 279
+    assert snapshot.sidebar_width <= 281
+
+    assert :ok = Automation.drag(session, "[data-resize='sidebar']", 90)
+
+    snapshot = Automation.snapshot(session)
+    assert snapshot.sidebar_width >= 360
+    assert snapshot.sidebar_width <= 380
+
+    resized_width = snapshot.sidebar_width
+
+    assert :ok = Automation.reload(session)
+
+    snapshot = Automation.snapshot(session)
+    assert snapshot.sidebar_visible == true
+    assert snapshot.sidebar_width >= resized_width - 2
+    assert snapshot.sidebar_width <= resized_width + 2
+  end
+
+  @tag timeout: 120_000
   test "automation stop_session shuts down the app and browser child processes it started" do
     baseline = automation_process_counts()
 
