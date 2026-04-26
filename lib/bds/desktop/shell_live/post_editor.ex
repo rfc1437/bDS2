@@ -303,7 +303,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
         draft = current_draft(socket.assigns, post, metadata, active_language)
         normalized = normalize_list_entry(value)
 
-        if normalized in [nil, ""] do
+        if normalized == "" do
           socket
         else
           ensure_list_value(post.project_id, kind, normalized)
@@ -414,8 +414,8 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   def build(_assigns), do: nil
 
-  def normalize_mode(mode) when mode in [:visual, :markdown, :preview], do: mode
-  def normalize_mode("visual"), do: :visual
+  def normalize_mode(mode) when mode in [:markdown, :preview], do: mode
+  def normalize_mode("visual"), do: :markdown
   def normalize_mode("preview"), do: :preview
   def normalize_mode(_mode), do: :markdown
 
@@ -507,7 +507,6 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   def post_editor_save_state_label(:discarded), do: translated("Reverted")
   def post_editor_save_state_label(_state), do: translated("Idle")
 
-  def post_editor_mode_label(:visual), do: translated("Visual")
   def post_editor_mode_label(:markdown), do: translated("Markdown")
   def post_editor_mode_label(:preview), do: translated("Preview")
 
@@ -687,7 +686,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       %{
         "title" => post.title || "",
         "excerpt" => post.excerpt || "",
-        "content" => post.content || "",
+        "content" => Posts.editor_body(post),
         "tags" => Enum.join(post.tags || [], ", "),
         "categories" => Enum.join(post.categories || [], ", "),
         "author" => post.author || metadata.default_author || "",
@@ -699,7 +698,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       %{
         "title" => translation && translation.title || "",
         "excerpt" => translation && translation.excerpt || "",
-        "content" => translation && translation.content || "",
+        "content" => if(translation, do: Posts.editor_body(translation), else: ""),
         "tags" => Enum.join(post.tags || [], ", "),
         "categories" => Enum.join(post.categories || [], ", "),
         "author" => post.author || metadata.default_author || "",

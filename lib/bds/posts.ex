@@ -215,6 +215,30 @@ defmodule BDS.Posts do
     end
   end
 
+  def editor_body(%Post{content: content}) when is_binary(content), do: content
+
+  def editor_body(%Post{project_id: project_id, file_path: file_path})
+      when is_binary(file_path) and file_path != "" do
+    project_id
+    |> Projects.get_project!()
+    |> Projects.project_data_dir()
+    |> Path.join(file_path)
+    |> read_markdown_body()
+  end
+
+  def editor_body(%Translation{content: content}) when is_binary(content), do: content
+
+  def editor_body(%Translation{project_id: project_id, file_path: file_path})
+      when is_binary(file_path) and file_path != "" do
+    project_id
+    |> Projects.get_project!()
+    |> Projects.project_data_dir()
+    |> Path.join(file_path)
+    |> read_markdown_body()
+  end
+
+  def editor_body(_record), do: ""
+
   def delete_post(post_id) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -664,8 +688,10 @@ defmodule BDS.Posts do
   defp published_post_body(%Post{content: content}, _full_path) when is_binary(content),
     do: content
 
-  defp published_post_body(_post, full_path) do
-    case File.read(full_path) do
+  defp published_post_body(_post, full_path), do: read_markdown_body(full_path)
+
+  defp read_markdown_body(path) do
+    case File.read(path) do
       {:ok, contents} ->
         case String.split(contents, "\n---\n", parts: 2) do
           [_frontmatter, body] -> String.trim_trailing(body, "\n")

@@ -1606,12 +1606,100 @@ button svg * {
   background: #ffffff;
 }
 
-.post-editor .post-editor-content {
+.post-editor .post-editor-markdown-surface {
+  position: relative;
   flex: 1;
   min-height: 380px;
-  resize: none;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  background: var(--vscode-input-background);
+  overflow: hidden;
+}
+
+.post-editor .post-editor-markdown-highlight,
+.post-editor .post-editor-content {
   font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--vscode-editor-font-size, 13px);
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.post-editor .post-editor-markdown-highlight {
+  display: none;
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--vscode-editor-foreground);
+}
+
+.post-editor .post-editor-markdown-surface.is-enhanced .post-editor-markdown-highlight {
+  display: block;
+}
+
+.post-editor .post-editor-content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 380px;
+  margin: 0;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  resize: none;
+}
+
+.post-editor .post-editor-markdown-surface.is-enhanced .post-editor-content {
+  color: transparent;
+  caret-color: var(--vscode-editor-foreground);
+  -webkit-text-fill-color: transparent;
+}
+
+.post-editor .post-editor-markdown-surface.is-enhanced .post-editor-content::selection {
+  background: rgba(97, 175, 239, 0.35);
+}
+
+.post-editor .md-heading-marker,
+.post-editor .md-list-marker,
+.post-editor .md-quote-marker,
+.post-editor .md-fence,
+.post-editor .token-keyword {
+  color: #c678dd;
+}
+
+.post-editor .md-heading-text,
+.post-editor .token-module {
+  color: #61afef;
+}
+
+.post-editor .md-inline-code,
+.post-editor .token-string {
+  color: #98c379;
+}
+
+.post-editor .md-link,
+.post-editor .token-atom {
+  color: #56b6c2;
+}
+
+.post-editor .md-emphasis,
+.post-editor .md-strong,
+.post-editor .token-number {
+  color: #e5c07b;
+}
+
+.post-editor .md-quote-text,
+.post-editor .token-comment {
+  color: var(--vscode-descriptionForeground);
+}
+
+.post-editor .md-code-line {
+  color: var(--vscode-editor-foreground);
 }
 
 .post-editor .editor-footer {

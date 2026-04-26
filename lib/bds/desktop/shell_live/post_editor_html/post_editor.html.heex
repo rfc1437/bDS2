@@ -327,7 +327,7 @@
 
         <div class="editor-toolbar-center">
           <div class="editor-mode-toggle">
-            <%= for mode <- [:visual, :markdown, :preview] do %>
+            <%= for mode <- [:markdown, :preview] do %>
               <button
                 class={if(@post_editor.mode == mode, do: "active")}
                 type="button"
@@ -386,7 +386,10 @@
           <% end %>
         </div>
       <% else %>
-        <textarea id={"post-editor-content-#{@post_editor.id}"} class="post-editor-textarea post-editor-content" data-testid="post-editor-content" phx-hook="PostEditorContent" data-post-editor-id={@post_editor.id} name="post_editor[content]" rows="18"><%= @post_editor.form["content"] %></textarea>
+        <div id={"post-editor-markdown-surface-#{@post_editor.id}"} class="post-editor-markdown-surface" data-testid="post-editor-markdown-surface" phx-hook="PostEditorContent" data-post-editor-id={@post_editor.id}>
+          <pre class="post-editor-markdown-highlight" aria-hidden="true"></pre>
+          <textarea id={"post-editor-content-#{@post_editor.id}"} class="post-editor-textarea post-editor-content" data-testid="post-editor-content" data-post-editor-id={@post_editor.id} name="post_editor[content]" rows="18"><%= @post_editor.form["content"] %></textarea>
+        </div>
       <% end %>
     </div>
   </form>

@@ -699,6 +699,34 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert discarded_post.title == "Updated Shell Post"
   end
 
+  test "published post editor loads body from file and renders markdown-only editor", %{project: project} do
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Published Editor Post",
+        content: "# Heading\n\n```elixir\nIO.puts(:ok)\n```\n",
+        excerpt: "Published excerpt"
+      })
+
+    assert {:ok, _published} = Posts.publish_post(post.id)
+    published = Posts.get_post!(post.id)
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => published.id,
+        "title" => published.title,
+        "subtitle" => "published"
+      })
+
+    assert html =~ ~s(data-testid="post-editor-content")
+    assert Regex.match?(~r/name="post_editor\[content\]"[^>]*># Heading\s+```elixir\s+IO\.puts\(:ok\)\s+```/s, html)
+    assert html =~ "post-editor-markdown-surface"
+    refute html =~ ~s(phx-value-mode="visual")
+  end
+
   defp seed_sidebar_posts(project_id) do
     now = Persistence.now_ms()
 

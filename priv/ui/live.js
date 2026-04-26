@@ -155,6 +155,92 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   };
 
+  const escapeHtml = (value) =>
+    String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const stashTokens = (source, pattern, className, tokens) =>
+    source.replace(pattern, (match) => {
+      const marker = `@@token_${tokens.length}@@`;
+      tokens.push(`<span class="${className}">${match}</span>`);
+      return marker;
+    });
+
+  const restoreTokens = (source, tokens) =>
+    tokens.reduce((html, token, index) => html.replaceAll(`@@token_${index}@@`, token), source);
+
+  const highlightCodeLine = (line, language) => {
+    const tokens = [];
+    let html = escapeHtml(line);
+
+    html = stashTokens(html, /#.*/g, "token-comment", tokens);
+    html = stashTokens(html, /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "token-string", tokens);
+    html = html.replace(/\b\d+(?:\.\d+)?\b/g, '<span class="token-number">$&</span>');
+
+    if (language === "elixir") {
+      html = html.replace(/:\w+[!?]?/g, '<span class="token-atom">$&</span>');
+      html = html.replace(
+        /\b(?:defp?|do|end|fn|case|cond|if|else|with|when|receive|after|rescue|catch|try|use|alias|import|require|quote|unquote|for|in)\b/g,
+        '<span class="token-keyword">$&</span>'
+      );
+      html = html.replace(/\b[A-Z][A-Za-z0-9_.]*\b/g, '<span class="token-module">$&</span>');
+    }
+
+    return `<span class="md-code-line">${restoreTokens(html, tokens)}</span>`;
+  };
+
+  const highlightMarkdownLine = (line) => {
+    let html = escapeHtml(line);
+
+    if (/^\s{0,3}#{1,6}\s/.test(line)) {
+      html = html.replace(/^((?:\s{0,3}#{1,6}))(\s+)(.*)$/, '<span class="md-heading-marker">$1</span>$2<span class="md-heading-text">$3</span>');
+    } else if (/^\s*&gt;\s?/.test(html)) {
+      html = html.replace(/^(\s*&gt;)(\s?)(.*)$/, '<span class="md-quote-marker">$1</span>$2<span class="md-quote-text">$3</span>');
+    } else if (/^\s*(?:[-*+]|\d+\.)\s+/.test(line)) {
+      html = html.replace(/^(\s*(?:[-*+]|\d+\.))(\s+)(.*)$/, '<span class="md-list-marker">$1</span>$2<span class="md-list-text">$3</span>');
+    }
+
+    html = html.replace(/(`[^`]+`)/g, '<span class="md-inline-code">$1</span>');
+    html = html.replace(/(\[[^\]]+\]\([^\)]+\))/g, '<span class="md-link">$1</span>');
+    html = html.replace(/(\*\*[^*]+\*\*)/g, '<span class="md-strong">$1</span>');
+    html = html.replace(/(^|[^*])(\*[^*\n]+\*)/g, '$1<span class="md-emphasis">$2</span>');
+
+    return html;
+  };
+
+  const highlightMarkdownSource = (source) => {
+    const lines = String(source || "").split("\n");
+    let inFence = false;
+    let fenceLanguage = "";
+
+    return lines
+      .map((line) => {
+        const trimmed = line.trimStart();
+
+        if (trimmed.startsWith("```")) {
+          const nextLanguage = trimmed.slice(3).trim().toLowerCase();
+          const highlightedFence = `<span class="md-fence">${escapeHtml(line)}</span>`;
+
+          if (!inFence) {
+            inFence = true;
+            fenceLanguage = nextLanguage;
+          } else {
+            inFence = false;
+            fenceLanguage = "";
+          }
+
+          return highlightedFence;
+        }
+
+        return inFence ? highlightCodeLine(line, fenceLanguage) : highlightMarkdownLine(line);
+      })
+      .join("\n");
+  };
+
   const Hooks = {
     AppShell: {
       mounted() {
@@ -375,30 +461,68 @@ document.addEventListener("DOMContentLoaded", () => {
 
     PostEditorContent: {
       mounted() {
-        this.handleInsert = ({ id, content }) => {
-          if (!content || String(id) !== String(this.el.dataset.postEditorId)) {
+        this.textarea = this.el.querySelector("textarea");
+        this.highlight = this.el.querySelector(".post-editor-markdown-highlight");
+
+        this.renderHighlight = () => {
+          if (!this.textarea || !this.highlight) {
             return;
           }
 
-          const start = this.el.selectionStart ?? this.el.value.length;
-          const end = this.el.selectionEnd ?? start;
-          const before = this.el.value.slice(0, start);
-          const after = this.el.value.slice(end);
+          this.highlight.innerHTML = `${highlightMarkdownSource(this.textarea.value)}\n`;
+          this.highlight.scrollTop = this.textarea.scrollTop;
+          this.highlight.scrollLeft = this.textarea.scrollLeft;
+        };
+
+        this.handleInput = () => this.renderHighlight();
+        this.handleScroll = () => {
+          if (!this.textarea || !this.highlight) {
+            return;
+          }
+
+          this.highlight.scrollTop = this.textarea.scrollTop;
+          this.highlight.scrollLeft = this.textarea.scrollLeft;
+        };
+
+        this.handleInsert = ({ id, content }) => {
+          if (!this.textarea || !content || String(id) !== String(this.el.dataset.postEditorId)) {
+            return;
+          }
+
+          const start = this.textarea.selectionStart ?? this.textarea.value.length;
+          const end = this.textarea.selectionEnd ?? start;
+          const before = this.textarea.value.slice(0, start);
+          const after = this.textarea.value.slice(end);
           const separator = before !== "" && !before.endsWith("\n") ? "\n" : "";
           const suffix = after !== "" && !content.endsWith("\n") ? "\n" : "";
           const inserted = `${separator}${content}${suffix}`;
           const nextValue = `${before}${inserted}${after}`;
 
-          this.el.focus();
-          this.el.value = nextValue;
+          this.textarea.focus();
+          this.textarea.value = nextValue;
 
           const caret = before.length + inserted.length;
-          this.el.setSelectionRange(caret, caret);
-          this.el.dispatchEvent(new Event("input", { bubbles: true }));
-          this.el.dispatchEvent(new Event("change", { bubbles: true }));
+          this.textarea.setSelectionRange(caret, caret);
+          this.textarea.dispatchEvent(new Event("input", { bubbles: true }));
+          this.textarea.dispatchEvent(new Event("change", { bubbles: true }));
         };
 
+        this.el.classList.add("is-enhanced");
+        this.textarea?.addEventListener("input", this.handleInput);
+        this.textarea?.addEventListener("scroll", this.handleScroll);
         this.handleEvent("post-editor-insert-content", this.handleInsert);
+        this.renderHighlight();
+      },
+
+      updated() {
+        this.textarea = this.el.querySelector("textarea");
+        this.highlight = this.el.querySelector(".post-editor-markdown-highlight");
+        this.renderHighlight();
+      },
+
+      destroyed() {
+        this.textarea?.removeEventListener("input", this.handleInput);
+        this.textarea?.removeEventListener("scroll", this.handleScroll);
       }
     }
   };
