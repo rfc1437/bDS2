@@ -41,6 +41,11 @@ defmodule BDS.Metadata do
     {:ok, load_state(project)}
   end
 
+  def read_project_metadata_from_filesystem(project_id) do
+    project = Projects.get_project!(project_id)
+    {:ok, load_state_from_filesystem(project)}
+  end
+
   def update_project_metadata(project_id, attrs) do
     project = Projects.get_project!(project_id)
     state = load_state(project)
@@ -131,35 +136,32 @@ defmodule BDS.Metadata do
   def sync_project_metadata_from_filesystem(project_id) do
     project = Projects.get_project!(project_id)
     now = Persistence.now_ms()
-
-    project_metadata_from_files =
-      read_json(project, "project.json") ||
-        stringify_project_metadata(default_project_metadata(project))
-
-    categories_from_files =
-      read_json(project, "categories.json") || %{"categories" => @default_categories}
-
-    category_meta_from_files = read_json(project, "category-meta.json") || %{"categories" => %{}}
-    publishing_from_files = read_json(project, "publishing.json") || %{"ssh_mode" => "scp"}
+    filesystem_state = load_state_from_filesystem(project)
 
     Repo.transaction(fn ->
       updated_project =
         project
         |> Project.changeset(%{
-          name: Map.get(project_metadata_from_files, "name", project.name),
-          description: Map.get(project_metadata_from_files, "description"),
+          name: filesystem_state.name,
+          description: filesystem_state.description,
           updated_at: now
         })
         |> Repo.update!()
 
-      persist_setting(project_id, "project", project_metadata_from_files, now)
-      persist_setting(project_id, "categories", categories_from_files, now)
-      persist_setting(project_id, "category_meta", category_meta_from_files, now)
-      persist_setting(project_id, "publishing", publishing_from_files, now)
-      write_project_json(updated_project, project_metadata_from_files)
-      write_categories_json(updated_project, normalized_categories(categories_from_files))
-      write_category_meta_json(updated_project, normalized_category_settings(category_meta_from_files))
-      write_publishing_json(updated_project, publishing_from_files)
+      persist_setting(project_id, "project", stringify_project_metadata(filesystem_state), now)
+      persist_setting(project_id, "categories", %{"categories" => filesystem_state.categories}, now)
+      persist_setting(
+        project_id,
+        "category_meta",
+        %{"categories" => filesystem_state.category_settings},
+        now
+      )
+
+      persist_setting(project_id, "publishing", filesystem_state.publishing_preferences, now)
+      write_project_json(updated_project, stringify_project_metadata(filesystem_state))
+      write_categories_json(updated_project, filesystem_state.categories)
+      write_category_meta_json(updated_project, filesystem_state.category_settings)
+      write_publishing_json(updated_project, filesystem_state.publishing_preferences)
       load_state(updated_project)
     end)
     |> unwrap_transaction()
@@ -190,6 +192,37 @@ defmodule BDS.Metadata do
       (load_setting(project.id, "category_meta") || %{"categories" => %{}})["categories"]
 
     publishing_preferences = load_setting(project.id, "publishing") || %{"ssh_mode" => "scp"}
+
+    %{
+      name: Map.get(project_metadata, "name", project.name),
+      description: Map.get(project_metadata, "description"),
+      public_url: Map.get(project_metadata, "public_url"),
+      main_language: Map.get(project_metadata, "main_language"),
+      default_author: Map.get(project_metadata, "default_author"),
+      max_posts_per_page:
+        Map.get(project_metadata, "max_posts_per_page", @default_max_posts_per_page),
+      blogmark_category: Map.get(project_metadata, "blogmark_category"),
+      pico_theme: Map.get(project_metadata, "pico_theme"),
+      semantic_similarity_enabled:
+        Map.get(project_metadata, "semantic_similarity_enabled", false),
+      blog_languages: Map.get(project_metadata, "blog_languages", []),
+      categories: categories,
+      category_settings: category_settings,
+      publishing_preferences: publishing_preferences
+    }
+  end
+
+  defp load_state_from_filesystem(project) do
+    project_metadata =
+      read_json(project, "project.json") ||
+        stringify_project_metadata(default_project_metadata(project))
+
+    categories = normalized_categories(read_json(project, "categories.json") || %{"categories" => @default_categories})
+
+    category_settings =
+      normalized_category_settings(read_json(project, "category-meta.json") || %{"categories" => %{}})
+
+    publishing_preferences = read_json(project, "publishing.json") || %{"ssh_mode" => "scp"}
 
     %{
       name: Map.get(project_metadata, "name", project.name),

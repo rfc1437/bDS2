@@ -3,6 +3,7 @@ defmodule BDS.Projects do
 
   import Ecto.Query
 
+  alias BDS.Metadata
   alias BDS.Persistence
   alias BDS.Projects.Project
   alias BDS.Repo
@@ -96,7 +97,7 @@ defmodule BDS.Projects do
       project
     end)
     |> case do
-      {:ok, project} -> {:ok, project}
+      {:ok, project} -> sync_filesystem_metadata(project)
       {:error, reason} -> {:error, reason}
     end
   end
@@ -166,6 +167,15 @@ defmodule BDS.Projects do
       data_path: project.data_path,
       is_active: project.is_active
     }
+  end
+
+  defp sync_filesystem_metadata(%Project{data_path: nil} = project), do: {:ok, project}
+
+  defp sync_filesystem_metadata(%Project{} = project) do
+    case Metadata.sync_project_metadata_from_filesystem(project.id) do
+      {:ok, _metadata} -> {:ok, get_project!(project.id)}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   defp unique_slug(base_slug) do

@@ -4,6 +4,7 @@ defmodule BDS.Maintenance do
   import Ecto.Query
 
   alias BDS.Frontmatter
+  alias BDS.Metadata
   alias BDS.Media.Media
   alias BDS.Media.Translation, as: MediaTranslation
   alias BDS.Embeddings
@@ -30,7 +31,8 @@ defmodule BDS.Maintenance do
     project = Projects.get_project!(project_id)
 
     diff_reports =
-      post_diff_reports(project_id, project) ++
+      project_metadata_diff_reports(project_id) ++
+        post_diff_reports(project_id, project) ++
         post_translation_diff_reports(project_id, project) ++
         media_diff_reports(project_id, project) ++
         media_translation_diff_reports(project_id, project) ++
@@ -41,6 +43,71 @@ defmodule BDS.Maintenance do
     orphan_reports = orphan_reports(project_id, project)
 
     {:ok, %{diff_reports: diff_reports, orphan_reports: orphan_reports}}
+  end
+
+  defp project_metadata_diff_reports(project_id) do
+    {:ok, db_state} = Metadata.get_project_metadata(project_id)
+    {:ok, filesystem_state} = Metadata.read_project_metadata_from_filesystem(project_id)
+
+    [
+      build_diff_report("project", project_id, [
+        diff_field("name", db_state.name, filesystem_state.name),
+        diff_field("description", db_state.description, filesystem_state.description),
+        diff_field("public_url", db_state.public_url, filesystem_state.public_url),
+        diff_field("main_language", db_state.main_language, filesystem_state.main_language),
+        diff_field("default_author", db_state.default_author, filesystem_state.default_author),
+        diff_field(
+          "max_posts_per_page",
+          db_state.max_posts_per_page,
+          filesystem_state.max_posts_per_page
+        ),
+        diff_field(
+          "blogmark_category",
+          db_state.blogmark_category,
+          filesystem_state.blogmark_category
+        ),
+        diff_field("pico_theme", db_state.pico_theme, filesystem_state.pico_theme),
+        diff_field(
+          "semantic_similarity_enabled",
+          db_state.semantic_similarity_enabled,
+          filesystem_state.semantic_similarity_enabled
+        ),
+        diff_field("blog_languages", db_state.blog_languages, filesystem_state.blog_languages)
+      ]),
+      build_diff_report("categories", project_id, [
+        diff_field("categories", db_state.categories, filesystem_state.categories)
+      ]),
+      build_diff_report("category_meta", project_id, [
+        diff_field(
+          "category_settings",
+          db_state.category_settings,
+          filesystem_state.category_settings
+        )
+      ]),
+      build_diff_report("publishing", project_id, [
+        diff_field(
+          "ssh_host",
+          Map.get(db_state.publishing_preferences, "ssh_host"),
+          Map.get(filesystem_state.publishing_preferences, "ssh_host")
+        ),
+        diff_field(
+          "ssh_user",
+          Map.get(db_state.publishing_preferences, "ssh_user"),
+          Map.get(filesystem_state.publishing_preferences, "ssh_user")
+        ),
+        diff_field(
+          "ssh_remote_path",
+          Map.get(db_state.publishing_preferences, "ssh_remote_path"),
+          Map.get(filesystem_state.publishing_preferences, "ssh_remote_path")
+        ),
+        diff_field(
+          "ssh_mode",
+          Map.get(db_state.publishing_preferences, "ssh_mode"),
+          Map.get(filesystem_state.publishing_preferences, "ssh_mode")
+        )
+      ])
+    ]
+    |> Enum.reject(&is_nil/1)
   end
 
   defp normalize_entity_type(:post), do: :post
@@ -366,6 +433,16 @@ defmodule BDS.Maintenance do
     |> Enum.map(&%{file_path: &1})
   end
 
+  defp build_diff_report(entity_type, entity_id, differences) do
+    normalized = Enum.reject(differences, &is_nil/1)
+
+    if normalized == [] do
+      nil
+    else
+      %{entity_type: entity_type, entity_id: entity_id, differences: normalized}
+    end
+  end
+
   defp diff_field(name, db_value, file_value) do
     if equal_diff_values?(db_value, file_value) do
       nil
@@ -376,6 +453,10 @@ defmodule BDS.Maintenance do
 
   defp equal_diff_values?(left, right) when is_list(left) and is_list(right) do
     normalize_list_diff_values(left) == normalize_list_diff_values(right)
+  end
+
+  defp equal_diff_values?(left, right) when is_map(left) and is_map(right) do
+    normalize_map_diff_values(left) == normalize_map_diff_values(right)
   end
 
   defp equal_diff_values?(left, right), do: stringify_value(left) == stringify_value(right)
@@ -392,10 +473,25 @@ defmodule BDS.Maintenance do
   defp stringify_value(value) when is_integer(value), do: Integer.to_string(value)
   defp stringify_value(value) when is_binary(value), do: value
 
+  defp stringify_value(value) when is_map(value),
+    do: value |> normalize_map_diff_values() |> Jason.encode!()
+
   defp stringify_value(value) when is_list(value),
     do: Enum.map_join(value, ",", &stringify_value/1)
 
   defp stringify_value(value), do: to_string(value)
+
+  defp normalize_map_diff_values(values) when is_map(values) do
+    values
+    |> Enum.map(fn {key, value} -> {to_string(key), normalize_nested_diff_value(value)} end)
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Map.new()
+  end
+
+  defp normalize_nested_diff_value(value) when is_map(value), do: normalize_map_diff_values(value)
+  defp normalize_nested_diff_value(value) when is_list(value), do: Enum.map(value, &normalize_nested_diff_value/1)
+  defp normalize_nested_diff_value(value) when is_atom(value), do: Atom.to_string(value)
+  defp normalize_nested_diff_value(value), do: value
 
   defp read_frontmatter_document(project, relative_path) do
     full_path = Path.join(Projects.project_data_dir(project), relative_path)

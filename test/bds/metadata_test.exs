@@ -221,6 +221,9 @@ defmodule BDS.MetadataTest do
   test "sync_project_metadata_from_filesystem materializes the canonical metadata files when missing",
        %{project: project, temp_dir: temp_dir} do
     meta_dir = Path.join(temp_dir, "meta")
+
+    File.rm_rf!(meta_dir)
+
     refute File.exists?(Path.join(meta_dir, "project.json"))
     refute File.exists?(Path.join(meta_dir, "categories.json"))
     refute File.exists?(Path.join(meta_dir, "category-meta.json"))

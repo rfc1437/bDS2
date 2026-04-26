@@ -3,6 +3,7 @@ defmodule BDS.ProjectsTest do
 
   import Ecto.Query
 
+  alias BDS.Metadata
   alias BDS.Projects.Project
   alias BDS.Repo
   alias BDS.Templates.Template
@@ -156,5 +157,61 @@ defmodule BDS.ProjectsTest do
     assert deleted_external_project.id == external_project.id
     assert BDS.Projects.get_project(external_project.id) == nil
     assert File.read!(marker_path) == "preserve me"
+  end
+
+  test "create_project loads project metadata from an existing filesystem-backed blog", %{temp_root: temp_root} do
+    external_dir = Path.join(temp_root, "imported-blog")
+    meta_dir = Path.join(external_dir, "meta")
+    File.mkdir_p!(meta_dir)
+
+    File.write!(
+      Path.join(meta_dir, "project.json"),
+      Jason.encode!(%{
+        "name" => "Imported Blog",
+        "description" => "Filesystem metadata",
+        "publicUrl" => "https://imported.example",
+        "mainLanguage" => "de",
+        "defaultAuthor" => "Importer",
+        "maxPostsPerPage" => 17,
+        "blogmarkCategory" => "notes",
+        "picoTheme" => "slate",
+        "semanticSimilarityEnabled" => true,
+        "blogLanguages" => ["en", "fr"]
+      })
+    )
+
+    File.write!(
+      Path.join(meta_dir, "publishing.json"),
+      Jason.encode!(%{
+        "sshHost" => "upload.example",
+        "sshUser" => "deploy",
+        "sshRemotePath" => "/srv/imported",
+        "sshMode" => "rsync"
+      })
+    )
+
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Placeholder", data_path: external_dir})
+
+    assert BDS.Projects.get_project!(project.id).name == "Imported Blog"
+
+    assert {:ok, metadata} = Metadata.get_project_metadata(project.id)
+    assert metadata.name == "Imported Blog"
+    assert metadata.description == "Filesystem metadata"
+    assert metadata.public_url == "https://imported.example"
+    assert metadata.main_language == "de"
+    assert metadata.default_author == "Importer"
+    assert metadata.max_posts_per_page == 17
+    assert metadata.blogmark_category == "notes"
+    assert metadata.pico_theme == "slate"
+    assert metadata.semantic_similarity_enabled == true
+    assert metadata.blog_languages == ["en", "fr"]
+
+    assert metadata.publishing_preferences == %{
+             "ssh_host" => "upload.example",
+             "ssh_user" => "deploy",
+             "ssh_remote_path" => "/srv/imported",
+             "ssh_mode" => "rsync"
+           }
   end
 end

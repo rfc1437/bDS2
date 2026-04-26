@@ -749,6 +749,70 @@ defmodule BDS.MaintenanceTest do
            end)
   end
 
+  test "metadata_diff includes project-level metadata drift", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{
+               name: "Database Blog",
+               description: "Database description",
+               public_url: "https://database.example",
+               main_language: "en",
+               default_author: "Database Author",
+               max_posts_per_page: 25,
+               blogmark_category: "article",
+               pico_theme: "blue",
+               semantic_similarity_enabled: false,
+               blog_languages: ["de"]
+             })
+
+    assert {:ok, _metadata} =
+             BDS.Metadata.set_publishing_preferences(project.id, %{
+               ssh_host: "db.example",
+               ssh_user: "db-user",
+               ssh_remote_path: "/srv/db",
+               ssh_mode: "scp"
+             })
+
+    meta_dir = Path.join(temp_dir, "meta")
+
+    File.write!(
+      Path.join(meta_dir, "project.json"),
+      Jason.encode!(%{
+        "name" => "Filesystem Blog",
+        "description" => "Filesystem description",
+        "publicUrl" => "https://filesystem.example",
+        "mainLanguage" => "fr",
+        "defaultAuthor" => "Filesystem Author",
+        "maxPostsPerPage" => 12,
+        "blogmarkCategory" => "notes",
+        "picoTheme" => "slate",
+        "semanticSimilarityEnabled" => true,
+        "blogLanguages" => ["it"]
+      })
+    )
+
+    File.write!(
+      Path.join(meta_dir, "publishing.json"),
+      Jason.encode!(%{
+        "sshHost" => "files.example",
+        "sshUser" => "files-user",
+        "sshRemotePath" => "/srv/files",
+        "sshMode" => "rsync"
+      })
+    )
+
+    assert {:ok, diff} = BDS.Maintenance.metadata_diff(project.id)
+
+    assert Enum.any?(diff.diff_reports, fn report ->
+             report.entity_type == "project" and
+               Enum.any?(report.differences, &(&1.name == "main_language" and &1.db_value == "en" and &1.file_value == "fr"))
+           end)
+
+    assert Enum.any?(diff.diff_reports, fn report ->
+             report.entity_type == "publishing" and
+               Enum.any?(report.differences, &(&1.name == "ssh_mode" and &1.db_value == "scp" and &1.file_value == "rsync"))
+           end)
+  end
+
   defp collect_progress_events(acc \\ []) do
     receive do
       {:rebuild_progress, value, message} -> collect_progress_events([{value, message} | acc])
