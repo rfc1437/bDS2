@@ -839,6 +839,82 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="task-list") or html =~ "No background tasks running"
   end
 
+  test "metadata diff tasks localize task text, show progress, and open the diff result in the UI" do
+    parent = self()
+    :ok = BDS.Tasks.clear_finished()
+
+    {:ok, _task} =
+      BDS.Tasks.submit_task(
+        "Metadata Diff",
+        fn report ->
+          send(parent, {:metadata_diff_worker, self()})
+          report.(0.35, "Comparing database and filesystem metadata")
+
+          receive do
+            :finish ->
+              %{
+                kind: "open_editor",
+                action: "metadata_diff",
+                project_id: "test-project",
+                route: "metadata_diff",
+                title: "Metadata Diff",
+                subtitle: "Database state compared against filesystem metadata",
+                editorMeta: [
+                  %{label: "Diffs", value: "1"},
+                  %{label: "Orphans", value: "1"}
+                ],
+                payload: %{
+                  summary: %{diff_count: 1, orphan_count: 1},
+                  diff_reports: [
+                    %{
+                      entity_type: "post",
+                      entity_id: "post-1",
+                      differences: [
+                        %{field: "slug", db_value: "hello-db", file_value: "hello-file"}
+                      ]
+                    }
+                  ],
+                  orphan_reports: [
+                    %{path: "posts/2026/04/orphan.md", entity_type: "post"}
+                  ]
+                }
+              }
+          end
+        end,
+        %{group_name: "Maintenance"}
+      )
+
+    assert_receive {:metadata_diff_worker, worker_pid}
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html = render_change(view, "change_ui_language", %{"ui_language" => "de"})
+
+    send(view.pid, :refresh_task_status)
+
+    html =
+      view
+      |> element("[data-testid='status-task-button']")
+      |> render_click()
+
+    assert html =~ "Metadaten-Diff"
+    assert html =~ "Vergleicht Datenbank- und Dateisystem-Metadaten"
+    assert html =~ "35%"
+    assert html =~ ~s(task-status-running)
+
+    send(worker_pid, :finish)
+    send(view.pid, :refresh_task_status)
+
+    html = render(view)
+
+    assert html =~ ~s(data-tab-type="metadata_diff")
+    assert html =~ "Metadaten-Diff"
+    assert html =~ "slug"
+    assert html =~ "hello-db"
+    assert html =~ "hello-file"
+    assert html =~ "posts/2026/04/orphan.md"
+  end
+
   test "post tabs render a real editor and drive save publish discard flows", %{project: project} do
     assert {:ok, _tag} = Tags.create_tag(%{project_id: project.id, name: "alpha", color: "#112233"})
     assert {:ok, _tag} = Tags.create_tag(%{project_id: project.id, name: "beta", color: "#445566"})

@@ -44,7 +44,9 @@ defmodule BDS.Desktop.ShellLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket) do
+    connected = connected?(socket)
+
+    if connected do
       :timer.send_interval(@refresh_interval, :refresh_task_status)
     end
 
@@ -55,7 +57,8 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:page_title, ShellData.title())
      |> assign(:page_language, ShellData.ui_language())
       |> assign(:client_shortcuts, Commands.client_shortcuts())
-    |> assign(:offline_mode, AI.airplane_mode?(true))
+    |> assign(:offline_mode, if(connected, do: AI.airplane_mode?(true), else: true))
+      |> assign(:handled_task_results, initial_handled_task_results())
       |> assign(:assistant_prompt, "")
       |> assign(:assistant_messages, [])
     |> assign(:is_mac_ui, mac_ui?())
@@ -1003,19 +1006,30 @@ defmodule BDS.Desktop.ShellLive do
 
   @impl true
   def handle_info(:refresh_task_status, socket) do
-    task_status = BDS.Tasks.status_snapshot()
+    raw_task_status = BDS.Tasks.status_snapshot()
 
-    {:noreply,
-     socket
-     |> assign(:task_status, task_status)
-     |> assign(:editor_meta, ShellData.editor_meta(task_status))
-     |> assign(
-       :status,
-       ShellData.status_bar(socket.assigns.workbench, task_status, socket.assigns.dashboard,
-         ui_language: socket.assigns.page_language,
-         offline_mode: socket.assigns.offline_mode
-       )
-     )}
+    case next_completed_task_result(socket, raw_task_status) do
+      nil ->
+        task_status = localize_task_status(raw_task_status, socket.assigns.page_language)
+
+        {:noreply,
+         socket
+         |> assign(:task_status, task_status)
+         |> assign(:editor_meta, ShellData.editor_meta(task_status))
+         |> assign(
+           :status,
+           ShellData.status_bar(socket.assigns.workbench, task_status, socket.assigns.dashboard,
+             ui_language: socket.assigns.page_language,
+             offline_mode: socket.assigns.offline_mode
+           )
+         )}
+
+      task ->
+        {:noreply,
+         socket
+         |> mark_task_result_handled(task.id)
+         |> apply_shell_command_result(task.result)}
+    end
   end
 
   @impl true
@@ -1031,10 +1045,17 @@ defmodule BDS.Desktop.ShellLive do
     active_view_id = Atom.to_string(workbench.active_view)
     sidebar_data = ShellData.sidebar_view(projects.active_project_id, active_view_id, ShellSidebarState.current_filters(socket, active_view_id))
     sidebar_data = ShellSidebarState.merge_ui_state(socket, active_view_id, sidebar_data)
-    task_status = BDS.Tasks.status_snapshot()
+    raw_task_status = BDS.Tasks.status_snapshot()
     activity_buttons = Workbench.activity_buttons(workbench, git_badge_count)
     page_language = socket.assigns[:page_language] || ShellData.ui_language()
-    offline_mode = Map.get(socket.assigns, :offline_mode, AI.airplane_mode?(true))
+    offline_mode =
+      if connected?(socket) do
+        Map.get(socket.assigns, :offline_mode, AI.airplane_mode?(true))
+      else
+        Map.get(socket.assigns, :offline_mode, true)
+      end
+
+    task_status = localize_task_status(raw_task_status, page_language)
 
     socket
     |> assign(:workbench, workbench)
@@ -1118,9 +1139,15 @@ defmodule BDS.Desktop.ShellLive do
           <div class="panel-entry task-entry">
             <div class="task-entry-header">
               <strong><%= task.name %></strong>
-              <span class={"task-status task-status-#{task.status}"}><%= task.status |> to_string() |> String.capitalize() %></span>
+              <span class={"task-status task-status-#{task.status}"}><%= Map.get(task, :status_label, task.status |> to_string() |> String.capitalize()) %></span>
             </div>
             <span><%= task.message || task.group_name || "" %></span>
+            <%= if is_number(task.progress) do %>
+              <div class="task-progress-row">
+                <progress max="1" value={task.progress}></progress>
+                <span><%= Map.get(task, :progress_label, progress_percent(task.progress)) %></span>
+              </div>
+            <% end %>
           </div>
         <% end %>
       </div>
@@ -1574,17 +1601,17 @@ defmodule BDS.Desktop.ShellLive do
       |> Workbench.set_panel_tab(String.to_existing_atom(panel_tab))
 
     socket
-    |> append_output_entry(title, message)
+    |> append_output_entry(translate_for_socket(socket, title), translate_for_socket(socket, message))
     |> reload_shell(workbench)
   end
 
   defp apply_shell_command_result(socket, %{kind: "output", title: title, message: message} = result) do
     socket
-    |> append_output_entry(title, message, Map.get(result, :details), Map.get(result, :level, "info"))
+    |> append_output_entry(translate_for_socket(socket, title), translate_for_socket(socket, message), Map.get(result, :details), Map.get(result, :level, "info"))
   end
 
   defp apply_shell_command_result(socket, %{kind: "open_url", title: title, message: message, url: url}) do
-    append_output_entry(socket, title, message, url)
+    append_output_entry(socket, translate_for_socket(socket, title), translate_for_socket(socket, message), url)
   end
 
   defp apply_shell_command_result(socket, %{kind: "open_editor", route: route, title: title, subtitle: subtitle} = result) do
@@ -1594,12 +1621,12 @@ defmodule BDS.Desktop.ShellLive do
 
     tab_meta =
       Map.put(socket.assigns.tab_meta, {route_atom, tab_id}, %{
-        title: title,
-        subtitle: subtitle,
+        title: translate_for_socket(socket, title),
+        subtitle: translate_for_socket(socket, subtitle),
         action: Map.get(result, :action),
         payload: Map.get(result, :payload),
         project_id: Map.get(result, :project_id),
-        editor_meta: Map.get(result, :editorMeta, [])
+        editor_meta: translate_editor_meta(Map.get(result, :editorMeta, []), socket.assigns.page_language)
       })
 
     socket
@@ -1608,6 +1635,90 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp apply_shell_command_result(socket, _result), do: socket
+
+  defp initial_handled_task_results do
+    BDS.Tasks.status_snapshot()
+    |> Map.get(:tasks, [])
+    |> Enum.filter(fn task -> task.status == :completed and is_map(task.result) end)
+    |> Enum.map(& &1.id)
+    |> MapSet.new()
+  end
+
+  defp next_completed_task_result(socket, task_status) do
+    handled = Map.get(socket.assigns, :handled_task_results, MapSet.new())
+
+    Enum.find(Map.get(task_status, :tasks, []), fn task ->
+      task.status == :completed and is_map(task.result) and not MapSet.member?(handled, task.id)
+    end)
+  end
+
+  defp mark_task_result_handled(socket, task_id) do
+    handled = Map.get(socket.assigns, :handled_task_results, MapSet.new())
+    assign(socket, :handled_task_results, MapSet.put(handled, task_id))
+  end
+
+  defp localize_task_status(task_status, locale) do
+    tasks = Enum.map(Map.get(task_status, :tasks, []), &localize_task(&1, locale))
+    active = Enum.filter(tasks, &(&1.status in [:running, :pending]))
+
+    task_status
+    |> Map.put(:tasks, tasks)
+    |> Map.put(:running_task_message, localized_running_task_message(active, locale))
+  end
+
+  defp localize_task(task, locale) do
+    progress = Map.get(task, :progress)
+
+    task
+    |> Map.put(:name, ShellData.translate(task.name, %{}, locale))
+    |> Map.put(:message, localize_task_message(Map.get(task, :message), locale))
+    |> Map.put(:group_name, localize_task_group(Map.get(task, :group_name), locale))
+    |> Map.put(:status_label, localize_task_status_label(task.status, locale))
+    |> Map.put(:progress_label, if(is_number(progress), do: progress_percent(progress), else: nil))
+  end
+
+  defp localize_task_message(nil, _locale), do: nil
+  defp localize_task_message("", _locale), do: ""
+  defp localize_task_message(message, locale), do: ShellData.translate(message, %{}, locale)
+
+  defp localize_task_group(nil, _locale), do: nil
+  defp localize_task_group(group, locale), do: ShellData.translate(group, %{}, locale)
+
+  defp localize_task_status_label(status, locale) do
+    status
+    |> to_string()
+    |> String.capitalize()
+    |> ShellData.translate(%{}, locale)
+  end
+
+  defp localized_running_task_message([], _locale), do: nil
+
+  defp localized_running_task_message([task | _rest], locale) do
+    cond do
+      task.status == :pending -> ShellData.translate("Queued", %{}, locale) <> ": " <> task.name
+      is_binary(task.message) and task.message != "" -> task.name <> ": " <> task.message
+      true -> task.name
+    end
+  end
+
+  defp translate_editor_meta(items, locale) do
+    Enum.map(items, fn item ->
+      item
+      |> Map.update(:label, nil, &ShellData.translate(&1, %{}, locale))
+      |> Map.update(:value, nil, &translate_editor_meta_value(&1, locale))
+    end)
+  end
+
+  defp translate_editor_meta_value(value, locale) when is_binary(value), do: ShellData.translate(value, %{}, locale)
+  defp translate_editor_meta_value(value, _locale), do: value
+
+  defp translate_for_socket(socket, text) when is_binary(text), do: ShellData.translate(text, %{}, socket.assigns.page_language)
+  defp translate_for_socket(_socket, text), do: text
+
+  defp progress_percent(progress) when is_number(progress) do
+    percentage = progress |> Kernel.*(100) |> round()
+    Integer.to_string(percentage) <> "%"
+  end
 
   defp command_title(action) do
     action
