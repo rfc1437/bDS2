@@ -121,6 +121,13 @@ button {
   z-index: 2;
 }
 
+.window-titlebar-menu-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
 .window-titlebar-menu-bar.is-hidden {
   display: none;
 }
@@ -161,7 +168,7 @@ button {
 .window-titlebar-menu-dropdown {
   position: absolute;
   top: 30px;
-  left: var(--bds-titlebar-menu-left, 6px);
+  left: 0;
   min-width: 210px;
   padding: 6px;
   display: flex;

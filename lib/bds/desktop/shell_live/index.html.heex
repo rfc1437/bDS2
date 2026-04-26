@@ -13,19 +13,53 @@
     >
       <div class="window-titlebar-menu-bar" data-testid="window-titlebar-menu-bar">
         <%= for group <- @menu_groups do %>
-          <button
-            class={[
-              "window-titlebar-menu-button",
-              if(@titlebar_menu_group == Atom.to_string(group.id), do: "is-active")
-            ]}
-            data-testid="window-titlebar-menu-button"
-            data-menu-group={group.id}
-            type="button"
-            phx-click="toggle_titlebar_menu"
-            phx-mouseenter="hover_titlebar_menu"
-            phx-value-group={group.id}
-            aria-label={group.label}
-          ><%= group.label %></button>
+          <div class="window-titlebar-menu-group">
+            <button
+              class={[
+                "window-titlebar-menu-button",
+                if(@titlebar_menu_group == Atom.to_string(group.id), do: "is-active")
+              ]}
+              data-testid="window-titlebar-menu-button"
+              data-menu-group={group.id}
+              type="button"
+              phx-click="toggle_titlebar_menu"
+              phx-mouseenter="hover_titlebar_menu"
+              phx-value-group={group.id}
+              aria-label={group.label}
+            ><%= group.label %></button>
+
+            <%= if @titlebar_menu_group == Atom.to_string(group.id) do %>
+              <div
+                class="window-titlebar-menu-dropdown"
+                data-testid="window-titlebar-menu-dropdown"
+                phx-click-away="close_titlebar_menu"
+              >
+                <%= for item <- titlebar_menu_dropdown_items(group) do %>
+                  <%= if item.separator do %>
+                    <div class="window-titlebar-menu-separator"></div>
+                  <% else %>
+                    <button
+                      class={[
+                        "window-titlebar-menu-item",
+                        if(@titlebar_menu_item_index == item.keyboard_index, do: "is-keyboard-active")
+                      ]}
+                      data-testid="window-titlebar-menu-item"
+                      data-menu-action={item.id}
+                      type="button"
+                      phx-click="titlebar_menu_action"
+                      phx-value-action={item.id}
+                      aria-label={item.label}
+                    >
+                      <span class="window-titlebar-menu-item-label"><%= item.label %></span>
+                      <%= if item.shortcut do %>
+                        <span class="window-titlebar-menu-item-accelerator"><%= item.shortcut %></span>
+                      <% end %>
+                    </button>
+                  <% end %>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
         <% end %>
       </div>
       <div class="window-titlebar-drag-region"></div>
@@ -68,37 +102,6 @@
           </span>
         </button>
       </div>
-      <%= if group = active_titlebar_menu_group(assigns) do %>
-        <div
-          class="window-titlebar-menu-dropdown"
-          data-testid="window-titlebar-menu-dropdown"
-          phx-click-away="close_titlebar_menu"
-        >
-          <%= for item <- titlebar_menu_dropdown_items(group) do %>
-            <%= if item.separator do %>
-              <div class="window-titlebar-menu-separator"></div>
-            <% else %>
-              <button
-                class={[
-                  "window-titlebar-menu-item",
-                  if(@titlebar_menu_item_index == item.keyboard_index, do: "is-keyboard-active")
-                ]}
-                data-testid="window-titlebar-menu-item"
-                data-menu-action={item.id}
-                type="button"
-                phx-click="titlebar_menu_action"
-                phx-value-action={item.id}
-                aria-label={item.label}
-              >
-                <span class="window-titlebar-menu-item-label"><%= item.label %></span>
-                <%= if item.shortcut do %>
-                  <span class="window-titlebar-menu-item-accelerator"><%= item.shortcut %></span>
-                <% end %>
-              </button>
-            <% end %>
-          <% end %>
-        </div>
-      <% end %>
     </div>
   <% end %>
 

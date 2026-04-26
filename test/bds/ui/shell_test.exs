@@ -170,11 +170,14 @@ defmodule BDS.UI.ShellTest do
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
-    assert css =~ "left: var(--bds-titlebar-menu-left, 6px);"
-    assert live_js =~ "--bds-titlebar-menu-left"
+    assert css =~ ".window-titlebar-menu-group {"
+    assert css =~ "left: 0;"
+    refute live_js =~ "--bds-titlebar-menu-left"
+    refute live_js =~ "syncTitlebarMenuAnchor"
     refute live_js =~ "handleTitlebarMenuKeyDown"
     refute live_js =~ "keyboardMenuIndex"
     assert template =~ "phx-window-keydown={if(@titlebar_menu_group, do: \"titlebar_menu_keydown\")}"
+    assert template =~ "window-titlebar-menu-group"
     assert live_ex =~ ~s(def handle_event("titlebar_menu_keydown")
     assert live_ex =~ "titlebar_menu_item_index"
   end

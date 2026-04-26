@@ -129,28 +129,6 @@ document.addEventListener("DOMContentLoaded", () => {
         this.syncStoredUiLanguage();
         this.destroyOverlaySync = syncTitlebarOverlayInsets();
 
-        this.syncTitlebarMenuAnchor = () => {
-          const titlebar = this.el.querySelector("[data-testid='window-titlebar']");
-          const dropdown = this.el.querySelector("[data-testid='window-titlebar-menu-dropdown']");
-          const openGroup = titlebar?.dataset.openMenuGroup;
-
-          if (!dropdown || !titlebar || !openGroup) {
-            return;
-          }
-
-          const button = this.getTitlebarMenuButtons().find((candidate) => candidate.dataset.menuGroup === openGroup);
-
-          if (!button) {
-            return;
-          }
-
-          const titlebarRect = titlebar.getBoundingClientRect();
-          const buttonRect = button.getBoundingClientRect();
-          const left = Math.max(6, Math.round(buttonRect.left - titlebarRect.left));
-
-          dropdown.style.setProperty("--bds-titlebar-menu-left", `${left}px`);
-        };
-
         this.handleMouseDown = (event) => {
           const handle = event.target.closest("[data-role='resize-handle']");
 
@@ -241,11 +219,6 @@ document.addEventListener("DOMContentLoaded", () => {
         window.addEventListener("bds:native-menu-action", this.handleNativeMenuAction);
         window.addEventListener("keydown", this.handleShortcutKeyDown, true);
         this.el.addEventListener("change", this.handleChange);
-        this.syncTitlebarMenuAnchor();
-      },
-
-      updated() {
-        this.syncTitlebarMenuAnchor();
       },
 
       destroyed() {
