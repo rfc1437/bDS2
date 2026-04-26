@@ -101,7 +101,9 @@ defmodule BDS.DesktopTest do
 
     assert conn.status == 200
     assert conn.resp_body =~ ~s(class="app")
-    assert conn.resp_body =~ ~s(class="window-titlebar")
+    assert conn.resp_body =~ ~s(data-testid="window-titlebar")
+    assert conn.resp_body =~ ~s(class="window-titlebar is-mac")
+    refute conn.resp_body =~ ~s(data-testid="window-titlebar-menu-bar")
     assert conn.resp_body =~ ~s(class="activity-bar")
     assert conn.resp_body =~ ~s(class="sidebar")
     assert conn.resp_body =~ ~s(class="status-bar")

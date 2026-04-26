@@ -2,6 +2,8 @@
     "chat.tools.terminal.autoApprove": {
         "mix": true,
         "allium": true,
-        "command": true
+        "command": true,
+        "printf": true,
+        "git ls-tree": true
     }
 }

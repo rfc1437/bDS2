@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive do
   import Phoenix.HTML
 
   alias BDS.Desktop.{FolderPicker, ShellCommands, ShellData}
+  alias BDS.Desktop.MenuBar, as: DesktopMenuBar
   alias BDS.Git
   alias BDS.Media.Media
   alias BDS.PostLinks
@@ -46,6 +47,9 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:page_language, ShellData.ui_language())
       |> assign(:client_shortcuts, Commands.client_shortcuts())
      |> assign(:offline_mode, true)
+    |> assign(:is_mac_ui, mac_ui?())
+    |> assign(:menu_groups, titlebar_menu_groups())
+    |> assign(:titlebar_menu_group, nil)
      |> assign(:tab_meta, %{})
       |> assign(:project_menu_open, false)
       |> assign(:sidebar_filters_by_view, %{})
@@ -337,6 +341,33 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, handle_native_menu_action(socket, action)}
   end
 
+  def handle_event("toggle_titlebar_menu", %{"group" => group}, socket) do
+    next_group = if socket.assigns.titlebar_menu_group == group, do: nil, else: group
+    {:noreply, assign(socket, :titlebar_menu_group, next_group)}
+  end
+
+  def handle_event("hover_titlebar_menu", %{"group" => group}, socket) do
+    socket =
+      if socket.assigns.titlebar_menu_group do
+        assign(socket, :titlebar_menu_group, group)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("close_titlebar_menu", _params, socket) do
+    {:noreply, assign(socket, :titlebar_menu_group, nil)}
+  end
+
+  def handle_event("titlebar_menu_action", %{"action" => action}, socket) do
+    {:noreply,
+     socket
+     |> assign(:titlebar_menu_group, nil)
+     |> handle_native_menu_action(action)}
+  end
+
   @impl true
   def handle_info(:refresh_task_status, socket) do
     task_status = BDS.Tasks.status_snapshot()
@@ -395,6 +426,7 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:activity_buttons, activity_buttons)
     |> assign(:panel_tabs, ShellData.panel_tabs(workbench))
     |> assign(:supported_ui_languages, ShellData.supported_ui_languages())
+    |> assign(:menu_groups, socket.assigns[:menu_groups] || titlebar_menu_groups())
     |> assign(:current_tab, current_tab(workbench))
   end
 
@@ -1347,6 +1379,21 @@ defmodule BDS.Desktop.ShellLive do
     |> String.replace("_", " ")
     |> String.split()
     |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp titlebar_menu_groups do
+    DesktopMenuBar.groups(dev_mode?: Application.get_env(:bds, :dev_routes, false))
+  end
+
+  defp active_titlebar_menu_group(assigns) do
+    Enum.find(assigns.menu_groups || [], fn group -> Atom.to_string(group.id) == assigns.titlebar_menu_group end)
+  end
+
+  defp mac_ui? do
+    case Application.get_env(:bds, :shell_platform) do
+      nil -> match?({:unix, :darwin}, :os.type())
+      platform -> match?({:unix, :darwin}, platform)
+    end
   end
 
   defp post_link_entries(assigns) do

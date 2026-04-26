@@ -25,6 +25,16 @@ defmodule BDS.Desktop.ShellLiveTest do
     {:ok, project} = Projects.create_project(%{name: "Shell Project", data_path: temp_dir})
     {:ok, _project} = Projects.set_active_project(project.id)
 
+    original_shell_platform = Application.get_env(:bds, :shell_platform)
+
+    on_exit(fn ->
+      if is_nil(original_shell_platform) do
+        Application.delete_env(:bds, :shell_platform)
+      else
+        Application.put_env(:bds, :shell_platform, original_shell_platform)
+      end
+    end)
+
     %{project: project, temp_dir: temp_dir}
   end
 
@@ -93,6 +103,59 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     refute html =~ ~s(data-tab-type="settings")
     assert html =~ ~s(class="tab-bar-empty")
+  end
+
+  test "titlebar menu stays hidden on macos because the native menu owns it" do
+    {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert html =~ ~s(class="window-titlebar is-mac")
+    refute html =~ ~s(data-testid="window-titlebar-menu-bar")
+    refute html =~ ~s(data-testid="window-titlebar-menu-button")
+    refute html =~ ~s(data-testid="window-titlebar-menu-dropdown")
+
+    html =
+      render_hook(view, "native_menu_action", %{"action" => "edit_preferences"})
+
+    assert html =~ ~s(data-tab-type="settings")
+    assert html =~ ">Settings<"
+  end
+
+  test "titlebar menu matches the old shell contract on windows and linux" do
+    Application.put_env(:bds, :shell_platform, {:unix, :linux})
+
+    {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    refute html =~ ~s(class="window-titlebar is-mac")
+    assert html =~ ~s(data-testid="window-titlebar-menu-bar")
+    assert html =~ ~s(data-testid="window-titlebar-menu-button")
+    assert html =~ ~s(data-menu-group="file")
+    assert html =~ ~s(>File<)
+
+    html =
+      view
+      |> element("[data-testid='window-titlebar-menu-button'][data-menu-group='file']")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="window-titlebar-menu-dropdown")
+    assert html =~ ~s(data-testid="window-titlebar-menu-item")
+    assert html =~ ~s(data-menu-action="new_post")
+    assert html =~ ~s(>New Post<)
+
+    html =
+      view
+      |> element("[data-testid='window-titlebar-menu-button'][data-menu-group='edit']")
+      |> render_click()
+
+    assert html =~ ~s(data-menu-action="edit_preferences")
+
+    html =
+      view
+      |> element("[data-testid='window-titlebar-menu-item'][data-menu-action='edit_preferences']")
+      |> render_click()
+
+    assert html =~ ~s(data-tab-type="settings")
+    assert html =~ ">Settings<"
+    refute html =~ ~s(data-testid="window-titlebar-menu-dropdown")
   end
 
   test "sidebar open supports preview and pin intents for entity tabs" do

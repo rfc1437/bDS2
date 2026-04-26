@@ -1,12 +1,29 @@
 <div class="app" id="bds-shell-app" phx-hook="AppShell" data-shortcuts={encoded_shortcuts(@client_shortcuts)}>
-  <div class="window-titlebar" data-region="title-bar">
-    <div class="window-titlebar-menu-bar is-hidden">
-      <button class="window-titlebar-menu-button" type="button">File</button>
-      <button class="window-titlebar-menu-button" type="button">Edit</button>
-      <button class="window-titlebar-menu-button" type="button">View</button>
-      <button class="window-titlebar-menu-button" type="button">Blog</button>
-      <button class="window-titlebar-menu-button" type="button">Help</button>
-    </div>
+  <div
+    class={["window-titlebar", if(@is_mac_ui, do: "is-mac")]}
+    data-region="title-bar"
+    data-testid="window-titlebar"
+    data-open-menu-group={@titlebar_menu_group || ""}
+  >
+    <%= unless @is_mac_ui do %>
+      <div class="window-titlebar-menu-bar" data-testid="window-titlebar-menu-bar">
+        <%= for group <- @menu_groups do %>
+          <button
+            class={[
+              "window-titlebar-menu-button",
+              if(@titlebar_menu_group == Atom.to_string(group.id), do: "is-active")
+            ]}
+            data-testid="window-titlebar-menu-button"
+            data-menu-group={group.id}
+            type="button"
+            phx-click="toggle_titlebar_menu"
+            phx-mouseenter="hover_titlebar_menu"
+            phx-value-group={group.id}
+            aria-label={group.label}
+          ><%= group.label %></button>
+        <% end %>
+      </div>
+    <% end %>
     <div class="window-titlebar-drag-region"></div>
     <div class="window-titlebar-title" data-testid="window-title"><%= @page_title %></div>
     <div class="window-titlebar-actions">
@@ -47,6 +64,36 @@
         </span>
       </button>
     </div>
+    <%= if not @is_mac_ui do %>
+      <%= if group = active_titlebar_menu_group(assigns) do %>
+        <div
+          class="window-titlebar-menu-dropdown"
+          data-testid="window-titlebar-menu-dropdown"
+          phx-click-away="close_titlebar_menu"
+        >
+          <%= for item <- group.items do %>
+            <%= if item.separator do %>
+              <div class="window-titlebar-menu-separator"></div>
+            <% else %>
+              <button
+                class="window-titlebar-menu-item"
+                data-testid="window-titlebar-menu-item"
+                data-menu-action={item.id}
+                type="button"
+                phx-click="titlebar_menu_action"
+                phx-value-action={item.id}
+                aria-label={item.label}
+              >
+                <span class="window-titlebar-menu-item-label"><%= item.label %></span>
+                <%= if item.shortcut do %>
+                  <span class="window-titlebar-menu-item-accelerator"><%= item.shortcut %></span>
+                <% end %>
+              </button>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
   </div>
 
   <div class="app-main">
