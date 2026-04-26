@@ -44,6 +44,7 @@ defmodule BDS.Desktop.ShellLive do
      socket
      |> assign(:page_title, ShellData.title())
      |> assign(:page_language, ShellData.ui_language())
+      |> assign(:client_shortcuts, Commands.client_shortcuts())
      |> assign(:offline_mode, true)
      |> assign(:tab_meta, %{})
       |> assign(:project_menu_open, false)
@@ -939,6 +940,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+
+  defp encoded_shortcuts(shortcuts), do: Jason.encode!(shortcuts)
 
   defp panel_tab_label(:tasks), do: translated("Tasks")
   defp panel_tab_label(:output), do: translated("Output")

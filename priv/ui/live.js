@@ -7,6 +7,37 @@ document.addEventListener("DOMContentLoaded", () => {
   const ASSISTANT_STORAGE_KEY = "bds-panel-assistant-sidebar";
   const UI_LANGUAGE_STORAGE_KEY = "bds-ui-language";
 
+  const parseShortcutConfig = (value) => {
+    if (!value) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      return [];
+    }
+  };
+
+  const normalizeShortcutKey = (key) => String(key || "").toLowerCase();
+
+  const shortcutTargetIsEditable = (event) => {
+    const tag = event.target?.tagName || null;
+    return event.target?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(tag);
+  };
+
+  const shortcutMatchesEvent = (shortcut, event) => {
+    const primary = event.metaKey || event.ctrlKey;
+
+    return (
+      normalizeShortcutKey(event.key) === normalizeShortcutKey(shortcut.key) &&
+      primary === Boolean(shortcut.primary) &&
+      event.shiftKey === Boolean(shortcut.shift) &&
+      event.altKey === Boolean(shortcut.alt)
+    );
+  };
+
   const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
 
   const readStoredSize = (key, fallback, min, max) => {
@@ -93,6 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const Hooks = {
     AppShell: {
       mounted() {
+        this.shortcuts = parseShortcutConfig(this.el.dataset.shortcuts);
         this.syncStoredLayout();
         this.syncStoredUiLanguage();
         this.destroyOverlaySync = syncTitlebarOverlayInsets();
@@ -159,7 +191,33 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         };
 
+        this.handleShortcutKeyDown = (event) => {
+          if (shortcutTargetIsEditable(event)) {
+            return;
+          }
+
+          const shortcut = this.shortcuts.find((candidate) => shortcutMatchesEvent(candidate, event));
+
+          if (!shortcut) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+
+          this.pushEvent("shortcut", {
+            key: normalizeShortcutKey(event.key),
+            meta: event.metaKey,
+            ctrl: event.ctrlKey,
+            alt: event.altKey,
+            shift: event.shiftKey,
+            tag: event.target?.tagName || null,
+            contentEditable: event.target?.isContentEditable || false
+          });
+        };
+
         window.addEventListener("bds:native-menu-action", this.handleNativeMenuAction);
+        window.addEventListener("keydown", this.handleShortcutKeyDown, true);
         this.el.addEventListener("change", this.handleChange);
       },
 
@@ -167,6 +225,7 @@ document.addEventListener("DOMContentLoaded", () => {
         this.el.removeEventListener("mousedown", this.handleMouseDown);
         this.el.removeEventListener("change", this.handleChange);
         window.removeEventListener("bds:native-menu-action", this.handleNativeMenuAction);
+        window.removeEventListener("keydown", this.handleShortcutKeyDown, true);
         if (this.destroyOverlaySync) {
           this.destroyOverlaySync();
         }

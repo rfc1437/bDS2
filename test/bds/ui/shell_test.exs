@@ -79,6 +79,9 @@ defmodule BDS.UI.ShellTest do
     state = Commands.handle_shortcut(state, %{meta: true, key: "w"})
     assert state.tabs == []
     assert state.editor_route == :dashboard
+
+    state = Commands.handle_shortcut(state, %{meta: true, key: ","})
+    assert state.editor_route == :settings
   end
 
   test "resizing is clamped to the shell limits and dirty flags only apply to post tabs" do
@@ -142,6 +145,11 @@ defmodule BDS.UI.ShellTest do
     assert live_js =~ "windowControlsOverlay"
     assert live_js =~ "geometrychange"
     assert live_js =~ "--bds-titlebar-overlay-left"
+    assert live_js =~ "dataset.shortcuts"
+    assert live_js =~ "addEventListener(\"keydown\", this.handleShortcutKeyDown, true)"
+    assert live_js =~ "event.preventDefault()"
+    assert live_js =~ "this.pushEvent(\"shortcut\""
+    assert template =~ "data-shortcuts={encoded_shortcuts(@client_shortcuts)}"
     assert template =~ "tab-actions"
     assert template =~ "tab-dirty-indicator"
   end

@@ -60,6 +60,11 @@ defmodule BDS.Desktop.AutomationTest do
     snapshot = Automation.snapshot(session)
     assert snapshot.panel_visible == false
 
+    assert :ok = Automation.press(session, "Meta+,")
+
+    snapshot = Automation.snapshot(session)
+    assert snapshot.editor_title == "Settings"
+
     assert :ok = Automation.click(session, "[data-testid='toggle-assistant']")
 
     snapshot = Automation.snapshot(session)

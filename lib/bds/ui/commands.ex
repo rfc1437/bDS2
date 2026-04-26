@@ -17,7 +17,7 @@ defmodule BDS.UI.Commands do
     %{id: :select_all, accelerator: "CTRL+A"},
     %{id: :find, accelerator: "CTRL+F"},
     %{id: :replace, accelerator: "CTRL+H"},
-    %{id: :edit_preferences, accelerator: "CTRL+,"},
+    %{id: :edit_preferences, accelerator: "CTRL+,", key: ",", primary: true},
     %{id: :view_posts, accelerator: "CTRL+1", key: "1", primary: true},
     %{id: :view_media, accelerator: "CTRL+2", key: "2", primary: true},
     %{id: :toggle_sidebar, accelerator: "CTRL+B", key: "b", primary: true},
@@ -37,10 +37,26 @@ defmodule BDS.UI.Commands do
       Map.get(shortcut, :meta, Map.get(shortcut, "meta", false)) or
         Map.get(shortcut, :ctrl, Map.get(shortcut, "ctrl", false))
 
-    case Enum.find(@menu_shortcuts, &shortcut_match?(&1, key, primary)) do
+    shift = Map.get(shortcut, :shift, Map.get(shortcut, "shift", false))
+    alt = Map.get(shortcut, :alt, Map.get(shortcut, "alt", false))
+
+    case Enum.find(@menu_shortcuts, &shortcut_match?(&1, key, primary, shift, alt)) do
       %{id: command_id} -> MenuBar.execute(state, command_id)
       nil -> state
     end
+  end
+
+  def client_shortcuts do
+    @menu_shortcuts
+    |> Enum.filter(&Map.has_key?(&1, :key))
+    |> Enum.map(fn shortcut ->
+      %{
+        key: shortcut.key,
+        primary: Map.get(shortcut, :primary, false),
+        shift: Map.get(shortcut, :shift, false),
+        alt: Map.get(shortcut, :alt, false)
+      }
+    end)
   end
 
   def accelerator_label(command_id) when is_atom(command_id) do
@@ -50,9 +66,12 @@ defmodule BDS.UI.Commands do
     end
   end
 
-  defp shortcut_match?(%{key: expected_key, primary: expected_primary}, key, primary) do
-    key == expected_key and primary == expected_primary
+  defp shortcut_match?(%{key: expected_key} = shortcut, key, primary, shift, alt) do
+    key == expected_key and
+      primary == Map.get(shortcut, :primary, false) and
+      shift == Map.get(shortcut, :shift, false) and
+      alt == Map.get(shortcut, :alt, false)
   end
 
-  defp shortcut_match?(_shortcut, _key, _primary), do: false
+  defp shortcut_match?(_shortcut, _key, _primary, _shift, _alt), do: false
 end
