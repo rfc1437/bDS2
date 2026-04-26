@@ -32,8 +32,6 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
         {:rerun,
          socket
          |> append_output.(translated("Site Validation"), translated("Validation changes applied"), inspect(result))}
-
-      {:error, reason} -> {:socket, append_output.(socket, translated("Site Validation"), inspect(reason), nil, "error")}
     end
   rescue
     error -> {:socket, append_output.(socket, translated("Site Validation"), inspect(error), nil, "error")}

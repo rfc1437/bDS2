@@ -117,6 +117,56 @@ defmodule BDS.Desktop.ShellCommands do
     end)
   end
 
+  defp dispatch("rebuild_posts_from_files", project, _params) do
+    queue_task(project, "rebuild_posts_from_files", "Rebuild Posts From Files", "Maintenance", fn report ->
+      {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post", on_progress: report, rebuild_embeddings: false)
+      report.(1.0, "Post rebuild complete")
+      %{project_id: project.id, counts: %{posts: length(posts)}}
+    end)
+  end
+
+  defp dispatch("rebuild_media_from_files", project, _params) do
+    queue_task(project, "rebuild_media_from_files", "Rebuild Media From Files", "Maintenance", fn report ->
+      {:ok, media} = Maintenance.rebuild_from_filesystem(project.id, "media", on_progress: report)
+      report.(1.0, "Media rebuild complete")
+      %{project_id: project.id, counts: %{media: length(media)}}
+    end)
+  end
+
+  defp dispatch("rebuild_scripts_from_files", project, _params) do
+    queue_task(project, "rebuild_scripts_from_files", "Rebuild Scripts From Files", "Maintenance", fn report ->
+      {:ok, scripts} = Maintenance.rebuild_from_filesystem(project.id, "script", on_progress: report)
+      report.(1.0, "Script rebuild complete")
+      %{project_id: project.id, counts: %{scripts: length(scripts)}}
+    end)
+  end
+
+  defp dispatch("rebuild_templates_from_files", project, _params) do
+    queue_task(project, "rebuild_templates_from_files", "Rebuild Templates From Files", "Maintenance", fn report ->
+      {:ok, templates} = Maintenance.rebuild_from_filesystem(project.id, "template", on_progress: report)
+      report.(1.0, "Template rebuild complete")
+      %{project_id: project.id, counts: %{templates: length(templates)}}
+    end)
+  end
+
+  defp dispatch("rebuild_post_links", project, _params) do
+    queue_task(project, "rebuild_post_links", "Rebuild Post Links", "Maintenance", fn report ->
+      report.(0.0, "Rebuilding link graph")
+      :ok = Posts.rebuild_post_links(project.id)
+      report.(1.0, "Post links rebuilt")
+      %{project_id: project.id}
+    end)
+  end
+
+  defp dispatch("regenerate_missing_thumbnails", project, _params) do
+    queue_task(project, "regenerate_missing_thumbnails", "Regenerate Missing Thumbnails", "Maintenance", fn report ->
+      report.(0.0, "Checking missing thumbnails")
+      result = BDS.Media.regenerate_missing_thumbnails(project.id)
+      report.(1.0, "Missing thumbnails regenerated")
+      Map.put(result, :project_id, project.id)
+    end)
+  end
+
   defp dispatch("rebuild_database", project, _params) do
     group_id = task_group_id("rebuild_database")
     attrs = %{group_id: group_id, group_name: "Maintenance"}

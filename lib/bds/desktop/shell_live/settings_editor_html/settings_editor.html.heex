@@ -1,4 +1,4 @@
-<div class="settings-view-shell" data-testid="settings-editor">
+<div class="settings-view-shell" data-testid="settings-editor" data-selected-settings-section={@settings_editor.selected_section}>
   <div class="settings-view">
     <div class="settings-header">
       <h2 data-testid="editor-title"><%= translated("Settings") %></h2>
@@ -8,7 +8,7 @@
     </div>
 
     <div class="settings-content">
-      <%= if not @settings_editor.project_visible? and not @settings_editor.content_visible? and not @settings_editor.publishing_visible? and not @settings_editor.data_visible? do %>
+      <%= if Enum.empty?(@settings_editor.active_sections) do %>
         <div class="settings-no-results">
           <p><%= translated("No settings match the current search") %></p>
         </div>
@@ -18,6 +18,7 @@
         <div class="setting-section" id="settings-section-project">
           <div class="setting-section-header">
             <h3><%= translated("Project") %></h3>
+            <p class="setting-section-description"><%= translated("Blog identity, URLs, authoring defaults, and bookmarklet setup") %></p>
           </div>
           <form class="setting-section-content" phx-change="change_settings_project">
             <div class="setting-row">
@@ -29,6 +30,15 @@
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Description") %></label></div>
               <div class="setting-control"><textarea name="settings_project[description]" rows="3"><%= @settings_editor.project["description"] %></textarea></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Data Path") %></label></div>
+              <div class="setting-control">
+                <div class="setting-input-group">
+                  <input type="text" value={@settings_editor.project_data_path} readonly />
+                  <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="open_data_folder"><%= translated("Open") %></button>
+                </div>
+              </div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Public URL") %></label></div>
@@ -76,34 +86,107 @@
               </div>
             </div>
             <div class="setting-row">
-              <div class="setting-info"><label class="setting-label"><%= translated("Semantic Similarity") %></label></div>
-              <div class="setting-control">
-                <label><input type="checkbox" name="settings_project[semantic_similarity_enabled]" checked={@settings_editor.project["semantic_similarity_enabled"]} /> <%= translated("Enable semantic similarity") %></label>
-              </div>
+              <div class="setting-info"><label class="setting-label"><%= translated("Blogmark Bookmarklet") %></label></div>
+              <div class="setting-control"><p class="setting-description"><%= translated("Bookmarklet copy support is wired through the desktop runtime and project public URL.") %></p></div>
             </div>
           </form>
           <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_project"><%= translated("Save") %></button></div>
         </div>
       <% end %>
 
+      <%= if @settings_editor.editor_visible? do %>
+        <div class="setting-section" id="settings-section-editor">
+          <div class="setting-section-header">
+            <h3><%= translated("Editor") %></h3>
+            <p class="setting-section-description"><%= translated("Default editing mode and diff presentation") %></p>
+          </div>
+          <form class="setting-section-content" phx-change="change_settings_editor">
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Default Editor Mode") %></label></div>
+              <div class="setting-control">
+                <select name="settings_editor[default_mode]">
+                  <option value="wysiwyg" selected={@settings_editor.editor["default_mode"] == "wysiwyg"}><%= translated("WYSIWYG") %></option>
+                  <option value="markdown" selected={@settings_editor.editor["default_mode"] == "markdown"}><%= translated("Markdown") %></option>
+                  <option value="preview" selected={@settings_editor.editor["default_mode"] == "preview"}><%= translated("Preview") %></option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Diff View Style") %></label></div>
+              <div class="setting-control">
+                <select name="settings_editor[diff_view_style]">
+                  <option value="inline" selected={@settings_editor.editor["diff_view_style"] == "inline"}><%= translated("Inline") %></option>
+                  <option value="side-by-side" selected={@settings_editor.editor["diff_view_style"] == "side-by-side"}><%= translated("Side by Side") %></option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Wrap Long Lines") %></label></div>
+              <div class="setting-control"><label><input type="checkbox" name="settings_editor[wrap_long_lines]" checked={@settings_editor.editor["wrap_long_lines"]} /> <%= translated("Enable line wrapping in diffs") %></label></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Hide Unchanged Regions") %></label></div>
+              <div class="setting-control"><label><input type="checkbox" name="settings_editor[hide_unchanged_regions]" checked={@settings_editor.editor["hide_unchanged_regions"]} /> <%= translated("Collapse unchanged diff hunks") %></label></div>
+            </div>
+          </form>
+          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_editor"><%= translated("Save") %></button></div>
+        </div>
+      <% end %>
+
       <%= if @settings_editor.content_visible? do %>
         <div class="setting-section" id="settings-section-content">
-          <div class="setting-section-header"><h3><%= translated("Content Categories") %></h3></div>
+          <div class="setting-section-header"><h3><%= translated("Content Categories") %></h3><p class="setting-section-description"><%= translated("Category defaults, rendering flags, and template wiring") %></p></div>
           <div class="setting-section-content">
-            <%= for category <- @settings_editor.categories do %>
-              <form class="setting-row" phx-change="save_settings_category">
-                <input type="hidden" name="category_settings[category]" value={category.name} />
-                <div class="setting-info"><label class="setting-label"><%= category.name %></label></div>
-                <div class="setting-control">
-                  <div class="setting-input-group">
-                    <input type="text" name="category_settings[title]" value={category.title} />
-                    <label><input type="checkbox" name="category_settings[render_in_lists]" checked={category.render_in_lists} /> <%= translated("Render in Lists") %></label>
-                    <label><input type="checkbox" name="category_settings[show_title]" checked={category.show_title} /> <%= translated("Show Titles") %></label>
-                    <button class="secondary" type="button" phx-click="remove_settings_category" phx-value-category={category.name} disabled={category.protected?}><%= translated("Remove") %></button>
-                  </div>
-                </div>
-              </form>
-            <% end %>
+            <table class="categories-table">
+              <thead>
+                <tr>
+                  <th><%= translated("Category") %></th>
+                  <th><%= translated("Title") %></th>
+                  <th><%= translated("Render in Lists") %></th>
+                  <th><%= translated("Show Titles") %></th>
+                  <th><%= translated("Post Template") %></th>
+                  <th><%= translated("List Template") %></th>
+                  <th><%= translated("Actions") %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <%= for category <- @settings_editor.categories do %>
+                  <tr>
+                    <td><%= category.name %></td>
+                    <td>
+                      <input type="text" name="category_settings[title]" value={category.title} form={"category-form-#{category.name}"} />
+                    </td>
+                    <td><input type="checkbox" name="category_settings[render_in_lists]" checked={category.render_in_lists} form={"category-form-#{category.name}"} /></td>
+                    <td><input type="checkbox" name="category_settings[show_title]" checked={category.show_title} form={"category-form-#{category.name}"} /></td>
+                    <td>
+                      <select name="category_settings[post_template_slug]" form={"category-form-#{category.name}"}>
+                        <option value=""><%= translated("Default") %></option>
+                        <%= for template <- @settings_editor.template_options.post do %>
+                          <option value={template.slug} selected={template.slug == category.post_template_slug}><%= template.title %></option>
+                        <% end %>
+                      </select>
+                    </td>
+                    <td>
+                      <select name="category_settings[list_template_slug]" form={"category-form-#{category.name}"}>
+                        <option value=""><%= translated("Default") %></option>
+                        <%= for template <- @settings_editor.template_options.list do %>
+                          <option value={template.slug} selected={template.slug == category.list_template_slug}><%= template.title %></option>
+                        <% end %>
+                      </select>
+                    </td>
+                    <td>
+                      <div class="setting-input-group">
+                        <form id={"category-form-#{category.name}"} phx-submit="save_settings_category">
+                          <input type="hidden" name="category_settings[category]" value={category.name} />
+                        </form>
+                        <button class="secondary" type="submit" form={"category-form-#{category.name}"}><%= translated("Save") %></button>
+                        <button class="secondary" type="button" phx-click="remove_settings_category" phx-value-category={category.name} disabled={category.protected?}><%= translated("Remove") %></button>
+                      </div>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Add Category") %></label></div>
               <div class="setting-control">
@@ -113,13 +196,122 @@
                 </div>
               </div>
             </div>
+            <div class="setting-actions"><button class="secondary" type="button" phx-click="reset_settings_categories"><%= translated("Reset to Defaults") %></button></div>
           </div>
+        </div>
+      <% end %>
+
+      <%= if @settings_editor.ai_visible? do %>
+        <div class="setting-section" id="settings-section-ai">
+          <div class="setting-section-header"><h3><%= translated("AI") %></h3><p class="setting-section-description"><%= translated("Provider keys, model preferences, airplane mode, and system prompt") %></p></div>
+          <form class="setting-section-content" phx-change="change_settings_ai">
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Anthropic / Online API Key") %></label></div>
+              <div class="setting-control"><input type="password" name="settings_ai[online_api_key]" value={@settings_editor.ai["online_api_key"]} /></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Mistral API Key") %></label></div>
+              <div class="setting-control"><input type="password" name="settings_ai[mistral_api_key]" value={@settings_editor.ai["mistral_api_key"]} /></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Offline Mode") %></label></div>
+              <div class="setting-control"><label><input type="checkbox" name="settings_ai[offline_mode]" checked={@settings_editor.ai["offline_mode"]} /> <%= translated("Route AI tasks through the airplane endpoint") %></label></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Default Model") %></label></div>
+              <div class="setting-control">
+                <select name="settings_ai[default_model]">
+                  <option value=""></option>
+                  <%= for model <- @settings_editor.model_options do %>
+                    <option value={model.id} selected={model.id == @settings_editor.ai["default_model"]}><%= model.label %></option>
+                  <% end %>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Title Model") %></label></div>
+              <div class="setting-control">
+                <select name="settings_ai[title_model]">
+                  <option value=""></option>
+                  <%= for model <- @settings_editor.model_options do %>
+                    <option value={model.id} selected={model.id == @settings_editor.ai["title_model"]}><%= model.label %></option>
+                  <% end %>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Image Analysis Model") %></label></div>
+              <div class="setting-control">
+                <select name="settings_ai[image_analysis_model]">
+                  <option value=""></option>
+                  <%= for model <- @settings_editor.image_model_options do %>
+                    <option value={model.id} selected={model.id == @settings_editor.ai["image_analysis_model"]}><%= model.label %></option>
+                  <% end %>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Offline Chat Model") %></label></div>
+              <div class="setting-control">
+                <select name="settings_ai[offline_chat_model]">
+                  <option value=""></option>
+                  <%= for model <- @settings_editor.model_options do %>
+                    <option value={model.id} selected={model.id == @settings_editor.ai["offline_chat_model"]}><%= model.label %></option>
+                  <% end %>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Offline Title Model") %></label></div>
+              <div class="setting-control">
+                <select name="settings_ai[offline_title_model]">
+                  <option value=""></option>
+                  <%= for model <- @settings_editor.model_options do %>
+                    <option value={model.id} selected={model.id == @settings_editor.ai["offline_title_model"]}><%= model.label %></option>
+                  <% end %>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Offline Image Analysis Model") %></label></div>
+              <div class="setting-control">
+                <select name="settings_ai[offline_image_analysis_model]">
+                  <option value=""></option>
+                  <%= for model <- @settings_editor.image_model_options do %>
+                    <option value={model.id} selected={model.id == @settings_editor.ai["offline_image_analysis_model"]}><%= model.label %></option>
+                  <% end %>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("System Prompt") %></label></div>
+              <div class="setting-control"><textarea name="settings_ai[system_prompt]" rows="12"><%= @settings_editor.ai["system_prompt"] %></textarea></div>
+            </div>
+          </form>
+          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_ai"><%= translated("Save") %></button><button class="secondary" type="button" phx-click="reset_settings_ai_prompt"><%= translated("Reset to Default") %></button></div>
+        </div>
+      <% end %>
+
+      <%= if @settings_editor.technology_visible? do %>
+        <div class="setting-section" id="settings-section-technology">
+          <div class="setting-section-header"><h3><%= translated("Technology") %></h3><p class="setting-section-description"><%= translated("Application-level runtime behavior and semantic indexing") %></p></div>
+          <form class="setting-section-content" phx-change="change_settings_project">
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Semantic Similarity") %></label></div>
+              <div class="setting-control"><label><input type="checkbox" name="settings_project[semantic_similarity_enabled]" checked={@settings_editor.technology["semantic_similarity_enabled"]} /> <%= translated("Enable duplicate search and related-post embeddings") %></label></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Scripting Runtime") %></label></div>
+              <div class="setting-control"><p class="setting-description"><%= translated("Scripting capabilities are configured at the application layer in the rewrite and do not expose runtime switching here.") %></p></div>
+            </div>
+          </form>
+          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_project"><%= translated("Save") %></button></div>
         </div>
       <% end %>
 
       <%= if @settings_editor.publishing_visible? do %>
         <div class="setting-section" id="settings-section-publishing">
-          <div class="setting-section-header"><h3><%= translated("Publishing") %></h3></div>
+          <div class="setting-section-header"><h3><%= translated("Publishing") %></h3><p class="setting-section-description"><%= translated("Deployment credentials for upload tasks") %></p></div>
           <form class="setting-section-content" phx-change="change_settings_publishing">
             <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= translated("SSH Mode") %></label></div><div class="setting-control"><select name="settings_publishing[ssh_mode]"><option value="scp" selected={@settings_editor.publishing["ssh_mode"] == "scp"}>scp</option><option value="rsync" selected={@settings_editor.publishing["ssh_mode"] == "rsync"}>rsync</option></select></div></div>
             <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= translated("Host") %></label></div><div class="setting-control"><input type="text" name="settings_publishing[ssh_host]" value={@settings_editor.publishing["ssh_host"]} /></div></div>
@@ -130,11 +322,37 @@
         </div>
       <% end %>
 
+      <%= if @settings_editor.mcp_visible? do %>
+        <div class="setting-section" id="settings-section-mcp">
+          <div class="setting-section-header"><h3><%= translated("MCP") %></h3><p class="setting-section-description"><%= translated("Agent configuration files for the built-in bDS MCP server") %></p></div>
+          <div class="setting-section-content">
+            <%= for agent <- @settings_editor.mcp do %>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <label class="setting-label"><%= agent.label %></label>
+                  <p class="setting-description"><%= agent.config_path || translated("Not supported in the rewrite yet") %></p>
+                </div>
+                <div class="setting-control">
+                  <button class="secondary" type="button" phx-click="toggle_settings_mcp_agent" phx-value-agent={agent.id} disabled={not agent.supported?}>
+                    <%= if agent.configured?, do: translated("Remove"), else: translated("Add") %>
+                  </button>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
       <%= if @settings_editor.data_visible? do %>
         <div class="setting-section" id="settings-section-data">
-          <div class="setting-section-header"><h3><%= translated("Data Maintenance") %></h3></div>
+          <div class="setting-section-header"><h3><%= translated("Data Maintenance") %></h3><p class="setting-section-description"><%= translated("Rebuild filesystem-backed records and thumbnails") %></p></div>
           <div class="setting-actions">
-            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_database"><%= translated("Rebuild Database") %></button>
+            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_posts_from_files"><%= translated("Rebuild Posts From Files") %></button>
+            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_media_from_files"><%= translated("Rebuild Media From Files") %></button>
+            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_scripts_from_files"><%= translated("Rebuild Scripts From Files") %></button>
+            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_templates_from_files"><%= translated("Rebuild Templates From Files") %></button>
+            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_post_links"><%= translated("Rebuild Links") %></button>
+            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="regenerate_missing_thumbnails"><%= translated("Regenerate Missing Thumbnails") %></button>
             <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_embedding_index"><%= translated("Rebuild Embedding Index") %></button>
             <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="open_data_folder"><%= translated("Open Data Folder") %></button>
           </div>

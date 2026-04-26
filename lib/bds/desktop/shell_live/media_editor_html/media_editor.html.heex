@@ -116,159 +116,160 @@
       <% end %>
     </div>
 
-    <form class="media-details media-editor-details-form" data-testid="media-editor-form" phx-change="change_media_editor">
-      <div class="editor-field">
-        <label><%= translated("File Name") %></label>
-        <input class="post-editor-input is-readonly" type="text" value={@media_editor.original_name} readonly />
-      </div>
-
-      <div class="editor-field">
-        <label><%= translated("MIME Type") %></label>
-        <input class="post-editor-input is-readonly" type="text" value={@media_editor.mime_type} readonly />
-      </div>
-
-      <div class="editor-field-row">
+    <div class="media-details">
+      <form class="media-editor-details-form" data-testid="media-editor-form" phx-change="change_media_editor">
         <div class="editor-field">
-          <label><%= translated("Size") %></label>
-          <input class="post-editor-input is-readonly" type="text" value={@media_editor.file_size} readonly />
+          <label><%= translated("File Name") %></label>
+          <input class="post-editor-input disabled" type="text" value={@media_editor.original_name} disabled />
         </div>
 
-        <%= if @media_editor.dimensions do %>
+        <div class="editor-field">
+          <label><%= translated("MIME Type") %></label>
+          <input class="post-editor-input disabled" type="text" value={@media_editor.mime_type} disabled />
+        </div>
+
+        <div class="editor-field-row">
           <div class="editor-field">
-            <label><%= translated("Dimensions") %></label>
-            <input class="post-editor-input is-readonly" type="text" value={@media_editor.dimensions} readonly />
+            <label><%= translated("Size") %></label>
+            <input class="post-editor-input disabled" type="text" value={@media_editor.file_size} disabled />
           </div>
-        <% end %>
-      </div>
 
-      <div class="editor-field">
-        <label><%= translated("Title") %></label>
-        <input class="post-editor-input" type="text" name="media_editor[title]" value={@media_editor.form["title"]} />
-      </div>
-
-      <div class="editor-field">
-        <label><%= translated("Alt Text") %></label>
-        <input class="post-editor-input" type="text" name="media_editor[alt]" value={@media_editor.form["alt"]} />
-      </div>
-
-      <div class="editor-field">
-        <label><%= translated("Caption") %></label>
-        <textarea class="post-editor-textarea" name="media_editor[caption]" rows="3"><%= @media_editor.form["caption"] %></textarea>
-      </div>
-
-      <div class="editor-field">
-        <label><%= translated("Tags") %></label>
-        <input class="post-editor-input" type="text" name="media_editor[tags]" value={@media_editor.form["tags"]} />
-      </div>
-
-      <div class="editor-field">
-        <label><%= translated("Author") %></label>
-        <input class="post-editor-input" type="text" name="media_editor[author]" value={@media_editor.form["author"]} />
-      </div>
-
-      <div class="editor-field">
-        <label><%= translated("Language") %></label>
-        <select class="post-editor-input" name="media_editor[language]">
-          <option value=""><%= translated("None") %></option>
-          <%= for language <- @media_editor.languages do %>
-            <option value={language} selected={language == @media_editor.form["language"]}><%= language_label(language) %></option>
+          <%= if @media_editor.dimensions do %>
+            <div class="editor-field">
+              <label><%= translated("Dimensions") %></label>
+              <input class="post-editor-input disabled" type="text" value={@media_editor.dimensions} disabled />
+            </div>
           <% end %>
-        </select>
-      </div>
-    </form>
-  </div>
+        </div>
 
-  <%= if @media_editor.form["language"] not in [nil, ""] do %>
-    <div class="editor-field media-translations-section">
-      <label><%= translated("Translations") %></label>
+        <div class="editor-field">
+          <label><%= translated("Title") %></label>
+          <input class="post-editor-input" type="text" name="media_editor[title]" value={@media_editor.form["title"]} />
+        </div>
 
-      <%= if Enum.empty?(@media_editor.translations) do %>
-        <div class="no-linked-posts"><%= translated("No translations") %></div>
-      <% else %>
-        <div class="linked-posts-list">
-          <%= for translation <- @media_editor.translations do %>
-            <div class="linked-post-item">
-              <button
-                class="linked-post-title linked-post-link"
-                type="button"
-                phx-click="edit_media_translation"
-                phx-value-id={@media_editor.id}
-                phx-value-language={translation.language}
-              >
-                <%= translation.flag %> <%= language_label(translation.language) %><%= if translation.title, do: " - #{translation.title}" %>
-              </button>
-              <button class="secondary compact" type="button" phx-click="refresh_media_translation" phx-value-id={@media_editor.id} phx-value-language={translation.language}>
-                <%= translated("Refresh") %>
-              </button>
-              <button class="unlink-btn" type="button" phx-click="delete_media_translation" phx-value-id={@media_editor.id} phx-value-language={translation.language}>×</button>
+        <div class="editor-field">
+          <label><%= translated("Alt Text") %></label>
+          <input class="post-editor-input" type="text" name="media_editor[alt]" value={@media_editor.form["alt"]} />
+        </div>
+
+        <div class="editor-field">
+          <label><%= translated("Caption") %></label>
+          <textarea class="post-editor-textarea" name="media_editor[caption]" rows="3"><%= @media_editor.form["caption"] %></textarea>
+        </div>
+
+        <div class="editor-field">
+          <label><%= translated("Tags") %></label>
+          <input class="post-editor-input" type="text" name="media_editor[tags]" value={@media_editor.form["tags"]} />
+        </div>
+
+        <div class="editor-field">
+          <label><%= translated("Author") %></label>
+          <input class="post-editor-input" type="text" name="media_editor[author]" value={@media_editor.form["author"]} />
+        </div>
+
+        <div class="editor-field">
+          <label><%= translated("Language") %></label>
+          <select class="post-editor-input" name="media_editor[language]">
+            <option value=""><%= translated("None") %></option>
+            <%= for language <- @media_editor.languages do %>
+              <option value={language} selected={language == @media_editor.form["language"]}><%= language_label(language) %></option>
+            <% end %>
+          </select>
+        </div>
+      </form>
+
+      <%= if @media_editor.form["language"] not in [nil, ""] do %>
+        <div class="editor-field media-translations-section">
+          <label><%= translated("Translations") %></label>
+
+          <%= if Enum.empty?(@media_editor.translations) do %>
+            <div class="no-linked-posts"><%= translated("No translations") %></div>
+          <% else %>
+            <div class="linked-posts-list">
+              <%= for translation <- @media_editor.translations do %>
+                <div class="linked-post-item">
+                  <button
+                    class="linked-post-title linked-post-link"
+                    type="button"
+                    phx-click="edit_media_translation"
+                    phx-value-id={@media_editor.id}
+                    phx-value-language={translation.language}
+                  >
+                    <%= translation.flag %> <%= language_label(translation.language) %><%= if translation.title, do: " — #{translation.title}" %>
+                  </button>
+                  <button class="secondary compact" type="button" phx-click="refresh_media_translation" phx-value-id={@media_editor.id} phx-value-language={translation.language}>
+                    <%= translated("Refresh") %>
+                  </button>
+                  <button class="unlink-btn" type="button" phx-click="delete_media_translation" phx-value-id={@media_editor.id} phx-value-language={translation.language}>×</button>
+                </div>
+              <% end %>
             </div>
           <% end %>
         </div>
       <% end %>
 
-    </div>
-  <% end %>
+      <div class="editor-field linked-posts-section">
+        <label>
+          <%= translated("Linked Posts") %>
+          <button class="add-link-btn" type="button" phx-click="toggle_media_post_picker" phx-value-id={@media_editor.id}>
+            <%= translated("Link to Post") %>
+          </button>
+        </label>
 
-  <div class="editor-field linked-posts-section">
-    <label>
-      <%= translated("Linked Posts") %>
-      <button class="add-link-btn" type="button" phx-click="toggle_media_post_picker" phx-value-id={@media_editor.id}>
-        <%= translated("Link to Post") %>
-      </button>
-    </label>
+        <%= if @media_editor.post_picker_open? do %>
+          <div class="post-picker">
+            <div class="post-picker-search">
+              <input
+                type="text"
+                name="media_post_picker[query]"
+                value={@media_editor.post_picker_query}
+                placeholder={translated("Search posts")}
+                phx-change="change_media_post_picker"
+                phx-value-id={@media_editor.id}
+              />
+            </div>
 
-    <%= if @media_editor.post_picker_open? do %>
-      <div class="post-picker">
-        <div class="post-picker-search">
-          <input
-            type="text"
-            name="media_post_picker[query]"
-            value={@media_editor.post_picker_query}
-            placeholder={translated("Search posts")}
-            phx-change="change_media_post_picker"
-            phx-value-id={@media_editor.id}
-          />
-        </div>
+            <%= if Enum.empty?(@media_editor.post_picker_results) do %>
+              <div class="no-posts"><%= translated("No posts to link") %></div>
+            <% else %>
+              <div class="post-picker-list">
+                <%= for result <- @media_editor.post_picker_results do %>
+                  <button class="post-picker-item" type="button" phx-click="link_media_to_post" phx-value-id={@media_editor.id} phx-value-post-id={result.post_id}>
+                    <%= result.title %>
+                  </button>
+                <% end %>
+                <%= if @media_editor.post_picker_overflow_count > 0 do %>
+                  <div class="post-picker-more"><%= translated("and %{count} more", %{count: @media_editor.post_picker_overflow_count}) %></div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
 
-        <%= if Enum.empty?(@media_editor.post_picker_results) do %>
-          <div class="no-posts"><%= translated("No posts to link") %></div>
+        <%= if Enum.empty?(@media_editor.linked_posts) do %>
+          <div class="no-linked-posts"><%= translated("Not linked to any posts") %></div>
         <% else %>
-          <div class="post-picker-list">
-            <%= for result <- @media_editor.post_picker_results do %>
-              <button class="post-picker-item" type="button" phx-click="link_media_to_post" phx-value-id={@media_editor.id} phx-value-post-id={result.post_id}>
-                <%= result.title %>
-              </button>
-            <% end %>
-            <%= if @media_editor.post_picker_overflow_count > 0 do %>
-              <div class="post-picker-more"><%= translated("and %{count} more", %{count: @media_editor.post_picker_overflow_count}) %></div>
+          <div class="linked-posts-list">
+            <%= for linked_post <- @media_editor.linked_posts do %>
+              <div class="linked-post-item">
+                <button
+                  class="linked-post-title linked-post-link"
+                  type="button"
+                  phx-click="pin_sidebar_item"
+                  phx-value-route="post"
+                  phx-value-id={linked_post.post_id}
+                  phx-value-title={linked_post.title}
+                  phx-value-subtitle="linked post"
+                >
+                  📄 <%= linked_post.title %>
+                </button>
+                <button class="unlink-btn" type="button" phx-click="unlink_media_from_post" phx-value-id={@media_editor.id} phx-value-post-id={linked_post.post_id}>×</button>
+              </div>
             <% end %>
           </div>
         <% end %>
       </div>
-    <% end %>
-
-    <%= if Enum.empty?(@media_editor.linked_posts) do %>
-      <div class="no-linked-posts"><%= translated("Not linked to any posts") %></div>
-    <% else %>
-      <div class="linked-posts-list">
-        <%= for linked_post <- @media_editor.linked_posts do %>
-          <div class="linked-post-item">
-            <button
-              class="linked-post-title linked-post-link"
-              type="button"
-              phx-click="pin_sidebar_item"
-              phx-value-route="post"
-              phx-value-id={linked_post.post_id}
-              phx-value-title={linked_post.title}
-              phx-value-subtitle="linked post"
-            >
-              📄 <%= linked_post.title %>
-            </button>
-            <button class="unlink-btn" type="button" phx-click="unlink_media_from_post" phx-value-id={@media_editor.id} phx-value-post-id={linked_post.post_id}>×</button>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
+    </div>
   </div>
 
   <%= if @media_editor.editing_translation do %>

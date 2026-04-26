@@ -218,6 +218,27 @@ defmodule BDS.UI.ShellTest do
     assert live_ex =~ "titlebar_menu_item_index"
   end
 
+  test "desktop shell css keeps the old media editor layout contract" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+
+    assert css =~ ".media-preview {"
+    assert css =~ "min-height: 300px;"
+    assert css =~ ".media-details {"
+    assert css =~ "width: 320px;"
+    assert css =~ ".media-details textarea {"
+    assert css =~ "resize: vertical;"
+    assert css =~ ".linked-posts-section label {"
+    assert css =~ "justify-content: space-between;"
+    assert css =~ ".add-link-btn {"
+    assert css =~ "font-size: 11px;"
+    assert css =~ ".post-picker {"
+    assert css =~ "max-height: 250px;"
+    assert css =~ ".post-picker-search input {"
+    assert css =~ "padding: 6px 10px;"
+    assert css =~ ".linked-post-item:hover .unlink-btn {"
+    assert css =~ "opacity: 1;"
+  end
+
   test "desktop shell status task area keeps the compact running-task markup" do
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 

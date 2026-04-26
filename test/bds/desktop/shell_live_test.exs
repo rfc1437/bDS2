@@ -860,6 +860,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="editor-content media-editor")
     assert html =~ ~s(class="quick-actions-wrapper")
     refute html =~ ~s(class="media-editor-form")
+    assert has_element?(view, "[data-testid='media-editor'] .editor-content.media-editor .media-details")
+    assert has_element?(view, "[data-testid='media-editor'] .editor-content.media-editor .media-details .media-translations-section")
+    assert has_element?(view, "[data-testid='media-editor'] .editor-content.media-editor .media-details .linked-posts-section")
 
     html = render_click(view, "edit_media_translation", %{"id" => media.id, "language" => "de"})
 
@@ -868,6 +871,54 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(name="media_translation[title]")
     assert html =~ ~s(name="media_translation[alt]")
     assert html =~ ~s(name="media_translation[caption]")
+  end
+
+  test "settings and media editors render localized labels when the UI language changes", %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "localized-hero.txt")
+    File.write!(source_path, "media body")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Lokales Bild",
+               alt: "Alt",
+               caption: "Beschriftung",
+               language: "de"
+             })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      view
+      |> form("[data-testid='status-language-form']", %{ui_language: "de"})
+      |> render_change()
+
+    assert html =~ "Beiträge durchsuchen..."
+
+    settings_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "settings",
+        "id" => "settings-editor",
+        "title" => "Editor",
+        "subtitle" => "Editor settings"
+      })
+
+    assert settings_html =~ "Standard-Bearbeitungsmodus"
+    refute settings_html =~ "Default Editor Mode"
+
+    media_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "media",
+        "id" => media.id,
+        "title" => media.title,
+        "subtitle" => media.original_name
+      })
+
+    assert media_html =~ "Dateiname"
+    assert media_html =~ "Verknüpfte Beiträge"
+    refute media_html =~ "File Name"
+    refute media_html =~ "Linked Posts"
   end
 
   test "remaining step-5 routes render dedicated editors instead of the generic shell placeholder", %{project: project} do
@@ -963,6 +1014,28 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert chat_html =~ ~s(class="chat-panel")
     assert chat_html =~ ~s(class="chat-input-container")
     refute chat_html =~ "Desktop workbench content routed through the Elixir shell."
+  end
+
+  test "settings sidebar categories render the full old-app section model and target the requested section" do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "settings",
+        "id" => "settings-ai",
+        "title" => "AI",
+        "subtitle" => "Assistant settings"
+      })
+
+    assert html =~ ~s(id="settings-section-project")
+    assert html =~ ~s(id="settings-section-editor")
+    assert html =~ ~s(id="settings-section-content")
+    assert html =~ ~s(id="settings-section-ai")
+    assert html =~ ~s(id="settings-section-technology")
+    assert html =~ ~s(id="settings-section-publishing")
+    assert html =~ ~s(id="settings-section-data")
+    assert html =~ ~s(id="settings-section-mcp")
+    assert html =~ ~s(data-selected-settings-section="ai")
   end
 
   test "template sidebar exposes old-app style delete control and removes template rows", %{project: project} do

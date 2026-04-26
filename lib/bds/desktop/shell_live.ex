@@ -509,12 +509,32 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, SettingsEditor.update_project_draft(socket, params, &reload_shell/2)}
   end
 
+  def handle_event("change_settings_editor", %{"settings_editor" => params}, socket) do
+    {:noreply, SettingsEditor.update_editor_draft(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("save_settings_editor", _params, socket) do
+    {:noreply, SettingsEditor.save_editor(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
   def handle_event("save_settings_project", _params, socket) do
     {:noreply, SettingsEditor.save_project(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("change_settings_publishing", %{"settings_publishing" => params}, socket) do
     {:noreply, SettingsEditor.update_publishing_draft(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("change_settings_ai", %{"settings_ai" => params}, socket) do
+    {:noreply, SettingsEditor.update_ai_draft(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("save_settings_ai", _params, socket) do
+    {:noreply, SettingsEditor.save_ai(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("reset_settings_ai_prompt", _params, socket) do
+    {:noreply, SettingsEditor.reset_ai_prompt(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("save_settings_publishing", _params, socket) do
@@ -533,6 +553,10 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, SettingsEditor.add_category(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
+  def handle_event("reset_settings_categories", _params, socket) do
+    {:noreply, SettingsEditor.reset_categories(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
   def handle_event("save_settings_category", %{"category_settings" => params}, socket) do
     {:noreply, SettingsEditor.save_category(socket, params, &reload_shell/2, &append_output_entry/5)}
   end
@@ -543,6 +567,10 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("settings_shell_command", %{"action" => action}, socket) do
     {:noreply, apply_shell_command(socket, action)}
+  end
+
+  def handle_event("toggle_settings_mcp_agent", %{"agent" => agent}, socket) do
+    {:noreply, SettingsEditor.toggle_mcp_agent(socket, agent, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("select_style_theme", %{"theme" => theme}, socket) do
@@ -1326,6 +1354,7 @@ defmodule BDS.Desktop.ShellLive do
 
     tab_meta =
       Map.put(socket.assigns.tab_meta, {route_atom, tab_id}, %{
+        sidebar_item_id: Map.get(params, "id"),
         title: Map.get(params, "title", ""),
         subtitle: Map.get(params, "subtitle", "")
       })
