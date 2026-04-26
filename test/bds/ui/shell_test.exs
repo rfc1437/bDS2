@@ -220,9 +220,16 @@ defmodule BDS.UI.ShellTest do
 
   test "desktop shell css keeps the old media editor layout contract" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex")
 
     assert css =~ ".media-preview {"
     assert css =~ "min-height: 300px;"
+    assert css =~ ".media-preview-image {"
+    assert css =~ "width: 100%;"
+    assert css =~ "height: 100%;"
+    assert css =~ "box-sizing: border-box;"
+    assert css =~ ".media-preview-image img {"
+    assert css =~ "object-fit: contain;"
     assert css =~ ".media-details {"
     assert css =~ "width: 320px;"
     assert css =~ ".media-details textarea {"
@@ -237,6 +244,12 @@ defmodule BDS.UI.ShellTest do
     assert css =~ "padding: 6px 10px;"
     assert css =~ ".linked-post-item:hover .unlink-btn {"
     assert css =~ "opacity: 1;"
+    assert Regex.match?(~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= translated\("Quick Actions"\) %><\/span>/s, template)
+    assert template =~ ~s(class="quick-action-text")
+    assert template =~ ~s(class="quick-action-icon">🤖</span>)
+    assert Regex.match?(~r/class="quick-action-text">\s*<strong><%= translated\("AI Suggestions"\) %><\/strong>.*?<\/span>\s*<span class="quick-action-icon">🤖<\/span>/s, template)
+    refute template =~ ~s|<span class="quick-action-icon">🤖</span>
+          <span class="quick-action-text">|
   end
 
   test "desktop shell status task area keeps the compact running-task markup" do

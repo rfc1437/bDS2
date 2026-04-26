@@ -25,7 +25,8 @@
           phx-click="toggle_media_editor_quick_actions"
           phx-value-id={@media_editor.id}
         >
-          <%= translated("Quick Actions") %>
+          <span class="quick-actions-btn-icon">⚡</span>
+          <span class="quick-actions-btn-label"><%= translated("Quick Actions") %></span>
         </button>
 
         <%= if @media_editor.quick_actions_open? do %>
@@ -38,11 +39,11 @@
                 phx-click="open_overlay"
                 phx-value-kind="ai_suggestions"
               >
-                <span class="quick-action-icon">🤖</span>
                 <span class="quick-action-text">
                   <strong><%= translated("AI Suggestions") %></strong>
                   <small><%= translated("Review title, alt text, and caption suggestions") %></small>
                 </span>
+                <span class="quick-action-icon">🤖</span>
               </button>
 
               <div class="quick-actions-divider"></div>
@@ -55,11 +56,11 @@
               phx-value-id={@media_editor.id}
               disabled={not @media_editor.can_detect_language?}
             >
-              <span class="quick-action-icon">🔍</span>
               <span class="quick-action-text">
                 <strong><%= translated("Detect Language") %></strong>
                 <small><%= translated("Persist the detected language for this media item") %></small>
               </span>
+              <span class="quick-action-icon">🔍</span>
             </button>
 
             <div class="quick-actions-divider"></div>
@@ -72,11 +73,11 @@
               phx-value-kind="language_picker"
               disabled={not @media_editor.can_translate?}
             >
-              <span class="quick-action-icon">🌍</span>
               <span class="quick-action-text">
                 <strong><%= translated("Translate") %></strong>
                 <small><%= translated("Select a target language for this media item") %></small>
               </span>
+              <span class="quick-action-icon">🌍</span>
             </button>
           </div>
         <% end %>
