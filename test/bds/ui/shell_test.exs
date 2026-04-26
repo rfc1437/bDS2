@@ -164,6 +164,16 @@ defmodule BDS.UI.ShellTest do
     assert template =~ "tab-dirty-indicator"
   end
 
+  test "desktop shell css keeps the old activity bar active marker contrast" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+
+    assert css =~ "--vscode-activityBar-foreground: #ffffff"
+    assert css =~ ".activity-bar-item:hover {"
+    assert css =~ ".activity-bar-item.active::before {"
+    assert css =~ "width: 2px;"
+    assert css =~ "background-color: var(--vscode-activityBar-foreground);"
+  end
+
   test "desktop shell assets keep legacy titlebar menu keyboard and anchoring behavior" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
     live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")

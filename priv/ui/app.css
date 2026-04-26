@@ -5,6 +5,7 @@
   --vscode-editor-foreground: #cccccc;
   --vscode-sideBar-background: #252526;
   --vscode-activityBar-background: #333333;
+  --vscode-activityBar-foreground: #ffffff;
   --vscode-panel-background: #1e1e1e;
   --vscode-titleBar-activeBackground: #252526;
   --vscode-titleBar-activeForeground: #cccccc;
@@ -384,6 +385,7 @@ button {
 
 .activity-bar-item:hover {
   opacity: 1;
+  background: transparent;
 }
 
 .activity-bar-item.active {
