@@ -221,5 +221,9 @@
   "View": "Vista",
   "Welcome to bDS2": "Benvenuto in bDS2",
   "Workbench Notes": "Note del banco di lavoro",
-  "Working tree integration is not wired yet in the shell, but the tab is selectable and ready for command output.": "L’integrazione del working tree non è ancora collegata nella shell, ma la scheda è selezionabile e pronta per l’output dei comandi."
+  "Working tree integration is not wired yet in the shell, but the tab is selectable and ready for command output.": "L’integrazione del working tree non è ancora collegata nella shell, ma la scheda è selezionabile e pronta per l’output dei comandi.",
+  "Ask the assistant about the active project or editor.": "Chiedi all’assistente del progetto o editor attivo.",
+  "Start chat": "Avvia chat",
+  "You": "Tu",
+  "The assistant sidebar chat surface is ready, but model execution is not connected yet.": "La superficie chat della barra laterale assistente è pronta, ma l’esecuzione del modello non è ancora collegata."
 }

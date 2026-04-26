@@ -177,6 +177,32 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ">7<"
   end
 
+  test "assistant sidebar exposes context, prompt, and offline-gated transcript" do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      view
+      |> element("[data-testid='toggle-assistant']")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="assistant-shell")
+    assert html =~ ~s(data-testid="assistant-context")
+    assert html =~ ~s(data-testid="assistant-prompt-form")
+    assert html =~ ~s(data-testid="assistant-prompt-input")
+    assert html =~ ~s(data-testid="assistant-start-button")
+    assert html =~ ~s(>Dashboard<)
+
+    html =
+      render_submit(view, "submit_assistant_prompt", %{
+        "assistant" => %{"prompt" => "Summarize the current project"}
+      })
+
+    assert html =~ ~s(data-testid="assistant-message-user")
+    assert html =~ ~s(data-testid="assistant-message-assistant")
+    assert html =~ "Summarize the current project"
+    assert html =~ "Automatic AI actions stay gated by airplane mode."
+  end
+
   test "sidebar open supports preview and pin intents for entity tabs" do
     {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 

@@ -416,15 +416,77 @@
     >
       <div class="resizable-panel-divider assistant-divider" data-resize="assistant" data-role="resize-handle"></div>
       <aside class="assistant-sidebar" data-region="assistant-sidebar">
-        <div class="assistant-header">
-          <strong><%= translated("Assistant") %></strong>
-        </div>
         <div class="assistant-content">
-          <%= for card <- @assistant_cards do %>
-            <section class="assistant-card">
-              <strong><%= translated(card.label) %></strong>
-              <span><%= translated(card.text) %></span>
-            </section>
+          <header class="assistant-sidebar-header">
+            <div class="assistant-sidebar-heading">
+              <strong><%= translated("AI Assistant") %></strong>
+              <span class="assistant-sidebar-description"><%= translated("AI conversations") %></span>
+            </div>
+            <span class={[
+              "assistant-sidebar-status",
+              if(@offline_mode, do: "is-offline", else: "is-online")
+            ]}>
+              <%= if @offline_mode, do: translated("Offline"), else: translated("Chat") %>
+            </span>
+          </header>
+
+          <section class="assistant-sidebar-context" data-testid="assistant-context">
+            <div class="assistant-sidebar-context-row">
+              <span class="assistant-sidebar-context-label"><%= translated("Project") %></span>
+              <span class="assistant-sidebar-context-value"><%= assistant_project_name(@current_project) %></span>
+            </div>
+            <div class="assistant-sidebar-context-row">
+              <span class="assistant-sidebar-context-label"><%= translated("Editor") %></span>
+              <span class="assistant-sidebar-context-value"><%= tab_title(@current_tab, @tab_meta) %></span>
+            </div>
+            <p class="assistant-sidebar-context-text"><%= tab_subtitle(@current_tab, @tab_meta) %></p>
+          </section>
+
+          <form
+            class="assistant-sidebar-prompt-form"
+            data-testid="assistant-prompt-form"
+            phx-change="update_assistant_prompt"
+            phx-submit="submit_assistant_prompt"
+          >
+            <textarea
+              class="assistant-sidebar-prompt"
+              data-testid="assistant-prompt-input"
+              name="assistant[prompt]"
+              rows="6"
+              placeholder={translated("Ask the assistant about the active project or editor.")}
+            ><%= @assistant_prompt %></textarea>
+
+            <button
+              class="assistant-sidebar-start-button"
+              data-testid="assistant-start-button"
+              type="submit"
+              disabled={String.trim(@assistant_prompt || "") == ""}
+            >
+              <%= translated("Start chat") %>
+            </button>
+          </form>
+
+          <%= if Enum.empty?(@assistant_messages) do %>
+            <div class="assistant-sidebar-welcome">
+              <%= for card <- @assistant_cards do %>
+                <section class="assistant-card">
+                  <strong><%= translated(card.label) %></strong>
+                  <span><%= translated(card.text) %></span>
+                </section>
+              <% end %>
+            </div>
+          <% else %>
+            <div class="assistant-sidebar-transcript">
+              <%= for message <- @assistant_messages do %>
+                <article
+                  class={["assistant-sidebar-message", message.role]}
+                  data-testid={assistant_message_testid(message.role)}
+                >
+                  <span class="assistant-sidebar-message-role"><%= assistant_message_label(message.role) %></span>
+                  <p class="assistant-sidebar-message-content"><%= message.content %></p>
+                </article>
+              <% end %>
+            </div>
           <% end %>
         </div>
       </aside>

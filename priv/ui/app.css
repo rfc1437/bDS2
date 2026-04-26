@@ -2010,6 +2010,134 @@ button {
   padding: 14px;
 }
 
+.assistant-sidebar-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.assistant-sidebar-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.assistant-sidebar-description,
+.assistant-sidebar-context-text,
+.assistant-sidebar-message-content {
+  color: var(--vscode-descriptionForeground);
+}
+
+.assistant-sidebar-status {
+  border-radius: 999px;
+  border: 1px solid var(--vscode-panel-border);
+  padding: 2px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.assistant-sidebar-status.is-offline {
+  background: rgba(255, 196, 0, 0.18);
+  border-color: rgba(255, 196, 0, 0.35);
+  color: var(--vscode-editor-foreground);
+}
+
+.assistant-sidebar-context {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--vscode-sideBar-background) 78%, var(--vscode-editor-background));
+}
+
+.assistant-sidebar-context-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.assistant-sidebar-context-label,
+.assistant-sidebar-message-role {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-descriptionForeground);
+}
+
+.assistant-sidebar-context-value {
+  text-align: right;
+  color: var(--vscode-editor-foreground);
+}
+
+.assistant-sidebar-context-text,
+.assistant-sidebar-message-content {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.assistant-sidebar-prompt-form,
+.assistant-sidebar-welcome,
+.assistant-sidebar-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assistant-sidebar-prompt {
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 10px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.assistant-sidebar-prompt:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.assistant-sidebar-start-button {
+  align-self: flex-start;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 999px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.assistant-sidebar-start-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.assistant-card,
+.assistant-sidebar-message {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 10px;
+  border-bottom-width: 1px;
+  background: color-mix(in srgb, var(--vscode-sideBar-background) 82%, var(--vscode-editor-background));
+}
+
+.assistant-sidebar-message.user {
+  background: color-mix(in srgb, var(--vscode-list-hoverBackground) 76%, transparent);
+}
+
+.assistant-sidebar-message.assistant {
+  background: color-mix(in srgb, var(--vscode-sideBar-background) 70%, var(--vscode-editor-background));
+}
+
 .status-bar {
   height: 22px;
   display: flex;

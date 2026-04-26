@@ -160,4 +160,19 @@ defmodule BDS.UI.ShellTest do
     assert template =~ "tab-actions"
     assert template =~ "tab-dirty-indicator"
   end
+
+  test "desktop shell assets keep the assistant sidebar chat surface contract" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
+
+    assert css =~ ".assistant-sidebar-context"
+    assert css =~ ".assistant-sidebar-prompt"
+    assert css =~ ".assistant-sidebar-start-button"
+    assert css =~ ".assistant-sidebar-message"
+    assert template =~ "data-testid=\"assistant-context\""
+    assert template =~ "data-testid=\"assistant-prompt-form\""
+    assert template =~ "data-testid=\"assistant-prompt-input\""
+    assert template =~ "data-testid=\"assistant-start-button\""
+    assert template =~ "assistant-sidebar-transcript"
+  end
 end

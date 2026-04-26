@@ -47,6 +47,8 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:page_language, ShellData.ui_language())
       |> assign(:client_shortcuts, Commands.client_shortcuts())
      |> assign(:offline_mode, true)
+      |> assign(:assistant_prompt, "")
+      |> assign(:assistant_messages, [])
     |> assign(:is_mac_ui, mac_ui?())
     |> assign(:menu_groups, titlebar_menu_groups())
     |> assign(:titlebar_menu_group, nil)
@@ -273,6 +275,25 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("toggle_offline_mode", _params, socket) do
     socket = assign(socket, :offline_mode, not socket.assigns.offline_mode)
     {:noreply, reload_shell(socket, socket.assigns.workbench)}
+  end
+
+  def handle_event("update_assistant_prompt", %{"assistant" => %{"prompt" => prompt}}, socket) do
+    {:noreply, assign(socket, :assistant_prompt, prompt)}
+  end
+
+  def handle_event("submit_assistant_prompt", %{"assistant" => %{"prompt" => prompt}}, socket) do
+    prompt = prompt |> to_string() |> String.trim()
+
+    socket =
+      if prompt == "" do
+        assign(socket, :assistant_prompt, "")
+      else
+        socket
+        |> assign(:assistant_prompt, "")
+        |> assign(:assistant_messages, socket.assigns.assistant_messages ++ assistant_turn(prompt, socket))
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("open_tasks_panel", _params, socket) do
@@ -1505,6 +1526,34 @@ defmodule BDS.Desktop.ShellLive do
   defp tab_icon_id(%{type: :git_diff}), do: "git"
   defp tab_icon_id(%{type: :style}), do: "settings"
   defp tab_icon_id(%{type: type}), do: Atom.to_string(type)
+
+  defp assistant_turn(prompt, socket) do
+    [
+      %{role: "user", content: prompt},
+      %{role: "assistant", content: assistant_reply(socket)}
+    ]
+  end
+
+  defp assistant_reply(socket) do
+    if socket.assigns.offline_mode do
+      ShellData.translate("Automatic AI actions stay gated by airplane mode.", %{}, socket.assigns.page_language)
+    else
+      ShellData.translate(
+        "The assistant sidebar chat surface is ready, but model execution is not connected yet.",
+        %{},
+        socket.assigns.page_language
+      )
+    end
+  end
+
+  defp assistant_project_name(nil), do: translated("Projects")
+  defp assistant_project_name(project), do: project.name
+
+  defp assistant_message_label("assistant"), do: translated("Assistant")
+  defp assistant_message_label("user"), do: translated("You")
+  defp assistant_message_label(_role), do: translated("Assistant")
+
+  defp assistant_message_testid(role), do: "assistant-message-#{role}"
 
   defp media_thumbnail_glyph(mime_type) do
     case String.split(to_string(mime_type || ""), "/", parts: 2) do

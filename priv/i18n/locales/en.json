@@ -221,5 +221,9 @@
   "View": "View",
   "Welcome to bDS2": "Welcome to bDS2",
   "Workbench Notes": "Workbench Notes",
-  "Working tree integration is not wired yet in the shell, but the tab is selectable and ready for command output.": "Working tree integration is not wired yet in the shell, but the tab is selectable and ready for command output."
+  "Working tree integration is not wired yet in the shell, but the tab is selectable and ready for command output.": "Working tree integration is not wired yet in the shell, but the tab is selectable and ready for command output.",
+  "Ask the assistant about the active project or editor.": "Ask the assistant about the active project or editor.",
+  "Start chat": "Start chat",
+  "You": "You",
+  "The assistant sidebar chat surface is ready, but model execution is not connected yet.": "The assistant sidebar chat surface is ready, but model execution is not connected yet."
 }
