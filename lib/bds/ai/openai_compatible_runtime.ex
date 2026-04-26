@@ -3,6 +3,23 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
 
   alias BDS.AI.HttpClient
 
+  def list_models(endpoint, opts \\ []) when is_map(endpoint) and is_list(opts) do
+    http_client = Keyword.get(opts, :http_client, HttpClient)
+    url = models_url(endpoint.url)
+
+    headers =
+      %{"accept" => "application/json"}
+      |> maybe_put_auth(endpoint.api_key)
+
+    with {:ok, response} <- http_client.get(url, headers),
+         200 <- response.status do
+      normalize_models_response(response.body)
+    else
+      status when is_integer(status) -> {:error, %{kind: :http_error, status: status}}
+      {:error, reason} -> {:error, %{kind: :http_error, reason: reason}}
+    end
+  end
+
   def generate(endpoint, request, _opts) when is_map(endpoint) and is_map(request) do
     url = completions_url(endpoint.url)
 
@@ -55,6 +72,36 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
       String.ends_with?(url, "/") -> url <> "chat/completions"
       true -> url <> "/chat/completions"
     end
+  end
+
+  defp models_url(url) do
+    cond do
+      String.ends_with?(url, "/chat/completions") -> String.replace_suffix(url, "/chat/completions", "/models")
+      String.ends_with?(url, "/models") -> url
+      String.ends_with?(url, "/") -> url <> "models"
+      true -> url <> "/models"
+    end
+  end
+
+  defp normalize_models_response(body) do
+    payload = Jason.decode!(body)
+
+    models =
+      payload
+      |> Map.get("data", [])
+      |> Enum.map(fn entry ->
+        id = entry["id"] || entry[:id]
+
+        %{
+          id: id,
+          label: id
+        }
+      end)
+      |> Enum.reject(&is_nil(&1.id))
+      |> Enum.uniq_by(& &1.id)
+      |> Enum.sort_by(&String.downcase(&1.id))
+
+    {:ok, models}
   end
 
   defp maybe_put_auth(headers, nil), do: headers

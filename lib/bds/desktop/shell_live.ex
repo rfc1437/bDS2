@@ -5,6 +5,7 @@ defmodule BDS.Desktop.ShellLive do
 
   import Phoenix.HTML
 
+  alias BDS.AI
   alias BDS.Desktop.{FilePicker, FolderPicker, Overlay, ShellCommands, ShellData}
   alias BDS.Desktop.ShellLive.{ChatEditor, CodeEntityEditor, MediaEditor, MiscEditor, SettingsEditor, TagsEditor}
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
@@ -54,7 +55,7 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:page_title, ShellData.title())
      |> assign(:page_language, ShellData.ui_language())
       |> assign(:client_shortcuts, Commands.client_shortcuts())
-     |> assign(:offline_mode, true)
+    |> assign(:offline_mode, AI.airplane_mode?(true))
       |> assign(:assistant_prompt, "")
       |> assign(:assistant_messages, [])
     |> assign(:is_mac_ui, mac_ui?())
@@ -81,6 +82,7 @@ defmodule BDS.Desktop.ShellLive do
         |> assign(:media_editor_translation_forms, %{})
         |> assign(:settings_editor_search, "")
         |> assign(:settings_editor_project_draft, %{})
+          |> assign(:settings_editor_endpoint_models, %{})
         |> assign(:settings_editor_publishing_draft, %{})
         |> assign(:settings_editor_new_category, "")
         |> assign(:style_editor_theme, nil)
@@ -343,7 +345,11 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("toggle_offline_mode", _params, socket) do
-    socket = assign(socket, :offline_mode, not socket.assigns.offline_mode)
+    next_mode = not socket.assigns.offline_mode
+
+    :ok = AI.set_airplane_mode(next_mode)
+    socket = assign(socket, :offline_mode, next_mode)
+
     {:noreply, reload_shell(socket, socket.assigns.workbench)}
   end
 
@@ -533,6 +539,11 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("change_settings_ai", %{"settings_ai" => params}, socket) do
     {:noreply, SettingsEditor.update_ai_draft(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("refresh_settings_ai_models", %{"endpoint" => endpoint}, socket) do
+    endpoint_key = String.to_existing_atom(endpoint)
+    {:noreply, SettingsEditor.refresh_ai_models(socket, endpoint_key, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("save_settings_ai", _params, socket) do
@@ -1023,7 +1034,7 @@ defmodule BDS.Desktop.ShellLive do
     task_status = BDS.Tasks.status_snapshot()
     activity_buttons = Workbench.activity_buttons(workbench, git_badge_count)
     page_language = socket.assigns[:page_language] || ShellData.ui_language()
-    offline_mode = Map.get(socket.assigns, :offline_mode, true)
+    offline_mode = Map.get(socket.assigns, :offline_mode, AI.airplane_mode?(true))
 
     socket
     |> assign(:workbench, workbench)

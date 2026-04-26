@@ -18,6 +18,20 @@ defmodule BDS.Desktop.ShellLiveTest do
   alias BDS.ImportDefinitions
   alias BDS.UI.{Session, Workbench}
 
+  defmodule FakeEndpointModelHttpClient do
+    def get("https://api.example.test/v1/models", _headers) do
+      {:ok,
+       %{status: 200, headers: %{}, body: Jason.encode!(%{"data" => [%{"id" => "gpt-4.1"}, %{"id" => "gpt-4.1-mini"}]})}}
+    end
+
+    def get("http://localhost:11434/v1/models", _headers) do
+      {:ok,
+       %{status: 200, headers: %{}, body: Jason.encode!(%{"data" => [%{"id" => "llama3.3"}, %{"id" => "llava:latest"}]})}}
+    end
+
+    def get(_url, _headers), do: {:error, :not_found}
+  end
+
   @endpoint BDS.Desktop.Endpoint
 
   setup do
@@ -34,6 +48,7 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     original_shell_platform = Application.get_env(:bds, :shell_platform)
     original_git_remote_state_provider = Application.get_env(:bds, :git_remote_state_provider)
+    original_ai_http_client = Application.get_env(:bds, :ai_http_client)
 
     on_exit(fn ->
       if is_nil(original_shell_platform) do
@@ -46,6 +61,12 @@ defmodule BDS.Desktop.ShellLiveTest do
         Application.delete_env(:bds, :git_remote_state_provider)
       else
         Application.put_env(:bds, :git_remote_state_provider, original_git_remote_state_provider)
+      end
+
+      if is_nil(original_ai_http_client) do
+        Application.delete_env(:bds, :ai_http_client)
+      else
+        Application.put_env(:bds, :ai_http_client, original_ai_http_client)
       end
     end)
 
@@ -211,12 +232,12 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(aria-label="Media")
     assert html =~ ~s(data-view="media")
 
-    html =
+    settings_html =
       view
       |> element("[data-testid='activity-button'][data-view='settings']")
       |> render_click()
 
-    assert html =~ ~s(data-testid="sidebar-open-item")
+    assert settings_html =~ ~s(data-testid="sidebar-open-item")
 
     html =
       view
@@ -385,6 +406,142 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-testid="assistant-message-assistant")
     assert html =~ "Summarize the current project"
     assert html =~ "Automatic AI actions stay gated by airplane mode."
+  end
+
+  test "ai settings expose two openai-compatible endpoints and clear legacy mistral config" do
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:mistral, %{
+               url: "https://legacy.example.test/v1",
+               api_key: "legacy-secret",
+               model: "legacy-model"
+             })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      view
+      |> element("[data-testid='activity-button'][data-view='settings']")
+      |> render_click()
+
+    html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='settings-project']")
+      |> render_click()
+
+    assert html =~ "AI"
+    assert html =~ "Online Endpoint URL"
+    assert html =~ "Offline Endpoint URL"
+    assert html =~ "Online API Key"
+    assert html =~ "Offline API Key"
+    refute html =~ "Mistral API Key"
+    refute html =~ "Anthropic / Online API Key"
+
+    _html =
+      render_change(view, "change_settings_ai", %{
+        "settings_ai" => %{
+          "online_url" => "https://api.example.test/v1",
+          "online_api_key" => "online-secret",
+          "online_chat_model" => "gpt-4.1",
+          "online_title_model" => "gpt-4.1-mini",
+          "online_image_analysis_model" => "gpt-4.1-vision",
+          "offline_url" => "http://localhost:11434/v1",
+          "offline_api_key" => "",
+          "offline_chat_model" => "llama3.3",
+          "offline_title_model" => "llama3.2",
+          "offline_image_analysis_model" => "llava:latest",
+          "offline_mode" => "true",
+          "system_prompt" => "You are the local test prompt."
+        }
+      })
+
+    _html = render_click(view, "save_settings_ai")
+
+    assert {:ok, online_endpoint} = AI.get_endpoint(:online)
+    assert online_endpoint.url == "https://api.example.test/v1"
+    assert online_endpoint.api_key == "online-secret"
+    assert online_endpoint.model == "gpt-4.1"
+
+    assert {:ok, offline_endpoint} = AI.get_endpoint(:airplane)
+    assert offline_endpoint.url == "http://localhost:11434/v1"
+    assert offline_endpoint.api_key in [nil, ""]
+    assert offline_endpoint.model == "llama3.3"
+
+    assert {:ok, nil} = AI.get_endpoint(:mistral)
+    assert AI.airplane_mode?()
+    assert {:ok, "gpt-4.1"} = AI.get_model_preference(:chat)
+    assert {:ok, "gpt-4.1-mini"} = AI.get_model_preference(:title)
+    assert {:ok, "gpt-4.1-vision"} = AI.get_model_preference(:image_analysis)
+    assert {:ok, "llama3.3"} = AI.get_model_preference(:airplane_chat)
+    assert {:ok, "llama3.2"} = AI.get_model_preference(:airplane_title)
+    assert {:ok, "llava:latest"} = AI.get_model_preference(:airplane_image_analysis)
+  end
+
+  test "ai settings refresh models from the configured endpoints" do
+    Application.put_env(:bds, :ai_http_client, FakeEndpointModelHttpClient)
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      view
+      |> element("[data-testid='activity-button'][data-view='settings']")
+      |> render_click()
+
+    html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='settings-project']")
+      |> render_click()
+
+    assert html =~ "Refresh Online Models"
+    assert html =~ "Refresh Offline Models"
+
+    _html =
+      render_change(view, "change_settings_ai", %{
+        "settings_ai" => %{
+          "online_url" => "https://api.example.test/v1",
+          "offline_url" => "http://localhost:11434/v1"
+        }
+      })
+
+    html =
+      view
+      |> element("button[phx-click='refresh_settings_ai_models'][phx-value-endpoint='online']")
+      |> render_click()
+
+    assert html =~ ~s(<option value="gpt-4.1"></option>)
+    assert html =~ ~s(<option value="gpt-4.1-mini"></option>)
+
+    html =
+      view
+      |> element("button[phx-click='refresh_settings_ai_models'][phx-value-endpoint='airplane']")
+      |> render_click()
+
+    assert html =~ ~s(<option value="llama3.3"></option>)
+    assert html =~ ~s(<option value="llava:latest"></option>)
+  end
+
+  test "status bar airplane toggle persists the active ai mode" do
+    assert :ok = AI.set_airplane_mode(false)
+
+    {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    refute html =~ ~s(status-bar-item offline-badge active)
+    refute AI.airplane_mode?()
+
+    html =
+      view
+      |> element("[data-testid='status-offline-button']")
+      |> render_click()
+
+    assert html =~ ~s(status-bar-item offline-badge active)
+    assert AI.airplane_mode?()
+
+    html =
+      view
+      |> element("[data-testid='status-offline-button']")
+      |> render_click()
+
+    refute html =~ ~s(status-bar-item offline-badge active)
+    refute AI.airplane_mode?()
   end
 
   test "sidebar open supports preview and pin intents for entity tabs" do

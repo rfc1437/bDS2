@@ -75,6 +75,19 @@ defmodule BDS.AITest do
     end
   end
 
+  defmodule FakeEndpointHttpClient do
+    def get("https://api.example.test/v1/models", _headers) do
+      {:ok,
+       %{
+         status: 200,
+         headers: %{},
+         body: Jason.encode!(%{"data" => [%{"id" => "gpt-4.1"}, %{"id" => "gpt-4.1-mini"}]})
+       }}
+    end
+
+    def get(_url, _headers), do: {:error, :not_found}
+  end
+
   defmodule FakeRuntime do
     def generate(endpoint, request, opts) do
       test_pid = Keyword.fetch!(opts, :test_pid)
@@ -222,6 +235,15 @@ defmodule BDS.AITest do
     assert {:ok, result} = BDS.AI.refresh_model_catalog(http_client: http_client)
     assert result.not_modified == true
     assert_received {:conditional_headers, %{"accept" => "application/json", "if-none-match" => "W/\"catalog-v1\""}}
+  end
+
+  test "list_endpoint_models reads openai-compatible models from the configured endpoint" do
+    assert {:ok, models} =
+             BDS.AI.list_endpoint_models(%{url: "https://api.example.test/v1", api_key: "online-secret"},
+               http_client: FakeEndpointHttpClient
+             )
+
+    assert [%{id: "gpt-4.1", label: "gpt-4.1"}, %{id: "gpt-4.1-mini", label: "gpt-4.1-mini"}] = models
   end
 
   test "airplane mode routes title tasks to airplane endpoint and offline title model" do

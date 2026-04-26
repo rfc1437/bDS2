@@ -75,6 +75,11 @@ defmodule BDS.AI do
     :ok
   end
 
+  def list_endpoint_models(endpoint, opts \\ []) when is_map(endpoint) and is_list(opts) do
+    http_client = Keyword.get(opts, :http_client, Application.get_env(:bds, :ai_http_client, BDS.AI.HttpClient))
+    OpenAICompatibleRuntime.list_models(endpoint, http_client: http_client)
+  end
+
   def refresh_model_catalog(opts \\ []) when is_list(opts) do
     http_client = Keyword.get(opts, :http_client, BDS.AI.HttpClient)
 
@@ -147,8 +152,12 @@ defmodule BDS.AI do
     put_setting("ai.airplane_mode_enabled", Atom.to_string(enabled))
   end
 
-  def airplane_mode? do
-    get_setting("ai.airplane_mode_enabled") == "true"
+  def airplane_mode?(default \\ false) when is_boolean(default) do
+    case get_setting("ai.airplane_mode_enabled") do
+      nil -> default
+      "false" -> false
+      _other -> true
+    end
   end
 
   def put_model_preference(key, model) when is_atom(key) and is_binary(model) do
@@ -709,11 +718,11 @@ defmodule BDS.AI do
   end
 
   defp resolve_model_for_operation(:chat, :online, endpoint, conversation: conversation) do
-    {:ok, conversation.model || get_model_preference_value(:chat) || get_model_preference_value(:default) || endpoint.model}
+    {:ok, conversation.model || get_model_preference_value(:chat) || endpoint.model}
   end
 
   defp resolve_model_for_operation(:chat, :online, endpoint, _extra) do
-    {:ok, get_model_preference_value(:chat) || get_model_preference_value(:default) || endpoint.model}
+    {:ok, get_model_preference_value(:chat) || endpoint.model}
   end
 
   defp resolve_model_for_operation(:analyze_image, :airplane, endpoint, _extra) do
@@ -721,7 +730,7 @@ defmodule BDS.AI do
   end
 
   defp resolve_model_for_operation(:analyze_image, :online, endpoint, _extra) do
-    {:ok, get_model_preference_value(:image_analysis) || get_model_preference_value(:default) || endpoint.model}
+    {:ok, get_model_preference_value(:image_analysis) || endpoint.model}
   end
 
   defp resolve_model_for_operation(_operation, :airplane, endpoint, _extra) do
@@ -729,7 +738,7 @@ defmodule BDS.AI do
   end
 
   defp resolve_model_for_operation(_operation, :online, endpoint, _extra) do
-    {:ok, get_model_preference_value(:title) || get_model_preference_value(:default) || endpoint.model}
+    {:ok, get_model_preference_value(:title) || endpoint.model}
   end
 
   defp validate_runtime_target(:analyze_image, model, _mode) do

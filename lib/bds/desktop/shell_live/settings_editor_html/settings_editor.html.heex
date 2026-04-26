@@ -203,90 +203,76 @@
 
       <%= if @settings_editor.ai_visible? do %>
         <div class="setting-section" id="settings-section-ai">
-          <div class="setting-section-header"><h3><%= translated("AI") %></h3><p class="setting-section-description"><%= translated("Provider keys, model preferences, airplane mode, and system prompt") %></p></div>
+          <div class="setting-section-header"><h3><%= translated("AI") %></h3><p class="setting-section-description"><%= translated("OpenAI-compatible endpoints, model routing, airplane mode, and system prompt") %></p></div>
           <form class="setting-section-content" phx-change="change_settings_ai">
             <div class="setting-row">
-              <div class="setting-info"><label class="setting-label"><%= translated("Anthropic / Online API Key") %></label></div>
+              <div class="setting-info"><label class="setting-label"><%= translated("Online Endpoint URL") %></label></div>
+              <div class="setting-control">
+                <div class="setting-input-group">
+                  <input type="url" name="settings_ai[online_url]" value={@settings_editor.ai["online_url"]} />
+                  <button class="secondary" type="button" phx-click="refresh_settings_ai_models" phx-value-endpoint="online"><%= translated("Refresh Online Models") %></button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Online API Key") %></label></div>
               <div class="setting-control"><input type="password" name="settings_ai[online_api_key]" value={@settings_editor.ai["online_api_key"]} /></div>
             </div>
             <div class="setting-row">
-              <div class="setting-info"><label class="setting-label"><%= translated("Mistral API Key") %></label></div>
-              <div class="setting-control"><input type="password" name="settings_ai[mistral_api_key]" value={@settings_editor.ai["mistral_api_key"]} /></div>
+              <div class="setting-info"><label class="setting-label"><%= translated("Online Chat Model") %></label></div>
+              <div class="setting-control"><input type="text" list="settings-ai-online-models" name="settings_ai[online_chat_model]" value={@settings_editor.ai["online_chat_model"]} /></div>
             </div>
             <div class="setting-row">
-              <div class="setting-info"><label class="setting-label"><%= translated("Offline Mode") %></label></div>
+              <div class="setting-info"><label class="setting-label"><%= translated("Online Title Model") %></label></div>
+              <div class="setting-control"><input type="text" list="settings-ai-online-models" name="settings_ai[online_title_model]" value={@settings_editor.ai["online_title_model"]} /></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Online Image Analysis Model") %></label></div>
+              <div class="setting-control"><input type="text" list="settings-ai-online-models" name="settings_ai[online_image_analysis_model]" value={@settings_editor.ai["online_image_analysis_model"]} /></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Offline Endpoint URL") %></label></div>
+              <div class="setting-control">
+                <div class="setting-input-group">
+                  <input type="url" name="settings_ai[offline_url]" value={@settings_editor.ai["offline_url"]} />
+                  <button class="secondary" type="button" phx-click="refresh_settings_ai_models" phx-value-endpoint="airplane"><%= translated("Refresh Offline Models") %></button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Offline API Key") %></label></div>
+              <div class="setting-control"><input type="password" name="settings_ai[offline_api_key]" value={@settings_editor.ai["offline_api_key"]} /></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Airplane Mode") %></label></div>
               <div class="setting-control"><label><input type="checkbox" name="settings_ai[offline_mode]" checked={@settings_editor.ai["offline_mode"]} /> <%= translated("Route AI tasks through the airplane endpoint") %></label></div>
             </div>
             <div class="setting-row">
-              <div class="setting-info"><label class="setting-label"><%= translated("Default Model") %></label></div>
-              <div class="setting-control">
-                <select name="settings_ai[default_model]">
-                  <option value=""></option>
-                  <%= for model <- @settings_editor.model_options do %>
-                    <option value={model.id} selected={model.id == @settings_editor.ai["default_model"]}><%= model.label %></option>
-                  <% end %>
-                </select>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info"><label class="setting-label"><%= translated("Title Model") %></label></div>
-              <div class="setting-control">
-                <select name="settings_ai[title_model]">
-                  <option value=""></option>
-                  <%= for model <- @settings_editor.model_options do %>
-                    <option value={model.id} selected={model.id == @settings_editor.ai["title_model"]}><%= model.label %></option>
-                  <% end %>
-                </select>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-info"><label class="setting-label"><%= translated("Image Analysis Model") %></label></div>
-              <div class="setting-control">
-                <select name="settings_ai[image_analysis_model]">
-                  <option value=""></option>
-                  <%= for model <- @settings_editor.image_model_options do %>
-                    <option value={model.id} selected={model.id == @settings_editor.ai["image_analysis_model"]}><%= model.label %></option>
-                  <% end %>
-                </select>
-              </div>
-            </div>
-            <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Offline Chat Model") %></label></div>
-              <div class="setting-control">
-                <select name="settings_ai[offline_chat_model]">
-                  <option value=""></option>
-                  <%= for model <- @settings_editor.model_options do %>
-                    <option value={model.id} selected={model.id == @settings_editor.ai["offline_chat_model"]}><%= model.label %></option>
-                  <% end %>
-                </select>
-              </div>
+              <div class="setting-control"><input type="text" list="settings-ai-offline-models" name="settings_ai[offline_chat_model]" value={@settings_editor.ai["offline_chat_model"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Offline Title Model") %></label></div>
-              <div class="setting-control">
-                <select name="settings_ai[offline_title_model]">
-                  <option value=""></option>
-                  <%= for model <- @settings_editor.model_options do %>
-                    <option value={model.id} selected={model.id == @settings_editor.ai["offline_title_model"]}><%= model.label %></option>
-                  <% end %>
-                </select>
-              </div>
+              <div class="setting-control"><input type="text" list="settings-ai-offline-models" name="settings_ai[offline_title_model]" value={@settings_editor.ai["offline_title_model"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Offline Image Analysis Model") %></label></div>
-              <div class="setting-control">
-                <select name="settings_ai[offline_image_analysis_model]">
-                  <option value=""></option>
-                  <%= for model <- @settings_editor.image_model_options do %>
-                    <option value={model.id} selected={model.id == @settings_editor.ai["offline_image_analysis_model"]}><%= model.label %></option>
-                  <% end %>
-                </select>
-              </div>
+              <div class="setting-control"><input type="text" list="settings-ai-offline-models" name="settings_ai[offline_image_analysis_model]" value={@settings_editor.ai["offline_image_analysis_model"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("System Prompt") %></label></div>
               <div class="setting-control"><textarea name="settings_ai[system_prompt]" rows="12"><%= @settings_editor.ai["system_prompt"] %></textarea></div>
             </div>
+            <datalist id="settings-ai-online-models">
+              <%= for model <- @settings_editor.online_endpoint_models do %>
+                <option value={model.id}></option>
+              <% end %>
+            </datalist>
+            <datalist id="settings-ai-offline-models">
+              <%= for model <- @settings_editor.offline_endpoint_models do %>
+                <option value={model.id}></option>
+              <% end %>
+            </datalist>
           </form>
           <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_ai"><%= translated("Save") %></button><button class="secondary" type="button" phx-click="reset_settings_ai_prompt"><%= translated("Reset to Default") %></button></div>
         </div>
