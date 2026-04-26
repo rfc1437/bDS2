@@ -24,6 +24,10 @@ defmodule BDS.Desktop.Automation do
     GenServer.call(session, {:click, selector}, @request_timeout)
   end
 
+  def press(session, shortcut) when is_binary(shortcut) do
+    GenServer.call(session, {:press, shortcut}, @request_timeout)
+  end
+
   def capture_screenshot(session, destination) when is_binary(destination) do
     GenServer.call(session, {:capture_screenshot, destination}, @request_timeout)
   end
@@ -75,6 +79,11 @@ defmodule BDS.Desktop.Automation do
 
   def handle_call({:click, selector}, _from, state) do
     {reply, state} = driver_request(state, %{"command" => "click", "selector" => selector})
+    {:reply, normalize_simple_reply(reply), state}
+  end
+
+  def handle_call({:press, shortcut}, _from, state) do
+    {reply, state} = driver_request(state, %{"command" => "press", "shortcut" => shortcut})
     {:reply, normalize_simple_reply(reply), state}
   end
 

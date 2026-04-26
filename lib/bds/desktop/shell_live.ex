@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive do
   import Phoenix.HTML
 
   alias BDS.Desktop.ShellData
+  alias BDS.UI.Commands
   alias BDS.UI.Registry
   alias BDS.UI.Workbench
 
@@ -63,6 +64,14 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("pin_sidebar_item", %{"route" => _route, "id" => _id} = params, socket) do
     {:noreply, open_sidebar_item(socket, params, :pin)}
+  end
+
+  def handle_event("shortcut", params, socket) do
+    if ignore_shortcut?(params) do
+      {:noreply, socket}
+    else
+      {:noreply, reload_shell(socket, Commands.handle_shortcut(socket.assigns.workbench, params))}
+    end
   end
 
   def handle_event("select_tab", %{"type" => type, "id" => id}, socket) do
@@ -428,6 +437,14 @@ defmodule BDS.Desktop.ShellLive do
 
   defp current_tab(%{tabs: tabs, active_tab: {type, id}}) do
     Enum.find(tabs, &(&1.type == type and &1.id == id))
+  end
+
+  defp ignore_shortcut?(params) do
+    Map.get(params, "alt", false) or
+      Map.get(params, "contentEditable", false) or
+      Map.get(params, "content_editable", false) or
+      Map.get(params, "tag") in ["INPUT", "TEXTAREA", "SELECT"] or
+      Map.get(params, :tag) in ["INPUT", "TEXTAREA", "SELECT"]
   end
 
   defp open_sidebar_item(socket, params, intent) do

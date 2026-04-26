@@ -125,4 +125,33 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert String.contains?(html, ">hero.png<")
     assert String.contains?(html, ">cover.png<")
   end
+
+  test "global shortcuts route through the shared command model" do
+    {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert html =~ ~s(data-testid="sidebar-shell")
+    assert html =~ ~s(class="panel-shell is-hidden")
+
+    html = render_keydown(view, "shortcut", %{key: "b", meta: true})
+    assert html =~ ~s(class="sidebar-shell is-hidden")
+
+    html = render_keydown(view, "shortcut", %{key: "j", meta: true})
+    refute html =~ ~s(class="panel-shell is-hidden")
+
+    html = render_keydown(view, "shortcut", %{key: "2", meta: true})
+    assert html =~ ~s(data-view="media")
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "media",
+        "id" => "media-1",
+        "title" => "hero.png",
+        "subtitle" => "12 KB"
+      })
+
+    assert html =~ ~s(data-tab-id="media-1")
+
+    html = render_keydown(view, "shortcut", %{key: "w", meta: true})
+    refute html =~ ~s(data-tab-id="media-1")
+  end
 end

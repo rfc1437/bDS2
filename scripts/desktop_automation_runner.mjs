@@ -63,6 +63,13 @@ for await (const line of rl) {
       continue;
     }
 
+    if (message.command === "press") {
+      await page.keyboard.press(message.shortcut);
+      await page.waitForTimeout(50);
+      console.log(JSON.stringify({ ref, status: "ok", result: "ok" }));
+      continue;
+    }
+
     if (message.command === "screenshot") {
       await page.screenshot({ path: message.path, fullPage: false });
       console.log(JSON.stringify({ ref, status: "ok", result: message.path }));

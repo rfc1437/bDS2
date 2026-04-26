@@ -32,7 +32,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const liveSocket = new LiveView.LiveSocket("/live", Phoenix.Socket, {
     params: { _csrf_token: csrfToken },
-    hooks: Hooks
+    hooks: Hooks,
+    metadata: {
+      keydown: (event) => ({
+        key: event.key,
+        meta: event.metaKey,
+        ctrl: event.ctrlKey,
+        alt: event.altKey,
+        shift: event.shiftKey,
+        tag: event.target?.tagName || null,
+        contentEditable: event.target?.isContentEditable || false
+      })
+    }
   });
 
   liveSocket.connect();
