@@ -83,6 +83,17 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, reload_shell(socket, workbench)}
   end
 
+  def handle_event("close_tab", %{"type" => type, "id" => id}, socket) do
+    type_atom = String.to_existing_atom(type)
+    workbench = Workbench.close_tab(socket.assigns.workbench, type_atom, id)
+    tab_meta = Map.delete(socket.assigns.tab_meta, {type_atom, id})
+
+    {:noreply,
+     socket
+     |> assign(:tab_meta, tab_meta)
+     |> reload_shell(workbench)}
+  end
+
   def handle_event("toggle_offline_mode", _params, socket) do
     socket = assign(socket, :offline_mode, not socket.assigns.offline_mode)
     {:noreply, reload_shell(socket, socket.assigns.workbench)}

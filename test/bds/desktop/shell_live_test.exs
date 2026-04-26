@@ -55,5 +55,13 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ ~s(data-tab-type="settings")
     assert html =~ ">Settings<"
+
+    html =
+      view
+      |> element("[data-testid='tab-close'][data-tab-type='settings'][data-tab-id='settings']")
+      |> render_click()
+
+    refute html =~ ~s(data-tab-type="settings")
+    assert html =~ ~s(class="tab-bar-empty")
   end
 end

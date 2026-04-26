@@ -112,19 +112,36 @@
         <% else %>
           <div class="tab-bar-tabs">
             <%= for tab <- @workbench.tabs do %>
-              <button
+              <div
                 class={["tab", if(@workbench.active_tab == {tab.type, tab.id}, do: "active"), if(tab.is_transient, do: "transient")]}
                 data-tab-type={tab.type}
                 data-tab-id={tab.id}
-                type="button"
-                phx-click="select_tab"
-                phx-value-type={tab.type}
-                phx-value-id={tab.id}
               >
-                <span class="tab-icon"><%= raw(ShellData.activity_icon(tab_icon_id(tab))) %></span>
-                <span class="tab-title"><%= tab_title(tab, @tab_meta) %></span>
-                <span class="tab-close" aria-hidden="true">×</span>
-              </button>
+                <button
+                  class="tab-select"
+                  type="button"
+                  phx-click="select_tab"
+                  phx-value-type={tab.type}
+                  phx-value-id={tab.id}
+                >
+                  <span class="tab-icon"><%= raw(ShellData.activity_icon(tab_icon_id(tab))) %></span>
+                  <span class="tab-title"><%= tab_title(tab, @tab_meta) %></span>
+                </button>
+                <button
+                  class="tab-close"
+                  data-testid="tab-close"
+                  data-tab-type={tab.type}
+                  data-tab-id={tab.id}
+                  type="button"
+                  phx-click="close_tab"
+                  phx-value-type={tab.type}
+                  phx-value-id={tab.id}
+                  aria-label={translated("Close tab")}
+                  title={translated("Close tab")}
+                >
+                  ×
+                </button>
+              </div>
             <% end %>
           </div>
         <% end %>
