@@ -338,9 +338,11 @@ defmodule BDS.UI.ShellTest do
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
     post_editor_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor.ex")
+    post_template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex")
 
     assert template =~ "<PostEditor.post_editor"
     assert post_editor_ex =~ "def build(%{current_tab: %{type: :post, id: post_id}} = assigns)"
+    assert Regex.match?(~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= translated\("Quick Actions"\) %><\/span>/s, post_template)
 
     refute live_ex =~ "defp update_post_editor("
     refute live_ex =~ "defp persist_post_editor("

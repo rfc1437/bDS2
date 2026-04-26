@@ -24,7 +24,8 @@
           phx-click="toggle_post_editor_quick_actions"
           phx-value-id={@post_editor.id}
         >
-          <%= translated("Quick Actions") %>
+          <span class="quick-actions-btn-icon">⚡</span>
+          <span class="quick-actions-btn-label"><%= translated("Quick Actions") %></span>
         </button>
 
         <%= if @post_editor.quick_actions_open? do %>

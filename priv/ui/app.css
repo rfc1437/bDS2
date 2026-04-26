@@ -978,6 +978,11 @@ button svg * {
   white-space: nowrap;
 }
 
+.post-editor .quick-actions-btn-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
 .post-editor .quick-actions-menu {
   position: absolute;
   top: 100%;
