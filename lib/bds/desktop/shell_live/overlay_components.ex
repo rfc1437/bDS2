@@ -135,7 +135,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   defp existing_translations(_tab), do: %{}
 
   defp blog_languages(metadata) do
-    ([metadata.main_language || "en"] ++ (metadata.blog_languages || []))
+    ([metadata.main_language || "en"] ++ (metadata.blog_languages || []) ++ Enum.map(I18n.supported_languages(), & &1.code))
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end

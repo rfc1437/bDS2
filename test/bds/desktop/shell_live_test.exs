@@ -5,6 +5,7 @@ defmodule BDS.Desktop.ShellLiveTest do
   import Phoenix.LiveViewTest
 
   alias BDS.Persistence
+  alias BDS.Metadata
   alias BDS.Posts
   alias BDS.Posts.Post
   alias BDS.Projects
@@ -561,12 +562,19 @@ defmodule BDS.Desktop.ShellLiveTest do
   end
 
   test "post tabs render a real editor and drive save publish discard flows", %{project: project} do
+    assert {:ok, _tag} = Tags.create_tag(%{project_id: project.id, name: "alpha", color: "#112233"})
+    assert {:ok, _tag} = Tags.create_tag(%{project_id: project.id, name: "beta", color: "#445566"})
+    assert {:ok, _metadata} = Metadata.add_category(project.id, "notes")
+    assert {:ok, _metadata} = Metadata.add_category(project.id, "guides")
+
     {:ok, post} =
       Posts.create_post(%{
         project_id: project.id,
         title: "Draft Shell Post",
         content: "Initial body",
-        excerpt: "Initial excerpt"
+        excerpt: "Initial excerpt",
+        tags: ["alpha", "beta"],
+        categories: ["notes", "guides"]
       })
 
     {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
@@ -586,7 +594,44 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(name="post_editor[excerpt]")
     assert html =~ ~s(data-testid="post-publish-button")
     assert html =~ ~s(data-testid="post-discard-button")
+    assert html =~ ~s(data-testid="post-detect-language-button")
+    assert html =~ "quick-actions-wrapper"
+    assert html =~ "quick-actions-btn"
+    assert html =~ "editor-header"
+    assert html =~ "editor-content"
+    assert html =~ "metadata-toggle-header"
+    assert html =~ "editor-translations-flags"
+    assert html =~ "editor-header-row"
+    assert html =~ "editor-media-panel"
+    assert html =~ "editor-body"
+    assert html =~ "editor-toolbar"
+    assert html =~ "editor-footer"
+    assert html =~ "tag-input-container"
+    assert html =~ "tag-chip"
+    assert html =~ "alpha"
+    assert html =~ "beta"
+    assert html =~ "notes"
+    assert html =~ "guides"
+    refute html =~ ~s(phx-click="save_post_editor")
+    refute html =~ ~s(data-testid="post-delete-button")
+    refute html =~ "gallery-button"
     refute html =~ "Desktop workbench content routed through the Elixir shell."
+
+    html = render_click(view, "toggle_post_editor_quick_actions", %{"id" => post.id})
+
+    assert html =~ "quick-actions-menu"
+    assert html =~ "quick-action-item"
+    assert html =~ "quick-actions-divider"
+
+    html = render_click(view, "set_post_editor_mode", %{"id" => post.id, "mode" => "preview"})
+
+    assert html =~ ~s(data-testid="post-editor-preview")
+    assert html =~ "editor-preview-frame"
+    refute html =~ ~s(data-testid="post-editor-content")
+
+    html = render_click(view, "set_post_editor_mode", %{"id" => post.id, "mode" => "markdown"})
+
+    assert html =~ ~s(data-testid="post-editor-content")
 
     html =
       view
@@ -599,8 +644,7 @@ defmodule BDS.Desktop.ShellLiveTest do
           categories: "notes, guides",
           author: "Ada Lovelace",
           language: "de",
-          do_not_translate: "false",
-          template_slug: ""
+          do_not_translate: "false"
         }
       })
       |> render_change()
@@ -622,6 +666,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     html = render_click(view, "publish_post_editor", %{"id" => post.id})
 
     assert html =~ ~s(data-testid="post-status-badge")
+    assert html =~ ~s(data-testid="post-delete-button")
+    refute html =~ ~s(data-testid="post-publish-button")
+    refute html =~ ~s(data-testid="post-discard-button")
     assert Posts.get_post!(post.id).status == :published
 
     _html =
@@ -635,8 +682,7 @@ defmodule BDS.Desktop.ShellLiveTest do
           categories: "notes, guides",
           author: "Ada Lovelace",
           language: "de",
-          do_not_translate: "false",
-          template_slug: ""
+          do_not_translate: "false"
         }
       })
       |> render_change()

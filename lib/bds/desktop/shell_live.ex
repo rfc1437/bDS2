@@ -63,6 +63,9 @@ defmodule BDS.Desktop.ShellLive do
       |> assign(:sidebar_filter_panels, %{})
         |> assign(:post_editor_drafts, %{})
         |> assign(:post_editor_active_languages, %{})
+        |> assign(:post_editor_tag_queries, %{})
+        |> assign(:post_editor_category_queries, %{})
+        |> assign(:post_editor_quick_actions_open, %{})
         |> assign(:post_editor_modes, %{})
         |> assign(:post_editor_expanded, %{})
         |> assign(:post_editor_save_states, %{})
@@ -352,7 +355,40 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, PostEditor.select_language(socket, post_id, language, &reload_shell/2)}
   end
 
+  def handle_event("toggle_post_editor_quick_actions", %{"id" => post_id}, socket) do
+    {:noreply, PostEditor.toggle_quick_actions(socket, post_id, &reload_shell/2)}
+  end
+
+  def handle_event("detect_post_editor_language", %{"id" => post_id}, socket) do
+    {:noreply, PostEditor.detect_language(socket, post_id, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("add_post_editor_tag", %{"id" => post_id, "tag" => tag}, socket) do
+    {:noreply, PostEditor.add_list_value(socket, post_id, :tags, tag, &reload_shell/2)}
+  end
+
+  def handle_event("remove_post_editor_tag", %{"id" => post_id, "tag" => tag}, socket) do
+    {:noreply, PostEditor.remove_list_value(socket, post_id, :tags, tag, &reload_shell/2)}
+  end
+
+  def handle_event("add_post_editor_category", %{"id" => post_id, "category" => category}, socket) do
+    {:noreply, PostEditor.add_list_value(socket, post_id, :categories, category, &reload_shell/2)}
+  end
+
+  def handle_event("remove_post_editor_category", %{"id" => post_id, "category" => category}, socket) do
+    {:noreply, PostEditor.remove_list_value(socket, post_id, :categories, category, &reload_shell/2)}
+  end
+
   def handle_event("open_overlay", %{"kind" => kind}, socket) do
+    socket =
+      case socket.assigns[:current_tab] do
+        %{type: :post, id: post_id} when kind in ["ai_suggestions", "language_picker"] ->
+          assign(socket, :post_editor_quick_actions_open, Map.put(socket.assigns.post_editor_quick_actions_open, post_id, false))
+
+        _other ->
+          socket
+      end
+
     overlay =
       with overlay_kind when not is_nil(overlay_kind) <- ShellOverlayComponents.kind(kind),
            %{type: route} <- socket.assigns[:current_tab] do
@@ -405,16 +441,17 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("overlay_select_result", %{"id" => id}, socket) do
     overlay = socket.assigns[:shell_overlay]
+    current_tab = socket.assigns[:current_tab]
 
     socket =
-      case overlay do
-        %{kind: :insert_link} ->
+      case {overlay, current_tab} do
+        {%{kind: :insert_link}, %{type: :post, id: post_id}} ->
           case Overlay.insert_link_result(overlay, id) do
             nil -> socket
-            result -> close_overlay_with_output(socket, overlay.title, ShellOverlayComponents.markdown_link(result.title, result.canonical_url))
+            result -> PostEditor.insert_content(socket, post_id, ShellOverlayComponents.markdown_link(result.title, result.canonical_url), &reload_shell/2)
           end
 
-        %{kind: :insert_media} ->
+        {%{kind: :insert_media}, %{type: :post, id: post_id}} ->
           case Overlay.insert_media_result(overlay, id) do
             nil -> socket
             result ->
@@ -425,7 +462,7 @@ defmodule BDS.Desktop.ShellLive do
                   "[#{result.original_name}](bds-media://#{result.media_id})"
                 end
 
-              close_overlay_with_output(socket, overlay.title, syntax)
+              PostEditor.insert_content(socket, post_id, syntax, &reload_shell/2)
           end
 
         _other ->
@@ -436,9 +473,11 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("overlay_insert_external", _params, socket) do
+    current_tab = socket.assigns[:current_tab]
+
     socket =
-      case socket.assigns[:shell_overlay] do
-        %{kind: :insert_link} = overlay ->
+      case {socket.assigns[:shell_overlay], current_tab} do
+        {%{kind: :insert_link} = overlay, %{type: :post, id: post_id}} ->
           details =
             case {overlay.external_url, String.trim(overlay.external_text || "")} do
               {"", _text} -> nil
@@ -447,7 +486,7 @@ defmodule BDS.Desktop.ShellLive do
             end
 
           if details do
-            close_overlay_with_output(socket, overlay.title, details)
+            PostEditor.insert_content(socket, post_id, details, &reload_shell/2)
           else
             socket
           end
@@ -460,9 +499,13 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("overlay_select_language", %{"code" => code}, socket) do
+    current_tab = socket.assigns[:current_tab]
+
     socket =
-      case socket.assigns[:shell_overlay] do
-        %{kind: :language_picker, title: title} -> close_overlay_with_output(socket, title, code)
+      case {socket.assigns[:shell_overlay], current_tab} do
+        {%{kind: :language_picker}, %{type: :post, id: post_id}} ->
+          PostEditor.translate(socket, post_id, code, &reload_shell/2, &append_output_entry/5)
+
         _other -> socket
       end
 
@@ -470,17 +513,23 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("overlay_confirm", _params, socket) do
-    socket =
-      case socket.assigns[:shell_overlay] do
-        %{kind: :ai_suggestions, title: title} = overlay ->
-          selected = Overlay.selected_ai_fields(overlay)
-          details = Enum.map_join(selected, ", ", & &1.label)
-          close_overlay_with_output(socket, title, details)
+    current_tab = socket.assigns[:current_tab]
 
-        %{kind: :confirm_delete, title: title, entity_name: entity_name} ->
+    socket =
+      case {socket.assigns[:shell_overlay], current_tab} do
+        {%{kind: :ai_suggestions} = overlay, %{type: :post, id: post_id}} ->
+          PostEditor.apply_ai_suggestions(
+            socket,
+            post_id,
+            Overlay.selected_ai_fields(overlay),
+            &reload_shell/2,
+            &append_output_entry/5
+          )
+
+        {%{kind: :confirm_delete, title: title, entity_name: entity_name}, _tab} ->
           close_overlay_with_output(socket, title, entity_name)
 
-        %{kind: :confirm_dialog, title: title, message: message} ->
+        {%{kind: :confirm_dialog, title: title, message: message}, _tab} ->
           close_overlay_with_output(socket, title, message)
 
         _other ->

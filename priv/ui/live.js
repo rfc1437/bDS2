@@ -371,6 +371,35 @@ document.addEventListener("DOMContentLoaded", () => {
       destroyed() {
         this.el.removeEventListener("dblclick", this.handleDblClick);
       }
+    },
+
+    PostEditorContent: {
+      mounted() {
+        this.handleInsert = ({ id, content }) => {
+          if (!content || String(id) !== String(this.el.dataset.postEditorId)) {
+            return;
+          }
+
+          const start = this.el.selectionStart ?? this.el.value.length;
+          const end = this.el.selectionEnd ?? start;
+          const before = this.el.value.slice(0, start);
+          const after = this.el.value.slice(end);
+          const separator = before !== "" && !before.endsWith("\n") ? "\n" : "";
+          const suffix = after !== "" && !content.endsWith("\n") ? "\n" : "";
+          const inserted = `${separator}${content}${suffix}`;
+          const nextValue = `${before}${inserted}${after}`;
+
+          this.el.focus();
+          this.el.value = nextValue;
+
+          const caret = before.length + inserted.length;
+          this.el.setSelectionRange(caret, caret);
+          this.el.dispatchEvent(new Event("input", { bubbles: true }));
+          this.el.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+
+        this.handleEvent("post-editor-insert-content", this.handleInsert);
+      }
     }
   };
 
