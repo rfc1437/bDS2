@@ -5,6 +5,7 @@ defmodule BDS.Preview do
 
   alias BDS.Posts
   alias BDS.Posts.Translation
+  alias BDS.PreviewAssets
   alias BDS.Projects
   alias BDS.Repo
   alias BDS.Rendering
@@ -24,6 +25,17 @@ defmodule BDS.Preview do
       {:start_preview, project_id, Projects.project_data_dir(project), self()}
     )
   end
+
+  def ensure_preview(project_id) when is_binary(project_id) do
+    project = Projects.get_project!(project_id)
+
+    GenServer.call(
+      __MODULE__,
+      {:ensure_preview, project_id, Projects.project_data_dir(project), self()}
+    )
+  end
+
+  def base_url, do: "http://#{@host}:#{@port}"
 
   def stop_preview(project_id) when is_binary(project_id) do
     GenServer.call(__MODULE__, {:stop_preview, project_id})
@@ -48,31 +60,17 @@ defmodule BDS.Preview do
 
   @impl true
   def handle_call({:start_preview, project_id, data_dir, owner_pid}, _from, state) do
-    state = stop_current_server(state)
-    maybe_allow_repo(owner_pid)
+    {reply, next_state} = start_server(state, project_id, data_dir, owner_pid)
+    {:reply, reply, next_state}
+  end
 
-    {:ok, listener} =
-      :gen_tcp.listen(@port, [
-        :binary,
-        packet: :raw,
-        active: false,
-        reuseaddr: true,
-        ip: {127, 0, 0, 1}
-      ])
+  def handle_call({:ensure_preview, project_id, _data_dir, _owner_pid}, _from, %{current: %{project_id: project_id, is_running: true}} = state) do
+    {:reply, {:ok, public_server(state.current)}, state}
+  end
 
-    acceptor_pid = spawn_link(fn -> accept_loop(listener, project_id) end)
-
-    server = %{
-      project_id: project_id,
-      data_dir: data_dir,
-      host: @host,
-      port: @port,
-      is_running: true,
-      listener: listener,
-      acceptor_pid: acceptor_pid
-    }
-
-    {:reply, {:ok, public_server(server)}, %{state | current: server}}
+  def handle_call({:ensure_preview, project_id, data_dir, owner_pid}, _from, state) do
+    {reply, next_state} = start_server(state, project_id, data_dir, owner_pid)
+    {:reply, reply, next_state}
   end
 
   def handle_call({:stop_preview, project_id}, _from, state) do
@@ -141,24 +139,30 @@ defmodule BDS.Preview do
   defp ensure_running(_server, _project_id), do: {:error, :not_running}
 
   defp resolve_request(server, request_path, query_params) do
-    with {:ok, relative_path, kind} <- route_request(request_path) do
-      full_path =
-        case kind do
-          :media -> safe_join(server.data_dir, Path.join(["media", relative_path]))
-          :generated -> safe_join(Path.join(server.data_dir, "html"), relative_path)
-        end
+    case PreviewAssets.response(request_path) do
+      {:ok, response} ->
+        {:ok, response}
 
-      case full_path do
-        {:error, :not_found} ->
-          {:error, :not_found}
+      :error ->
+        with {:ok, relative_path, kind} <- route_request(request_path) do
+          full_path =
+            case kind do
+              :media -> safe_join(server.data_dir, Path.join(["media", relative_path]))
+              :generated -> safe_join(Path.join(server.data_dir, "html"), relative_path)
+            end
 
-        resolved_path ->
-          case read_response(resolved_path) do
-            {:error, :not_found} -> render_not_found_response(server.project_id, query_params)
-            {:ok, response} -> {:ok, apply_response_overrides(response, query_params)}
-            other -> other
+          case full_path do
+            {:error, :not_found} ->
+              {:error, :not_found}
+
+            resolved_path ->
+              case read_response(resolved_path) do
+                {:error, :not_found} -> render_not_found_response(server.project_id, query_params)
+                {:ok, response} -> {:ok, apply_response_overrides(response, query_params)}
+                other -> other
+              end
           end
-      end
+        end
     end
   end
 
@@ -197,8 +201,8 @@ defmodule BDS.Preview do
         %{
           id: translation.id,
           title: translation.title,
-          content: translation.content || "",
-          body: translation.content || "",
+          content: Posts.editor_body(translation),
+          body: Posts.editor_body(translation),
           slug: post.slug,
           language: translation.language,
           excerpt: translation.excerpt,
@@ -209,8 +213,8 @@ defmodule BDS.Preview do
         %{
           id: post.id,
           title: post.title,
-          content: post.content || "",
-          body: post.content || "",
+          content: Posts.editor_body(post),
+          body: Posts.editor_body(post),
           slug: post.slug,
           language: post.language,
           excerpt: post.excerpt,
@@ -385,6 +389,34 @@ defmodule BDS.Preview do
 
   defp stop_current_server(state), do: state
 
+  defp start_server(state, project_id, data_dir, owner_pid) do
+    state = stop_current_server(state)
+    maybe_allow_repo(owner_pid)
+
+    {:ok, listener} =
+      :gen_tcp.listen(@port, [
+        :binary,
+        packet: :raw,
+        active: false,
+        reuseaddr: true,
+        ip: {127, 0, 0, 1}
+      ])
+
+    acceptor_pid = spawn_link(fn -> accept_loop(listener, project_id) end)
+
+    server = %{
+      project_id: project_id,
+      data_dir: data_dir,
+      host: @host,
+      port: @port,
+      is_running: true,
+      listener: listener,
+      acceptor_pid: acceptor_pid
+    }
+
+    {{:ok, public_server(server)}, %{state | current: server}}
+  end
+
   defp public_server(server) do
     Map.take(server, [:project_id, :host, :port, :is_running])
   end
@@ -435,8 +467,21 @@ defmodule BDS.Preview do
 
   defp apply_preview_overrides(body, query_params) when is_binary(body) and is_map(query_params) do
     body
+    |> override_pico_stylesheet_href(normalize_override(query_params["theme"]))
     |> override_html_attribute("data-theme", normalize_override(query_params["theme"]))
     |> override_html_attribute("data-mode", normalize_override(query_params["mode"]))
+  end
+
+  defp override_pico_stylesheet_href(body, nil), do: body
+
+  defp override_pico_stylesheet_href(body, theme) do
+    replacement =
+      case theme do
+        "default" -> "/assets/pico.min.css"
+        value -> "/assets/pico.#{value}.min.css"
+      end
+
+    Regex.replace(~r{/assets/pico(?:\.[a-z]+)?\.min\.css}, body, replacement, global: false)
   end
 
   defp normalize_override(nil), do: nil

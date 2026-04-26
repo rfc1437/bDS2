@@ -172,8 +172,18 @@ defmodule BDS.Rendering do
           :page_title,
           Map.get(assigns, "page_title", Map.get(assigns, :title, Map.get(assigns, "title")))
         ),
-      pico_stylesheet_href: default_pico_stylesheet_href(),
-      html_theme_attribute: html_theme_attribute(metadata.pico_theme),
+      pico_stylesheet_href:
+        Map.get(
+          assigns,
+          :pico_stylesheet_href,
+          Map.get(assigns, "pico_stylesheet_href", default_pico_stylesheet_href(metadata.pico_theme))
+        ),
+      html_theme_attribute:
+        Map.get(
+          assigns,
+          :html_theme_attribute,
+          Map.get(assigns, "html_theme_attribute", html_theme_attribute(metadata.pico_theme))
+        ),
       blog_languages: blog_languages(metadata, language),
       alternate_links: alternate_links(canonical_post, project_id, main_language),
       menu_items: menu_items(project_id),
@@ -220,8 +230,18 @@ defmodule BDS.Rendering do
         ),
       page_title: Map.get(assigns, :page_title, Map.get(assigns, "page_title")),
       posts: posts,
-      pico_stylesheet_href: default_pico_stylesheet_href(),
-      html_theme_attribute: html_theme_attribute(metadata.pico_theme),
+      pico_stylesheet_href:
+        Map.get(
+          assigns,
+          :pico_stylesheet_href,
+          Map.get(assigns, "pico_stylesheet_href", default_pico_stylesheet_href(metadata.pico_theme))
+        ),
+      html_theme_attribute:
+        Map.get(
+          assigns,
+          :html_theme_attribute,
+          Map.get(assigns, "html_theme_attribute", html_theme_attribute(metadata.pico_theme))
+        ),
       blog_languages: blog_languages(metadata, language),
       alternate_links: [],
       menu_items: menu_items(project_id),
@@ -267,8 +287,18 @@ defmodule BDS.Rendering do
           :language_prefix,
           Map.get(assigns, "language_prefix", language_prefix(language, main_language))
         ),
-      pico_stylesheet_href: default_pico_stylesheet_href(),
-      html_theme_attribute: html_theme_attribute(metadata.pico_theme),
+      pico_stylesheet_href:
+        Map.get(
+          assigns,
+          :pico_stylesheet_href,
+          Map.get(assigns, "pico_stylesheet_href", default_pico_stylesheet_href(metadata.pico_theme))
+        ),
+      html_theme_attribute:
+        Map.get(
+          assigns,
+          :html_theme_attribute,
+          Map.get(assigns, "html_theme_attribute", html_theme_attribute(metadata.pico_theme))
+        ),
       blog_languages: blog_languages(metadata, language),
       menu_items: menu_items(project_id),
       alternate_links: [],
@@ -695,9 +725,13 @@ defmodule BDS.Rendering do
 
   defp html_theme_attribute(nil), do: nil
   defp html_theme_attribute(""), do: nil
+  defp html_theme_attribute("default"), do: nil
   defp html_theme_attribute(theme), do: ~s(data-theme="#{theme}")
 
-  defp default_pico_stylesheet_href, do: "/assets/pico.min.css"
+  defp default_pico_stylesheet_href(nil), do: "/assets/pico.min.css"
+  defp default_pico_stylesheet_href(""), do: "/assets/pico.min.css"
+  defp default_pico_stylesheet_href("default"), do: "/assets/pico.min.css"
+  defp default_pico_stylesheet_href(theme), do: "/assets/pico.#{theme}.min.css"
 
   defp href_for_language(""), do: "/"
   defp href_for_language(prefix), do: prefix <> "/"

@@ -78,6 +78,16 @@ defmodule BDS.PreviewTest do
     assert {:ok, %{body: "console.log('pagefind')", content_type: "application/javascript"}} =
              BDS.Preview.request(project.id, "/pagefind/pagefind-ui.js")
 
+    assert {:ok, %{body: pico_css, content_type: "text/css"}} =
+         BDS.Preview.request(project.id, "/assets/pico.min.css")
+
+    assert pico_css =~ ":root"
+
+    assert {:ok, %{body: bds_css, content_type: "text/css"}} =
+         BDS.Preview.request(project.id, "/assets/bds.css")
+
+    assert bds_css =~ ".blog-menu"
+
     assert {:ok, %{body: "media body", content_type: "text/plain"}} =
              BDS.Preview.request(project.id, "/media/2026/04/image.txt")
 
@@ -85,6 +95,7 @@ defmodule BDS.PreviewTest do
              BDS.Preview.preview_draft(project.id, "/draft/draft-post", post.id)
 
     assert draft_html =~ "Draft preview body"
+    assert draft_html =~ ~s(href="/assets/pico.min.css")
     assert {:error, :not_found} = BDS.Preview.request(project.id, "/media/../../secret.txt")
 
     assert :ok = BDS.Preview.stop_preview(project.id)
@@ -198,6 +209,40 @@ defmodule BDS.PreviewTest do
     assert fallback_html =~ ~s(<html lang="en")
     assert fallback_html =~ "Canonical Draft"
     assert fallback_html =~ "Canonical body"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "http draft preview serves published post body from the file-backed canonical route", %{
+    project: project
+  } do
+    :inets.start()
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Published HTTP Preview",
+               content: "Published body from file",
+               language: "en"
+             })
+
+    assert {:ok, _published} = Posts.publish_post(post.id)
+    assert {:ok, server} = BDS.Preview.start_preview(project.id)
+
+    datetime = DateTime.from_unix!(post.created_at, :millisecond)
+
+    request_url =
+      "http://#{server.host}:#{server.port}/#{datetime.year}/#{String.pad_leading(Integer.to_string(datetime.month), 2, "0")}/#{String.pad_leading(Integer.to_string(datetime.day), 2, "0")}/#{post.slug}?draft=true&post_id=#{post.id}"
+
+    assert {:ok, {{_version, 200, _reason}, _headers, body}} =
+             :httpc.request(
+               :get,
+               {to_charlist(request_url), []},
+               [],
+               body_format: :binary
+             )
+
+    assert body =~ "Published body from file"
 
     assert :ok = BDS.Preview.stop_preview(project.id)
   end
@@ -362,12 +407,14 @@ defmodule BDS.PreviewTest do
 
     assert generated_html =~ ~s(data-theme="amber")
     assert generated_html =~ ~s(data-mode="dark")
+    assert generated_html =~ ~s(/assets/pico.amber.min.css)
 
     assert {:ok, %{body: draft_html, content_type: "text/html"}} =
              BDS.Preview.preview_draft(project.id, "/draft/theme-draft?theme=amber&mode=dark", post.id)
 
     assert draft_html =~ ~s(data-theme="amber")
     assert draft_html =~ ~s(data-mode="dark")
+    assert draft_html =~ ~s(/assets/pico.amber.min.css)
 
     assert :ok = BDS.Preview.stop_preview(project.id)
   end

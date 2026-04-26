@@ -140,9 +140,20 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   def set_mode(socket, post_id, mode, reload) do
     workbench = socket.assigns.workbench
+    normalized_mode = normalize_mode(mode)
+
+    if normalized_mode == :preview do
+      case Repo.get(Post, post_id) do
+        %Post{} = post ->
+          _ = Preview.ensure_preview(post.project_id)
+
+        _other ->
+          :ok
+      end
+    end
 
     socket
-    |> assign(:post_editor_modes, Map.put(socket.assigns.post_editor_modes, post_id, normalize_mode(mode)))
+    |> assign(:post_editor_modes, Map.put(socket.assigns.post_editor_modes, post_id, normalized_mode))
     |> reload.(workbench)
   end
 
@@ -870,18 +881,13 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   defp preview_url(_post, _active_language, _canonical_language, mode) when mode != :preview, do: nil
 
   defp preview_url(%Post{} = post, active_language, canonical_language, :preview) do
-    with {:ok, server} <- Preview.start_preview(post.project_id) do
-      base_url = "http://#{server.host}:#{server.port}"
-      query =
-        %{}
-        |> maybe_put_query("draft", "true")
-        |> maybe_put_query("post_id", post.id)
-        |> maybe_put_query("lang", active_language != canonical_language && active_language)
+    query =
+      %{}
+      |> maybe_put_query("draft", "true")
+      |> maybe_put_query("post_id", post.id)
+      |> maybe_put_query("lang", active_language != canonical_language && active_language)
 
-      base_url <> canonical_preview_path(post.created_at, post.slug) <> "?" <> URI.encode_query(query)
-    else
-      _other -> nil
-    end
+    Preview.base_url() <> canonical_preview_path(post.created_at, post.slug) <> "?" <> URI.encode_query(query)
   end
 
   defp canonical_preview_path(created_at_ms, slug) do
