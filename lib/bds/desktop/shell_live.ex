@@ -2213,10 +2213,8 @@ defmodule BDS.Desktop.ShellLive do
   defp overlay_project_metadata(nil), do: %{main_language: "en", blog_languages: []}
 
   defp overlay_project_metadata(project_id) do
-    case Metadata.get_project_metadata(project_id) do
-      {:ok, metadata} -> metadata
-      _other -> %{main_language: "en", blog_languages: []}
-    end
+    {:ok, metadata} = Metadata.get_project_metadata(project_id)
+    metadata
   rescue
     _error -> %{main_language: "en", blog_languages: []}
   end
