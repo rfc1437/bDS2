@@ -369,7 +369,7 @@ defmodule BDS.Git do
   end
 
   defp parse_count(value) do
-    case Integer.parse(to_string(value || "")) do
+    case Integer.parse(to_string(value)) do
       {count, _rest} -> count
       :error -> 0
     end

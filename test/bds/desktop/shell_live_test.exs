@@ -176,6 +176,35 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ ~s(data-testid="window-titlebar-menu-dropdown")
   end
 
+  test "titlebar menu keyboard navigation is owned by liveview on windows and linux" do
+    Application.put_env(:bds, :shell_platform, {:unix, :linux})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      view
+      |> element("[data-testid='window-titlebar-menu-button'][data-menu-group='file']")
+      |> render_click()
+
+    assert html =~ ~s(data-open-menu-group="file")
+
+    html = render_keydown(view, "titlebar_menu_keydown", %{key: "ArrowRight"})
+
+    assert html =~ ~s(data-open-menu-group="edit")
+    assert html =~ ~s(data-menu-action="edit_preferences")
+
+    html = render_keydown(view, "titlebar_menu_keydown", %{key: "End"})
+
+    assert html =~ ~s(class="window-titlebar-menu-item is-keyboard-active")
+    assert html =~ ~s(data-menu-action="edit_preferences")
+
+    html = render_keydown(view, "titlebar_menu_keydown", %{key: "Enter"})
+
+    assert html =~ ~s(data-tab-type="settings")
+    assert html =~ ">Settings<"
+    refute html =~ ~s(data-testid="window-titlebar-menu-dropdown")
+  end
+
   test "shell live renders the legacy git activity badge from remote behind count" do
     Application.put_env(:bds, :git_remote_state_provider, fn _project_id, _opts ->
       {:ok, %{local_branch: "main", upstream_branch: "origin/main", has_upstream: true, ahead: 0, behind: 7}}

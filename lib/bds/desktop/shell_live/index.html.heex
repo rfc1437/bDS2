@@ -9,6 +9,7 @@
       data-region="title-bar"
       data-testid="window-titlebar"
       data-open-menu-group={@titlebar_menu_group || ""}
+      phx-window-keydown={if(@titlebar_menu_group, do: "titlebar_menu_keydown")}
     >
       <div class="window-titlebar-menu-bar" data-testid="window-titlebar-menu-bar">
         <%= for group <- @menu_groups do %>
@@ -73,12 +74,15 @@
           data-testid="window-titlebar-menu-dropdown"
           phx-click-away="close_titlebar_menu"
         >
-          <%= for item <- group.items do %>
+          <%= for item <- titlebar_menu_dropdown_items(group) do %>
             <%= if item.separator do %>
               <div class="window-titlebar-menu-separator"></div>
             <% else %>
               <button
-                class="window-titlebar-menu-item"
+                class={[
+                  "window-titlebar-menu-item",
+                  if(@titlebar_menu_item_index == item.keyboard_index, do: "is-keyboard-active")
+                ]}
                 data-testid="window-titlebar-menu-item"
                 data-menu-action={item.id}
                 type="button"
@@ -588,7 +592,10 @@
         <% end %>
       </div>
       <button class="status-bar-item status-bar-task-button" data-testid="status-task-button" type="button" phx-click="open_tasks_panel">
-        <span><%= @status.left.running_task_message || translated("Idle") %></span>
+        <%= if @status.left.running_task_message do %>
+          <span class="task-spinner"></span>
+        <% end %>
+        <span class="task-message-text"><%= @status.left.running_task_message || translated("Idle") %></span>
         <%= if (@status.left.running_task_overflow || 0) > 0 do %>
           <span class="status-bar-count">+<%= @status.left.running_task_overflow %></span>
         <% end %>

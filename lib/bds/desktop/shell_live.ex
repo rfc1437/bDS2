@@ -52,6 +52,7 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:is_mac_ui, mac_ui?())
     |> assign(:menu_groups, titlebar_menu_groups())
     |> assign(:titlebar_menu_group, nil)
+      |> assign(:titlebar_menu_item_index, nil)
      |> assign(:tab_meta, %{})
       |> assign(:project_menu_open, false)
       |> assign(:sidebar_filters_by_view, %{})
@@ -362,15 +363,22 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, handle_native_menu_action(socket, action)}
   end
 
+  def handle_event("titlebar_menu_keydown", %{"key" => key}, socket) do
+    {:noreply, handle_titlebar_menu_keydown(socket, key)}
+  end
+
   def handle_event("toggle_titlebar_menu", %{"group" => group}, socket) do
-    next_group = if socket.assigns.titlebar_menu_group == group, do: nil, else: group
-    {:noreply, assign(socket, :titlebar_menu_group, next_group)}
+    {:noreply,
+     if(socket.assigns.titlebar_menu_group == group,
+       do: close_titlebar_menu(socket),
+       else: open_titlebar_menu(socket, group)
+     )}
   end
 
   def handle_event("hover_titlebar_menu", %{"group" => group}, socket) do
     socket =
       if socket.assigns.titlebar_menu_group do
-        assign(socket, :titlebar_menu_group, group)
+        open_titlebar_menu(socket, group)
       else
         socket
       end
@@ -379,13 +387,13 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("close_titlebar_menu", _params, socket) do
-    {:noreply, assign(socket, :titlebar_menu_group, nil)}
+    {:noreply, close_titlebar_menu(socket)}
   end
 
   def handle_event("titlebar_menu_action", %{"action" => action}, socket) do
     {:noreply,
      socket
-     |> assign(:titlebar_menu_group, nil)
+     |> close_titlebar_menu()
      |> handle_native_menu_action(action)}
   end
 
@@ -449,6 +457,7 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:panel_tabs, ShellData.panel_tabs(workbench))
     |> assign(:supported_ui_languages, ShellData.supported_ui_languages())
     |> assign(:menu_groups, socket.assigns[:menu_groups] || titlebar_menu_groups())
+    |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
     |> assign(:current_tab, current_tab(workbench))
   end
 
@@ -1407,8 +1416,147 @@ defmodule BDS.Desktop.ShellLive do
     DesktopMenuBar.groups(dev_mode?: Application.get_env(:bds, :dev_routes, false))
   end
 
+  defp titlebar_menu_dropdown_items(group) do
+    group.items
+    |> Enum.map_reduce(0, fn item, keyboard_index ->
+      if Map.get(item, :separator, false) do
+        {%{separator: true}, keyboard_index}
+      else
+        {Map.put(item, :keyboard_index, keyboard_index), keyboard_index + 1}
+      end
+    end)
+    |> elem(0)
+  end
+
   defp active_titlebar_menu_group(assigns) do
     Enum.find(assigns.menu_groups || [], fn group -> Atom.to_string(group.id) == assigns.titlebar_menu_group end)
+  end
+
+  defp active_titlebar_menu_items(assigns) do
+    assigns
+    |> active_titlebar_menu_group()
+    |> case do
+      nil -> []
+      group -> Enum.reject(group.items, &Map.get(&1, :separator, false))
+    end
+  end
+
+  defp open_titlebar_menu(socket, group) do
+    socket
+    |> assign(:titlebar_menu_group, group)
+    |> assign(:titlebar_menu_item_index, nil)
+  end
+
+  defp close_titlebar_menu(socket) do
+    socket
+    |> assign(:titlebar_menu_group, nil)
+    |> assign(:titlebar_menu_item_index, nil)
+  end
+
+  defp handle_titlebar_menu_keydown(socket, key) do
+    if socket.assigns.titlebar_menu_group do
+      case key do
+        "Escape" ->
+          close_titlebar_menu(socket)
+
+        "ArrowRight" ->
+          rotate_titlebar_menu_group(socket, 1)
+
+        "ArrowLeft" ->
+          rotate_titlebar_menu_group(socket, -1)
+
+        "ArrowDown" ->
+          advance_titlebar_menu_item_index(socket, 1)
+
+        "ArrowUp" ->
+          advance_titlebar_menu_item_index(socket, -1)
+
+        "Home" ->
+          set_first_titlebar_menu_item_index(socket)
+
+        "End" ->
+          set_last_titlebar_menu_item_index(socket)
+
+        "Enter" ->
+          invoke_active_titlebar_menu_item(socket)
+
+        " " ->
+          invoke_active_titlebar_menu_item(socket)
+
+        _other ->
+          socket
+      end
+    else
+      socket
+    end
+  end
+
+  defp rotate_titlebar_menu_group(socket, offset) do
+    groups = socket.assigns.menu_groups || []
+    current_group = socket.assigns.titlebar_menu_group
+    current_index = Enum.find_index(groups, fn group -> Atom.to_string(group.id) == current_group end)
+
+    if is_nil(current_index) or groups == [] do
+      socket
+    else
+      next_index = rem(current_index + offset + length(groups), length(groups))
+      next_group = Enum.at(groups, next_index)
+      open_titlebar_menu(socket, Atom.to_string(next_group.id))
+    end
+  end
+
+  defp advance_titlebar_menu_item_index(socket, offset) do
+    items = active_titlebar_menu_items(socket.assigns)
+    current_index = socket.assigns[:titlebar_menu_item_index]
+
+    cond do
+      items == [] ->
+        socket
+
+      current_index == nil and offset > 0 ->
+        assign(socket, :titlebar_menu_item_index, 0)
+
+      current_index == nil and offset < 0 ->
+        assign(socket, :titlebar_menu_item_index, length(items) - 1)
+
+      true ->
+        next_index = rem(current_index + offset + length(items), length(items))
+        assign(socket, :titlebar_menu_item_index, next_index)
+    end
+  end
+
+  defp set_last_titlebar_menu_item_index(socket) do
+    items = active_titlebar_menu_items(socket.assigns)
+
+    if items == [] do
+      socket
+    else
+      assign(socket, :titlebar_menu_item_index, length(items) - 1)
+    end
+  end
+
+  defp set_first_titlebar_menu_item_index(socket) do
+    items = active_titlebar_menu_items(socket.assigns)
+
+    if items == [] do
+      socket
+    else
+      assign(socket, :titlebar_menu_item_index, 0)
+    end
+  end
+
+  defp invoke_active_titlebar_menu_item(socket) do
+    items = active_titlebar_menu_items(socket.assigns)
+
+    case Enum.at(items, socket.assigns[:titlebar_menu_item_index]) do
+      %{id: id} ->
+        socket
+        |> close_titlebar_menu()
+        |> handle_native_menu_action(Atom.to_string(id))
+
+      _other ->
+        socket
+    end
   end
 
   defp mac_ui? do

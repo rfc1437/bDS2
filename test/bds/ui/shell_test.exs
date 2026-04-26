@@ -164,6 +164,58 @@ defmodule BDS.UI.ShellTest do
     assert template =~ "tab-dirty-indicator"
   end
 
+  test "desktop shell assets keep legacy titlebar menu keyboard and anchoring behavior" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
+    live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
+    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
+
+    assert css =~ "left: var(--bds-titlebar-menu-left, 6px);"
+    assert live_js =~ "--bds-titlebar-menu-left"
+    refute live_js =~ "handleTitlebarMenuKeyDown"
+    refute live_js =~ "keyboardMenuIndex"
+    assert template =~ "phx-window-keydown={if(@titlebar_menu_group, do: \"titlebar_menu_keydown\")}" 
+    assert live_ex =~ ~s(def handle_event("titlebar_menu_keydown")
+    assert live_ex =~ "titlebar_menu_item_index"
+  end
+
+  test "desktop shell status task area keeps the compact running-task markup" do
+    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
+
+    assert template =~ "task-message-text"
+    assert template =~ "task-spinner"
+    assert template =~ "status-bar-count"
+  end
+
+  test "desktop shell css keeps old panel and output density" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+
+    assert css =~ ".panel-content {"
+    assert css =~ "padding: 8px;"
+    assert css =~ ".task-spinner {"
+    assert css =~ ".task-message-text"
+    assert css =~ ".output-entry {"
+    assert css =~ "background-color: var(--vscode-sideBar-background);"
+    assert css =~ "border-radius: 4px;"
+    assert css =~ ".task-entry {"
+    assert css =~ "background-color: var(--vscode-sideBar-background);"
+  end
+
+  test "desktop shell css keeps legacy sidebar header and post list layout" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+
+    assert css =~ ".sidebar-section {"
+    assert css =~ "margin-bottom: 4px;"
+    assert css =~ "border-left: 2px solid transparent;"
+    assert css =~ "border-left-color: var(--vscode-focusBorder);"
+    assert css =~ ".sidebar-section-header {"
+    assert css =~ "justify-content: space-between;"
+    assert css =~ "font-weight: 600;"
+    assert css =~ ".sidebar-item {"
+    assert css =~ "align-items: flex-start;"
+    assert css =~ "gap: 8px;"
+  end
+
   test "desktop shell assets keep the assistant sidebar chat surface contract" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
@@ -177,5 +229,19 @@ defmodule BDS.UI.ShellTest do
     assert template =~ "data-testid=\"assistant-prompt-input\""
     assert template =~ "data-testid=\"assistant-start-button\""
     assert template =~ "assistant-sidebar-transcript"
+  end
+
+  test "desktop shell css keeps the old assistant sidebar panel styling" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+
+    assert css =~ ".assistant-content {"
+    assert css =~ "padding: 12px;"
+    assert css =~ ".assistant-sidebar-context {"
+    assert css =~ "padding: 8px;"
+    assert css =~ "border-radius: 6px;"
+    assert css =~ "background: var(--vscode-editorWidget-background, rgba(0, 0, 0, 0.2));"
+    assert css =~ ".assistant-sidebar-prompt {"
+    assert css =~ "min-height: 120px;"
+    assert css =~ "padding: 10px;"
   end
 end

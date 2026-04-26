@@ -129,6 +129,28 @@ document.addEventListener("DOMContentLoaded", () => {
         this.syncStoredUiLanguage();
         this.destroyOverlaySync = syncTitlebarOverlayInsets();
 
+        this.syncTitlebarMenuAnchor = () => {
+          const titlebar = this.el.querySelector("[data-testid='window-titlebar']");
+          const dropdown = this.el.querySelector("[data-testid='window-titlebar-menu-dropdown']");
+          const openGroup = titlebar?.dataset.openMenuGroup;
+
+          if (!dropdown || !titlebar || !openGroup) {
+            return;
+          }
+
+          const button = this.getTitlebarMenuButtons().find((candidate) => candidate.dataset.menuGroup === openGroup);
+
+          if (!button) {
+            return;
+          }
+
+          const titlebarRect = titlebar.getBoundingClientRect();
+          const buttonRect = button.getBoundingClientRect();
+          const left = Math.max(6, Math.round(buttonRect.left - titlebarRect.left));
+
+          dropdown.style.setProperty("--bds-titlebar-menu-left", `${left}px`);
+        };
+
         this.handleMouseDown = (event) => {
           const handle = event.target.closest("[data-role='resize-handle']");
 
@@ -183,27 +205,6 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         };
 
-        this.menuIsOpen = () => {
-          const titlebar = this.el.querySelector("[data-testid='window-titlebar']");
-          return Boolean(titlebar?.dataset.openMenuGroup);
-        };
-
-        this.handleTitlebarPointerDown = (event) => {
-          if (!this.menuIsOpen()) {
-            return;
-          }
-
-          if (event.target.closest("[data-testid='window-titlebar-menu-button']")) {
-            return;
-          }
-
-          if (event.target.closest("[data-testid='window-titlebar-menu-dropdown']")) {
-            return;
-          }
-
-          this.pushEvent("close_titlebar_menu", {});
-        };
-
         this.handleChange = (event) => {
           const select = event.target.closest(".status-bar-language-select");
 
@@ -237,17 +238,14 @@ document.addEventListener("DOMContentLoaded", () => {
           });
         };
 
-        this.handleEscapeKey = (event) => {
-          if (event.key === "Escape" && this.menuIsOpen()) {
-            this.pushEvent("close_titlebar_menu", {});
-          }
-        };
-
         window.addEventListener("bds:native-menu-action", this.handleNativeMenuAction);
         window.addEventListener("keydown", this.handleShortcutKeyDown, true);
-        window.addEventListener("keydown", this.handleEscapeKey, true);
-        window.addEventListener("pointerdown", this.handleTitlebarPointerDown, true);
         this.el.addEventListener("change", this.handleChange);
+        this.syncTitlebarMenuAnchor();
+      },
+
+      updated() {
+        this.syncTitlebarMenuAnchor();
       },
 
       destroyed() {
@@ -255,8 +253,6 @@ document.addEventListener("DOMContentLoaded", () => {
         this.el.removeEventListener("change", this.handleChange);
         window.removeEventListener("bds:native-menu-action", this.handleNativeMenuAction);
         window.removeEventListener("keydown", this.handleShortcutKeyDown, true);
-        window.removeEventListener("keydown", this.handleEscapeKey, true);
-        window.removeEventListener("pointerdown", this.handleTitlebarPointerDown, true);
         if (this.destroyOverlaySync) {
           this.destroyOverlaySync();
         }
