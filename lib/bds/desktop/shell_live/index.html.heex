@@ -1,11 +1,15 @@
 <div class="app" id="bds-shell-app" phx-hook="AppShell" data-shortcuts={encoded_shortcuts(@client_shortcuts)}>
-  <div
-    class={["window-titlebar", if(@is_mac_ui, do: "is-mac")]}
-    data-region="title-bar"
-    data-testid="window-titlebar"
-    data-open-menu-group={@titlebar_menu_group || ""}
-  >
-    <%= unless @is_mac_ui do %>
+  <%= if @is_mac_ui do %>
+    <span data-testid="window-title" hidden><%= @page_title %></span>
+  <% end %>
+
+  <%= unless @is_mac_ui do %>
+    <div
+      class="window-titlebar"
+      data-region="title-bar"
+      data-testid="window-titlebar"
+      data-open-menu-group={@titlebar_menu_group || ""}
+    >
       <div class="window-titlebar-menu-bar" data-testid="window-titlebar-menu-bar">
         <%= for group <- @menu_groups do %>
           <button
@@ -23,48 +27,46 @@
           ><%= group.label %></button>
         <% end %>
       </div>
-    <% end %>
-    <div class="window-titlebar-drag-region"></div>
-    <div class="window-titlebar-title" data-testid="window-title"><%= @page_title %></div>
-    <div class="window-titlebar-actions">
-      <button
-        class="window-titlebar-action-button"
-        data-testid="toggle-sidebar"
-        type="button"
-        phx-click="toggle_sidebar"
-        aria-label="Toggle sidebar"
-        title="Toggle sidebar"
-      >
-        <span class={["window-titlebar-sidebar-icon", if(@workbench.sidebar_visible, do: "is-active", else: "is-inactive")]}> 
-          <span class="window-titlebar-sidebar-pane"></span>
-        </span>
-      </button>
-      <button
-        class="window-titlebar-action-button"
-        data-testid="toggle-panel"
-        type="button"
-        phx-click="toggle_panel"
-        aria-label="Toggle panel"
-        title="Toggle panel"
-      >
-        <span class={["window-titlebar-panel-icon", if(@workbench.panel.visible, do: "is-active", else: "is-inactive")]}> 
-          <span class="window-titlebar-panel-pane"></span>
-        </span>
-      </button>
-      <button
-        class="window-titlebar-action-button"
-        data-testid="toggle-assistant"
-        type="button"
-        phx-click="toggle_assistant_sidebar"
-        aria-label="Toggle assistant"
-        title="Toggle assistant"
-      >
-        <span class={["window-titlebar-assistant-icon", if(@workbench.assistant_sidebar_visible, do: "is-active", else: "is-inactive")]}> 
-          <span class="window-titlebar-assistant-pane"></span>
-        </span>
-      </button>
-    </div>
-    <%= if not @is_mac_ui do %>
+      <div class="window-titlebar-drag-region"></div>
+      <div class="window-titlebar-title" data-testid="window-title"><%= @page_title %></div>
+      <div class="window-titlebar-actions">
+        <button
+          class="window-titlebar-action-button"
+          data-testid="toggle-sidebar"
+          type="button"
+          phx-click="toggle_sidebar"
+          aria-label={translated("Toggle sidebar")}
+          title={translated("Toggle sidebar")}
+        >
+          <span class={["window-titlebar-sidebar-icon", if(@workbench.sidebar_visible, do: "is-active", else: "is-inactive")]}> 
+            <span class="window-titlebar-sidebar-pane"></span>
+          </span>
+        </button>
+        <button
+          class="window-titlebar-action-button"
+          data-testid="toggle-panel"
+          type="button"
+          phx-click="toggle_panel"
+          aria-label={translated("Toggle panel")}
+          title={translated("Toggle panel")}
+        >
+          <span class={["window-titlebar-panel-icon", if(@workbench.panel.visible, do: "is-active", else: "is-inactive")]}> 
+            <span class="window-titlebar-panel-pane"></span>
+          </span>
+        </button>
+        <button
+          class="window-titlebar-action-button"
+          data-testid="toggle-assistant"
+          type="button"
+          phx-click="toggle_assistant_sidebar"
+          aria-label={translated("Toggle assistant")}
+          title={translated("Toggle assistant")}
+        >
+          <span class={["window-titlebar-assistant-icon", if(@workbench.assistant_sidebar_visible, do: "is-active", else: "is-inactive")]}> 
+            <span class="window-titlebar-assistant-pane"></span>
+          </span>
+        </button>
+      </div>
       <%= if group = active_titlebar_menu_group(assigns) do %>
         <div
           class="window-titlebar-menu-dropdown"
@@ -93,8 +95,8 @@
           <% end %>
         </div>
       <% end %>
-    <% end %>
-  </div>
+    </div>
+  <% end %>
 
   <div class="app-main">
     <aside class="activity-bar" data-region="activity-bar">
@@ -495,6 +497,46 @@
 
   <footer class="status-bar" data-region="status-bar" data-testid="status-bar">
     <div class="status-bar-left">
+      <%= if @is_mac_ui do %>
+        <div class="status-shell-controls" data-testid="status-shell-controls">
+          <button
+            class="status-shell-toggle-button"
+            data-testid="toggle-sidebar"
+            type="button"
+            phx-click="toggle_sidebar"
+            aria-label={translated("Toggle sidebar")}
+            title={translated("Toggle sidebar")}
+          >
+            <span class={["window-titlebar-sidebar-icon", if(@workbench.sidebar_visible, do: "is-active", else: "is-inactive")]}> 
+              <span class="window-titlebar-sidebar-pane"></span>
+            </span>
+          </button>
+          <button
+            class="status-shell-toggle-button"
+            data-testid="toggle-panel"
+            type="button"
+            phx-click="toggle_panel"
+            aria-label={translated("Toggle panel")}
+            title={translated("Toggle panel")}
+          >
+            <span class={["window-titlebar-panel-icon", if(@workbench.panel.visible, do: "is-active", else: "is-inactive")]}> 
+              <span class="window-titlebar-panel-pane"></span>
+            </span>
+          </button>
+          <button
+            class="status-shell-toggle-button"
+            data-testid="toggle-assistant"
+            type="button"
+            phx-click="toggle_assistant_sidebar"
+            aria-label={translated("Toggle assistant")}
+            title={translated("Toggle assistant")}
+          >
+            <span class={["window-titlebar-assistant-icon", if(@workbench.assistant_sidebar_visible, do: "is-active", else: "is-inactive")]}> 
+              <span class="window-titlebar-assistant-pane"></span>
+            </span>
+          </button>
+        </div>
+      <% end %>
       <div class="project-selector">
         <button
           class="project-selector-trigger"

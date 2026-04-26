@@ -112,13 +112,24 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="tab-bar-empty")
   end
 
-  test "titlebar menu stays hidden on macos because the native menu owns it" do
+  test "macos hides the custom titlebar and moves shell toggles into the status bar" do
     {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
-    assert html =~ ~s(class="window-titlebar is-mac")
+    refute html =~ ~s(data-testid="window-titlebar")
     refute html =~ ~s(data-testid="window-titlebar-menu-bar")
     refute html =~ ~s(data-testid="window-titlebar-menu-button")
     refute html =~ ~s(data-testid="window-titlebar-menu-dropdown")
+    assert html =~ ~s(data-testid="status-shell-controls")
+    assert html =~ ~s(data-testid="toggle-sidebar")
+    assert html =~ ~s(data-testid="toggle-panel")
+    assert html =~ ~s(data-testid="toggle-assistant")
+
+    html =
+      view
+      |> element("[data-testid='toggle-sidebar']")
+      |> render_click()
+
+    assert html =~ ~s(class="sidebar-shell is-hidden")
 
     html =
       render_hook(view, "native_menu_action", %{"action" => "edit_preferences"})
