@@ -120,6 +120,28 @@ defmodule BDS.Desktop.AutomationTest do
     assert automation_process_counts() == baseline
   end
 
+  @tag timeout: 120_000
+  test "automation dispatches native menu actions into the liveview shell" do
+    {:ok, session} = Automation.start_session()
+
+    on_exit(fn ->
+      Automation.stop_session(session)
+    end)
+
+    snapshot = Automation.snapshot(session)
+    assert snapshot.sidebar_visible == true
+
+    assert :ok = Automation.native_menu_action(session, "toggle_sidebar")
+
+    snapshot = Automation.snapshot(session)
+    assert snapshot.sidebar_visible == false
+
+    assert :ok = Automation.native_menu_action(session, "edit_preferences")
+
+    snapshot = Automation.snapshot(session)
+    assert snapshot.editor_title == "Settings"
+  end
+
   defp os_pid_alive?(pid) do
     case System.cmd("kill", ["-0", Integer.to_string(pid)], stderr_to_stdout: true) do
       {_, 0} -> true

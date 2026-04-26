@@ -32,6 +32,10 @@ defmodule BDS.Desktop.Automation do
     GenServer.call(session, {:press, shortcut}, @request_timeout)
   end
 
+  def native_menu_action(session, action) when is_binary(action) do
+    GenServer.call(session, {:native_menu_action, action}, @request_timeout)
+  end
+
   def reload(session) do
     GenServer.call(session, :reload, @request_timeout)
   end
@@ -99,6 +103,11 @@ defmodule BDS.Desktop.Automation do
 
   def handle_call({:press, shortcut}, _from, state) do
     {reply, state} = driver_request(state, %{"command" => "press", "shortcut" => shortcut})
+    {:reply, normalize_simple_reply(reply), state}
+  end
+
+  def handle_call({:native_menu_action, action}, _from, state) do
+    {reply, state} = driver_request(state, %{"command" => "native_menu_action", "action" => action})
     {:reply, normalize_simple_reply(reply), state}
   end
 

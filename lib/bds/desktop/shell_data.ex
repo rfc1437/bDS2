@@ -15,8 +15,8 @@ defmodule BDS.Desktop.ShellData do
     I18n.current_ui_locale()
   end
 
-  def translations do
-    I18n.get_ui_translations(ui_language())
+  def translations(locale \\ nil) do
+    I18n.get_ui_translations(effective_ui_language(locale))
   end
 
   def supported_ui_languages do
@@ -25,8 +25,8 @@ defmodule BDS.Desktop.ShellData do
     end)
   end
 
-  def translate(key, bindings \\ %{}) do
-    text = Map.get(translations(), to_string(key), to_string(key))
+  def translate(key, bindings \\ %{}, locale \\ nil) do
+    text = Map.get(translations(locale), to_string(key), to_string(key))
 
     Enum.reduce(bindings, text, fn {binding, value}, acc ->
       String.replace(acc, "%{#{binding}}", to_string(value))
@@ -60,15 +60,15 @@ defmodule BDS.Desktop.ShellData do
       Dashboard.empty_snapshot()
   end
 
-  def sidebar_view(project_id, view_id) do
-    Sidebar.view(project_id, view_id, %{})
+  def sidebar_view(project_id, view_id, params \\ %{}) do
+    Sidebar.view(project_id, view_id, params)
   rescue
     error in [Exqlite.Error, DBConnection.OwnershipError] ->
       if match?(%Exqlite.Error{}, error) and not String.contains?(Exception.message(error), "no such table") do
         reraise error, __STACKTRACE__
       end
 
-      Sidebar.view(nil, view_id, %{})
+      Sidebar.view(nil, view_id, params)
   end
 
   def assistant_cards do
@@ -101,7 +101,10 @@ defmodule BDS.Desktop.ShellData do
   end
 
   def panel_tabs(workbench) do
-    [:tasks, :output, :git_log, workbench.panel.active_tab]
+    [:tasks, :output]
+    |> maybe_add_panel_tab(workbench.editor_route, :post_links)
+    |> maybe_add_panel_tab(workbench.editor_route, :git_log)
+    |> Kernel.++([workbench.panel.active_tab])
     |> Enum.uniq()
   end
 
@@ -208,6 +211,16 @@ defmodule BDS.Desktop.ShellData do
         :erlang.float_to_binary(value, decimals: decimals) <> " " <> unit
     end
   end
+
+  defp effective_ui_language(nil) do
+    Process.get(:bds_ui_locale) || ui_language()
+  end
+
+  defp effective_ui_language(locale), do: locale
+
+  defp maybe_add_panel_tab(tabs, :post, :post_links), do: tabs ++ [:post_links]
+  defp maybe_add_panel_tab(tabs, route, :git_log) when route in [:post, :media], do: tabs ++ [:git_log]
+  defp maybe_add_panel_tab(tabs, _route, _tab), do: tabs
 
   defp default_project_snapshot do
     %{

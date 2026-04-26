@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const SIDEBAR_STORAGE_KEY = "bds-panel-sidebar";
   const ASSISTANT_STORAGE_KEY = "bds-panel-assistant-sidebar";
+  const UI_LANGUAGE_STORAGE_KEY = "bds-ui-language";
 
   const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
 
@@ -53,6 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
     AppShell: {
       mounted() {
         this.syncStoredLayout();
+        this.syncStoredUiLanguage();
 
         this.handleMouseDown = (event) => {
           const handle = event.target.closest("[data-role='resize-handle']");
@@ -99,10 +101,31 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         this.el.addEventListener("mousedown", this.handleMouseDown);
+
+        this.handleNativeMenuAction = (event) => {
+          const action = event.detail?.action;
+
+          if (action) {
+            this.pushEvent("native_menu_action", { action });
+          }
+        };
+
+        this.handleChange = (event) => {
+          const select = event.target.closest(".status-bar-language-select");
+
+          if (select && this.el.contains(select)) {
+            window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, select.value);
+          }
+        };
+
+        window.addEventListener("bds:native-menu-action", this.handleNativeMenuAction);
+        this.el.addEventListener("change", this.handleChange);
       },
 
       destroyed() {
         this.el.removeEventListener("mousedown", this.handleMouseDown);
+        this.el.removeEventListener("change", this.handleChange);
+        window.removeEventListener("bds:native-menu-action", this.handleNativeMenuAction);
       },
 
       syncStoredLayout() {
@@ -110,6 +133,14 @@ document.addEventListener("DOMContentLoaded", () => {
           sidebar_width: readStoredSize(SIDEBAR_STORAGE_KEY, shellWidth("[data-testid='sidebar-shell']"), 200, 500),
           assistant_sidebar_width: readStoredSize(ASSISTANT_STORAGE_KEY, 360, 280, 640)
         });
+      },
+
+      syncStoredUiLanguage() {
+        const stored = window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY);
+
+        if (stored) {
+          this.pushEvent("sync_ui_language", { language: stored });
+        }
       }
     },
 

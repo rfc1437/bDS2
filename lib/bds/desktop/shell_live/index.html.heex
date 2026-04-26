@@ -99,6 +99,7 @@
               <span><%= String.upcase(sidebar_header_label(@sidebar_header)) %></span>
             </div>
           </div>
+          <%= render_sidebar_filters(assigns) %>
           <%= render_sidebar_body(assigns) %>
         </div>
       </div>
@@ -232,7 +233,17 @@
                   <h4><%= translated("dashboard.section.recentlyUpdated") %></h4>
                   <div class="recent-posts-list">
                     <%= for post <- @dashboard_recent_posts do %>
-                      <button class="recent-post-item" type="button">
+                      <button
+                        class="recent-post-item"
+                        data-testid="recent-post-item"
+                        data-post-id={post.id}
+                        type="button"
+                        phx-click="open_sidebar_item"
+                        phx-value-route="post"
+                        phx-value-id={post.id}
+                        phx-value-title={post.title || ""}
+                        phx-value-subtitle={post.status || "draft"}
+                      >
                         <span class="recent-post-title"><%= post.title || "" %></span>
                         <span class={"recent-post-status status-#{post.status || "draft"}"}><%= ShellData.dashboard_status_label(post.status || "draft") %></span>
                         <span class="recent-post-date"><%= ShellData.format_dashboard_date(post.updated_at) %></span>
@@ -329,7 +340,13 @@
   <footer class="status-bar" data-region="status-bar" data-testid="status-bar">
     <div class="status-bar-left">
       <div class="project-selector">
-        <button class="project-selector-trigger" type="button" title={translated("Switch project")}>
+        <button
+          class="project-selector-trigger"
+          data-testid="project-selector-trigger"
+          type="button"
+          title={translated("Switch project")}
+          phx-click="toggle_project_menu"
+        >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="project-icon">
             <path d="M14.5 3H7.71l-.85-.85A.5.5 0 0 0 6.5 2h-5a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5v-10a.5.5 0 0 0-.5-.5zm-13 1h5.29l.85.85c.1.1.23.15.36.15h6.5v9h-13V4z"></path>
           </svg>
@@ -338,8 +355,41 @@
             <path d="M4.5 5.5L8 9l3.5-3.5h-7z"></path>
           </svg>
         </button>
+
+        <%= if @project_menu_open do %>
+          <div class="project-dropdown" data-testid="project-dropdown" phx-click-away="close_project_menu">
+            <div class="project-dropdown-header">
+              <span><%= translated("Projects") %></span>
+            </div>
+            <div class="project-list">
+              <%= for project <- @projects.projects do %>
+                <button
+                  class={["project-item", if(project.id == @projects.active_project_id, do: "active")]}
+                  data-testid="project-item"
+                  data-project-id={project.id}
+                  type="button"
+                  phx-click="select_project"
+                  phx-value-project_id={project.id}
+                >
+                  <span class="project-item-name"><%= project.name %></span>
+                  <%= if project.id == @projects.active_project_id do %>
+                    <span class="project-check-icon">✓</span>
+                  <% end %>
+                </button>
+              <% end %>
+            </div>
+            <div class="project-dropdown-footer">
+              <button class="existing-project-btn" type="button" phx-click="import_project">
+                <span><%= translated("Open Existing Blog") %></span>
+              </button>
+              <button class="create-project-btn" type="button" phx-click="create_project">
+                <span><%= translated("New Project") %></span>
+              </button>
+            </div>
+          </div>
+        <% end %>
       </div>
-      <button class="status-bar-item status-bar-task-button" data-testid="status-task-button" type="button" phx-click="toggle_panel">
+      <button class="status-bar-item status-bar-task-button" data-testid="status-task-button" type="button" phx-click="open_tasks_panel">
         <span><%= @status.left.running_task_message || translated("Idle") %></span>
         <%= if (@status.left.running_task_overflow || 0) > 0 do %>
           <span class="status-bar-count">+<%= @status.left.running_task_overflow %></span>
@@ -351,14 +401,14 @@
       <span class="status-bar-item"><%= @status.right.media_count %></span>
       <span class="status-bar-item theme-badge"><%= @status.right.theme_badge %></span>
       <button class={["status-bar-item", "offline-badge", if(@status.right.offline_mode, do: "active")]} data-testid="status-offline-button" type="button" phx-click="toggle_offline_mode" title={translated("Toggle offline mode")}>✈</button>
-      <label class="status-bar-item language-badge">
+      <form class="status-bar-item language-badge" data-testid="status-language-form" phx-change="change_ui_language">
         <span><%= translated("UI") %></span>
-        <select class="status-bar-language-select">
+        <select class="status-bar-language-select" name="ui_language" data-testid="status-language-select">
           <%= for language <- @supported_ui_languages do %>
             <option selected={language.code == @page_language} value={language.code}><%= language.flag %></option>
           <% end %>
         </select>
-      </label>
+      </form>
       <span class="status-bar-item brand"><%= @status.right.brand %></span>
     </div>
   </footer>

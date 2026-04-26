@@ -72,6 +72,15 @@ for await (const line of rl) {
       continue;
     }
 
+    if (message.command === "native_menu_action") {
+      await page.evaluate((action) => {
+        window.dispatchEvent(new CustomEvent("bds:native-menu-action", { detail: { action } }));
+      }, message.action);
+      await page.waitForTimeout(50);
+      console.log(JSON.stringify({ ref, status: "ok", result: "ok" }));
+      continue;
+    }
+
     if (message.command === "drag") {
       const locator = page.locator(message.selector);
       const box = await locator.boundingBox();

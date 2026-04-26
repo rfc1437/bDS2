@@ -13,7 +13,7 @@ The rewrite already implements most of the backend and compatibility-critical su
 - Compatibility parity locks: executable parity coverage now pins the old-bDS behavior for serializer/file contracts, metadata-diff ordering, canonical generation routes, feed output, localized archive rendering, preview draft language selection, taxonomy archive links, and media URL rewriting.
 - Core editorial domains: projects, posts, post translations, media, media translations, tags, templates, scripts, menu data, and project metadata.
 - Output and infrastructure: search, Liquid rendering, site generation, preview server, publishing, background tasks, i18n, git support, MCP server, AI operations, embeddings, and CLI sync.
-- Desktop shell foundation: native menu definitions, LiveView shell endpoint, activity bar, sidebar views, tab/workbench state, task panel, assistant sidebar, status bar, project switcher, shell command routing, and template-backed shell rendering.
+- Desktop shell foundation: native menu definitions, LiveView shell endpoint, activity bar, sidebar views, tab/workbench state, task panel, assistant sidebar, status bar, project switcher, shell command routing, template-backed shell rendering, sidebar search/filter/load-more controls, dashboard recent-post opening, UI language switching, project dropdown actions, output/post-link/git lower-panel content, and browser-native menu bridging.
 
 ### Implemented But Not Yet At Parity
 
@@ -52,8 +52,8 @@ The remaining work needs to proceed from base contracts upward. Later phases sho
 2. Close engine-level behavior gaps. Completed 2026-04-25.
    Save/publish/delete side-effects, published-post `templateSlug` frontmatter rewrites, manual-translation source-post reopening, post-to-media sidecar cleanup, auto-translation task cascades, linked-media translation cascades, link graph maintenance, thumbnail regeneration rules, and rebuild notifications are now implemented and covered at the backend layer independent of UI.
 
-3. Finish the desktop shell primitives. Completed 2026-04-25.
-   Route state, registry-backed shell command coverage, panel fallback integration, menu/native-command wiring, template-backed LiveView rendering, and sidebar-to-tab/status-bar interactions now cover every sidebar view and singleton editor route while preserving the old app shell frame and styling.
+3. Finish the desktop shell primitives. Completed 2026-04-26.
+   Route state, registry-backed shell command coverage, panel fallback integration, menu/native-command wiring, template-backed LiveView rendering, sidebar search/filter/load-more controls, dashboard recent-post opening, project dropdown actions, UI language switching, real output/post-link/git lower-panel content, and native-menu event bridging now cover the old shell frame behavior while preserving the legacy layout and styling.
 
 4. Implement the shared modal and confirmation layer.
    Add the modal/overlay system required by the specs: AI suggestions, delete confirmations, merge confirmation, picker overlays, and gallery flows.

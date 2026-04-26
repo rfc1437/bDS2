@@ -112,6 +112,17 @@ defmodule BDS.Git do
     end
   end
 
+  def file_history(project_id, file_path, opts \\ [])
+      when is_binary(project_id) and is_binary(file_path) and is_list(opts) do
+    with {:ok, project_dir} <- project_dir(project_id),
+         {:ok, output} <- run_git(project_dir, ["log", "--follow", "--format=%H%x09%s", "--", file_path], opts) do
+      {:ok, %{commits: parse_local_history(output) |> Enum.take(50)}}
+    else
+      {:error, {:git_failed, _message}} -> {:ok, %{commits: []}}
+      error -> error
+    end
+  end
+
   def fetch(project_id, opts \\ []) when is_binary(project_id) and is_list(opts) do
     with {:ok, project_dir} <- project_dir(project_id) do
       case run_git(project_dir, ["fetch", "--all", "--prune"], opts) do
