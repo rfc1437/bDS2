@@ -215,8 +215,7 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp dispatch("metadata_diff", project, _params) do
     queue_task(project, "metadata_diff", "Metadata Diff", "Maintenance", fn report ->
-      report.(0.2, "Comparing database and filesystem metadata")
-      {:ok, metadata_diff} = Maintenance.metadata_diff(project.id)
+      {:ok, metadata_diff} = Maintenance.metadata_diff(project.id, on_progress: report)
       report.(1.0, "Metadata diff complete")
       metadata_diff_result(project.id, metadata_diff)
     end)
@@ -230,10 +229,16 @@ defmodule BDS.Desktop.ShellCommands do
       {:error, %{action: "repair_metadata_diff", message: "No metadata diff items selected"}}
     else
       queue_task(project, "repair_metadata_diff", "Repair Metadata Diff", "Maintenance", fn report ->
-        report.(0.2, "Repairing metadata differences")
-        {:ok, _repair} = Maintenance.repair_metadata_diff(project.id, direction, items)
-        report.(0.9, "Refreshing metadata diff")
-        {:ok, metadata_diff} = Maintenance.metadata_diff(project.id)
+        {:ok, _repair} =
+          Maintenance.repair_metadata_diff(project.id, direction, items,
+            on_progress: scaled_progress_reporter(report, 0.0, 0.8)
+          )
+
+        {:ok, metadata_diff} =
+          Maintenance.metadata_diff(project.id,
+            on_progress: scaled_progress_reporter(report, 0.8, 0.98)
+          )
+
         report.(1.0, "Metadata diff repair complete")
         metadata_diff_result(project.id, metadata_diff)
       end)
@@ -247,10 +252,16 @@ defmodule BDS.Desktop.ShellCommands do
       {:error, %{action: "import_metadata_diff_orphans", message: "No orphan files selected"}}
     else
       queue_task(project, "import_metadata_diff_orphans", "Import Metadata Diff Orphans", "Maintenance", fn report ->
-        report.(0.2, "Importing orphan files")
-        {:ok, _import} = Maintenance.import_metadata_diff_orphans(project.id, orphans)
-        report.(0.9, "Refreshing metadata diff")
-        {:ok, metadata_diff} = Maintenance.metadata_diff(project.id)
+        {:ok, _import} =
+          Maintenance.import_metadata_diff_orphans(project.id, orphans,
+            on_progress: scaled_progress_reporter(report, 0.0, 0.8)
+          )
+
+        {:ok, metadata_diff} =
+          Maintenance.metadata_diff(project.id,
+            on_progress: scaled_progress_reporter(report, 0.8, 0.98)
+          )
+
         report.(1.0, "Metadata diff import complete")
         metadata_diff_result(project.id, metadata_diff)
       end)
@@ -314,6 +325,13 @@ defmodule BDS.Desktop.ShellCommands do
        task_id: task.id,
        panel_tab: "tasks"
      }}
+  end
+
+  defp scaled_progress_reporter(report, start_value, end_value) when is_function(report, 2) do
+    fn value, message ->
+      scaled_value = start_value + (end_value - start_value) * value
+      report.(scaled_value, message)
+    end
   end
 
   defp rebuild_database_steps(project) do

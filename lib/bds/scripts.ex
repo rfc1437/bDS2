@@ -3,6 +3,7 @@ defmodule BDS.Scripts do
 
   import Ecto.Query
 
+  alias BDS.DocumentFields
   alias BDS.Frontmatter
   alias BDS.Persistence
   alias BDS.Projects
@@ -283,19 +284,19 @@ defmodule BDS.Scripts do
     now = Persistence.now_ms()
 
     attrs = %{
-      id: Map.get(fields, "id") || Ecto.UUID.generate(),
+      id: DocumentFields.get(fields, "id") || Ecto.UUID.generate(),
       project_id: project_id,
-      slug: Map.fetch!(fields, "slug"),
-      title: Map.get(fields, "title") || "",
-      kind: parse_script_kind(Map.fetch!(fields, "kind")),
+      slug: DocumentFields.fetch!(fields, "slug"),
+      title: DocumentFields.get(fields, "title") || "",
+      kind: parse_script_kind(DocumentFields.fetch!(fields, "kind")),
       entrypoint: Map.get(fields, "entrypoint") || "main",
       enabled: Map.get(fields, "enabled", true),
       version: Map.get(fields, "version", 1),
       file_path: relative_path,
       status: :published,
       content: nil,
-      created_at: Map.get(fields, "createdAt", now),
-      updated_at: Map.get(fields, "updatedAt", now)
+      created_at: DocumentFields.get(fields, "createdAt", now),
+      updated_at: DocumentFields.get(fields, "updatedAt", now)
     }
 
     script = Repo.get_by(Script, project_id: project_id, slug: attrs.slug) || %Script{}

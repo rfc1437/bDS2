@@ -4,6 +4,7 @@ defmodule BDS.Maintenance do
   import Ecto.Query
 
   alias BDS.Frontmatter
+  alias BDS.DocumentFields
   alias BDS.Metadata
   alias BDS.Media.Media
   alias BDS.Media.Translation, as: MediaTranslation
@@ -78,20 +79,36 @@ defmodule BDS.Maintenance do
     end
   end
 
-  def metadata_diff(project_id) when is_binary(project_id) do
+  def metadata_diff(project_id, opts \\ [])
+
+  def metadata_diff(project_id, opts) when is_binary(project_id) and is_list(opts) do
     project = Projects.get_project!(project_id)
+    on_progress = progress_callback(opts)
+
+    phases = [
+      {"Comparing project metadata", fn -> project_metadata_diff_reports(project_id) end},
+      {"Comparing post metadata", fn -> post_diff_reports(project_id, project) end},
+      {"Comparing post translations", fn -> post_translation_diff_reports(project_id, project) end},
+      {"Comparing media metadata", fn -> media_diff_reports(project_id, project) end},
+      {"Comparing media translations", fn -> media_translation_diff_reports(project_id, project) end},
+      {"Comparing script metadata", fn -> script_diff_reports(project_id, project) end},
+      {"Comparing template metadata", fn -> template_diff_reports(project_id, project) end},
+      {"Comparing embeddings", fn -> Embeddings.diff_reports(project_id) end}
+    ]
+
+    total_phases = length(phases) + 1
 
     diff_reports =
-      project_metadata_diff_reports(project_id) ++
-        post_diff_reports(project_id, project) ++
-        post_translation_diff_reports(project_id, project) ++
-        media_diff_reports(project_id, project) ++
-        media_translation_diff_reports(project_id, project) ++
-        script_diff_reports(project_id, project) ++
-        template_diff_reports(project_id, project) ++
-        Embeddings.diff_reports(project_id)
+      phases
+      |> Enum.with_index(1)
+      |> Enum.flat_map(fn {{label, fun}, index} ->
+        :ok = report_metadata_diff_phase(on_progress, index, total_phases, label)
+        fun.()
+      end)
 
+    :ok = report_metadata_diff_phase(on_progress, total_phases, total_phases, "Scanning orphan files")
     orphan_reports = orphan_reports(project_id, project)
+    :ok = report_metadata_diff_complete(on_progress)
 
     {:ok, %{diff_reports: diff_reports, orphan_reports: orphan_reports}}
   end
@@ -189,11 +206,11 @@ defmodule BDS.Maintenance do
               diff_field("excerpt", post.excerpt, Map.get(fields, "excerpt")),
               diff_field("author", post.author, Map.get(fields, "author")),
               diff_field("language", post.language, Map.get(fields, "language")),
-              diff_field("status", post.status, Map.get(fields, "status")),
-              diff_field("template_slug", post.template_slug, Map.get(fields, "templateSlug")),
-              diff_field("created_at", post.created_at, Map.get(fields, "createdAt")),
-              diff_field("updated_at", post.updated_at, Map.get(fields, "updatedAt")),
-              diff_field("published_at", post.published_at, Map.get(fields, "publishedAt")),
+              diff_field("status", post.status, DocumentFields.get(fields, "status")),
+              diff_field("template_slug", post.template_slug, DocumentFields.get(fields, "templateSlug")),
+              diff_field("created_at", post.created_at, DocumentFields.get(fields, "createdAt")),
+              diff_field("updated_at", post.updated_at, DocumentFields.get(fields, "updatedAt")),
+              diff_field("published_at", post.published_at, DocumentFields.get(fields, "publishedAt")),
               diff_field("tags", post.tags, Map.get(fields, "tags", [])),
               diff_field("categories", post.categories, Map.get(fields, "categories", []))
             ]
@@ -228,8 +245,8 @@ defmodule BDS.Maintenance do
               diff_field("caption", media.caption, Map.get(fields, "caption")),
               diff_field("author", media.author, Map.get(fields, "author")),
               diff_field("language", media.language, Map.get(fields, "language")),
-              diff_field("created_at", media.created_at, Map.get(fields, "createdAt")),
-              diff_field("updated_at", media.updated_at, Map.get(fields, "updatedAt")),
+              diff_field("created_at", media.created_at, DocumentFields.get(fields, "createdAt")),
+              diff_field("updated_at", media.updated_at, DocumentFields.get(fields, "updatedAt")),
               diff_field("tags", media.tags, Map.get(fields, "tags", []))
             ]
             |> Enum.reject(&is_nil/1)
@@ -261,18 +278,18 @@ defmodule BDS.Maintenance do
               diff_field("title", translation.title, Map.get(fields, "title")),
               diff_field("excerpt", translation.excerpt, Map.get(fields, "excerpt")),
               diff_field("language", translation.language, Map.get(fields, "language")),
-              diff_field("status", translation.status, Map.get(fields, "status")),
+              diff_field("status", translation.status, DocumentFields.get(fields, "status")),
               diff_field(
                 "translation_for",
                 translation.translation_for,
-                Map.get(fields, "translationFor")
+                DocumentFields.get(fields, "translationFor")
               ),
-              diff_field("created_at", translation.created_at, Map.get(fields, "createdAt")),
-              diff_field("updated_at", translation.updated_at, Map.get(fields, "updatedAt")),
+              diff_field("created_at", translation.created_at, DocumentFields.get(fields, "createdAt")),
+              diff_field("updated_at", translation.updated_at, DocumentFields.get(fields, "updatedAt")),
               diff_field(
                 "published_at",
                 translation.published_at,
-                Map.get(fields, "publishedAt")
+                DocumentFields.get(fields, "publishedAt")
               )
             ]
             |> Enum.reject(&is_nil/1)
@@ -311,7 +328,7 @@ defmodule BDS.Maintenance do
               diff_field(
                 "translation_for",
                 translation.translation_for,
-                Map.get(fields, "translationFor")
+                DocumentFields.get(fields, "translationFor")
               )
             ]
             |> Enum.reject(&is_nil/1)
@@ -349,8 +366,8 @@ defmodule BDS.Maintenance do
               diff_field("title", script.title, Map.get(fields, "title")),
               diff_field("entrypoint", script.entrypoint, Map.get(fields, "entrypoint")),
               diff_field("enabled", script.enabled, Map.get(fields, "enabled")),
-              diff_field("created_at", script.created_at, Map.get(fields, "createdAt")),
-              diff_field("updated_at", script.updated_at, Map.get(fields, "updatedAt"))
+              diff_field("created_at", script.created_at, DocumentFields.get(fields, "createdAt")),
+              diff_field("updated_at", script.updated_at, DocumentFields.get(fields, "updatedAt"))
             ]
             |> Enum.reject(&is_nil/1)
 
@@ -380,8 +397,8 @@ defmodule BDS.Maintenance do
             [
               diff_field("title", template.title, Map.get(fields, "title")),
               diff_field("enabled", template.enabled, Map.get(fields, "enabled")),
-              diff_field("created_at", template.created_at, Map.get(fields, "createdAt")),
-              diff_field("updated_at", template.updated_at, Map.get(fields, "updatedAt"))
+              diff_field("created_at", template.created_at, DocumentFields.get(fields, "createdAt")),
+              diff_field("updated_at", template.updated_at, DocumentFields.get(fields, "updatedAt"))
             ]
             |> Enum.reject(&is_nil/1)
 
@@ -667,6 +684,21 @@ defmodule BDS.Maintenance do
       callback when is_function(callback, 2) -> callback
       _other -> nil
     end
+  end
+
+  defp report_metadata_diff_phase(nil, _current, _total, _label), do: :ok
+
+  defp report_metadata_diff_phase(callback, current, total, label) do
+    value = if total <= 1, do: 0.0, else: (current - 1) / total
+    callback.(value, "#{label} (#{current}/#{total})")
+    :ok
+  end
+
+  defp report_metadata_diff_complete(nil), do: :ok
+
+  defp report_metadata_diff_complete(callback) do
+    callback.(1.0, "Metadata diff complete")
+    :ok
   end
 
   defp report_started(nil, _total, _label), do: :ok

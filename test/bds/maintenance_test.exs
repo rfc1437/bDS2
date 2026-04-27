@@ -328,6 +328,49 @@ defmodule BDS.MaintenanceTest do
     assert_incremental_progress(collect_progress_events())
   end
 
+  test "metadata_diff reports incremental progress across comparison phases", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    parent = self()
+    on_progress = fn value, message -> send(parent, {:rebuild_progress, value, message}) end
+
+    posts_dir = Path.join([temp_dir, "posts", "2026", "04"])
+    File.mkdir_p!(posts_dir)
+
+    Enum.each(1..40, fn index ->
+      slug = "diff-progress-post-#{index}"
+
+      File.write!(
+        Path.join(posts_dir, "#{slug}.md"),
+        [
+          "---",
+          "id: #{slug}",
+          "title: Diff Progress Post #{index}",
+          "slug: #{slug}",
+          "status: published",
+          "createdAt: 1711843200",
+          "updatedAt: 1711929600",
+          "publishedAt: 1712016000",
+          "tags:",
+          "categories:",
+          "---",
+          "Body #{index}",
+          ""
+        ]
+        |> Enum.join("\n")
+      )
+    end)
+
+    assert {:ok, _posts} = BDS.Maintenance.rebuild_from_filesystem(project.id, "post")
+
+    assert {:ok, _diff} = BDS.Maintenance.metadata_diff(project.id, on_progress: on_progress)
+
+    events = collect_progress_events()
+    assert_incremental_progress(events)
+    assert Enum.any?(events, fn {_value, message} -> String.contains?(message, "Comparing") end)
+  end
+
   test "maintenance rebuilds and diffs embedding state explicitly", %{project: project} do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
@@ -746,6 +789,51 @@ defmodule BDS.MaintenanceTest do
     refute Enum.any?(diff_reports, fn report ->
              report.entity_type == "post" and report.entity_id == published_post.id and
                Enum.any?(report.differences, &(&1.name in ["tags", "categories"]))
+           end)
+  end
+
+  test "metadata_diff accepts legacy snake_case post frontmatter keys for status and timestamps", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Legacy Keys Post",
+               content: "Body",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
+
+    post_path = Path.join(temp_dir, published_post.file_path)
+
+    File.write!(
+      post_path,
+      [
+        "---",
+        "id: #{published_post.id}",
+        "title: #{published_post.title}",
+        "slug: #{published_post.slug}",
+        "status: published",
+        "language: en",
+        "created_at: #{published_post.created_at}",
+        "updated_at: #{published_post.updated_at}",
+        "published_at: #{published_post.published_at}",
+        "tags:",
+        "categories:",
+        "---",
+        "Body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, %{diff_reports: diff_reports}} = BDS.Maintenance.metadata_diff(project.id)
+
+    refute Enum.any?(diff_reports, fn report ->
+             report.entity_type == "post" and report.entity_id == published_post.id and
+               Enum.any?(report.differences, &(&1.name in ["status", "created_at", "updated_at", "published_at"]))
            end)
   end
 

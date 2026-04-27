@@ -3,6 +3,7 @@ defmodule BDS.Media do
 
   import Ecto.Query
 
+  alias BDS.DocumentFields
   alias BDS.Media.Media
   alias BDS.Media.Translation
   alias BDS.Persistence
@@ -156,10 +157,10 @@ defmodule BDS.Media do
         if File.exists?(sidecar_path) do
           sidecar = parse_translation_sidecar(sidecar_path)
 
-          case upsert_media_translation(media.id, Map.fetch!(sidecar.fields, "language"), %{
-                 title: Map.get(sidecar.fields, "title"),
-                 alt: Map.get(sidecar.fields, "alt"),
-                 caption: Map.get(sidecar.fields, "caption")
+          case upsert_media_translation(media.id, DocumentFields.fetch!(sidecar.fields, "language"), %{
+                 title: DocumentFields.get(sidecar.fields, "title"),
+                 alt: DocumentFields.get(sidecar.fields, "alt"),
+                 caption: DocumentFields.get(sidecar.fields, "caption")
                }) do
             {:ok, updated_translation} -> {:ok, updated_translation}
             error -> error
@@ -188,20 +189,20 @@ defmodule BDS.Media do
     if File.exists?(sidecar_path) do
       sidecar = parse_translation_sidecar(sidecar_path)
 
-      case Repo.get(Media, Map.get(sidecar.fields, "translationFor")) do
+      case Repo.get(Media, DocumentFields.get(sidecar.fields, "translationFor")) do
         nil ->
           {:error, :not_found}
 
         media ->
           case Repo.get_by(Translation,
                  translation_for: media.id,
-                 language: Map.fetch!(sidecar.fields, "language")
+                 language: DocumentFields.fetch!(sidecar.fields, "language")
                ) do
             nil ->
-              upsert_media_translation(media.id, Map.fetch!(sidecar.fields, "language"), %{
-                title: Map.get(sidecar.fields, "title"),
-                alt: Map.get(sidecar.fields, "alt"),
-                caption: Map.get(sidecar.fields, "caption")
+              upsert_media_translation(media.id, DocumentFields.fetch!(sidecar.fields, "language"), %{
+                title: DocumentFields.get(sidecar.fields, "title"),
+                alt: DocumentFields.get(sidecar.fields, "alt"),
+                caption: DocumentFields.get(sidecar.fields, "caption")
               })
 
             _translation ->
@@ -562,25 +563,25 @@ defmodule BDS.Media do
     now = Persistence.now_ms()
 
     attrs = %{
-      id: Map.get(sidecar.fields, "id") || Ecto.UUID.generate(),
+      id: DocumentFields.get(sidecar.fields, "id") || Ecto.UUID.generate(),
       project_id: project.id,
       filename: sidecar.filename,
-      original_name: Map.get(sidecar.fields, "originalName") || sidecar.filename,
-      mime_type: Map.get(sidecar.fields, "mimeType") || detect_mime(sidecar.filename),
-      size: Map.get(sidecar.fields, "size", 0),
-      width: blank_to_nil(Map.get(sidecar.fields, "width")),
-      height: blank_to_nil(Map.get(sidecar.fields, "height")),
-      title: Map.get(sidecar.fields, "title"),
-      alt: Map.get(sidecar.fields, "alt"),
-      caption: Map.get(sidecar.fields, "caption"),
-      author: Map.get(sidecar.fields, "author"),
-      language: Map.get(sidecar.fields, "language"),
+      original_name: DocumentFields.get(sidecar.fields, "originalName") || sidecar.filename,
+      mime_type: DocumentFields.get(sidecar.fields, "mimeType") || detect_mime(sidecar.filename),
+      size: DocumentFields.get(sidecar.fields, "size", 0),
+      width: blank_to_nil(DocumentFields.get(sidecar.fields, "width")),
+      height: blank_to_nil(DocumentFields.get(sidecar.fields, "height")),
+      title: DocumentFields.get(sidecar.fields, "title"),
+      alt: DocumentFields.get(sidecar.fields, "alt"),
+      caption: DocumentFields.get(sidecar.fields, "caption"),
+      author: DocumentFields.get(sidecar.fields, "author"),
+      language: DocumentFields.get(sidecar.fields, "language"),
       file_path: sidecar.relative_file_path,
       sidecar_path: sidecar.relative_sidecar_path,
       checksum: nil,
-      tags: Map.get(sidecar.fields, "tags", []),
-      created_at: Map.get(sidecar.fields, "createdAt", now),
-      updated_at: Map.get(sidecar.fields, "updatedAt", now)
+      tags: DocumentFields.get(sidecar.fields, "tags", []),
+      created_at: DocumentFields.get(sidecar.fields, "createdAt", now),
+      updated_at: DocumentFields.get(sidecar.fields, "updatedAt", now)
     }
 
     media =
@@ -653,7 +654,7 @@ defmodule BDS.Media do
 
       media ->
         now = Persistence.now_ms()
-        language = Map.fetch!(sidecar.fields, "language")
+        language = DocumentFields.fetch!(sidecar.fields, "language")
 
         translation =
           Repo.get_by(Translation, translation_for: media.id, language: language) ||
@@ -665,9 +666,9 @@ defmodule BDS.Media do
           project_id: project.id,
           translation_for: media.id,
           language: language,
-          title: Map.get(sidecar.fields, "title"),
-          alt: Map.get(sidecar.fields, "alt"),
-          caption: Map.get(sidecar.fields, "caption"),
+          title: DocumentFields.get(sidecar.fields, "title"),
+          alt: DocumentFields.get(sidecar.fields, "alt"),
+          caption: DocumentFields.get(sidecar.fields, "caption"),
           created_at: translation.created_at || now,
           updated_at: now
         })

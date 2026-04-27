@@ -3,6 +3,7 @@ defmodule BDS.Posts do
 
   import Ecto.Query
 
+  alias BDS.DocumentFields
   alias BDS.Frontmatter
   alias BDS.Embeddings
   alias BDS.AI
@@ -846,24 +847,24 @@ defmodule BDS.Posts do
     now = Persistence.now_ms()
 
     attrs = %{
-      id: Map.get(fields, "id") || Ecto.UUID.generate(),
+      id: DocumentFields.get(fields, "id") || Ecto.UUID.generate(),
       project_id: project_id,
-      title: Map.get(fields, "title") || "",
-      slug: Map.fetch!(fields, "slug"),
+      title: DocumentFields.get(fields, "title") || "",
+      slug: DocumentFields.fetch!(fields, "slug"),
       excerpt: Map.get(fields, "excerpt"),
       content: nil,
-      status: parse_post_status(Map.get(fields, "status", "published")),
+      status: parse_post_status(DocumentFields.get(fields, "status", "published")),
       author: Map.get(fields, "author"),
-      created_at: Map.get(fields, "createdAt", now),
-      updated_at: Map.get(fields, "updatedAt", now),
-      published_at: Map.get(fields, "publishedAt"),
+      created_at: DocumentFields.get(fields, "createdAt", now),
+      updated_at: DocumentFields.get(fields, "updatedAt", now),
+      published_at: DocumentFields.get(fields, "publishedAt"),
       file_path: rebuild_file.relative_path,
       checksum: nil,
       tags: Map.get(fields, "tags", []),
       categories: Map.get(fields, "categories", []),
-      template_slug: Map.get(fields, "templateSlug"),
+      template_slug: DocumentFields.get(fields, "templateSlug"),
       language: Map.get(fields, "language"),
-      do_not_translate: Map.get(fields, "doNotTranslate", false),
+      do_not_translate: DocumentFields.get(fields, "doNotTranslate", false),
       published_title: nil,
       published_content: nil,
       published_tags: nil,
@@ -894,26 +895,26 @@ defmodule BDS.Posts do
 
   defp upsert_post_translation_from_rebuild_file(project_id, rebuild_file, opts) do
     fields = rebuild_file.fields
-    source_post_id = Map.fetch!(fields, "translationFor")
+    source_post_id = DocumentFields.fetch!(fields, "translationFor")
     source_post = Repo.get_by!(Post, project_id: project_id, id: source_post_id)
     now = Persistence.now_ms()
-    language = normalize_language(Map.fetch!(fields, "language"))
+    language = normalize_language(DocumentFields.fetch!(fields, "language"))
 
     translation =
       Repo.get_by(Translation, translation_for: source_post_id, language: language) || %Translation{}
 
     attrs = %{
-      id: Map.get(fields, "id") || Ecto.UUID.generate(),
+      id: DocumentFields.get(fields, "id") || Ecto.UUID.generate(),
       project_id: project_id,
       translation_for: source_post_id,
       language: language,
-      title: Map.get(fields, "title") || "",
+      title: DocumentFields.get(fields, "title") || "",
       excerpt: Map.get(fields, "excerpt"),
       content: nil,
-      status: parse_translation_status(Map.get(fields, "status", "published")),
-      created_at: Map.get(fields, "createdAt", source_post.created_at || now),
-      updated_at: Map.get(fields, "updatedAt", source_post.updated_at || source_post.created_at || now),
-      published_at: Map.get(fields, "publishedAt", source_post.published_at),
+      status: parse_translation_status(DocumentFields.get(fields, "status", "published")),
+      created_at: DocumentFields.get(fields, "createdAt", source_post.created_at || now),
+      updated_at: DocumentFields.get(fields, "updatedAt", source_post.updated_at || source_post.created_at || now),
+      published_at: DocumentFields.get(fields, "publishedAt", source_post.published_at),
       file_path: rebuild_file.relative_path,
       checksum: nil
     }
@@ -946,7 +947,7 @@ defmodule BDS.Posts do
   end
 
   defp translation_rebuild_file?(%{fields: fields}) do
-    Map.has_key?(fields, "translationFor") and not Map.has_key?(fields, "slug")
+    DocumentFields.has_key?(fields, "translationFor") and not DocumentFields.has_key?(fields, "slug")
   end
 
   defp list_matching_files(dir, pattern) do

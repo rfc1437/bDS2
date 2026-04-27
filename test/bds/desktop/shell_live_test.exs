@@ -1034,6 +1034,72 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute Enum.any?(diff.diff_reports, &(&1.entity_id == published_post.id))
   end
 
+  test "metadata diff refresh reruns the diff and replaces the current result", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    :ok = BDS.Tasks.clear_finished()
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Database Post",
+               content: "Body",
+               excerpt: "Summary",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    post_path = Path.join(temp_dir, published_post.file_path)
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert {:ok, queued} = BDS.Desktop.ShellCommands.execute("metadata_diff")
+    completed_task!(queued.task_id)
+    send(view.pid, :refresh_task_status)
+
+    html = render(view)
+    refute html =~ "Filesystem Post"
+
+    File.write!(
+      post_path,
+      [
+        "---",
+        "id: #{published_post.id}",
+        "title: Filesystem Post",
+        "slug: #{published_post.slug}",
+        "excerpt: Summary",
+        "status: published",
+        "language: en",
+        "createdAt: #{published_post.created_at}",
+        "updatedAt: #{published_post.updated_at + 1}",
+        "publishedAt: #{published_post.published_at}",
+        "tags:",
+        "categories:",
+        "---",
+        "Body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    existing_ids = MapSet.new(Enum.map(BDS.Tasks.list_tasks(), & &1.id))
+
+    html =
+      view
+      |> element("button[phx-click='rerun_misc_editor']")
+      |> render_click()
+
+    assert html =~ "Metadata Diff"
+
+    refresh_task = new_task!(existing_ids, "Metadata Diff")
+    completed_task!(refresh_task.id)
+    send(view.pid, :refresh_task_status)
+
+    html = render(view)
+    assert html =~ "Filesystem Post"
+  end
+
   test "metadata diff orphan import action queues an import task and removes the orphan", %{
     project: project,
     temp_dir: temp_dir

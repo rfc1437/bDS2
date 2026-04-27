@@ -99,6 +99,45 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert is_map(completed.result.payload.summary)
   end
 
+  test "repair_metadata_diff exposes live in-task progress from the repair worker", %{project: project} do
+    original = Application.get_env(:bds, :tasks, [])
+
+    Application.put_env(
+      :bds,
+      :tasks,
+      original
+      |> Keyword.put(:max_concurrent, 1)
+      |> Keyword.put(:progress_throttle_ms, 0)
+    )
+
+    on_exit(fn -> Application.put_env(:bds, :tasks, original) end)
+
+    items =
+      Enum.map(1..40, fn _index ->
+        %{"entity_type" => "project", "entity_id" => project.id}
+      end)
+
+    assert {:ok, result} =
+             ShellCommands.execute("repair_metadata_diff", %{
+               "direction" => "file_to_db",
+               "items" => items
+             })
+
+    progressed =
+      wait_for_task(
+        result.task_id,
+        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.2 and &1.progress < 1.0),
+        5_000
+      )
+
+    assert progressed.group_name == "Maintenance"
+    assert String.contains?(progressed.message, "Repairing")
+    assert String.contains?(progressed.message, "/")
+
+    assert wait_for_task(result.task_id, &(&1.status == :completed and &1.progress == 1.0), 5_000).status ==
+             :completed
+  end
+
   test "find_duplicates queues a tracked embeddings task and returns the report as an editor payload" do
     assert {:ok, result} = ShellCommands.execute("find_duplicates")
 
