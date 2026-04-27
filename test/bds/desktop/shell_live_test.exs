@@ -1736,6 +1736,160 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute chat_html =~ "Desktop workbench content routed through the Elixir shell."
   end
 
+  test "chat editor renders legacy model controls, tool markers, and structured tool surfaces" do
+    assert {:ok, conversation} = AI.start_chat(%{title: "Editor Chat", model: "gpt-4.1"})
+
+    now = Persistence.now_ms()
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :user,
+        content: "Show me a table",
+        created_at: now
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :assistant,
+        content: "Here is the current summary.",
+        tool_calls:
+          Jason.encode!([
+            %{
+              "id" => "call-table",
+              "name" => "render_table",
+              "arguments" => %{"title" => "Blog Stats", "columns" => ["Metric", "Value"]}
+            }
+          ]),
+        created_at: now + 1
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :tool,
+        tool_call_id: "call-table",
+        content:
+          Jason.encode!(%{
+            "type" => "table",
+            "title" => "Blog Stats",
+            "columns" => ["Metric", "Value"],
+            "rows" => [["Posts", "1"], ["Media", "0"]]
+          }),
+        created_at: now + 2
+      })
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert html =~ ~s(data-testid="chat-model-selector-button")
+    assert html =~ "gpt-4.1"
+    assert html =~ ~s(data-testid="chat-tool-marker")
+    assert html =~ "render_table"
+    assert html =~ ~s(data-testid="chat-tool-surface")
+    assert html =~ "Blog Stats"
+    assert html =~ "Metric"
+    assert html =~ "Posts"
+  end
+
+  test "translation validation route renders dedicated cards and fix controls", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en", "de"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Hello",
+               content: "World",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+
+    assert {:ok, _translation} =
+             Posts.upsert_post_translation(post.id, "de", %{
+               title: "Hallo",
+               content: "Welt",
+               status: :published
+             })
+
+    invalid_file_path =
+      Path.join([
+        temp_dir,
+        Path.dirname(published_post.file_path),
+        "#{published_post.slug}.en.md"
+      ])
+
+    File.write!(
+      invalid_file_path,
+      [
+        "---",
+        "translationFor: #{post.id}",
+        "language: en",
+        "title: Wrong Language",
+        "---",
+        "Invalid translation",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert {:ok, queued} = BDS.Desktop.ShellCommands.execute("validate_translations")
+    completed_task!(queued.task_id)
+    send(view.pid, :refresh_task_status)
+
+    html = render(view)
+
+    assert html =~ ~s(class="translation-validation-view")
+    assert html =~ ~s(data-testid="translation-validation-revalidate")
+    assert html =~ ~s(data-testid="translation-validation-fix")
+    assert html =~ ~s(data-testid="translation-validation-card")
+    assert html =~ invalid_file_path
+  end
+
+  test "git diff route renders a structured Monaco diff surface for working tree changes", %{temp_dir: temp_dir} do
+    posts_dir = Path.join(temp_dir, "posts")
+    File.mkdir_p!(posts_dir)
+
+    file_path = Path.join(posts_dir, "first.md")
+    File.write!(file_path, "Old content\n")
+
+    init_git_repo!(temp_dir, "initial")
+    File.write!(file_path, "New content\n")
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "git_diff",
+        "id" => "git-working-tree",
+        "title" => "Working tree",
+        "subtitle" => "Working tree and history"
+      })
+
+    assert html =~ ~s(class="git-diff-view")
+    assert html =~ ~s(data-testid="git-diff-file-select")
+    assert html =~ "posts/first.md"
+    assert html =~ ~s(phx-hook="MonacoDiffEditor")
+    refute html =~ ~s(<pre><code>)
+  end
+
   test "settings sidebar categories render the full old-app section model and target the requested section" do
     {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 

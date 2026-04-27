@@ -580,69 +580,116 @@ defmodule BDS.Posts do
   end
 
   def validate_translations(project_id, opts \\ []) do
+    project = Projects.get_project!(project_id)
     {:ok, metadata} = Metadata.get_project_metadata(project_id)
     on_progress = progress_callback(opts)
 
-    posts =
+    source_posts =
       Repo.all(
         from post in Post,
-          where: post.project_id == ^project_id and post.status == :published,
+          where: post.project_id == ^project_id,
           order_by: [asc: post.created_at, asc: post.slug]
       )
 
-        total_posts = length(posts)
-        :ok = report_rebuild_started(on_progress, total_posts, "published posts")
+    source_post_map = Map.new(source_posts, &{&1.id, &1})
 
-    translation_languages =
+    translation_rows =
       Repo.all(
         from translation in Translation,
-          join: post in Post,
-          on: post.id == translation.translation_for,
-          where: post.project_id == ^project_id,
-          select: {translation.translation_for, translation.language}
+          where: translation.project_id == ^project_id,
+          order_by: [asc: translation.translation_for, asc: translation.language, asc: translation.id]
       )
-      |> Enum.group_by(fn {post_id, _language} -> post_id end, fn {_post_id, language} ->
-        language
-      end)
 
-    required_languages =
-      metadata.blog_languages
-      |> Enum.map(&normalize_language/1)
-      |> Enum.reject(&(&1 == normalize_language(metadata.main_language)))
-      |> Enum.uniq()
-      |> Enum.sort()
+    project_data_dir = Projects.project_data_dir(project)
 
-    missing =
-      posts
+    markdown_files =
+      project_data_dir
+      |> Path.join("posts")
+      |> list_markdown_files_recursive()
+
+    total_items = length(translation_rows) + length(markdown_files)
+    :ok = report_rebuild_started(on_progress, total_items, "translations")
+
+    invalid_database_rows =
+      translation_rows
       |> Enum.with_index(1)
-      |> Enum.flat_map(fn {post, index} ->
-        available = Map.get(translation_languages, post.id, [])
+      |> Enum.flat_map(fn {translation, index} ->
+        :ok = report_rebuild_progress(on_progress, index, total_items, "translations")
 
-        :ok = report_rebuild_progress(on_progress, index, total_posts, "published posts")
+        case invalid_database_translation_issue(translation, source_post_map, metadata) do
+          nil -> []
+          issue -> [issue]
+        end
+      end)
+      |> Enum.sort_by(&translation_validation_issue_sort_key/1)
 
-        cond do
-          post.do_not_translate ->
-            []
+    {checked_filesystem_file_count, invalid_filesystem_files} =
+      markdown_files
+      |> Enum.with_index(length(translation_rows) + 1)
+      |> Enum.reduce({0, []}, fn {file_path, index}, {count, issues} ->
+        :ok = report_rebuild_progress(on_progress, index, total_items, "translations")
 
-          true ->
-            required_languages
-            |> Enum.reject(&(&1 in available))
-            |> Enum.map(&%{post_id: post.id, language: &1})
+        case invalid_filesystem_translation_issue(file_path, source_post_map, metadata) do
+          {:ok, nil} ->
+            {count + 1, issues}
+
+          {:ok, issue} ->
+            {count + 1, [issue | issues]}
+
+          :skip ->
+            {count, issues}
         end
       end)
 
-    do_not_translate_posts =
-      posts
-      |> Enum.filter(& &1.do_not_translate)
-      |> Enum.map(& &1.id)
-
-    orphan_files = orphan_translation_files(project_id)
+     missing = legacy_missing_translation_entries(source_posts, translation_rows, metadata)
+     orphan_files = legacy_orphan_translation_files(invalid_filesystem_files, project_data_dir)
+     do_not_translate_posts = legacy_do_not_translate_posts(source_posts)
 
     {:ok,
      %{
+       checked_database_row_count: length(translation_rows),
+       checked_filesystem_file_count: checked_filesystem_file_count,
+       invalid_database_rows: invalid_database_rows,
+       invalid_filesystem_files: Enum.reverse(invalid_filesystem_files) |> Enum.sort_by(&translation_validation_issue_sort_key/1),
        missing: missing,
        orphan_files: orphan_files,
        do_not_translate_posts: do_not_translate_posts
+     }}
+  end
+
+  def fix_invalid_translations(report) when is_map(report) do
+    normalized_report = normalize_translation_validation_report(report)
+
+    {deleted_database_rows, flushed_translations, synced_post_ids} =
+      Enum.reduce(normalized_report.invalid_database_rows, {0, 0, MapSet.new()}, fn issue, {deleted, flushed, synced_ids} ->
+        case fix_invalid_database_translation(issue) do
+          {:deleted, post_id} ->
+            {deleted + 1, flushed, maybe_put_synced_post(synced_ids, post_id)}
+
+          {:flushed, post_id} ->
+            {deleted, flushed + 1, maybe_put_synced_post(synced_ids, post_id)}
+
+          :noop ->
+            {deleted, flushed, synced_ids}
+        end
+      end)
+
+    deleted_files =
+      Enum.reduce(normalized_report.invalid_filesystem_files, 0, fn issue, count ->
+        if delete_translation_validation_file(issue.file_path) do
+          count + 1
+        else
+          count
+        end
+      end)
+
+    Enum.each(synced_post_ids, &Search.sync_post/1)
+
+    {:ok,
+     %{
+       deleted_database_rows: deleted_database_rows,
+       deleted_files: deleted_files,
+       flushed_translations: flushed_translations
      }}
   end
 
@@ -997,6 +1044,12 @@ defmodule BDS.Posts do
   end
 
   defp normalize_translation_updates(post, %Translation{} = translation, language, attrs, now) do
+    requested_status =
+      case attr(attrs, :status) do
+        nil -> nil
+        status -> parse_translation_status(status)
+      end
+
     updates =
       %{}
       |> maybe_put(:title, attr(attrs, :title))
@@ -1006,6 +1059,8 @@ defmodule BDS.Posts do
     reopened? =
       translation.status == :published and translation_content_change?(translation, updates)
 
+    status = if(reopened?, do: :draft, else: requested_status || translation.status || :draft)
+
     %{
       id: translation.id || Ecto.UUID.generate(),
       project_id: post.project_id,
@@ -1014,10 +1069,10 @@ defmodule BDS.Posts do
       title: Map.get(updates, :title, translation.title),
       excerpt: Map.get(updates, :excerpt, translation.excerpt),
       content: Map.get(updates, :content, translation.content),
-      status: if(reopened?, do: :draft, else: translation.status || :draft),
+      status: status,
       created_at: translation.created_at || now,
       updated_at: now,
-      published_at: translation.published_at,
+      published_at: translation.published_at || if(status == :published, do: now, else: nil),
       file_path: translation.file_path || "",
       checksum: translation.checksum
     }
@@ -1303,31 +1358,289 @@ defmodule BDS.Posts do
   defp present?(value) when is_binary(value), do: String.trim(value) != ""
   defp present?(value), do: not is_nil(value)
 
-  defp orphan_translation_files(project_id) do
-    project = Projects.get_project!(project_id)
-
-    translation_paths =
-      MapSet.new(
-        Repo.all(
-          from translation in Translation,
-            where: translation.project_id == ^project_id,
-            select: translation.file_path
-        )
-      )
-
-    project
-    |> Projects.project_data_dir()
-    |> Path.join("posts")
-    |> list_matching_files("*.md")
-    |> Enum.map(&Path.relative_to(&1, Projects.project_data_dir(project)))
-    |> Enum.filter(&translation_file?/1)
-    |> Enum.reject(&MapSet.member?(translation_paths, &1))
+  defp list_markdown_files_recursive(dir) do
+    ["*.md", "*.markdown", "*.mdx"]
+    |> Enum.flat_map(&list_matching_files(dir, &1))
+    |> Enum.uniq()
     |> Enum.sort()
   end
 
-  defp translation_file?(relative_path) do
-    Regex.match?(~r/\.[a-z]{2}\.md$/i, relative_path)
+  defp invalid_database_translation_issue(%Translation{} = translation, source_post_map, metadata) do
+    source_post = Map.get(source_post_map, translation.translation_for)
+    normalized_language = normalize_language(translation.language)
+
+    cond do
+      is_nil(source_post) ->
+        translation_validation_issue(%{
+          issue: "missing-source-post",
+          translation_id: translation.id,
+          translation_for: translation.translation_for,
+          translation_language: normalized_language,
+          title: translation.title,
+          file_path: blank_to_nil(translation.file_path)
+        })
+
+      canonical_translation_language?(source_post, normalized_language, metadata) ->
+        translation_validation_issue(%{
+          issue: "same-language-as-canonical",
+          translation_id: translation.id,
+          translation_for: translation.translation_for,
+          canonical_language: canonical_translation_language(source_post, metadata),
+          translation_language: normalized_language,
+          title: translation.title,
+          file_path: blank_to_nil(translation.file_path)
+        })
+
+      source_post.do_not_translate ->
+        translation_validation_issue(%{
+          issue: "do-not-translate-has-translations",
+          translation_id: translation.id,
+          translation_for: translation.translation_for,
+          translation_language: normalized_language,
+          title: translation.title,
+          file_path: blank_to_nil(translation.file_path)
+        })
+
+      translation.status == :published and present?(translation.content) ->
+        translation_validation_issue(%{
+          issue: "content-in-database",
+          translation_id: translation.id,
+          translation_for: translation.translation_for,
+          translation_language: normalized_language,
+          title: translation.title,
+          file_path: blank_to_nil(translation.file_path)
+        })
+
+      true ->
+        nil
+    end
   end
+
+  defp invalid_filesystem_translation_issue(file_path, source_post_map, metadata) do
+    with {:ok, contents} <- File.read(file_path),
+         {:ok, %{fields: fields}} <- Frontmatter.parse_document(contents),
+         true <- translation_rebuild_file?(%{fields: fields}) do
+      translation_for = DocumentFields.get(fields, "translationFor")
+      source_post = Map.get(source_post_map, translation_for)
+      normalized_language = normalize_language(DocumentFields.get(fields, "language"))
+      title = DocumentFields.get(fields, "title")
+
+      issue =
+        cond do
+          is_nil(source_post) ->
+            translation_validation_issue(%{
+              issue: "missing-source-post",
+              translation_for: translation_for,
+              translation_language: normalized_language,
+              title: title,
+              file_path: file_path
+            })
+
+          canonical_translation_language?(source_post, normalized_language, metadata) ->
+            translation_validation_issue(%{
+              issue: "same-language-as-canonical",
+              translation_for: translation_for,
+              canonical_language: canonical_translation_language(source_post, metadata),
+              translation_language: normalized_language,
+              title: title,
+              file_path: file_path
+            })
+
+          source_post.do_not_translate ->
+            translation_validation_issue(%{
+              issue: "do-not-translate-has-translations",
+              translation_for: translation_for,
+              translation_language: normalized_language,
+              title: title,
+              file_path: file_path
+            })
+
+          true ->
+            nil
+        end
+
+      {:ok, issue}
+    else
+      false -> :skip
+      _other -> :skip
+    end
+  end
+
+  defp normalize_translation_validation_report(report) do
+    %{
+      checked_database_row_count: map_value(report, :checked_database_row_count, 0),
+      checked_filesystem_file_count: map_value(report, :checked_filesystem_file_count, 0),
+      invalid_database_rows:
+        report
+        |> map_value(:invalid_database_rows, [])
+        |> Enum.map(&normalize_translation_validation_issue/1),
+      invalid_filesystem_files:
+        report
+        |> map_value(:invalid_filesystem_files, [])
+        |> Enum.map(&normalize_translation_validation_issue/1)
+    }
+  end
+
+  defp legacy_missing_translation_entries(source_posts, translation_rows, metadata) do
+    configured_languages =
+      ([Map.get(metadata, :main_language)] ++ Map.get(metadata, :blog_languages, []))
+      |> Enum.map(&normalize_language/1)
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> Enum.uniq()
+
+    existing_languages_by_post =
+      Enum.reduce(translation_rows, %{}, fn translation, acc ->
+        Map.update(
+          acc,
+          translation.translation_for,
+          MapSet.new([normalize_language(translation.language)]),
+          &MapSet.put(&1, normalize_language(translation.language))
+        )
+      end)
+
+    source_posts
+    |> Enum.filter(&(&1.status == :published and not &1.do_not_translate))
+    |> Enum.flat_map(fn post ->
+      canonical_language = canonical_translation_language(post, metadata)
+      existing_languages = Map.get(existing_languages_by_post, post.id, MapSet.new())
+
+      configured_languages
+      |> Enum.reject(&(&1 == canonical_language or MapSet.member?(existing_languages, &1)))
+      |> Enum.map(&%{post_id: post.id, language: &1})
+    end)
+    |> Enum.sort_by(&{&1.post_id, &1.language})
+  end
+
+  defp legacy_orphan_translation_files(invalid_filesystem_files, project_data_dir) do
+    invalid_filesystem_files
+    |> Enum.filter(&(Map.get(&1, :issue) == "missing-source-post"))
+    |> Enum.map(fn issue ->
+      issue
+      |> Map.get(:file_path)
+      |> relative_project_data_path(project_data_dir)
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.sort()
+  end
+
+  defp legacy_do_not_translate_posts(source_posts) do
+    source_posts
+    |> Enum.filter(&(&1.status == :published and &1.do_not_translate))
+    |> Enum.map(& &1.id)
+    |> Enum.sort()
+  end
+
+  defp normalize_translation_validation_issue(issue) when is_map(issue) do
+    %{
+      issue: map_value(issue, :issue),
+      translation_id: blank_to_nil(map_value(issue, :translation_id)),
+      translation_for: map_value(issue, :translation_for),
+      canonical_language: blank_to_nil(map_value(issue, :canonical_language)),
+      translation_language: map_value(issue, :translation_language),
+      title: blank_to_nil(map_value(issue, :title)),
+      file_path: blank_to_nil(map_value(issue, :file_path))
+    }
+  end
+
+  defp fix_invalid_database_translation(%{issue: "content-in-database", translation_id: translation_id})
+       when is_binary(translation_id) do
+    case Repo.get(Translation, translation_id) do
+      %Translation{} = translation ->
+        case Repo.get(Post, translation.translation_for) do
+          %Post{} = post ->
+            :ok = publish_translation(post, translation)
+            {:flushed, translation.translation_for}
+
+          nil ->
+            :noop
+        end
+
+      nil ->
+        :noop
+    end
+  end
+
+  defp fix_invalid_database_translation(%{translation_id: translation_id, translation_for: translation_for})
+       when is_binary(translation_id) do
+    case Repo.get(Translation, translation_id) do
+      %Translation{} = translation ->
+        Repo.delete!(translation)
+        {:deleted, translation_for}
+
+      nil ->
+        :noop
+    end
+  end
+
+  defp fix_invalid_database_translation(_issue), do: :noop
+
+  defp delete_translation_validation_file(file_path) when file_path in [nil, ""], do: false
+
+  defp delete_translation_validation_file(file_path) do
+    case File.rm(file_path) do
+      :ok -> true
+      {:error, :enoent} -> false
+      {:error, _reason} -> false
+    end
+  end
+
+  defp translation_validation_issue(attrs) do
+    %{
+      issue: Map.get(attrs, :issue),
+      translation_id: Map.get(attrs, :translation_id),
+      translation_for: Map.get(attrs, :translation_for),
+      canonical_language: Map.get(attrs, :canonical_language),
+      translation_language: Map.get(attrs, :translation_language),
+      title: Map.get(attrs, :title),
+      file_path: Map.get(attrs, :file_path)
+    }
+  end
+
+  defp translation_validation_issue_sort_key(issue) do
+    [Map.get(issue, :translation_for), Map.get(issue, :translation_id), Map.get(issue, :file_path)]
+    |> Enum.map(&to_string(&1 || ""))
+    |> Enum.join(":")
+  end
+
+  defp canonical_translation_language(source_post, metadata) do
+    language = normalize_language(source_post.language)
+
+    if language == "" do
+      normalize_language(Map.get(metadata, :main_language))
+    else
+      language
+    end
+  end
+
+  defp canonical_translation_language?(source_post, language, metadata) do
+    canonical_language = canonical_translation_language(source_post, metadata)
+    canonical_language != "" and canonical_language == normalize_language(language)
+  end
+
+  defp map_value(map, key, default \\ nil) when is_map(map) do
+    Map.get(map, key, Map.get(map, Atom.to_string(key), default))
+  end
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(value), do: value
+
+  defp relative_project_data_path(nil, _project_data_dir), do: nil
+
+  defp relative_project_data_path(file_path, project_data_dir) do
+    case Path.relative_to(file_path, project_data_dir) do
+      relative_path when relative_path == file_path -> file_path
+      relative_path -> relative_path
+    end
+  end
+
+  defp maybe_put_synced_post(set, post_id) when is_binary(post_id) and post_id != "", do: MapSet.put(set, post_id)
+  defp maybe_put_synced_post(set, _post_id), do: set
 
   defp normalize_language(nil), do: ""
 

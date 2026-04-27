@@ -181,10 +181,79 @@
         </div>
 
       <% :translation_validation -> %>
-        <div class="misc-columns">
-          <section class="misc-card"><h3><%= translated("Missing") %></h3><ul><%= for issue <- @misc_editor.missing do %><li><%= inspect(issue) %></li><% end %></ul></section>
-          <section class="misc-card"><h3><%= translated("Orphan Files") %></h3><ul><%= for file <- @misc_editor.orphan_files do %><li><%= file %></li><% end %></ul></section>
-          <section class="misc-card"><h3><%= translated("Do Not Translate") %></h3><ul><%= for post <- @misc_editor.do_not_translate_posts do %><li><%= inspect(post) %></li><% end %></ul></section>
+        <div class="translation-validation-view">
+          <section class="translation-validation-summary">
+            <p><%= @misc_editor.summary_text %></p>
+          </section>
+
+          <section class="translation-validation-section">
+            <h3><%= translated("translationValidation.databaseTitle") %></h3>
+
+            <%= if @misc_editor.invalid_database_rows == [] do %>
+              <p class="translation-validation-empty"><%= translated("translationValidation.noneDatabase") %></p>
+            <% else %>
+              <div class="translation-validation-list">
+                <%= for issue <- @misc_editor.invalid_database_rows do %>
+                  <article class="translation-validation-card translation-validation-card-db" data-testid="translation-validation-card">
+                    <p class="translation-validation-card-title"><%= translation_issue_label(issue) %></p>
+                    <dl class="translation-validation-card-meta">
+                      <dt><%= translated("translationValidation.field.translationFor") %></dt>
+                      <dd><%= translation_issue_value(issue, :translation_for) %></dd>
+                      <%= if translation_issue_value(issue, :translation_id) do %>
+                        <dt><%= translated("translationValidation.field.translationId") %></dt>
+                        <dd><%= translation_issue_value(issue, :translation_id) %></dd>
+                      <% end %>
+                      <%= if translation_issue_value(issue, :title) do %>
+                        <dt><%= translated("translationValidation.field.title") %></dt>
+                        <dd><%= translation_issue_value(issue, :title) %></dd>
+                      <% end %>
+                      <dt><%= translated("translationValidation.field.languages") %></dt>
+                      <dd><%= translation_issue_languages(issue) %></dd>
+                      <%= if translation_issue_value(issue, :file_path) do %>
+                        <dt><%= translated("translationValidation.field.filePath") %></dt>
+                        <dd><%= translation_issue_value(issue, :file_path) %></dd>
+                      <% end %>
+                    </dl>
+                  </article>
+                <% end %>
+              </div>
+            <% end %>
+          </section>
+
+          <section class="translation-validation-section">
+            <h3><%= translated("translationValidation.filesystemTitle") %></h3>
+
+            <%= if @misc_editor.invalid_filesystem_files == [] do %>
+              <p class="translation-validation-empty"><%= translated("translationValidation.noneFilesystem") %></p>
+            <% else %>
+              <div class="translation-validation-list">
+                <%= for issue <- @misc_editor.invalid_filesystem_files do %>
+                  <article class="translation-validation-card translation-validation-card-file" data-testid="translation-validation-card">
+                    <p class="translation-validation-card-title"><%= translation_issue_label(issue) %></p>
+                    <dl class="translation-validation-card-meta">
+                      <dt><%= translated("translationValidation.field.translationFor") %></dt>
+                      <dd><%= translation_issue_value(issue, :translation_for) %></dd>
+                      <%= if translation_issue_value(issue, :title) do %>
+                        <dt><%= translated("translationValidation.field.title") %></dt>
+                        <dd><%= translation_issue_value(issue, :title) %></dd>
+                      <% end %>
+                      <dt><%= translated("translationValidation.field.languages") %></dt>
+                      <dd><%= translation_issue_languages(issue) %></dd>
+                      <%= if translation_issue_value(issue, :file_path) do %>
+                        <dt><%= translated("translationValidation.field.filePath") %></dt>
+                        <dd><%= translation_issue_value(issue, :file_path) %></dd>
+                      <% end %>
+                    </dl>
+                  </article>
+                <% end %>
+              </div>
+            <% end %>
+          </section>
+
+          <div class="translation-validation-actions">
+            <button class="secondary" type="button" phx-click="rerun_misc_editor" data-testid="translation-validation-revalidate"><%= translated("translationValidation.revalidate") %></button>
+            <button class="primary" type="button" phx-click="fix_translation_validation" data-testid="translation-validation-fix" disabled={not @misc_editor.can_fix?}><%= translated("translationValidation.fix") %></button>
+          </div>
         </div>
 
       <% :find_duplicates -> %>
@@ -202,7 +271,35 @@
         </div>
 
       <% :git_diff -> %>
-        <div class="misc-card misc-code-card"><pre><code><%= @misc_editor.diff_text %></code></pre></div>
+        <div class="git-diff-view">
+          <%= if @misc_editor.files == [] do %>
+            <p class="git-diff-empty"><%= @misc_editor.empty_message %></p>
+          <% else %>
+            <form class="git-diff-toolbar" phx-change="select_git_diff_file">
+              <label for="git-diff-file-select"><%= translated("gitDiff.changedFiles") %></label>
+              <select id="git-diff-file-select" data-testid="git-diff-file-select" name="path">
+                <%= for file_path <- @misc_editor.files do %>
+                  <option value={file_path} selected={file_path == @misc_editor.selected_file_path}><%= file_path %></option>
+                <% end %>
+              </select>
+            </form>
+
+            <div
+              id={"git-diff-editor-#{String.replace(@misc_editor.active_diff.file_path || "working-tree", ~r/[^a-zA-Z0-9_-]+/, "-")}"}
+              class="git-diff-editor"
+              phx-hook="MonacoDiffEditor"
+              data-monaco-diff-language={@misc_editor.active_diff.language}
+              data-monaco-diff-file-path={@misc_editor.active_diff.file_path}
+              data-monaco-diff-view-style={@misc_editor.preferences.view_style}
+              data-monaco-diff-word-wrap={if(@misc_editor.preferences.word_wrap, do: "on", else: "off")}
+              data-monaco-diff-hide-unchanged={if(@misc_editor.preferences.hide_unchanged_regions, do: "true", else: "false")}
+            >
+              <textarea class="monaco-diff-original" hidden><%= @misc_editor.active_diff.original %></textarea>
+              <textarea class="monaco-diff-modified" hidden><%= @misc_editor.active_diff.modified %></textarea>
+              <div class="monaco-diff-editor-instance"></div>
+            </div>
+          <% end %>
+        </div>
     <% end %>
   </div>
 </div>

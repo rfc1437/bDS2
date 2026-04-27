@@ -97,7 +97,9 @@ defmodule BDS.Desktop.ShellLive do
         |> assign(:script_editor_drafts, %{})
         |> assign(:template_editor_drafts, %{})
         |> assign(:chat_editor_inputs, %{})
+        |> assign(:chat_model_selectors_open, %{})
         |> assign(:misc_editor_selected_pairs, %{})
+        |> assign(:misc_editor_git_selected_files, %{})
         |> assign(:metadata_diff_active_tabs, %{})
         |> assign(:metadata_diff_field_filters, %{})
         |> assign(:shell_overlay, nil)
@@ -683,6 +685,14 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, ChatEditor.update_input(socket, message, &reload_shell/2)}
   end
 
+  def handle_event("toggle_chat_model_selector", _params, socket) do
+    {:noreply, ChatEditor.toggle_model_selector(socket, &reload_shell/2)}
+  end
+
+  def handle_event("select_chat_model", %{"model" => model_id}, socket) do
+    {:noreply, ChatEditor.set_model(socket, model_id, &reload_shell/2, &append_output_entry/5)}
+  end
+
   def handle_event("send_chat_editor_message", _params, socket) do
     {:noreply, ChatEditor.send_message(socket, &reload_shell/2, &append_output_entry/5)}
   end
@@ -699,6 +709,17 @@ defmodule BDS.Desktop.ShellLive do
       {:rerun, next_socket} -> {:noreply, apply_shell_command(next_socket, "validate_site")}
       {:socket, next_socket} -> {:noreply, next_socket}
     end
+  end
+
+  def handle_event("fix_translation_validation", _params, socket) do
+    case MiscEditor.fix_translation_validation(socket, &append_output_entry/5) do
+      {:rerun, next_socket} -> {:noreply, apply_shell_command(next_socket, "validate_translations")}
+      {:socket, next_socket} -> {:noreply, next_socket}
+    end
+  end
+
+  def handle_event("select_git_diff_file", %{"path" => path}, socket) do
+    {:noreply, socket |> MiscEditor.select_git_diff_file(path) |> assign_misc_editor()}
   end
 
   def handle_event("toggle_duplicate_pair", %{"pair-id" => pair_id}, socket) do

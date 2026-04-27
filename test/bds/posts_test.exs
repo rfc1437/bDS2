@@ -705,6 +705,75 @@ defmodule BDS.PostsTest do
     assert {:ok, %{indexed: 3, total: 3}} = BDS.Embeddings.get_indexing_progress(project.id)
   end
 
+  test "validate_translations and fix_invalid_translations follow the legacy invalid-translation workflow",
+       %{project: project} do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Source Post",
+               content: "Canonical body",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
+
+    assert {:ok, translation} =
+             BDS.Posts.upsert_post_translation(post.id, "de", %{
+               title: "Translated Post",
+               content: "Translated body",
+               status: :published
+             })
+
+    invalid_file_path =
+      Path.join([
+        BDS.Projects.project_data_dir(project),
+        Path.dirname(published_post.file_path),
+        "#{published_post.slug}.en.md"
+      ])
+
+    File.write!(
+      invalid_file_path,
+      [
+        "---",
+        "translationFor: #{post.id}",
+        "language: en",
+        "title: Invalid Same Language",
+        "---",
+        "Wrong translation",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, report} = BDS.Posts.validate_translations(project.id)
+
+    assert report.checked_database_row_count == 1
+    assert report.checked_filesystem_file_count == 1
+
+    assert [db_issue] = report.invalid_database_rows
+    assert db_issue.issue == "content-in-database"
+    assert db_issue.translation_id == translation.id
+    assert db_issue.translation_for == post.id
+    assert db_issue.translation_language == "de"
+
+    assert [file_issue] = report.invalid_filesystem_files
+    assert file_issue.issue == "same-language-as-canonical"
+    assert file_issue.translation_for == post.id
+    assert file_issue.translation_language == "en"
+    assert file_issue.file_path == invalid_file_path
+
+    assert {:ok, result} = BDS.Posts.fix_invalid_translations(report)
+    assert result.deleted_database_rows == 0
+    assert result.deleted_files == 1
+    assert result.flushed_translations == 1
+
+    saved_translation = BDS.Repo.get!(BDS.Posts.Translation, translation.id)
+    assert saved_translation.content == nil
+    assert is_binary(saved_translation.file_path)
+    assert File.exists?(Path.join(BDS.Projects.project_data_dir(project), saved_translation.file_path))
+    refute File.exists?(invalid_file_path)
+  end
+
   def handle_repo_query(_event, _measurements, metadata, owner_pid) do
     send(owner_pid, {:repo_query, metadata.query || ""})
   end

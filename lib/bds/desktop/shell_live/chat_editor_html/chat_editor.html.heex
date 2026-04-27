@@ -1,37 +1,113 @@
 <div class="chat-panel" data-testid="chat-editor">
   <div class="chat-panel-header">
     <div class="chat-panel-title"><%= @chat_editor.title %></div>
+
+    <div class="chat-panel-header-actions">
+      <button
+        class="chat-model-selector-button"
+        type="button"
+        phx-click="toggle_chat_model_selector"
+        data-testid="chat-model-selector-button"
+      >
+        <span><%= @chat_editor.model || translated("chat.newChat") %></span>
+        <span class="chat-model-selector-caret">▾</span>
+      </button>
+
+      <%= if @chat_editor.model_selector_open? and @chat_editor.available_models != [] do %>
+        <div class="chat-model-selector-menu">
+          <%= for model <- @chat_editor.available_models do %>
+            <button
+              class={[
+                "chat-model-selector-option",
+                if(model.id == @chat_editor.model, do: "active")
+              ]}
+              type="button"
+              phx-click="select_chat_model"
+              phx-value-model={model.id}
+            >
+              <%= model.name %>
+            </button>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
   </div>
 
   <div class="chat-messages">
     <%= if Enum.empty?(@chat_editor.messages) do %>
       <div class="chat-welcome">
         <div class="chat-welcome-icon">🤖</div>
-        <h2><%= translated("New Chat") %></h2>
-        <p><%= translated("Ask the assistant about the active project.") %></p>
+        <h2><%= translated("chat.welcomeTitle") %></h2>
+        <p><%= translated("chat.welcomeDescription") %></p>
         <ul>
-          <li><%= translated("Search posts and media") %></li>
-          <li><%= translated("Inspect metadata") %></li>
-          <li><%= translated("Open related tabs") %></li>
-          <li><%= translated("Review generated output") %></li>
-          <li><%= translated("Navigate settings") %></li>
+          <li><%= translated("chat.welcomeTipSearch") %></li>
+          <li><%= translated("chat.welcomeTipChart") %></li>
+          <li><%= translated("chat.welcomeTipTable") %></li>
+          <li><%= translated("chat.welcomeTipMetadata") %></li>
+          <li><%= translated("chat.welcomeTipTabs") %></li>
         </ul>
       </div>
     <% else %>
       <%= for message <- @chat_editor.messages do %>
         <div class={["chat-message", to_string(message.role || "assistant")]}>
           <div class="chat-message-content">
-            <div class="chat-message-header"><span class="chat-message-role"><%= String.capitalize(to_string(message.role || "assistant")) %></span></div>
+            <div class="chat-message-header"><span class="chat-message-role"><%= message_role_label(message.role) %></span></div>
+
+            <%= if message.tool_markers != [] do %>
+              <div class="chat-tool-markers">
+                <%= for tool_call <- message.tool_markers do %>
+                  <div class="chat-tool-marker" data-testid="chat-tool-marker">
+                    <span class="chat-tool-marker-name"><%= tool_call_name(tool_call) %></span>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+
             <div class="chat-message-text"><%= message.content || "" %></div>
           </div>
         </div>
+
+        <%= for surface <- message.tool_surfaces do %>
+          <article class="chat-tool-surface" data-testid="chat-tool-surface">
+            <%= if surface.title do %>
+              <h3><%= surface.title %></h3>
+            <% end %>
+
+            <%= case tool_surface_type(surface) do %>
+              <% "table" -> %>
+                <div class="chat-tool-surface-table-wrap">
+                  <table class="chat-tool-surface-table">
+                    <thead>
+                      <tr>
+                        <%= for column <- surface.columns do %>
+                          <th><%= column %></th>
+                        <% end %>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <%= for row <- surface.rows do %>
+                        <tr>
+                          <%= for value <- row do %>
+                            <td><%= value %></td>
+                          <% end %>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                </div>
+
+              <% _other -> %>
+                <pre class="chat-tool-surface-json"><%= Jason.encode!(surface.data, pretty: true) %></pre>
+            <% end %>
+          </article>
+        <% end %>
       <% end %>
     <% end %>
   </div>
 
   <div class="chat-input-container">
     <form class="chat-input-wrapper" phx-change="change_chat_editor_input">
-      <textarea class="chat-input chat-surface-input" name="message" rows="1" placeholder={translated("Send a message")}><%= @chat_editor.input %></textarea>
+      <textarea class="chat-input chat-surface-input" name="message" rows="1" placeholder={translated("chat.inputPlaceholder")}><%= @chat_editor.input %></textarea>
       <button class="chat-send-button" type="button" phx-click="send_chat_editor_message" disabled={String.trim(@chat_editor.input || "") == "" or @chat_editor.offline?}>↑</button>
     </form>
   </div>

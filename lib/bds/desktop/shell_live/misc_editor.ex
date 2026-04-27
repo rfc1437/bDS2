@@ -3,8 +3,11 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   use Phoenix.Component
 
-  alias BDS.{Embeddings, Generation, Git}
+  import Ecto.Query
+
+  alias BDS.{Embeddings, Generation, Git, Posts, Repo}
   alias BDS.Desktop.ShellData
+  alias BDS.Settings.Setting
 
   embed_templates "misc_editor_html/*"
 
@@ -112,6 +115,37 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
         |> append_output.(translated("Find Duplicates"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
+  end
+
+  def fix_translation_validation(socket, append_output) do
+    report =
+      socket.assigns
+      |> meta()
+      |> Map.get(:payload, %{})
+      |> normalize_translation_validation_report()
+
+    {:ok, result} = Posts.fix_invalid_translations(report)
+
+    {:rerun,
+     socket
+     |> append_output.(
+       translated("Translation Validation"),
+       translated("translationValidation.toast.fixSuccess", %{
+         dbRows: result.deleted_database_rows,
+         files: result.deleted_files,
+         flushed: result.flushed_translations
+       })
+     )}
+  rescue
+    error -> {:socket, append_output.(socket, translated("Translation Validation"), inspect(error), nil, "error")}
+  end
+
+  def select_git_diff_file(socket, file_path) do
+    assign(
+      socket,
+      :misc_editor_git_selected_files,
+      Map.put(socket.assigns.misc_editor_git_selected_files, socket.assigns.current_tab.id, file_path)
+    )
   end
 
   def metadata_diff_repair_request(socket, field, direction) do
@@ -245,14 +279,23 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   end
 
   defp build_translation_validation(meta, payload) do
+    report = normalize_translation_validation_report(payload)
+
     %{
       kind: :translation_validation,
       title: Map.get(meta, :title, translated("Translation Validation")),
       subtitle: Map.get(meta, :subtitle, ""),
-      summary: Map.get(payload, :summary, %{}),
-      missing: Map.get(payload, :missing, []),
-      orphan_files: Map.get(payload, :orphan_files, []),
-      do_not_translate_posts: Map.get(payload, :do_not_translate_posts, [])
+      summary: %{},
+      summary_text:
+        translated("translationValidation.summary", %{
+          dbRows: report.checked_database_row_count,
+          files: report.checked_filesystem_file_count,
+          invalidDb: length(report.invalid_database_rows),
+          invalidFiles: length(report.invalid_filesystem_files)
+        }),
+      invalid_database_rows: report.invalid_database_rows,
+      invalid_filesystem_files: report.invalid_filesystem_files,
+      can_fix?: report.invalid_database_rows != [] or report.invalid_filesystem_files != []
     }
   end
 
@@ -270,27 +313,91 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   end
 
   defp build_git_diff(assigns, meta) do
-    diff_text =
-      case Git.diff(assigns.projects.active_project_id) do
-        {:ok, %{staged_diff: staged, unstaged_diff: unstaged}} ->
-          [
-            "# Staged Changes\n\n",
-            if(String.trim(staged) == "", do: translated("No staged changes"), else: staged),
-            "\n\n# Working Tree\n\n",
-            if(String.trim(unstaged) == "", do: translated("No unstaged changes"), else: unstaged)
-          ]
-          |> IO.iodata_to_binary()
+    project_id = assigns.projects.active_project_id
+    selected_files = Map.get(assigns, :misc_editor_git_selected_files, %{})
 
-        {:error, reason} -> inspect(reason)
+    {files, diff, error_message} =
+      case Git.status(project_id) do
+        {:ok, %{files: files}} ->
+          file_paths = files |> Enum.map(&Map.get(&1, :path)) |> Enum.reject(&is_nil/1) |> Enum.uniq() |> Enum.sort()
+          selected_file_path = select_git_diff_path(assigns.current_tab.id, file_paths, selected_files)
+
+          diff =
+            case selected_file_path do
+              nil ->
+                empty_git_diff(project_id)
+
+              file_path ->
+                case Git.get_diff_content(project_id, file_path) do
+                  {:ok, diff} -> diff
+                  {:error, reason} -> Map.merge(empty_git_diff(project_id), %{file_path: file_path, error: inspect(reason)})
+                end
+            end
+
+          {file_paths, diff, nil}
+
+        {:error, reason} ->
+          {[], empty_git_diff(project_id), inspect(reason)}
       end
+
+    preferences = git_diff_preferences()
 
     %{
       kind: :git_diff,
       title: Map.get(meta, :title, translated("Git Diff")),
       subtitle: Map.get(meta, :subtitle, ""),
-      diff_text: diff_text,
-      summary: %{}
+      summary: %{},
+      files: files,
+      selected_file_path: diff.file_path,
+      active_diff: Map.put(diff, :language, git_diff_language(diff.file_path)),
+      preferences: preferences,
+      empty_message: error_message || translated("No unstaged changes")
     }
+  end
+
+  def translation_issue_label(issue) do
+    case issue_value(issue, :issue) do
+      "same-language-as-canonical" -> translated("translationValidation.issue.sameLanguage")
+      "do-not-translate-has-translations" -> translated("translationValidation.issue.doNotTranslate")
+      "content-in-database" -> translated("translationValidation.issue.contentInDatabase")
+      _other -> translated("translationValidation.issue.missingSource")
+    end
+  end
+
+  def translation_issue_languages(issue) do
+    canonical_language = issue_value(issue, :canonical_language)
+    translation_language = issue_value(issue, :translation_language)
+
+    if canonical_language in [nil, ""] do
+      translation_language
+    else
+      translated("translationValidation.languagesWithCanonical", %{
+        canonical: canonical_language,
+        translation: translation_language
+      })
+    end
+  end
+
+  def translation_issue_value(issue, key), do: issue_value(issue, key)
+
+  def git_diff_language(nil), do: "plaintext"
+
+  def git_diff_language(file_path) do
+    case file_path |> Path.extname() |> String.downcase() do
+      ".md" -> "markdown"
+      ".markdown" -> "markdown"
+      ".mdx" -> "markdown"
+      ".ts" -> "typescript"
+      ".tsx" -> "typescript"
+      ".js" -> "javascript"
+      ".jsx" -> "javascript"
+      ".json" -> "json"
+      ".css" -> "css"
+      ".html" -> "html"
+      ".yml" -> "yaml"
+      ".yaml" -> "yaml"
+      _other -> "plaintext"
+    end
   end
 
   defp meta(assigns) do
@@ -495,5 +602,61 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   defp diff_name(diff) do
     Map.get(diff, :field) || Map.get(diff, "field") || Map.get(diff, :name) || Map.get(diff, "name") || "value"
+  end
+
+  defp normalize_translation_validation_report(payload) when is_map(payload) do
+    %{
+      checked_database_row_count: issue_value(payload, :checked_database_row_count) || 0,
+      checked_filesystem_file_count: issue_value(payload, :checked_filesystem_file_count) || 0,
+      invalid_database_rows:
+        payload
+        |> issue_value(:invalid_database_rows)
+        |> List.wrap(),
+      invalid_filesystem_files:
+        payload
+        |> issue_value(:invalid_filesystem_files)
+        |> List.wrap()
+    }
+  end
+
+  defp normalize_translation_validation_report(_payload) do
+    %{
+      checked_database_row_count: 0,
+      checked_filesystem_file_count: 0,
+      invalid_database_rows: [],
+      invalid_filesystem_files: []
+    }
+  end
+
+  defp issue_value(issue, key) when is_map(issue) do
+    Map.get(issue, key) || Map.get(issue, Atom.to_string(key))
+  end
+
+  defp issue_value(_issue, _key), do: nil
+
+  defp select_git_diff_path(tab_id, files, selected_files) do
+    selected = Map.get(selected_files, tab_id)
+
+    if selected in files do
+      selected
+    else
+      List.first(files)
+    end
+  end
+
+  defp empty_git_diff(file_path) do
+    %{file_path: file_path, original: "", modified: "", error: nil}
+  end
+
+  defp git_diff_preferences do
+    %{
+      view_style: get_global_setting("ui.git_diff_view_style") || "inline",
+      word_wrap: get_global_setting("ui.git_diff_word_wrap") == "true",
+      hide_unchanged_regions: get_global_setting("ui.git_diff_hide_unchanged_regions") == "true"
+    }
+  end
+
+  defp get_global_setting(key) do
+    Repo.one(from setting in Setting, where: setting.key == ^key, select: setting.value)
   end
 end

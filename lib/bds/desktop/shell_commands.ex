@@ -514,14 +514,10 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp normalize_translation_validation(report) do
     %{
-      summary: %{
-        missing_count: length(report.missing),
-        orphan_count: length(report.orphan_files),
-        do_not_translate_count: length(report.do_not_translate_posts)
-      },
-      missing: Enum.map(report.missing, &stringify_map/1),
-      orphan_files: report.orphan_files,
-      do_not_translate_posts: report.do_not_translate_posts
+      checked_database_row_count: report.checked_database_row_count,
+      checked_filesystem_file_count: report.checked_filesystem_file_count,
+      invalid_database_rows: Enum.map(report.invalid_database_rows, &stringify_map/1),
+      invalid_filesystem_files: Enum.map(report.invalid_filesystem_files, &stringify_map/1)
     }
   end
 
@@ -532,11 +528,10 @@ defmodule BDS.Desktop.ShellCommands do
       project_id: project_id,
       route: "translation_validation",
       title: "Translation Validation",
-      subtitle: "Published posts checked against required blog languages",
+      subtitle: "Database rows and translation files checked for invalid state",
       editorMeta: [
-        %{label: "Missing", value: Integer.to_string(length(report.missing))},
-        %{label: "Orphan Files", value: Integer.to_string(length(report.orphan_files))},
-        %{label: "Skipped", value: Integer.to_string(length(report.do_not_translate_posts))}
+        %{label: "Invalid DB", value: Integer.to_string(length(report.invalid_database_rows))},
+        %{label: "Invalid Files", value: Integer.to_string(length(report.invalid_filesystem_files))}
       ],
       payload: normalize_translation_validation(report)
     }

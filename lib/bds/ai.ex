@@ -317,6 +317,48 @@ defmodule BDS.AI do
     |> Enum.map(&format_conversation/1)
   end
 
+  def available_chat_models(current_model \\ nil) do
+    endpoint_models =
+      [:online, :airplane]
+      |> Enum.flat_map(fn kind ->
+        case get_endpoint(kind) do
+          {:ok, %{model: model}} when is_binary(model) and model != "" -> [model]
+          _other -> []
+        end
+      end)
+
+    preference_models =
+      [:chat, :airplane_chat]
+      |> Enum.flat_map(fn key ->
+        case get_model_preference(key) do
+          {:ok, model} when is_binary(model) and model != "" -> [model]
+          _other -> []
+        end
+      end)
+
+    [current_model | endpoint_models ++ preference_models]
+    |> Enum.filter(&(is_binary(&1) and String.trim(&1) != ""))
+    |> Enum.uniq()
+    |> Enum.map(&%{id: &1, name: &1})
+  end
+
+  def set_conversation_model(conversation_id, model_id)
+      when is_binary(conversation_id) and is_binary(model_id) do
+    case Repo.get(ChatConversation, conversation_id) do
+      nil ->
+        {:error, :not_found}
+
+      %ChatConversation{} = conversation ->
+        conversation
+        |> ChatConversation.changeset(%{model: model_id, updated_at: Persistence.now_ms()})
+        |> Repo.update()
+        |> case do
+          {:ok, updated_conversation} -> {:ok, format_conversation(updated_conversation)}
+          error -> error
+        end
+    end
+  end
+
   def list_chat_messages(conversation_id) when is_binary(conversation_id) do
     Repo.all(
       from message in ChatMessage,

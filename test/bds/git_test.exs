@@ -72,6 +72,26 @@ defmodule BDS.GitTest do
     assert repo.current_branch == "main"
   end
 
+  test "get_diff_content returns HEAD and working tree content for a changed file", %{
+    project: project,
+    project_dir: project_dir
+  } do
+    posts_dir = Path.join(project_dir, "posts")
+    File.mkdir_p!(posts_dir)
+
+    relative_path = "posts/first.md"
+    full_path = Path.join(project_dir, relative_path)
+
+    File.write!(full_path, "Old content\n")
+    init_git_repo!(project_dir, "initial")
+    File.write!(full_path, "New content\n")
+
+    assert {:ok, diff} = Git.get_diff_content(project.id, relative_path)
+    assert diff.file_path == relative_path
+    assert diff.original == "Old content\n"
+    assert diff.modified == "New content\n"
+  end
+
   test "remote_state reports upstream ahead and behind counts", %{project: project} do
     runner = fake_runner(fn
       "git", ["rev-parse", "--abbrev-ref", "HEAD"], _opts -> {"main\n", 0}
@@ -145,5 +165,19 @@ defmodule BDS.GitTest do
 
   defp fake_runner(handler) do
     fn command, args, opts -> handler.(command, args, opts) end
+  end
+
+  defp init_git_repo!(project_dir, message) do
+    run_git!(project_dir, ["init", "-b", "master"])
+    run_git!(project_dir, ["config", "user.name", "bDS Tests"])
+    run_git!(project_dir, ["config", "user.email", "tests@example.com"])
+    run_git!(project_dir, ["add", "-A"])
+    run_git!(project_dir, ["commit", "-m", message])
+  end
+
+  defp run_git!(dir, args) do
+    {output, status} = System.cmd("git", args, cd: dir, stderr_to_stdout: true)
+
+    assert status == 0, output
   end
 end

@@ -51,13 +51,7 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert result.project_id == project.id
   end
 
-  test "validate_translations returns an editor payload with current translation gaps", %{project: project} do
-    assert {:ok, _metadata} =
-             BDS.Metadata.update_project_metadata(project.id, %{
-               main_language: "en",
-               blog_languages: ["en", "de"]
-             })
-
+  test "validate_translations returns an editor payload with current translation gaps", %{project: project, temp_dir: temp_dir} do
     assert {:ok, post} =
              BDS.Posts.create_post(%{
                project_id: project.id,
@@ -66,7 +60,37 @@ defmodule BDS.Desktop.ShellCommandsTest do
                language: "en"
              })
 
-    assert {:ok, _published_post} = BDS.Posts.publish_post(post.id)
+    assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
+
+    assert {:ok, translation} =
+             BDS.Posts.upsert_post_translation(post.id, "de", %{
+               title: "Hallo",
+               content: "Welt",
+               status: :published
+             })
+
+    translation_id = translation.id
+
+    invalid_file_path =
+      Path.join([
+        temp_dir,
+        Path.dirname(published_post.file_path),
+        "#{published_post.slug}.en.md"
+      ])
+
+    File.write!(
+      invalid_file_path,
+      [
+        "---",
+        "translationFor: #{post.id}",
+        "language: en",
+        "title: Wrong Language",
+        "---",
+        "Invalid translation",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
 
     assert {:ok, result} = ShellCommands.execute("validate_translations")
 
@@ -79,9 +103,28 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert completed.group_name == "Validation"
     assert completed.result.kind == "open_editor"
     assert completed.result.route == "translation_validation"
-    assert completed.result.payload.summary.missing_count == 1
+    assert completed.result.payload.checked_database_row_count == 1
+    assert completed.result.payload.checked_filesystem_file_count == 1
+
     post_id = post.id
-    assert [%{"language" => "de", "post_id" => ^post_id}] = completed.result.payload.missing
+
+    assert [
+             %{
+               "issue" => "content-in-database",
+               "translation_for" => ^post_id,
+               "translation_id" => ^translation_id,
+               "translation_language" => "de"
+             }
+           ] = completed.result.payload.invalid_database_rows
+
+    assert [
+             %{
+               "issue" => "same-language-as-canonical",
+               "translation_for" => ^post_id,
+               "translation_language" => "en",
+               "file_path" => ^invalid_file_path
+             }
+           ] = completed.result.payload.invalid_filesystem_files
   end
 
   test "validate_site queues a tracked validation task and returns the report as an editor payload" do

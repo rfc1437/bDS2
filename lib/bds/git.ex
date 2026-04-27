@@ -87,6 +87,27 @@ defmodule BDS.Git do
     end
   end
 
+  def get_diff_content(project_id, file_path, opts \\ [])
+      when is_binary(project_id) and is_binary(file_path) and is_list(opts) do
+    with {:ok, project_dir} <- project_dir(project_id) do
+      runner = Keyword.get(opts, :runner, &system_runner/3)
+
+      original =
+        case runner.("git", ["show", "HEAD:#{file_path}"], command_opts(project_dir)) do
+          {output, 0} -> output
+          {_output, _status} -> ""
+        end
+
+      modified =
+        case File.read(Path.join(project_dir, file_path)) do
+          {:ok, contents} -> contents
+          {:error, _reason} -> ""
+        end
+
+      {:ok, %{file_path: file_path, original: original, modified: modified}}
+    end
+  end
+
   def history(project_id, branch, opts \\ [])
       when is_binary(project_id) and is_binary(branch) and is_list(opts) do
     with {:ok, project_dir} <- project_dir(project_id),
