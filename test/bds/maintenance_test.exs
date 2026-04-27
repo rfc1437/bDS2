@@ -647,6 +647,8 @@ defmodule BDS.MaintenanceTest do
 
     assert Enum.any?(diff_reports, fn report ->
              report.entity_type == "post" and report.entity_id == published_post.id and
+               report.label == "Original Post" and
+               report.meta_label == BDS.Persistence.timestamp_to_iso8601(published_post.created_at) and
                Enum.any?(
                  report.differences,
                  &(&1.name == "title" and &1.db_value == "Original Post" and
@@ -833,6 +835,63 @@ defmodule BDS.MaintenanceTest do
 
     refute Enum.any?(diff_reports, fn report ->
              report.entity_type == "post" and report.entity_id == published_post.id and
+               Enum.any?(report.differences, &(&1.name in ["status", "created_at", "updated_at", "published_at"]))
+           end)
+  end
+
+  test "metadata_diff treats translation status and timestamps as inherited from the canonical post" do
+    legacy_dir =
+      Path.join(System.tmp_dir!(), "bds-maintenance-legacy-translation-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(legacy_dir)
+    on_exit(fn -> File.rm_rf(legacy_dir) end)
+
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Legacy Translation Diff", data_path: legacy_dir})
+
+    posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2026", "04"])
+    File.mkdir_p!(posts_dir)
+
+    File.write!(
+      Path.join(posts_dir, "chimera.md"),
+      [
+        "---",
+        "id: post-from-old-app",
+        "title: Chimera Source",
+        "slug: chimera",
+        "status: published",
+        "language: de",
+        "createdAt: 2024-03-30T21:20:00.000Z",
+        "updatedAt: 2024-03-31T21:20:00.000Z",
+        "publishedAt: 2024-04-01T21:20:00.000Z",
+        "---",
+        "Quelle",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(
+      Path.join(posts_dir, "chimera.en.md"),
+      [
+        "---",
+        "id: translation-from-old-app",
+        "translationFor: post-from-old-app",
+        "language: en",
+        "title: Chimera",
+        "excerpt: Imported translation",
+        "---",
+        "Translated body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, _posts} = BDS.Posts.rebuild_posts_from_files(project.id)
+    assert {:ok, %{diff_reports: diff_reports}} = BDS.Maintenance.metadata_diff(project.id)
+
+    refute Enum.any?(diff_reports, fn report ->
+             report.entity_type == "post_translation" and
                Enum.any?(report.differences, &(&1.name in ["status", "created_at", "updated_at", "published_at"]))
            end)
   end

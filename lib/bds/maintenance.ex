@@ -11,6 +11,7 @@ defmodule BDS.Maintenance do
   alias BDS.Embeddings
   alias BDS.Posts.Post
   alias BDS.Posts.Translation, as: PostTranslation
+  alias BDS.Persistence
   alias BDS.Projects
   alias BDS.Repo
   alias BDS.Scripts.Script
@@ -219,7 +220,12 @@ defmodule BDS.Maintenance do
           if differences == [] do
             []
           else
-            [%{entity_type: "post", entity_id: post.id, differences: differences}]
+            [
+              build_diff_report("post", post.id, differences,
+                label: metadata_diff_entity_label(post.title, post.slug, post.id),
+                meta_label: metadata_diff_timestamp_label(post.created_at)
+              )
+            ]
           end
 
         {:error, _reason} ->
@@ -278,18 +284,10 @@ defmodule BDS.Maintenance do
               diff_field("title", translation.title, Map.get(fields, "title")),
               diff_field("excerpt", translation.excerpt, Map.get(fields, "excerpt")),
               diff_field("language", translation.language, Map.get(fields, "language")),
-              diff_field("status", translation.status, DocumentFields.get(fields, "status")),
               diff_field(
                 "translation_for",
                 translation.translation_for,
                 DocumentFields.get(fields, "translationFor")
-              ),
-              diff_field("created_at", translation.created_at, DocumentFields.get(fields, "createdAt")),
-              diff_field("updated_at", translation.updated_at, DocumentFields.get(fields, "updatedAt")),
-              diff_field(
-                "published_at",
-                translation.published_at,
-                DocumentFields.get(fields, "publishedAt")
               )
             ]
             |> Enum.reject(&is_nil/1)
@@ -298,11 +296,10 @@ defmodule BDS.Maintenance do
             []
           else
             [
-              %{
-                entity_type: "post_translation",
-                entity_id: translation.id,
-                differences: differences
-              }
+              build_diff_report("post_translation", translation.id, differences,
+                label: metadata_diff_entity_label(translation.title, nil, translation.id),
+                meta_label: translation.language
+              )
             ]
           end
 
@@ -502,14 +499,42 @@ defmodule BDS.Maintenance do
   end
 
   defp build_diff_report(entity_type, entity_id, differences) do
+    build_diff_report(entity_type, entity_id, differences, [])
+  end
+
+  defp build_diff_report(entity_type, entity_id, differences, opts) do
     normalized = Enum.reject(differences, &is_nil/1)
 
     if normalized == [] do
       nil
     else
-      %{entity_type: entity_type, entity_id: entity_id, differences: normalized}
+      %{
+        entity_type: entity_type,
+        entity_id: entity_id,
+        differences: normalized,
+        label: Keyword.get(opts, :label),
+        meta_label: Keyword.get(opts, :meta_label)
+      }
     end
   end
+
+  defp metadata_diff_entity_label(title, slug, fallback_id) do
+    blank_to_nil(title) || blank_to_nil(slug) || fallback_id
+  end
+
+  defp metadata_diff_timestamp_label(nil), do: nil
+  defp metadata_diff_timestamp_label(timestamp), do: Persistence.timestamp_to_iso8601(timestamp)
+
+  defp blank_to_nil(nil), do: nil
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(value), do: value
 
   defp diff_field(name, db_value, file_value) do
     if equal_diff_values?(db_value, file_value) do

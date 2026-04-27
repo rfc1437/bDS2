@@ -88,7 +88,6 @@ config {
 
 value PostFrontmatter {
     -- File path: posts/{YYYY}/{MM}/{slug}.md
-    -- For translations: posts/{YYYY}/{MM}/{slug}.{language}.md
     id: String              -- UUID v4
     title: String
     slug: String
@@ -103,6 +102,29 @@ value PostFrontmatter {
     published_at: Timestamp? -- Only written if published
     tags: List<String>      -- Always written, even if empty
     categories: List<String> -- Always written, even if empty
+}
+
+value TranslationFrontmatter {
+    -- File path: posts/{YYYY}/{MM}/{slug}.{language}.md
+    -- Translation files only store language-specific metadata.
+    -- Shared publication state and timestamps are inherited from the
+    -- canonical post file and are not duplicated here.
+    id: String              -- UUID v4
+    translation_for: String -- Canonical post UUID
+    language: String        -- ISO 639-1 language code
+    title: String           -- Translated title
+    excerpt: String?        -- Only written when the translated excerpt differs
+}
+
+surface TranslationFrontmatterSurface {
+    context frontmatter: TranslationFrontmatter
+
+    exposes:
+        frontmatter.id
+        frontmatter.translation_for
+        frontmatter.language
+        frontmatter.title
+        frontmatter.excerpt when frontmatter.excerpt != null
 }
 
 invariant PostFileLayout {
@@ -123,6 +145,13 @@ invariant PostTranslationFileLayout {
             mm: t.canonical_post.created_at.month_padded,
             slug: t.canonical_post.slug,
             lang: t.language)
+}
+
+invariant TranslationFilesInheritCanonicalMetadata {
+    -- Missing status and timestamp fields in translation files are expected.
+    -- Rebuild and metadata diff must resolve those values from the canonical post.
+    for t in PostTranslations where file_path != "":
+        parse_frontmatter(read_file(t.file_path)) = translation_frontmatter_fields(t)
 }
 
 rule WritePostFile {

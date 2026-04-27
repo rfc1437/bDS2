@@ -46,6 +46,20 @@ rule RunMetadataDiff {
         if diffs.count > 0:
             ensures: DiffReport.created(entity_type: "post", entity_id: post.id, differences: diffs)
 
+    -- Translation files only carry language-specific metadata. Shared status and
+    -- timestamp fields come from the canonical post and must not be reported as
+    -- missing when they are absent from the translation file.
+    for translation in project.post_translations:
+        let translation_file_data = parse_post_file(translation.file_path)
+        let translation_diffs = compare_translation_specific_fields(translation, translation_file_data)
+        if translation_diffs.count > 0:
+            ensures:
+                DiffReport.created(
+                    entity_type: "post_translation",
+                    entity_id: translation.id,
+                    differences: translation_diffs
+                )
+
     -- Detect orphan files (on disk but not in DB)
     for file in scan_directory(project.effective_data_dir + "/posts", "*.md"):
         let matching = Posts where file_path = file

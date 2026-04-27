@@ -377,6 +377,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
       entity_type: entity_type,
       entity_id: entity_id,
       label: metadata_diff_item_label(item, entity_id),
+      meta_label: metadata_diff_item_meta_label(item, entity_id),
       display_entity_type: metadata_diff_item_type_label(entity_type),
       differences: differences
     }
@@ -405,6 +406,10 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   defp metadata_diff_item_label(item, entity_id) do
     Map.get(item, :label) || Map.get(item, "label") || Map.get(item, :title) || Map.get(item, "title") || Map.get(item, :slug) || Map.get(item, "slug") || entity_id
+  end
+
+  defp metadata_diff_item_meta_label(item, entity_id) do
+    Map.get(item, :meta_label) || Map.get(item, "meta_label") || entity_id
   end
 
   defp metadata_diff_item_type_label("post"), do: translated("Post")

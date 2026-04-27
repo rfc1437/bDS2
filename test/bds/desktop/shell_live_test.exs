@@ -869,6 +869,8 @@ defmodule BDS.Desktop.ShellLiveTest do
                     %{
                       entity_type: "post",
                       entity_id: "post-1",
+                      label: "Hello DB",
+                      meta_label: "2026-04-05T12:00:00Z",
                       differences: [
                         %{field: "slug", db_value: "hello-db", file_value: "hello-file"},
                         %{field: "title", db_value: "Hello DB", file_value: "Hello File"}
@@ -931,10 +933,11 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-testid="metadata-diff-field-pill")
     assert html =~ "slug"
     assert html =~ "title"
-    assert html =~ "slug"
+    assert html =~ "2026-04-05T12:00:00Z"
     assert html =~ "hello-db"
     assert html =~ "hello-file"
     assert html =~ "posts/2026/04/orphan.md"
+    refute html =~ "Beitrag · post-1"
 
     html =
       view

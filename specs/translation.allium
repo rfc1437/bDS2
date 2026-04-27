@@ -64,6 +64,15 @@ entity PostTranslation {
     }
 }
 
+invariant TranslationFilesStoreOnlyLanguageSpecificMetadata {
+    -- Translation markdown files persist only fields that differ by language.
+    -- Shared metadata such as publication status and timestamps belongs to the
+    -- canonical post file and is inherited from the canonical post when
+    -- rebuilding or diffing translation files.
+    for t in PostTranslations where file_path != "":
+        translation_file(t).omits_shared_metadata = true
+}
+
 surface PostTranslationSurface {
     context translation: PostTranslation
 
