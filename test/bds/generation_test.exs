@@ -764,6 +764,42 @@ defmodule BDS.GenerationTest do
     assert english_html =~ "Canonical body"
   end
 
+  test "single generation uses host local calendar date for dated output paths", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    created_at = DateTime.to_unix(~U[2010-11-16 23:26:04Z], :millisecond)
+    {{year, month, day}, _time} = :calendar.system_time_to_local_time(created_at, :millisecond)
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Umzugsstatus",
+               content: "Local date body",
+               language: "de"
+             })
+
+    Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^post.id),
+      set: [created_at: created_at, published_at: created_at, updated_at: created_at]
+    )
+
+    assert {:ok, _published} = Posts.publish_post(post.id)
+
+    assert {:ok, result} = BDS.Generation.generate_site(project.id, [:single])
+
+    expected_path =
+      Path.join([
+        Integer.to_string(year),
+        String.pad_leading(Integer.to_string(month), 2, "0"),
+        String.pad_leading(Integer.to_string(day), 2, "0"),
+        "umzugsstatus",
+        "index.html"
+      ])
+
+    assert expected_path in Enum.map(result.generated_files, & &1.relative_path)
+    assert File.exists?(Path.join([temp_dir, "html", expected_path]))
+  end
+
   test "archive generation writes paginated category, tag, and date pages", %{
     project: project,
     temp_dir: temp_dir
@@ -803,11 +839,11 @@ defmodule BDS.GenerationTest do
     expected_paths = [
       "category/notes/index.html",
       "category/notes/page/2/index.html",
-      "tag/elixir/index.html",
+      "tag/Elixir/index.html",
       "2026/index.html",
       "2026/04/index.html",
       "de/category/notes/index.html",
-      "de/tag/elixir/index.html",
+      "de/tag/Elixir/index.html",
       "de/2026/index.html",
       "de/2026/04/index.html"
     ]
@@ -821,7 +857,7 @@ defmodule BDS.GenerationTest do
              Path.join([temp_dir, "html", "category", "notes", "page", "2", "index.html"])
            ) =~ "Archive 3"
 
-    assert File.read!(Path.join([temp_dir, "html", "tag", "elixir", "index.html"])) =~ "Elixir"
+    assert File.read!(Path.join([temp_dir, "html", "tag", "Elixir", "index.html"])) =~ "Elixir"
     assert File.read!(Path.join([temp_dir, "html", "2026", "04", "index.html"])) =~ "2026-04"
   end
 
@@ -1029,6 +1065,126 @@ defmodule BDS.GenerationTest do
     refute sitemap_xml =~ "localized-post.de"
   end
 
+  test "generate_site and validate_site exclude do_not_translate posts from language subtree pagination",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en", "de"],
+               max_posts_per_page: 1
+             })
+
+    assert {:ok, translatable_post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Translatable",
+               content: "Translatable body",
+               language: "en"
+             })
+
+    Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^translatable_post.id),
+      set: [created_at: DateTime.to_unix(~U[2026-04-15 12:00:00Z]), updated_at: DateTime.to_unix(~U[2026-04-15 12:00:00Z])]
+    )
+
+    assert {:ok, _published_translatable} = Posts.publish_post(translatable_post.id)
+
+    assert {:ok, do_not_translate_post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Stay Local",
+               content: "Only main language",
+               language: "en",
+               do_not_translate: true
+             })
+
+    Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^do_not_translate_post.id),
+      set: [created_at: DateTime.to_unix(~U[2026-04-14 12:00:00Z]), updated_at: DateTime.to_unix(~U[2026-04-14 12:00:00Z])]
+    )
+
+    assert {:ok, _published_do_not_translate} = Posts.publish_post(do_not_translate_post.id)
+
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core])
+
+    refute File.exists?(Path.join([temp_dir, "html", "de", "page", "2", "index.html"]))
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id, [:core])
+    assert report.missing_url_paths == []
+    assert report.extra_url_paths == []
+    assert report.updated_post_url_paths == []
+  end
+
+  test "generate_site and validate_site use URL-encoded tag paths like old bDS", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "de",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Encoded Tag",
+               content: "Encoded tag body",
+               language: "de",
+               tags: ["bücher"]
+             })
+
+    assert {:ok, _published_post} = Posts.publish_post(post.id)
+
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:tag])
+
+    assert File.exists?(Path.join([temp_dir, "html", "tag", "b%C3%BCcher", "index.html"]))
+    refute File.exists?(Path.join([temp_dir, "html", "tag", "bucher", "index.html"]))
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id, [:tag])
+    assert report.missing_url_paths == []
+    assert report.extra_url_paths == []
+    assert report.updated_post_url_paths == []
+  end
+
+  test "generate_site and validate_site percent-encode reserved tag characters like old bDS", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "de",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Reserved Tag",
+               content: "Reserved tag body",
+               language: "de",
+               tags: ["google+", "c#", "f#"]
+             })
+
+    assert {:ok, _published_post} = Posts.publish_post(post.id)
+
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:tag])
+
+    assert File.exists?(Path.join([temp_dir, "html", "tag", "google%2B", "index.html"]))
+    assert File.exists?(Path.join([temp_dir, "html", "tag", "c%23", "index.html"]))
+    assert File.exists?(Path.join([temp_dir, "html", "tag", "f%23", "index.html"]))
+
+    refute File.exists?(Path.join([temp_dir, "html", "tag", "google+", "index.html"]))
+    refute File.exists?(Path.join([temp_dir, "html", "tag", "c", "index.html"]))
+    refute File.exists?(Path.join([temp_dir, "html", "tag", "f", "index.html"]))
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id, [:tag])
+    assert report.missing_url_paths == []
+    assert report.extra_url_paths == []
+    assert report.updated_post_url_paths == []
+  end
+
   test "generation and validation include old-app pagination and day archive routes", %{
     project: project,
     temp_dir: temp_dir
@@ -1082,13 +1238,13 @@ defmodule BDS.GenerationTest do
     relative_paths = Enum.map(result.generated_files, & &1.relative_path)
 
     assert "page/2/index.html" in relative_paths
-    assert "tag/elixir/page/2/index.html" in relative_paths
+    assert "tag/Elixir/page/2/index.html" in relative_paths
     assert "2026/04/15/index.html" in relative_paths
     assert "2026/04/15/page/2/index.html" in relative_paths
     assert "about/index.html" in relative_paths
 
     assert File.exists?(Path.join([temp_dir, "html", "page", "2", "index.html"]))
-    assert File.exists?(Path.join([temp_dir, "html", "tag", "elixir", "page", "2", "index.html"]))
+    assert File.exists?(Path.join([temp_dir, "html", "tag", "Elixir", "page", "2", "index.html"]))
     assert File.exists?(Path.join([temp_dir, "html", "2026", "04", "15", "index.html"]))
     assert File.exists?(Path.join([temp_dir, "html", "2026", "04", "15", "page", "2", "index.html"]))
     assert File.exists?(Path.join([temp_dir, "html", "about", "index.html"]))
