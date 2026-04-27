@@ -937,6 +937,121 @@ defmodule BDS.GenerationTest do
     assert report.existing_html_url_count > 0
   end
 
+  test "validate_site uses published snapshot routes instead of mutable post rows", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Snapshot Route",
+               content: "Snapshot route body",
+               language: "en"
+             })
+
+    created_at = DateTime.to_unix(~U[2026-04-15 12:00:00Z])
+
+    Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^post.id),
+      set: [created_at: created_at, updated_at: created_at]
+    )
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core, :single, :date])
+
+    Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^post.id),
+      set: [created_at: DateTime.to_unix(~U[2026-04-16 12:00:00Z]), status: :draft]
+    )
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id, [:core, :single, :date])
+    assert report.missing_url_paths == []
+    assert report.extra_url_paths == []
+    assert report.updated_post_url_paths == []
+
+    assert File.exists?(
+             Path.join([
+               BDS.Projects.project_data_dir(BDS.Projects.get_project!(project.id)),
+               "html",
+               BDS.Generation.post_output_path(published_post)
+             ])
+           )
+  end
+
+  test "generation and validation include old-app pagination and day archive routes", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"],
+               max_posts_per_page: 2
+             })
+
+    for index <- 1..3 do
+      assert {:ok, post} =
+               Posts.create_post(%{
+                 project_id: project.id,
+                 title: "Paged #{index}",
+                 content: "Paged body #{index}",
+                 language: "en",
+                 categories: ["notes"],
+                 tags: ["Elixir"]
+               })
+
+      created_at = DateTime.to_unix(~U[2026-04-15 12:00:00Z]) + index
+
+      Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^post.id),
+        set: [created_at: created_at, updated_at: created_at]
+      )
+
+      assert {:ok, _published} = Posts.publish_post(post.id)
+    end
+
+    assert {:ok, page_post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "About",
+               content: "About body",
+               language: "en",
+               categories: ["page"]
+             })
+
+    page_created_at = DateTime.to_unix(~U[2026-04-15 13:00:00Z])
+
+    Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^page_post.id),
+      set: [created_at: page_created_at, updated_at: page_created_at]
+    )
+
+    assert {:ok, _published_page} = Posts.publish_post(page_post.id)
+    assert {:ok, result} = BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
+
+    relative_paths = Enum.map(result.generated_files, & &1.relative_path)
+
+    assert "page/2/index.html" in relative_paths
+    assert "tag/elixir/page/2/index.html" in relative_paths
+    assert "2026/04/15/index.html" in relative_paths
+    assert "2026/04/15/page/2/index.html" in relative_paths
+    assert "about/index.html" in relative_paths
+
+    assert File.exists?(Path.join([temp_dir, "html", "page", "2", "index.html"]))
+    assert File.exists?(Path.join([temp_dir, "html", "tag", "elixir", "page", "2", "index.html"]))
+    assert File.exists?(Path.join([temp_dir, "html", "2026", "04", "15", "index.html"]))
+    assert File.exists?(Path.join([temp_dir, "html", "2026", "04", "15", "page", "2", "index.html"]))
+    assert File.exists?(Path.join([temp_dir, "html", "about", "index.html"]))
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id)
+    assert report.missing_url_paths == []
+    assert report.extra_url_paths == []
+    assert report.updated_post_url_paths == []
+  end
+
   test "apply_validation clears updated post routes without rewriting unchanged html", %{
     project: project,
     temp_dir: temp_dir
