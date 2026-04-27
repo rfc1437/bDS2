@@ -113,6 +113,106 @@ defmodule BDS.Media do
     end
   end
 
+  def sync_media_from_sidecar(media_id) do
+    case Repo.get(Media, media_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Media{} = media ->
+        project = Projects.get_project!(media.project_id)
+        sidecar_path = Path.join(Projects.project_data_dir(project), media.sidecar_path)
+
+        if File.exists?(sidecar_path) do
+          {:ok, upsert_media_from_sidecar(project, parse_canonical_sidecar(project, sidecar_path), sync_search: true)}
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
+  def sync_media_translation_sidecar(translation_id) do
+    case Repo.get(Translation, translation_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Translation{} = translation ->
+        media = Repo.get!(Media, translation.translation_for)
+        project = Projects.get_project!(media.project_id)
+        :ok = write_translation_sidecar(project, media, translation)
+        {:ok, translation}
+    end
+  end
+
+  def sync_media_translation_from_sidecar(translation_id) do
+    case Repo.get(Translation, translation_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Translation{} = translation ->
+        media = Repo.get!(Media, translation.translation_for)
+        project = Projects.get_project!(media.project_id)
+        sidecar_path = Path.join(Projects.project_data_dir(project), translation_sidecar_path(media, translation.language))
+
+        if File.exists?(sidecar_path) do
+          sidecar = parse_translation_sidecar(sidecar_path)
+
+          case upsert_media_translation(media.id, Map.fetch!(sidecar.fields, "language"), %{
+                 title: Map.get(sidecar.fields, "title"),
+                 alt: Map.get(sidecar.fields, "alt"),
+                 caption: Map.get(sidecar.fields, "caption")
+               }) do
+            {:ok, updated_translation} -> {:ok, updated_translation}
+            error -> error
+          end
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
+  def import_orphan_media_sidecar(project_id, relative_path) do
+    project = Projects.get_project!(project_id)
+    sidecar_path = Path.join(Projects.project_data_dir(project), relative_path)
+
+    if File.exists?(sidecar_path) do
+      {:ok, upsert_media_from_sidecar(project, parse_canonical_sidecar(project, sidecar_path), sync_search: true)}
+    else
+      {:error, :not_found}
+    end
+  end
+
+  def import_orphan_media_translation_sidecar(project_id, relative_path) do
+    project = Projects.get_project!(project_id)
+    sidecar_path = Path.join(Projects.project_data_dir(project), relative_path)
+
+    if File.exists?(sidecar_path) do
+      sidecar = parse_translation_sidecar(sidecar_path)
+
+      case Repo.get(Media, Map.get(sidecar.fields, "translationFor")) do
+        nil ->
+          {:error, :not_found}
+
+        media ->
+          case Repo.get_by(Translation,
+                 translation_for: media.id,
+                 language: Map.fetch!(sidecar.fields, "language")
+               ) do
+            nil ->
+              upsert_media_translation(media.id, Map.fetch!(sidecar.fields, "language"), %{
+                title: Map.get(sidecar.fields, "title"),
+                alt: Map.get(sidecar.fields, "alt"),
+                caption: Map.get(sidecar.fields, "caption")
+              })
+
+            _translation ->
+              {:error, :conflict}
+          end
+      end
+    else
+      {:error, :not_found}
+    end
+  end
+
   def delete_media(media_id) do
     case Repo.get(Media, media_id) do
       nil ->

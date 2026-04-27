@@ -167,6 +167,15 @@ defmodule BDS.Metadata do
     |> unwrap_transaction()
   end
 
+  def flush_project_metadata_to_filesystem(project_id) do
+    project = Projects.get_project!(project_id)
+    state = load_state(project)
+
+    write_project_metadata_files(project, state, state)
+
+    {:ok, state}
+  end
+
   defp update_state(project_id, updater) do
     project = Projects.get_project!(project_id)
     state = load_state(project)

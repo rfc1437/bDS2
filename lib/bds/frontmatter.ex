@@ -34,7 +34,10 @@ defmodule BDS.Frontmatter do
 
   defp serialize_field({_key, nil}), do: []
   defp serialize_field({_key, ""}), do: []
-  defp serialize_field({_key, false}), do: []
+
+  defp serialize_field({key, false}) do
+    ["#{key}: false"]
+  end
 
   defp serialize_field({key, true}) do
     ["#{key}: true"]

@@ -864,18 +864,34 @@ defmodule BDS.Desktop.ShellLiveTest do
                   %{label: "Orphans", value: "1"}
                 ],
                 payload: %{
-                  summary: %{diff_count: 1, orphan_count: 1},
+                  summary: %{diff_count: 3, orphan_count: 2},
                   diff_reports: [
                     %{
                       entity_type: "post",
                       entity_id: "post-1",
                       differences: [
-                        %{field: "slug", db_value: "hello-db", file_value: "hello-file"}
+                        %{field: "slug", db_value: "hello-db", file_value: "hello-file"},
+                        %{field: "title", db_value: "Hello DB", file_value: "Hello File"}
+                      ]
+                    },
+                    %{
+                      entity_type: "post_translation",
+                      entity_id: "post-1-de",
+                      differences: [
+                        %{field: "excerpt", db_value: "Kurz DB", file_value: "Kurz Datei"}
+                      ]
+                    },
+                    %{
+                      entity_type: "media",
+                      entity_id: "media-1",
+                      differences: [
+                        %{field: "alt", db_value: "Alt DB", file_value: "Alt Datei"}
                       ]
                     }
                   ],
                   orphan_reports: [
-                    %{path: "posts/2026/04/orphan.md", entity_type: "post"}
+                    %{path: "posts/2026/04/orphan.md", entity_type: "post"},
+                    %{path: "media/2026/04/orphan.txt.meta", entity_type: "media"}
                   ]
                 }
               }
@@ -909,10 +925,173 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ ~s(data-tab-type="metadata_diff")
     assert html =~ "Metadaten-Diff"
+    assert html =~ ~s(data-testid="metadata-diff-tab")
+    assert html =~ ~s(data-entity-tab="posts")
+    assert html =~ ~s(data-entity-tab="media")
+    assert html =~ ~s(data-testid="metadata-diff-field-pill")
+    assert html =~ "slug"
+    assert html =~ "title"
     assert html =~ "slug"
     assert html =~ "hello-db"
     assert html =~ "hello-file"
     assert html =~ "posts/2026/04/orphan.md"
+
+    html =
+      view
+      |> element("[data-testid='metadata-diff-tab'][data-entity-tab='media']")
+      |> render_click()
+
+    assert html =~ "Alt DB"
+    assert html =~ "Alt Datei"
+    refute html =~ "hello-db"
+    refute html =~ "posts/2026/04/orphan.md"
+    assert html =~ "media/2026/04/orphan.txt.meta"
+
+    _html =
+      view
+      |> element("[data-testid='metadata-diff-tab'][data-entity-tab='posts']")
+      |> render_click()
+
+    html =
+      view
+      |> element("[data-testid='metadata-diff-field-pill'][data-field='slug']")
+      |> render_click()
+
+    assert html =~ "hello-db"
+    assert html =~ "hello-file"
+    refute html =~ "Kurz DB"
+    refute html =~ "posts/2026/04/orphan.md"
+  end
+
+  test "metadata diff repair actions queue a repair task and refresh the diff result", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    :ok = BDS.Tasks.clear_finished()
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Database Post",
+               content: "Body",
+               excerpt: "Summary",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+
+    post_path = Path.join(temp_dir, published_post.file_path)
+
+    File.write!(
+      post_path,
+      [
+        "---",
+        "id: #{published_post.id}",
+        "title: Filesystem Post",
+        "slug: #{published_post.slug}",
+        "excerpt: Summary",
+        "status: published",
+        "language: en",
+        "createdAt: #{published_post.created_at}",
+        "updatedAt: #{published_post.updated_at + 1}",
+        "publishedAt: #{published_post.published_at}",
+        "tags:",
+        "categories:",
+        "---",
+        "Body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert {:ok, queued} = BDS.Desktop.ShellCommands.execute("metadata_diff")
+    completed_task!(queued.task_id)
+    send(view.pid, :refresh_task_status)
+
+    html = render(view)
+    assert html =~ ~s(data-testid="metadata-diff-repair-button")
+    assert html =~ ~s(data-field="title")
+
+    existing_ids = MapSet.new(Enum.map(BDS.Tasks.list_tasks(), & &1.id))
+
+    html =
+      view
+      |> element("[data-testid='metadata-diff-repair-button'][data-direction='file_to_db'][data-field='title']")
+      |> render_click()
+
+    assert html =~ "Repair Metadata Diff"
+
+    repair_task = new_task!(existing_ids, "Repair Metadata Diff")
+    completed_task!(repair_task.id)
+    send(view.pid, :refresh_task_status)
+    _html = render(view)
+
+    assert Repo.get!(Post, published_post.id).title == "Filesystem Post"
+
+    assert {:ok, diff} = BDS.Maintenance.metadata_diff(project.id)
+    refute Enum.any?(diff.diff_reports, &(&1.entity_id == published_post.id))
+  end
+
+  test "metadata diff orphan import action queues an import task and removes the orphan", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    :ok = BDS.Tasks.clear_finished()
+
+    orphan_relative_path = Path.join(["posts", "2026", "04", "orphan-post.md"])
+    orphan_full_path = Path.join(temp_dir, orphan_relative_path)
+    File.mkdir_p!(Path.dirname(orphan_full_path))
+
+    File.write!(
+      orphan_full_path,
+      [
+        "---",
+        "id: orphan-post",
+        "title: Orphan Post",
+        "slug: orphan-post",
+        "status: published",
+        "createdAt: 1",
+        "updatedAt: 1",
+        "publishedAt: 1",
+        "tags:",
+        "categories:",
+        "---",
+        "Orphan body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert {:ok, queued} = BDS.Desktop.ShellCommands.execute("metadata_diff")
+    completed_task!(queued.task_id)
+    send(view.pid, :refresh_task_status)
+
+    html = render(view)
+    assert html =~ ~s(data-testid="metadata-diff-import-button")
+    assert html =~ orphan_relative_path
+
+    existing_ids = MapSet.new(Enum.map(BDS.Tasks.list_tasks(), & &1.id))
+
+    html =
+      view
+      |> element("[data-testid='metadata-diff-import-button']")
+      |> render_click()
+
+    assert html =~ "Import Metadata Diff Orphans"
+
+    import_task = new_task!(existing_ids, "Import Metadata Diff Orphans")
+    completed_task!(import_task.id)
+    send(view.pid, :refresh_task_status)
+    _html = render(view)
+
+    assert Repo.get_by(Post, project_id: project.id, file_path: orphan_relative_path)
+
+    assert {:ok, diff} = BDS.Maintenance.metadata_diff(project.id)
+    refute orphan_relative_path in Enum.map(diff.orphan_reports, & &1.file_path)
   end
 
   test "post tabs render a real editor and drive save publish discard flows", %{project: project} do
@@ -1051,6 +1230,36 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert discarded_post.status == :published
     assert discarded_post.content == nil
     assert discarded_post.title == "Updated Shell Post"
+  end
+
+  defp completed_task!(task_id, attempts \\ 50)
+
+  defp completed_task!(_task_id, 0), do: flunk("task did not complete in time")
+
+  defp completed_task!(task_id, attempts) do
+    case Enum.find(BDS.Tasks.list_tasks(), &(&1.id == task_id and &1.status == :completed)) do
+      nil ->
+        Process.sleep(20)
+        completed_task!(task_id, attempts - 1)
+
+      task ->
+        task
+    end
+  end
+
+  defp new_task!(existing_ids, name, attempts \\ 50)
+
+  defp new_task!(_existing_ids, _name, 0), do: flunk("new task was not created in time")
+
+  defp new_task!(existing_ids, name, attempts) do
+    case Enum.find(BDS.Tasks.list_tasks(), &(&1.name == name and not MapSet.member?(existing_ids, &1.id))) do
+      nil ->
+        Process.sleep(20)
+        new_task!(existing_ids, name, attempts - 1)
+
+      task ->
+        task
+    end
   end
 
   test "published post editor loads body from file and renders markdown-only editor", %{project: project} do

@@ -140,6 +140,54 @@ defmodule BDS.Scripts do
     {:ok, scripts}
   end
 
+  def sync_script_from_file(script_id) do
+    case Repo.get(Script, script_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Script{file_path: file_path} when file_path in [nil, ""] ->
+        {:error, :not_found}
+
+      %Script{} = script ->
+        project = Projects.get_project!(script.project_id)
+        full_path = Path.join(Projects.project_data_dir(project), script.file_path)
+
+        if File.exists?(full_path) do
+          {:ok, upsert_script_from_file(script.project_id, project, full_path)}
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
+  def sync_published_script_file(script_id) do
+    case Repo.get(Script, script_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Script{file_path: file_path, status: status} = script
+      when file_path not in [nil, ""] and status == :published ->
+        full_path = full_file_path(script.project_id, script.file_path)
+        body = published_script_body(script)
+        :ok = Persistence.atomic_write(full_path, serialize_script_file(script, body))
+        {:ok, script}
+
+      %Script{} ->
+        {:error, :not_found}
+    end
+  end
+
+  def import_orphan_script_file(project_id, relative_path) do
+    project = Projects.get_project!(project_id)
+    full_path = Path.join(Projects.project_data_dir(project), relative_path)
+
+    if File.exists?(full_path) do
+      {:ok, upsert_script_from_file(project_id, project, full_path)}
+    else
+      {:error, :not_found}
+    end
+  end
+
   defp default_entrypoint(:macro), do: "render"
   defp default_entrypoint(_kind), do: "main"
 
@@ -210,6 +258,21 @@ defmodule BDS.Scripts do
       :ok -> :ok
       {:error, :enoent} -> :ok
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp published_script_body(%Script{content: content}) when is_binary(content), do: content
+
+  defp published_script_body(script) do
+    case File.read(full_file_path(script.project_id, script.file_path)) do
+      {:ok, contents} ->
+        case Frontmatter.parse_document(contents) do
+          {:ok, %{body: body}} -> body
+          {:error, _reason} -> ""
+        end
+
+      {:error, _reason} ->
+        ""
     end
   end
 

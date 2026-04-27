@@ -222,6 +222,41 @@ defmodule BDS.Desktop.ShellCommands do
     end)
   end
 
+  defp dispatch("repair_metadata_diff", project, params) do
+    items = normalize_metadata_diff_items(Map.get(params, "items", Map.get(params, :items, [])))
+    direction = Map.get(params, "direction", Map.get(params, :direction))
+
+    if items == [] do
+      {:error, %{action: "repair_metadata_diff", message: "No metadata diff items selected"}}
+    else
+      queue_task(project, "repair_metadata_diff", "Repair Metadata Diff", "Maintenance", fn report ->
+        report.(0.2, "Repairing metadata differences")
+        {:ok, _repair} = Maintenance.repair_metadata_diff(project.id, direction, items)
+        report.(0.9, "Refreshing metadata diff")
+        {:ok, metadata_diff} = Maintenance.metadata_diff(project.id)
+        report.(1.0, "Metadata diff repair complete")
+        metadata_diff_result(project.id, metadata_diff)
+      end)
+    end
+  end
+
+  defp dispatch("import_metadata_diff_orphans", project, params) do
+    orphans = normalize_metadata_diff_orphans(Map.get(params, "orphans", Map.get(params, :orphans, [])))
+
+    if orphans == [] do
+      {:error, %{action: "import_metadata_diff_orphans", message: "No orphan files selected"}}
+    else
+      queue_task(project, "import_metadata_diff_orphans", "Import Metadata Diff Orphans", "Maintenance", fn report ->
+        report.(0.2, "Importing orphan files")
+        {:ok, _import} = Maintenance.import_metadata_diff_orphans(project.id, orphans)
+        report.(0.9, "Refreshing metadata diff")
+        {:ok, metadata_diff} = Maintenance.metadata_diff(project.id)
+        report.(1.0, "Metadata diff import complete")
+        metadata_diff_result(project.id, metadata_diff)
+      end)
+    end
+  end
+
   defp dispatch("validate_translations", project, _params) do
     queue_task(project, "validate_translations", "Validate Translations", "Validation", fn report ->
       report.(0.2, "Checking published translations")
@@ -518,6 +553,25 @@ defmodule BDS.Desktop.ShellCommands do
   defp stringify_map(map) when is_map(map) do
     Map.new(map, fn {key, value} -> {to_string(key), stringify_value(value)} end)
   end
+
+  defp normalize_metadata_diff_items(items) when is_list(items) do
+    Enum.map(items, fn item ->
+      %{
+        entity_type: Map.get(item, :entity_type) || Map.get(item, "entity_type"),
+        entity_id: Map.get(item, :entity_id) || Map.get(item, "entity_id")
+      }
+    end)
+  end
+
+  defp normalize_metadata_diff_items(_items), do: []
+
+  defp normalize_metadata_diff_orphans(orphans) when is_list(orphans) do
+    Enum.map(orphans, fn orphan ->
+      %{file_path: Map.get(orphan, :file_path) || Map.get(orphan, "file_path")}
+    end)
+  end
+
+  defp normalize_metadata_diff_orphans(_orphans), do: []
 
   defp stringify_value(value) when is_map(value), do: stringify_map(value)
   defp stringify_value(value) when is_list(value), do: Enum.map(value, &stringify_value/1)

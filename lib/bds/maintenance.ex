@@ -16,6 +16,57 @@ defmodule BDS.Maintenance do
   alias BDS.Sidecar
   alias BDS.Templates.Template
 
+  def repair_metadata_diff(project_id, direction, items, opts \\ [])
+
+  def repair_metadata_diff(project_id, direction, items, opts)
+      when is_binary(project_id) and is_list(items) do
+    on_progress = progress_callback(opts)
+    total = length(items)
+    :ok = report_started(on_progress, total, "Repairing metadata differences")
+
+    result =
+      items
+      |> Enum.with_index(1)
+      |> Enum.reduce(%{repaired: 0, failed: 0}, fn {item, index}, acc ->
+        next_acc =
+          case repair_metadata_diff_item(project_id, direction, item) do
+            :ok -> %{acc | repaired: acc.repaired + 1}
+            {:ok, _value} -> %{acc | repaired: acc.repaired + 1}
+            _error -> %{acc | failed: acc.failed + 1}
+          end
+
+        :ok = report_progress(on_progress, index, total, "Repairing metadata differences")
+        next_acc
+      end)
+
+    {:ok, result}
+  end
+
+  def import_metadata_diff_orphans(project_id, orphans, opts \\ [])
+
+  def import_metadata_diff_orphans(project_id, orphans, opts)
+      when is_binary(project_id) and is_list(orphans) do
+    on_progress = progress_callback(opts)
+    total = length(orphans)
+    :ok = report_started(on_progress, total, "Importing orphan files")
+
+    result =
+      orphans
+      |> Enum.with_index(1)
+      |> Enum.reduce(%{imported: 0, failed: 0}, fn {orphan, index}, acc ->
+        next_acc =
+          case import_metadata_diff_orphan(project_id, orphan) do
+            {:ok, _value} -> %{acc | imported: acc.imported + 1}
+            _error -> %{acc | failed: acc.failed + 1}
+          end
+
+        :ok = report_progress(on_progress, index, total, "Importing orphan files")
+        next_acc
+      end)
+
+    {:ok, result}
+  end
+
   def rebuild_from_filesystem(project_id, entity_type, opts \\ []) do
     case normalize_entity_type(entity_type) do
       :post -> BDS.Posts.rebuild_posts_from_files(project_id, opts)
@@ -546,5 +597,95 @@ defmodule BDS.Maintenance do
       nil -> nil
       file_path -> "#{file_path}.#{translation.language}.meta"
     end
+  end
+
+  defp repair_metadata_diff_item(project_id, direction, item) do
+    entity_type = Map.get(item, :entity_type) || Map.get(item, "entity_type")
+    entity_id = Map.get(item, :entity_id) || Map.get(item, "entity_id")
+
+    case {normalize_repair_direction(direction), entity_type} do
+      {:file_to_db, entity_type} when entity_type in ["project", "categories", "category_meta", "publishing"] ->
+        Metadata.sync_project_metadata_from_filesystem(project_id)
+
+      {:db_to_file, entity_type} when entity_type in ["project", "categories", "category_meta", "publishing"] ->
+        Metadata.flush_project_metadata_to_filesystem(project_id)
+
+      {:file_to_db, "post"} -> BDS.Posts.sync_post_from_file(entity_id)
+      {:db_to_file, "post"} -> BDS.Posts.rewrite_published_post(entity_id)
+      {:file_to_db, "post_translation"} -> BDS.Posts.sync_post_translation_from_file(entity_id)
+      {:db_to_file, "post_translation"} -> BDS.Posts.rewrite_published_post_translation(entity_id)
+      {:file_to_db, "media"} -> BDS.Media.sync_media_from_sidecar(entity_id)
+      {:db_to_file, "media"} -> BDS.Media.sync_media_sidecar(entity_id)
+      {:file_to_db, "media_translation"} -> BDS.Media.sync_media_translation_from_sidecar(entity_id)
+      {:db_to_file, "media_translation"} -> BDS.Media.sync_media_translation_sidecar(entity_id)
+      {:file_to_db, "script"} -> BDS.Scripts.sync_script_from_file(entity_id)
+      {:db_to_file, "script"} -> BDS.Scripts.sync_published_script_file(entity_id)
+      {:file_to_db, "template"} -> BDS.Templates.sync_template_from_file(entity_id)
+      {:db_to_file, "template"} -> BDS.Templates.sync_published_template_file(entity_id)
+      _other -> {:error, :unsupported}
+    end
+  end
+
+  defp import_metadata_diff_orphan(project_id, orphan) do
+    file_path = Map.get(orphan, :file_path) || Map.get(orphan, "file_path")
+
+    cond do
+      is_nil(file_path) ->
+        {:error, :not_found}
+
+      translation_post_file?(file_path) ->
+        BDS.Posts.import_orphan_post_translation_file(project_id, file_path)
+
+      String.ends_with?(file_path, ".md") ->
+        BDS.Posts.import_orphan_post_file(project_id, file_path)
+
+      translation_media_sidecar?(file_path) ->
+        BDS.Media.import_orphan_media_translation_sidecar(project_id, file_path)
+
+      canonical_media_sidecar?(file_path) and String.ends_with?(file_path, ".meta") ->
+        BDS.Media.import_orphan_media_sidecar(project_id, file_path)
+
+      String.ends_with?(file_path, ".lua") ->
+        BDS.Scripts.import_orphan_script_file(project_id, file_path)
+
+      String.ends_with?(file_path, ".liquid") ->
+        BDS.Templates.import_orphan_template_file(project_id, file_path)
+
+      true ->
+        {:error, :unsupported}
+    end
+  end
+
+  defp normalize_repair_direction(:file_to_db), do: :file_to_db
+  defp normalize_repair_direction(:db_to_file), do: :db_to_file
+  defp normalize_repair_direction("file_to_db"), do: :file_to_db
+  defp normalize_repair_direction("db_to_file"), do: :db_to_file
+  defp normalize_repair_direction(_direction), do: :unsupported
+
+  defp progress_callback(opts) do
+    case Keyword.get(opts, :on_progress) do
+      callback when is_function(callback, 2) -> callback
+      _other -> nil
+    end
+  end
+
+  defp report_started(nil, _total, _label), do: :ok
+
+  defp report_started(callback, 0, label) do
+    callback.(1.0, label)
+    :ok
+  end
+
+  defp report_started(callback, total, label) do
+    callback.(0.05, "#{label} (0/#{total})")
+    :ok
+  end
+
+  defp report_progress(nil, _current, _total, _label), do: :ok
+  defp report_progress(_callback, _current, 0, _label), do: :ok
+
+  defp report_progress(callback, current, total, label) do
+    callback.(0.05 + 0.95 * (current / total), "#{label} (#{current}/#{total})")
+    :ok
   end
 end

@@ -239,6 +239,119 @@ defmodule BDS.Posts do
 
   def editor_body(_record), do: ""
 
+  def sync_post_from_file(post_id) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Post{file_path: file_path} when file_path in [nil, ""] ->
+        {:error, :not_found}
+
+      %Post{} = post ->
+        project = Projects.get_project!(post.project_id)
+        full_path = Path.join(Projects.project_data_dir(project), post.file_path)
+
+        if File.exists?(full_path) do
+          repaired_post = upsert_post_from_file(post.project_id, project, full_path)
+          :ok = PostLinks.sync_post_links(repaired_post)
+          {:ok, repaired_post}
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
+  def sync_post_translation_from_file(translation_id) do
+    case Repo.get(Translation, translation_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Translation{file_path: file_path} when file_path in [nil, ""] ->
+        {:error, :not_found}
+
+      %Translation{} = translation ->
+        project = Projects.get_project!(translation.project_id)
+        full_path = Path.join(Projects.project_data_dir(project), translation.file_path)
+
+        if File.exists?(full_path) do
+          rebuild_file = parse_rebuild_file(project, full_path)
+          {:ok, upsert_post_translation_from_rebuild_file(translation.project_id, rebuild_file, sync_search: true)}
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
+  def rewrite_published_post_translation(translation_id) do
+    case Repo.get(Translation, translation_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Translation{file_path: file_path, status: status} = translation
+      when file_path not in [nil, ""] and status == :published ->
+        post = Repo.get!(Post, translation.translation_for)
+        :ok = publish_translation(post, translation)
+        {:ok, Repo.get!(Translation, translation_id)}
+
+      %Translation{} ->
+        {:error, :not_found}
+    end
+  end
+
+  def import_orphan_post_file(project_id, relative_path) do
+    project = Projects.get_project!(project_id)
+    full_path = Path.join(Projects.project_data_dir(project), relative_path)
+
+    if File.exists?(full_path) do
+      rebuild_file = parse_rebuild_file(project, full_path)
+
+      if translation_rebuild_file?(rebuild_file) do
+        {:error, :unsupported_file}
+      else
+        fields =
+          rebuild_file.fields
+          |> Map.put("id", unique_post_id(Map.get(rebuild_file.fields, "id")))
+          |> Map.put("slug", unique_slug_for_import(project_id, Map.fetch!(rebuild_file.fields, "slug")))
+
+        {:ok, upsert_post_from_rebuild_file(project_id, %{rebuild_file | fields: fields})}
+      end
+    else
+      {:error, :not_found}
+    end
+  end
+
+  def import_orphan_post_translation_file(project_id, relative_path) do
+    project = Projects.get_project!(project_id)
+    full_path = Path.join(Projects.project_data_dir(project), relative_path)
+
+    if File.exists?(full_path) do
+      rebuild_file = parse_rebuild_file(project, full_path)
+
+      if translation_rebuild_file?(rebuild_file) do
+        source_post_id = Map.fetch!(rebuild_file.fields, "translationFor")
+        language = normalize_language(Map.fetch!(rebuild_file.fields, "language"))
+
+        case Repo.get(Post, source_post_id) do
+          nil ->
+            {:error, :not_found}
+
+          %Post{} = post ->
+            if normalize_language(post.language) == language or
+                 Repo.get_by(Translation, translation_for: source_post_id, language: language) do
+              {:error, :conflict}
+            else
+              fields = Map.put(rebuild_file.fields, "id", Ecto.UUID.generate())
+              {:ok, upsert_post_translation_from_rebuild_file(project_id, %{rebuild_file | fields: fields}, sync_search: true)}
+            end
+        end
+      else
+        {:error, :unsupported_file}
+      end
+    else
+      {:error, :not_found}
+    end
+  end
+
   def delete_post(post_id) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -631,6 +744,26 @@ defmodule BDS.Posts do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp unique_slug_for_import(project_id, slug) do
+    normalized = default_slug_source(slug) |> Slug.slugify()
+
+    if slug_available?(project_id, normalized) do
+      normalized
+    else
+      find_unique_slug(project_id, normalized, 2)
+    end
+  end
+
+  defp unique_post_id(nil), do: Ecto.UUID.generate()
+
+  defp unique_post_id(id) do
+    if Repo.get(Post, id) || Repo.get(Translation, id) do
+      Ecto.UUID.generate()
+    else
+      id
+    end
+  end
 
   defp normalize_title(nil), do: ""
   defp normalize_title(title), do: title

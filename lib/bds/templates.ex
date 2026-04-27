@@ -186,6 +186,53 @@ defmodule BDS.Templates do
     end
   end
 
+  def sync_template_from_file(template_id) do
+    case Repo.get(Template, template_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Template{file_path: file_path} when file_path in [nil, ""] ->
+        {:error, :not_found}
+
+      %Template{} = template ->
+        project = Projects.get_project!(template.project_id)
+        full_path = Path.join(Projects.project_data_dir(project), template.file_path)
+
+        if File.exists?(full_path) do
+          {:ok, upsert_template_from_file(template.project_id, project, full_path)}
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
+  def sync_published_template_file(template_id) do
+    case Repo.get(Template, template_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Template{file_path: file_path, status: status} = template
+      when file_path not in [nil, ""] and status == :published ->
+        full_path = full_file_path(template.project_id, template.file_path)
+        :ok = Persistence.atomic_write(full_path, serialize_template_file(template, published_template_body(template)))
+        {:ok, template}
+
+      %Template{} ->
+        {:error, :not_found}
+    end
+  end
+
+  def import_orphan_template_file(project_id, relative_path) do
+    project = Projects.get_project!(project_id)
+    full_path = Path.join(Projects.project_data_dir(project), relative_path)
+
+    if File.exists?(full_path) do
+      {:ok, upsert_template_from_file(project_id, project, full_path)}
+    else
+      {:error, :not_found}
+    end
+  end
+
   defp unique_slug(project_id, base_slug, fallback, exclude_id \\ nil) do
     normalized = if base_slug == "", do: fallback, else: base_slug
 

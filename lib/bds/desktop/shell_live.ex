@@ -98,6 +98,8 @@ defmodule BDS.Desktop.ShellLive do
         |> assign(:template_editor_drafts, %{})
         |> assign(:chat_editor_inputs, %{})
         |> assign(:misc_editor_selected_pairs, %{})
+        |> assign(:metadata_diff_active_tabs, %{})
+        |> assign(:metadata_diff_field_filters, %{})
         |> assign(:shell_overlay, nil)
       |> assign(:output_entries, [])
      |> reload_shell(workbench)}
@@ -709,6 +711,46 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("dismiss_selected_duplicates", _params, socket) do
     {:noreply, MiscEditor.dismiss_selected(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("repair_metadata_diff", %{"field" => field, "direction" => direction}, socket) do
+    case MiscEditor.metadata_diff_repair_request(socket, field, direction) do
+      {:ok, params} -> {:noreply, apply_shell_command(socket, "repair_metadata_diff", params)}
+      {:error, message} -> {:noreply, append_output_entry(socket, translate_for_socket(socket, "Metadata Diff"), message, nil, "error")}
+    end
+  end
+
+  def handle_event("import_metadata_diff_orphans", _params, socket) do
+    case MiscEditor.metadata_diff_orphan_import_request(socket) do
+      {:ok, params} -> {:noreply, apply_shell_command(socket, "import_metadata_diff_orphans", params)}
+      {:error, message} -> {:noreply, append_output_entry(socket, translate_for_socket(socket, "Metadata Diff"), message, nil, "error")}
+    end
+  end
+
+  def handle_event("select_metadata_diff_tab", %{"tab" => tab}, socket) do
+    tab_id = socket.assigns.current_tab.id
+
+    socket =
+      socket
+      |> assign(:metadata_diff_active_tabs, Map.put(socket.assigns.metadata_diff_active_tabs, tab_id, tab))
+      |> assign(:metadata_diff_field_filters, Map.delete(socket.assigns.metadata_diff_field_filters, tab_id))
+      |> assign_misc_editor()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("toggle_metadata_diff_field", %{"field" => field}, socket) do
+    tab_id = socket.assigns.current_tab.id
+    current = Map.get(socket.assigns.metadata_diff_field_filters, tab_id)
+
+    next_filters =
+      if current == field do
+        Map.delete(socket.assigns.metadata_diff_field_filters, tab_id)
+      else
+        Map.put(socket.assigns.metadata_diff_field_filters, tab_id, field)
+      end
+
+    {:noreply, socket |> assign(:metadata_diff_field_filters, next_filters) |> assign_misc_editor()}
   end
 
   def handle_event("open_duplicate_post", %{"id" => id, "title" => title}, socket) do
@@ -1586,8 +1628,8 @@ defmodule BDS.Desktop.ShellLive do
     ArgumentError -> nil
   end
 
-  defp apply_shell_command(socket, action) do
-    case ShellCommands.execute(action) do
+  defp apply_shell_command(socket, action, params \\ %{}) do
+    case ShellCommands.execute(action, params) do
       {:ok, result} -> apply_shell_command_result(socket, result)
       {:error, %{message: message}} -> append_output_entry(socket, command_title(action), message, nil, "error")
       {:error, reason} -> append_output_entry(socket, command_title(action), inspect(reason), nil, "error")

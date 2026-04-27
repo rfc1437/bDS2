@@ -31,10 +31,153 @@
         </div>
 
       <% :metadata_diff -> %>
-        <div class="misc-columns">
-          <section class="misc-card"><h3><%= translated("Field Summary") %></h3><div class="misc-summary-grid"><%= for field <- @misc_editor.field_summaries do %><span class="misc-summary-pill"><%= field.field_name %> <strong><%= field.diff_count %></strong></span><% end %></div></section>
-          <section class="misc-card"><h3><%= translated("Diff Items") %></h3><div class="misc-list"><%= for item <- @misc_editor.items do %><article class="misc-list-item"><header><strong><%= Map.get(item, :entity_type) || Map.get(item, "entity_type") %></strong> <span><%= Map.get(item, :entity_id) || Map.get(item, "entity_id") %></span></header><ul><%= for diff <- Map.get(item, :differences) || Map.get(item, "differences") || [] do %><li><strong><%= Map.get(diff, :field) || Map.get(diff, "field") %></strong><span><%= inspect(Map.get(diff, :db_value) || Map.get(diff, "db_value")) %></span><span><%= inspect(Map.get(diff, :file_value) || Map.get(diff, "file_value")) %></span></li><% end %></ul></article><% end %></div></section>
-          <section class="misc-card"><h3><%= translated("Orphan Files") %></h3><ul><%= for orphan <- @misc_editor.orphan_files do %><li><%= inspect(orphan) %></li><% end %></ul></section>
+        <div class="metadata-diff-tool">
+          <div class="metadata-diff-tabs" role="tablist">
+            <%= for tab <- @misc_editor.tabs do %>
+              <button
+                class={["metadata-diff-tab", if(@misc_editor.active_tab == tab.id, do: "active")]}
+                data-testid="metadata-diff-tab"
+                data-entity-tab={tab.id}
+                type="button"
+                phx-click="select_metadata_diff_tab"
+                phx-value-tab={tab.id}
+              >
+                <span><%= tab.label %></span>
+                <%= if tab.badge_count > 0 do %>
+                  <span class="tab-badge"><%= tab.badge_count %></span>
+                <% end %>
+              </button>
+            <% end %>
+          </div>
+
+          <%= if @misc_editor.field_summaries != [] do %>
+            <div class="metadata-diff-field-pills">
+              <%= for field <- @misc_editor.field_summaries do %>
+                <div class={["metadata-diff-field-pill", if(@misc_editor.active_field == field.field_name, do: "active")]}>
+                  <button
+                    class="metadata-diff-field-pill-toggle"
+                    data-testid="metadata-diff-field-pill"
+                    data-field={field.field_name}
+                    type="button"
+                    phx-click="toggle_metadata_diff_field"
+                    phx-value-field={field.field_name}
+                  >
+                    <span class="field-pill-label"><%= field.field_name %></span>
+                    <span class="field-pill-count"><%= field.diff_count %></span>
+                  </button>
+
+                  <%= if @misc_editor.repair_enabled do %>
+                    <div class="metadata-diff-field-pill-actions">
+                      <button
+                        class="secondary metadata-diff-action-button"
+                        data-testid="metadata-diff-repair-button"
+                        data-direction="db_to_file"
+                        data-field={field.field_name}
+                        type="button"
+                        phx-click="repair_metadata_diff"
+                        phx-value-direction="db_to_file"
+                        phx-value-field={field.field_name}
+                      >
+                        <%= translated("DB to File") %>
+                      </button>
+
+                      <button
+                        class="secondary metadata-diff-action-button"
+                        data-testid="metadata-diff-repair-button"
+                        data-direction="file_to_db"
+                        data-field={field.field_name}
+                        type="button"
+                        phx-click="repair_metadata_diff"
+                        phx-value-direction="file_to_db"
+                        phx-value-field={field.field_name}
+                      >
+                        <%= translated("File to DB") %>
+                      </button>
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+
+          <div class="metadata-diff-results">
+            <%= if @misc_editor.items == [] do %>
+              <section class="misc-card metadata-diff-empty">
+                <p><%= @misc_editor.empty_message %></p>
+              </section>
+            <% else %>
+              <div class="diff-item-list">
+                <%= for item <- @misc_editor.items do %>
+                  <article class="diff-item-card" data-entity-type={item.entity_type}>
+                    <header class="diff-item-header">
+                      <div>
+                        <strong><%= item.label %></strong>
+                        <div class="diff-item-meta"><%= item.display_entity_type %> · <%= item.entity_id %></div>
+                      </div>
+                    </header>
+
+                    <div class="diff-item-fields">
+                      <%= for diff <- item.differences do %>
+                        <div class="diff-field-row" data-field={diff.field}>
+                          <div class="diff-field-name"><%= diff.field %></div>
+                          <div class="diff-field-values">
+                            <div class="diff-field-value db-value">
+                              <span class="diff-source-label">DB</span>
+                              <span><%= diff.db_value %></span>
+                            </div>
+                            <div class="diff-field-value file-value">
+                              <span class="diff-source-label"><%= translated("File") %></span>
+                              <span><%= diff.file_value %></span>
+                            </div>
+                          </div>
+                        </div>
+                      <% end %>
+                    </div>
+                  </article>
+                <% end %>
+              </div>
+            <% end %>
+
+            <%= if @misc_editor.active_field == nil and @misc_editor.orphan_files != [] do %>
+              <section class="orphan-files-section" data-testid="metadata-diff-orphans">
+                <div class="orphan-files-header">
+                  <h3><%= translated("Orphan Files") %></h3>
+                  <div class="orphan-files-actions">
+                    <span class="misc-summary-pill"><%= length(@misc_editor.orphan_files) %></span>
+                    <button
+                      class="secondary metadata-diff-action-button"
+                      data-testid="metadata-diff-import-button"
+                      type="button"
+                      phx-click="import_metadata_diff_orphans"
+                    >
+                      <%= translated("Import") %>
+                    </button>
+                  </div>
+                </div>
+                <div class="diff-item-list">
+                  <%= for orphan <- @misc_editor.orphan_files do %>
+                    <article class="diff-item-card orphan-file">
+                      <header class="diff-item-header">
+                        <div>
+                          <strong><%= orphan.slug %></strong>
+                          <div class="diff-item-meta"><%= translated("Orphan Files") %></div>
+                        </div>
+                      </header>
+
+                      <div class="diff-item-fields">
+                        <div class="diff-field-row">
+                          <div class="diff-field-name"><%= translated("Path") %></div>
+                          <div class="diff-field-values">
+                            <div class="diff-field-value file-value orphan-path"><span><%= orphan.file_path %></span></div>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  <% end %>
+                </div>
+              </section>
+            <% end %>
+          </div>
         </div>
 
       <% :translation_validation -> %>
