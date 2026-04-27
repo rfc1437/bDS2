@@ -119,7 +119,7 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp dispatch("rebuild_posts_from_files", project, _params) do
     queue_task(project, "rebuild_posts_from_files", "Rebuild Posts From Files", "Maintenance", fn report ->
-      {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post", on_progress: report, rebuild_embeddings: false)
+      {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post", on_progress: report)
       report.(1.0, "Post rebuild complete")
       %{project_id: project.id, counts: %{posts: length(posts)}}
     end)

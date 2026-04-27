@@ -664,6 +664,8 @@ defmodule BDS.Maintenance do
       {:db_to_file, "script"} -> BDS.Scripts.sync_published_script_file(entity_id)
       {:file_to_db, "template"} -> BDS.Templates.sync_template_from_file(entity_id)
       {:db_to_file, "template"} -> BDS.Templates.sync_published_template_file(entity_id)
+      {:file_to_db, "embedding"} -> BDS.Embeddings.sync_post(entity_id)
+      {:db_to_file, "embedding"} -> BDS.Embeddings.refresh_snapshot(project_id)
       _other -> {:error, :unsupported}
     end
   end

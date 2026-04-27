@@ -17,7 +17,11 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   def rerun(socket) do
     case meta(socket.assigns) do
       %{action: action} when is_binary(action) -> {:command, action}
-      _other -> {:noop, socket}
+      _other ->
+        case misc_route_action(socket.assigns.current_tab.type) do
+          nil -> {:noop, socket}
+          action -> {:command, action}
+        end
     end
   end
 
@@ -464,7 +468,13 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
-  defp metadata_diff_repairable_tab?(tab_id), do: tab_id in ["posts", "media", "scripts", "templates", "project"]
+  defp metadata_diff_repairable_tab?(tab_id), do: tab_id in ["posts", "media", "scripts", "templates", "project", "embeddings"]
+
+  defp misc_route_action(:site_validation), do: "validate_site"
+  defp misc_route_action(:metadata_diff), do: "metadata_diff"
+  defp misc_route_action(:translation_validation), do: "validate_translations"
+  defp misc_route_action(:find_duplicates), do: "find_duplicates"
+  defp misc_route_action(_route), do: nil
 
   defp format_metadata_diff_value(nil), do: "-"
   defp format_metadata_diff_value(""), do: "-"

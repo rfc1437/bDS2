@@ -370,6 +370,34 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="tab active transient")
   end
 
+  test "metadata diff refresh reruns after workbench session restore", %{project: project} do
+    :ok = BDS.Tasks.clear_finished()
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    session_payload =
+      Workbench.new()
+      |> Workbench.open_tab(:metadata_diff, "metadata_diff", :pin)
+      |> Session.serialize()
+
+    html = render_hook(view, "restore_workbench_session", %{"session" => session_payload})
+    assert html =~ ~s(data-tab-type="metadata_diff")
+
+    existing_ids = MapSet.new(Enum.map(BDS.Tasks.list_tasks(), & &1.id))
+
+    _html =
+      view
+      |> element("button[phx-click='rerun_misc_editor']")
+      |> render_click()
+
+    refresh_task = new_task!(existing_ids, "Metadata Diff")
+    assert refresh_task.group_name == "Maintenance"
+    completed_task!(refresh_task.id)
+    send(view.pid, :refresh_task_status)
+
+    assert render(view) =~ project.name
+  end
+
   test "shell live renders the legacy git activity badge from remote behind count" do
     Application.put_env(:bds, :git_remote_state_provider, fn _project_id, _opts ->
       {:ok, %{local_branch: "main", upstream_branch: "origin/main", has_upstream: true, ahead: 0, behind: 7}}
@@ -1161,6 +1189,59 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert {:ok, diff} = BDS.Maintenance.metadata_diff(project.id)
     refute orphan_relative_path in Enum.map(diff.orphan_reports, & &1.file_path)
+  end
+
+  test "metadata diff embeddings tab exposes repair actions and clears embedding drift", %{project: project} do
+    :ok = BDS.Tasks.clear_finished()
+
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Embedding Drift",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
+
+    Repo.delete_all(BDS.Embeddings.Key)
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert {:ok, queued} = BDS.Desktop.ShellCommands.execute("metadata_diff")
+    completed_task!(queued.task_id)
+    send(view.pid, :refresh_task_status)
+
+    html =
+      view
+      |> element("[data-testid='metadata-diff-tab'][data-entity-tab='embeddings']")
+      |> render_click()
+
+    assert html =~ "content_hash"
+    assert html =~ ~s(data-testid="metadata-diff-repair-button")
+
+    existing_ids = MapSet.new(Enum.map(BDS.Tasks.list_tasks(), & &1.id))
+
+    html =
+      view
+      |> element("[data-testid='metadata-diff-repair-button'][data-direction='file_to_db'][data-field='content_hash']")
+      |> render_click()
+
+    assert html =~ "Repair Metadata Diff"
+
+    repair_task = new_task!(existing_ids, "Repair Metadata Diff")
+    completed_task!(repair_task.id)
+    send(view.pid, :refresh_task_status)
+    _html = render(view)
+
+    assert Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: published_post.id) != nil
+
+    assert {:ok, diff} = BDS.Maintenance.metadata_diff(project.id)
+    refute Enum.any?(diff.diff_reports, &(&1.entity_type == "embedding" and &1.entity_id == published_post.id))
   end
 
   test "post tabs render a real editor and drive save publish discard flows", %{project: project} do

@@ -20,6 +20,14 @@ defmodule BDS.Embeddings do
   def index_path(project_id), do: Index.path(project_id)
   def reindex_all(project_id), do: rebuild_project(project_id)
 
+  def refresh_snapshot(project_id) when is_binary(project_id) do
+    if enabled_for_project?(project_id) do
+      :ok = rebuild_snapshot(project_id)
+    end
+
+    :ok
+  end
+
   def get_indexing_progress(project_id) when is_binary(project_id) do
     indexed =
       Repo.one(
@@ -105,7 +113,15 @@ defmodule BDS.Embeddings do
         if differences == [] do
           []
         else
-          [%{entity_type: "embedding", entity_id: post.id, differences: differences}]
+          [
+            %{
+              entity_type: "embedding",
+              entity_id: post.id,
+              label: post.title || post.slug || post.id,
+              meta_label: Persistence.timestamp_to_iso8601(post.created_at),
+              differences: differences
+            }
+          ]
         end
       end)
     else

@@ -99,6 +99,30 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert is_map(completed.result.payload.summary)
   end
 
+  test "rebuild_posts_from_files rebuilds embeddings for published posts when semantic similarity is enabled", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Filesystem Embedding Source",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
+    assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: published_post.id) != nil
+
+    BDS.Repo.delete_all(BDS.Embeddings.Key)
+
+    assert {:ok, result} = ShellCommands.execute("rebuild_posts_from_files")
+    completed = wait_for_task(result.task_id, &(&1.status == :completed))
+
+    assert completed.group_name == "Maintenance"
+    assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: published_post.id) != nil
+  end
+
   test "repair_metadata_diff exposes live in-task progress from the repair worker", %{project: project} do
     original = Application.get_env(:bds, :tasks, [])
 
