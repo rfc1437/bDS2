@@ -450,15 +450,20 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp normalize_site_validation(report) do
     %{
+      sitemap_path: report.sitemap_path,
+      sitemap_changed: report.sitemap_changed,
       summary: %{
-        missing_count: length(report.missing_pages),
-        extra_count: length(report.extra_pages),
-        stale_count: length(report.stale_pages)
+        expected_count: report.expected_url_count,
+        existing_count: report.existing_html_url_count,
+        missing_count: length(report.missing_url_paths),
+        extra_count: length(report.extra_url_paths),
+        updated_count: length(report.updated_post_url_paths)
       },
-      missing_pages: report.missing_pages,
-      extra_pages: report.extra_pages,
-      stale_pages: report.stale_pages,
-      sections: Enum.map(report.sections, &to_string/1)
+      missing_url_paths: report.missing_url_paths,
+      extra_url_paths: report.extra_url_paths,
+      updated_post_url_paths: report.updated_post_url_paths,
+      expected_url_count: report.expected_url_count,
+      existing_html_url_count: report.existing_html_url_count
     }
   end
 
@@ -471,9 +476,11 @@ defmodule BDS.Desktop.ShellCommands do
       title: "Site Validation",
       subtitle: "Generated output checked against expected site files",
       editorMeta: [
-        %{label: "Missing", value: Integer.to_string(length(report.missing_pages))},
-        %{label: "Extra", value: Integer.to_string(length(report.extra_pages))},
-        %{label: "Stale", value: Integer.to_string(length(report.stale_pages))}
+        %{label: "Expected", value: Integer.to_string(report.expected_url_count)},
+        %{label: "Existing", value: Integer.to_string(report.existing_html_url_count)},
+        %{label: "Missing", value: Integer.to_string(length(report.missing_url_paths))},
+        %{label: "Extra", value: Integer.to_string(length(report.extra_url_paths))},
+        %{label: "Updated", value: Integer.to_string(length(report.updated_post_url_paths))}
       ],
       payload: normalize_site_validation(report)
     }

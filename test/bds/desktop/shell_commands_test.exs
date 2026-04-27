@@ -97,6 +97,12 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert completed.result.kind == "open_editor"
     assert completed.result.route == "site_validation"
     assert is_map(completed.result.payload.summary)
+    assert Map.has_key?(completed.result.payload, :missing_url_paths)
+    assert Map.has_key?(completed.result.payload, :extra_url_paths)
+    assert Map.has_key?(completed.result.payload, :updated_post_url_paths)
+    assert Map.has_key?(completed.result.payload.summary, :expected_count)
+    assert Map.has_key?(completed.result.payload.summary, :existing_count)
+    assert Map.has_key?(completed.result.payload.summary, :updated_count)
   end
 
   test "metadata_diff queues a tracked maintenance task and returns the report as an editor payload" do

@@ -7,7 +7,7 @@
     <div class="misc-editor-actions">
       <button class="secondary" type="button" phx-click="rerun_misc_editor"><%= translated("Refresh") %></button>
       <%= if @misc_editor.kind == :site_validation do %>
-        <button class="primary" type="button" phx-click="apply_site_validation" disabled={Enum.empty?(@misc_editor.missing_pages) and Enum.empty?(@misc_editor.extra_pages) and Enum.empty?(@misc_editor.stale_pages)}><%= translated("Apply") %></button>
+        <button class="primary" type="button" phx-click="apply_site_validation" disabled={Enum.empty?(@misc_editor.missing_url_paths) and Enum.empty?(@misc_editor.extra_url_paths) and Enum.empty?(@misc_editor.updated_post_url_paths)}><%= translated("Apply") %></button>
       <% end %>
       <%= if @misc_editor.kind == :find_duplicates do %>
         <button class="secondary" type="button" phx-click="dismiss_selected_duplicates" disabled={MapSet.size(@misc_editor.selected_pairs) == 0}><%= translated("Dismiss Checked") %></button>
@@ -25,9 +25,9 @@
     <%= case @misc_editor.kind do %>
       <% :site_validation -> %>
         <div class="misc-columns">
-          <section class="misc-card"><h3><%= translated("Missing URLs") %></h3><%= if Enum.empty?(@misc_editor.missing_pages) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.missing_pages do %><li><%= path %></li><% end %></ul></section>
-          <section class="misc-card"><h3><%= translated("Extra URLs") %></h3><%= if Enum.empty?(@misc_editor.extra_pages) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.extra_pages do %><li><%= path %></li><% end %></ul></section>
-          <section class="misc-card"><h3><%= translated("Updated URLs") %></h3><%= if Enum.empty?(@misc_editor.stale_pages) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.stale_pages do %><li><%= path %></li><% end %></ul></section>
+          <section class="misc-card"><h3><%= translated("Missing URLs") %></h3><%= if Enum.empty?(@misc_editor.missing_url_paths) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.missing_url_paths do %><li><%= path %></li><% end %></ul></section>
+          <section class="misc-card"><h3><%= translated("Extra URLs") %></h3><%= if Enum.empty?(@misc_editor.extra_url_paths) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.extra_url_paths do %><li><%= path %></li><% end %></ul></section>
+          <section class="misc-card"><h3><%= translated("Updated URLs") %></h3><%= if Enum.empty?(@misc_editor.updated_post_url_paths) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.updated_post_url_paths do %><li><%= path %></li><% end %></ul></section>
         </div>
 
       <% :metadata_diff -> %>

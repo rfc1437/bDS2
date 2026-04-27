@@ -713,7 +713,7 @@ defmodule BDS.GenerationTest do
     assert File.read!(Path.join([temp_dir, "html", "2026", "04", "index.html"])) =~ "2026-04"
   end
 
-  test "validate_site reports missing, extra, and stale generated pages and apply_validation repairs them",
+  test "validate_site reports missing, extra, and updated routes and apply_validation repairs them",
        %{project: project, temp_dir: temp_dir} do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
@@ -734,30 +734,161 @@ defmodule BDS.GenerationTest do
     assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core, :single])
 
     post_path = BDS.Generation.post_output_path(published_post)
-    index_path = Path.join([temp_dir, "html", "index.html"])
     post_file_path = Path.join([temp_dir, "html", post_path])
-    extra_path = Path.join([temp_dir, "html", "obsolete.html"])
+    source_path = Path.join([temp_dir, published_post.file_path])
+    extra_path = Path.join([temp_dir, "html", "obsolete", "index.html"])
 
-    File.write!(index_path, "<html>tampered</html>")
     File.rm!(post_file_path)
+    Process.sleep(1200)
+    File.write!(source_path, File.read!(source_path) <> "\n")
+    File.mkdir_p!(Path.dirname(extra_path))
     File.write!(extra_path, "<html>obsolete</html>")
 
     assert {:ok, report} = BDS.Generation.validate_site(project.id)
 
-    assert "index.html" in report.stale_pages
-    assert post_path in report.missing_pages
-    assert "obsolete.html" in report.extra_pages
+    assert relative_path_to_url_path(post_path) in report.missing_url_paths
+    assert "/obsolete" in report.extra_url_paths
+    assert report.updated_post_url_paths == []
 
-    assert {:ok, repair} = BDS.Generation.apply_validation(project.id, [:core, :single])
-    assert Enum.sort(repair.sections) == [:core, :single]
+    assert {:ok, repair} = BDS.Generation.apply_validation(project.id, report)
+    assert repair.rendered_url_count > 0
 
-    assert File.read!(index_path) != "<html>tampered</html>"
     assert File.exists?(post_file_path)
     refute File.exists?(extra_path)
 
-    assert {:ok, clean_report} = BDS.Generation.validate_site(project.id, [:core, :single])
-    assert clean_report.missing_pages == []
-    assert clean_report.extra_pages == []
-    assert clean_report.stale_pages == []
+    assert {:ok, clean_report} = BDS.Generation.validate_site(project.id)
+    assert clean_report.missing_url_paths == []
+    assert clean_report.extra_url_paths == []
+    assert clean_report.updated_post_url_paths == []
+  end
+
+  test "validate_site regenerates sitemap and reports missing, extra, and updated post url paths",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, missing_post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Missing Route Post",
+               content: "Missing route body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["missing-tag"]
+             })
+
+    assert {:ok, updated_post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Updated Route Post",
+               content: "Updated route body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["updated-tag"]
+             })
+
+    assert {:ok, published_missing_post} = Posts.publish_post(missing_post.id)
+    assert {:ok, published_updated_post} = Posts.publish_post(updated_post.id)
+
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
+
+    missing_post_path = BDS.Generation.post_output_path(published_missing_post)
+    updated_post_path = BDS.Generation.post_output_path(published_updated_post)
+    missing_post_url_path = relative_path_to_url_path(missing_post_path)
+    updated_post_url_path = relative_path_to_url_path(updated_post_path)
+
+    sitemap_path = Path.join([temp_dir, "html", "sitemap.xml"])
+    missing_post_html_path = Path.join([temp_dir, "html", missing_post_path])
+    updated_post_source_path = Path.join([temp_dir, published_updated_post.file_path])
+    extra_route_path = Path.join([temp_dir, "html", "obsolete", "deep", "index.html"])
+
+    File.rm!(sitemap_path)
+    File.rm!(missing_post_html_path)
+    File.mkdir_p!(Path.dirname(extra_route_path))
+    File.write!(extra_route_path, "<html>obsolete</html>")
+
+    Process.sleep(1200)
+    File.write!(updated_post_source_path, File.read!(updated_post_source_path) <> "\n")
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id)
+
+    assert report.sitemap_path == sitemap_path
+    assert report.sitemap_changed == true
+    assert File.exists?(sitemap_path)
+    assert missing_post_url_path in report.missing_url_paths
+    assert "/obsolete/deep" in report.extra_url_paths
+    assert updated_post_url_path in report.updated_post_url_paths
+    assert report.expected_url_count > 0
+    assert report.existing_html_url_count > 0
+  end
+
+  test "apply_validation clears updated post routes without rewriting unchanged html", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Stable Route Post",
+               content: "Stable route body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["stable-tag"]
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
+
+    post_path = BDS.Generation.post_output_path(published_post)
+    post_url_path = relative_path_to_url_path(post_path)
+    post_html_path = Path.join([temp_dir, "html", post_path])
+    post_source_path = Path.join([temp_dir, published_post.file_path])
+
+    before_stat = File.stat!(post_html_path)
+
+    Process.sleep(1200)
+    File.write!(post_source_path, File.read!(post_source_path) <> "\n")
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id)
+    assert report.missing_url_paths == []
+    assert report.extra_url_paths == []
+    assert report.updated_post_url_paths == [post_url_path]
+
+    assert {:ok, apply_result} = BDS.Generation.apply_validation(project.id, report)
+    assert apply_result.rendered_url_count > 0
+    assert apply_result.deleted_url_count == 0
+
+    after_stat = File.stat!(post_html_path)
+    assert after_stat.mtime == before_stat.mtime
+
+    assert {:ok, clean_report} = BDS.Generation.validate_site(project.id)
+    assert clean_report.missing_url_paths == []
+    assert clean_report.extra_url_paths == []
+    assert clean_report.updated_post_url_paths == []
+  end
+
+  defp relative_path_to_url_path(relative_path) do
+    cleaned =
+      relative_path
+      |> String.trim_leading("/")
+      |> String.trim_trailing("index.html")
+      |> String.trim_trailing("/")
+
+    if cleaned == "" do
+      "/"
+    else
+      "/" <> cleaned
+    end
   end
 end

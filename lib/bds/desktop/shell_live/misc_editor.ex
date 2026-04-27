@@ -29,9 +29,18 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     meta = meta(socket.assigns)
     payload = Map.get(meta, :payload, %{})
     project_id = Map.get(meta, :project_id, socket.assigns.projects.active_project_id)
-    sections = Enum.map(Map.get(payload, :sections, []), &String.to_existing_atom/1)
 
-    case Generation.apply_validation(project_id, sections) do
+    report = %{
+      sitemap_path: Map.get(payload, :sitemap_path),
+      sitemap_changed: Map.get(payload, :sitemap_changed, false),
+      missing_url_paths: Map.get(payload, :missing_url_paths, []),
+      extra_url_paths: Map.get(payload, :extra_url_paths, []),
+      updated_post_url_paths: Map.get(payload, :updated_post_url_paths, []),
+      expected_url_count: Map.get(payload, :expected_url_count, 0),
+      existing_html_url_count: Map.get(payload, :existing_html_url_count, 0)
+    }
+
+    case Generation.apply_validation(project_id, report) do
       {:ok, result} ->
         {:rerun,
          socket
@@ -194,15 +203,19 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
       title: Map.get(meta, :title, translated("Site Validation")),
       subtitle: Map.get(meta, :subtitle, ""),
       summary: %{
-        expected: Map.get(summary, :missing_count, 0) + Map.get(summary, :extra_count, 0) + Map.get(summary, :stale_count, 0),
+        expected: Map.get(summary, :expected_count, 0),
+        existing: Map.get(summary, :existing_count, 0),
         missing: Map.get(summary, :missing_count, 0),
         extra: Map.get(summary, :extra_count, 0),
-        stale: Map.get(summary, :stale_count, 0)
+        updated: Map.get(summary, :updated_count, 0)
       },
-      missing_pages: Map.get(payload, :missing_pages, []),
-      extra_pages: Map.get(payload, :extra_pages, []),
-      stale_pages: Map.get(payload, :stale_pages, []),
-      sections: Map.get(payload, :sections, [])
+      sitemap_path: Map.get(payload, :sitemap_path),
+      sitemap_changed: Map.get(payload, :sitemap_changed, false),
+      missing_url_paths: Map.get(payload, :missing_url_paths, []),
+      extra_url_paths: Map.get(payload, :extra_url_paths, []),
+      updated_post_url_paths: Map.get(payload, :updated_post_url_paths, []),
+      expected_url_count: Map.get(payload, :expected_url_count, 0),
+      existing_html_url_count: Map.get(payload, :existing_html_url_count, 0)
     }
   end
 

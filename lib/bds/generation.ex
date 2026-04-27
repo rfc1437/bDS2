@@ -65,54 +65,49 @@ defmodule BDS.Generation do
   def validate_site(project_id, sections, opts) when is_binary(project_id) and is_list(sections) and is_list(opts) do
     with {:ok, plan} <- plan_generation(project_id, sections) do
       expected_outputs = build_outputs(plan)
+      expected_output_map = Map.new(expected_outputs)
       on_progress = progress_callback(opts)
       total_outputs = length(expected_outputs)
+      project = Projects.get_project!(project_id)
+      published_posts = list_published_posts(project_id)
+      published_translations = list_published_translations(project_id)
+      generated_file_updated_at = generated_file_updated_at_map(project_id)
 
       :ok = report_generation_started(on_progress, total_outputs, "generated files")
 
-      expected_paths = MapSet.new(Enum.map(expected_outputs, &elem(&1, 0)))
+      Enum.each(1..total_outputs, fn index ->
+        :ok = report_generation_progress(on_progress, index, total_outputs, "generated files")
+      end)
 
-      expected_hashes =
-        expected_outputs
-        |> Enum.with_index(1)
-        |> Enum.map(fn {{relative_path, content}, index} ->
-          :ok = report_generation_progress(on_progress, index, total_outputs, "generated files")
-          {relative_path, sha256(content)}
-        end)
-        |> Map.new()
+      sitemap_content = Map.fetch!(expected_output_map, "sitemap.xml")
 
-      actual_files = disk_generated_files(project_id)
-      actual_paths = MapSet.new(Map.keys(actual_files))
+      {:ok, sitemap_write} =
+        write_generated_file(project_id, "sitemap.xml", sitemap_content)
 
-      missing_pages =
-        expected_paths
-        |> MapSet.difference(actual_paths)
-        |> MapSet.to_list()
-        |> Enum.sort()
-
-      extra_pages =
-        actual_paths
-        |> MapSet.difference(expected_paths)
-        |> MapSet.to_list()
-        |> Enum.sort()
-
-      stale_pages =
-        expected_hashes
-        |> Enum.filter(fn {relative_path, expected_hash} ->
-          case actual_files do
-            %{^relative_path => actual_hash} -> actual_hash != expected_hash
-            _other -> false
-          end
-        end)
-        |> Enum.map(&elem(&1, 0))
-        |> Enum.sort()
+      diff_result =
+        compare_sitemap_to_html(%{
+          sitemap_xml: sitemap_content,
+          base_url: plan.base_url,
+          html_dir: output_path(project, ""),
+          post_timestamp_checks:
+            build_post_timestamp_checks(
+              project_id,
+              plan.language,
+              published_posts,
+              published_translations,
+              generated_file_updated_at
+            )
+        })
 
       {:ok,
        %{
-         missing_pages: missing_pages,
-         extra_pages: extra_pages,
-         stale_pages: stale_pages,
-         sections: affected_sections(missing_pages ++ extra_pages ++ stale_pages)
+         sitemap_path: output_path(project, "sitemap.xml"),
+         sitemap_changed: sitemap_write.written?,
+         missing_url_paths: diff_result.missing_url_paths,
+         extra_url_paths: diff_result.extra_url_paths,
+         updated_post_url_paths: diff_result.updated_post_url_paths,
+         expected_url_count: diff_result.expected_url_count,
+         existing_html_url_count: diff_result.existing_html_url_count
        }}
     end
   end
@@ -197,6 +192,47 @@ defmodule BDS.Generation do
     end
   end
 
+  def apply_validation(project_id, report) when is_binary(project_id) and is_map(report) do
+    with {:ok, plan} <- plan_generation(project_id, @core_sections) do
+      expected_outputs = build_outputs(plan)
+      expected_output_map = Map.new(expected_outputs)
+      project = Projects.get_project!(project_id)
+      published_posts = list_published_posts(project_id)
+      targeted_plan =
+        build_targeted_validation_plan(
+          plan_validation_paths(report_paths(report), additional_languages(plan)),
+          published_posts
+        )
+
+      outputs_to_render =
+        expected_outputs
+        |> Enum.filter(fn {relative_path, _content} ->
+          targeted_output?(relative_path, targeted_plan, plan.language, additional_languages(plan))
+        end)
+
+      Enum.each(outputs_to_render, fn {relative_path, content} ->
+        _ =
+          write_generated_file(project_id, relative_path, content,
+            refresh_timestamp_on_unchanged: route_html_path?(relative_path)
+          )
+      end)
+
+      {deleted_url_count, removed_empty_dir_count} =
+        delete_extra_validation_paths(project_id, project, Map.get(report, :extra_url_paths, []))
+
+      if outputs_to_render != [] or deleted_url_count > 0 do
+        write_ancillary_validation_outputs(project_id, expected_output_map)
+      end
+
+      {:ok,
+       %{
+         rendered_url_count: Enum.count(outputs_to_render, fn {relative_path, _content} -> route_html_path?(relative_path) end),
+         deleted_url_count: deleted_url_count,
+         removed_empty_dir_count: removed_empty_dir_count
+       }}
+    end
+  end
+
   def post_output_path(%Post{} = post), do: post_output_path(post, nil)
 
   def post_output_path(%Post{} = post, language) do
@@ -214,33 +250,36 @@ defmodule BDS.Generation do
     end
   end
 
-  def write_generated_file(project_id, relative_path, content)
-      when is_binary(project_id) and is_binary(relative_path) and is_binary(content) do
+  def write_generated_file(project_id, relative_path, content),
+    do: write_generated_file(project_id, relative_path, content, [])
+
+  def write_generated_file(project_id, relative_path, content, opts)
+      when is_binary(project_id) and is_binary(relative_path) and is_binary(content) and is_list(opts) do
     project = Projects.get_project!(project_id)
     content_hash = sha256(content)
     now = Persistence.now_ms()
+    full_path = output_path(project, relative_path)
+    refresh_timestamp? = Keyword.get(opts, :refresh_timestamp_on_unchanged, false)
 
     case Repo.get_by(GeneratedFileHash, project_id: project_id, relative_path: relative_path) do
       %GeneratedFileHash{content_hash: ^content_hash} ->
-        {:ok, %{relative_path: relative_path, content_hash: content_hash, written?: false}}
+        cond do
+          not File.exists?(full_path) ->
+            :ok = Persistence.atomic_write(full_path, content)
+            :ok = upsert_generated_file_hash(project_id, relative_path, content_hash, now)
+            {:ok, %{relative_path: relative_path, content_hash: content_hash, written?: true}}
+
+          refresh_timestamp? ->
+            :ok = upsert_generated_file_hash(project_id, relative_path, content_hash, now)
+            {:ok, %{relative_path: relative_path, content_hash: content_hash, written?: false}}
+
+          true ->
+            {:ok, %{relative_path: relative_path, content_hash: content_hash, written?: false}}
+        end
 
       _existing ->
-        full_path = output_path(project, relative_path)
         :ok = Persistence.atomic_write(full_path, content)
-
-        attrs = %{
-          project_id: project_id,
-          relative_path: relative_path,
-          content_hash: content_hash,
-          updated_at: now
-        }
-
-        %GeneratedFileHash{}
-        |> GeneratedFileHash.changeset(attrs)
-        |> Repo.insert!(
-          on_conflict: [set: [content_hash: content_hash, updated_at: now]],
-          conflict_target: [:project_id, :relative_path]
-        )
+        :ok = upsert_generated_file_hash(project_id, relative_path, content_hash, now)
 
         {:ok, %{relative_path: relative_path, content_hash: content_hash, written?: true}}
     end
@@ -305,6 +344,7 @@ defmodule BDS.Generation do
 
     urls =
       (core_outputs ++ single_outputs ++ archive_outputs)
+      |> Enum.filter(fn {relative_path, _content} -> sitemap_route_output?(relative_path) end)
       |> Enum.map(fn {relative_path, _content} ->
         url_for_output(plan.base_url, relative_path)
       end)
@@ -356,14 +396,6 @@ defmodule BDS.Generation do
       {:error, :enoent} ->
         %{}
     end
-  end
-
-  defp affected_sections(paths) do
-    paths
-    |> Enum.map(&path_section/1)
-    |> Enum.reject(&is_nil/1)
-    |> Enum.uniq()
-    |> Enum.sort()
   end
 
   defp path_section(relative_path) do
@@ -783,6 +815,12 @@ defmodule BDS.Generation do
     "<urlset>#{entries}</urlset>"
   end
 
+  defp sitemap_route_output?("404.html"), do: false
+  defp sitemap_route_output?("feed.xml"), do: false
+  defp sitemap_route_output?("atom.xml"), do: false
+  defp sitemap_route_output?("calendar.json"), do: false
+  defp sitemap_route_output?(relative_path), do: String.ends_with?(relative_path, ".html")
+
   defp build_pagefind_outputs(plan, html_outputs) do
     language_outputs =
       plan.blog_languages
@@ -1069,6 +1107,570 @@ defmodule BDS.Generation do
     |> String.replace(">", "&gt;")
     |> String.replace("\"", "&quot;")
     |> String.replace("'", "&apos;")
+  end
+
+  defp upsert_generated_file_hash(project_id, relative_path, content_hash, now) do
+    %GeneratedFileHash{}
+    |> GeneratedFileHash.changeset(%{
+      project_id: project_id,
+      relative_path: relative_path,
+      content_hash: content_hash,
+      updated_at: now
+    })
+    |> Repo.insert!(
+      on_conflict: [set: [content_hash: content_hash, updated_at: now]],
+      conflict_target: [:project_id, :relative_path]
+    )
+
+    :ok
+  end
+
+  defp generated_file_updated_at_map(project_id) do
+    project_id
+    |> list_generated_files()
+    |> case do
+      {:ok, files} -> Map.new(files, &{&1.relative_path, &1.updated_at})
+      _other -> %{}
+    end
+  end
+
+  defp build_post_timestamp_checks(
+         project_id,
+         main_language,
+         published_posts,
+         published_translations,
+         generated_file_updated_at
+       ) do
+    translations_by_post_language =
+      Map.new(published_translations, fn translation ->
+        {{translation.translation_for, translation.language}, translation}
+      end)
+
+    post_by_id = Map.new(published_posts, &{&1.id, &1})
+
+    canonical_checks =
+      Enum.map(published_posts, fn post ->
+        canonical_variant = Map.get(translations_by_post_language, {post.id, main_language}, post)
+        relative_path = post_output_path(post)
+
+        %{
+          post_url_path: relative_path_to_url_path(relative_path),
+          post_file_path: source_full_path(project_id, canonical_variant.file_path),
+          generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
+        }
+      end)
+
+    translation_checks =
+      Enum.flat_map(published_posts, fn post ->
+        post_variant =
+          if post.language == main_language do
+            []
+          else
+            [{post.language, post}]
+          end
+
+        translation_variants =
+          published_translations
+          |> Enum.filter(&(&1.translation_for == post.id and &1.language != main_language))
+          |> Enum.map(&{&1.language, &1})
+
+        Enum.map(post_variant ++ translation_variants, fn {language, variant} ->
+          canonical_post = Map.get(post_by_id, post.id, post)
+          relative_path = post_output_path(canonical_post, language)
+
+          %{
+            post_url_path: relative_path_to_url_path(relative_path),
+            post_file_path: source_full_path(project_id, variant.file_path),
+            generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
+          }
+        end)
+      end)
+
+    canonical_checks ++ translation_checks
+  end
+
+  defp source_full_path(_project_id, file_path) when file_path in [nil, ""], do: nil
+
+  defp source_full_path(project_id, file_path) do
+    project = Projects.get_project!(project_id)
+    Path.join(Projects.project_data_dir(project), file_path)
+  end
+
+  defp compare_sitemap_to_html(params) do
+    expected_path_set =
+      params.sitemap_xml
+      |> extract_sitemap_locs()
+      |> Enum.map(&sitemap_loc_to_project_path(&1, params.base_url))
+      |> MapSet.new()
+
+    {existing_html_path_set, zero_byte_html_path_set} = collect_html_index_paths(params.html_dir)
+
+    missing_url_paths =
+      expected_path_set
+      |> MapSet.to_list()
+      |> Enum.reject(&MapSet.member?(existing_html_path_set, &1))
+      |> Enum.sort()
+
+    extra_url_paths =
+      existing_html_path_set
+      |> MapSet.to_list()
+      |> Enum.reject(&MapSet.member?(expected_path_set, &1))
+      |> Kernel.++(
+        zero_byte_html_path_set
+        |> MapSet.to_list()
+        |> Enum.reject(&MapSet.member?(expected_path_set, &1))
+      )
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    updated_post_url_paths =
+      params
+      |> Map.get(:post_timestamp_checks, [])
+      |> Enum.reduce(MapSet.new(), fn check, acc ->
+        normalized_url_path = normalize_url_path(check.post_url_path)
+
+        cond do
+          not MapSet.member?(expected_path_set, normalized_url_path) ->
+            acc
+
+          normalized_url_path in missing_url_paths ->
+            acc
+
+          is_nil(check.post_file_path) or check.post_file_path == "" ->
+            acc
+
+          true ->
+            html_path = Path.join(params.html_dir, url_path_to_relative_index_path(normalized_url_path))
+
+            case {File.stat(html_path, time: :posix), File.stat(check.post_file_path, time: :posix)} do
+              {{:ok, html_stat}, {:ok, post_stat}} ->
+                effective_generated_at_ms = max(mtime_ms(html_stat), check.generated_updated_at_ms || 0)
+
+                if mtime_ms(post_stat) > effective_generated_at_ms do
+                  MapSet.put(acc, normalized_url_path)
+                else
+                  acc
+                end
+
+              _other ->
+                acc
+            end
+        end
+      end)
+      |> MapSet.to_list()
+      |> Enum.sort()
+
+    %{
+      missing_url_paths: missing_url_paths,
+      extra_url_paths: extra_url_paths,
+      updated_post_url_paths: updated_post_url_paths,
+      expected_url_count: MapSet.size(expected_path_set),
+      existing_html_url_count: MapSet.size(existing_html_path_set)
+    }
+  end
+
+  defp extract_sitemap_locs(sitemap_xml) do
+    Regex.scan(~r/<loc>(.*?)<\/loc>/, sitemap_xml, capture: :all_but_first)
+    |> Enum.map(fn [value] -> String.trim(value) end)
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  defp sitemap_loc_to_project_path(loc, nil), do: normalize_url_path(loc)
+
+  defp sitemap_loc_to_project_path(loc, base_url) do
+    with {:ok, loc_uri} <- URI.new(loc),
+         {:ok, base_uri} <- URI.new(base_url) do
+      loc_path = String.trim_trailing(loc_uri.path || "/", "/")
+      base_path = String.trim_trailing(base_uri.path || "", "/")
+
+      cond do
+        base_path != "" and String.starts_with?(loc_path, base_path) ->
+          loc_path
+          |> String.replace_prefix(base_path, "")
+          |> normalize_url_path()
+
+        true ->
+          normalize_url_path(loc_path)
+      end
+    else
+      _other -> normalize_url_path(loc)
+    end
+  end
+
+  defp collect_html_index_paths(html_dir) do
+    index_paths = Path.wildcard(Path.join(html_dir, "**/index.html"))
+
+    Enum.reduce(index_paths, {MapSet.new(), MapSet.new()}, fn path, {existing, zero_byte} ->
+      relative_dir =
+        path
+        |> Path.relative_to(html_dir)
+        |> Path.dirname()
+
+      url_path =
+        case relative_dir do
+          "." -> "/"
+          value -> normalize_url_path("/" <> value)
+        end
+
+      case File.stat(path) do
+        {:ok, %{size: size}} when size > 0 -> {MapSet.put(existing, url_path), zero_byte}
+        {:ok, _stat} -> {existing, MapSet.put(zero_byte, url_path)}
+        {:error, _reason} -> {existing, MapSet.put(zero_byte, url_path)}
+      end
+    end)
+  end
+
+  defp normalize_url_path(nil), do: "/"
+
+  defp normalize_url_path(url_path) do
+    trimmed = String.trim(url_path || "")
+
+    cond do
+      trimmed in ["", "/"] ->
+        "/"
+
+      true ->
+        trimmed
+        |> String.split(["?", "#"])
+        |> List.first()
+        |> to_string()
+        |> String.trim("/")
+        |> case do
+          "" -> "/"
+          value -> "/" <> value
+        end
+    end
+  end
+
+  defp relative_path_to_url_path(relative_path) do
+    relative_path
+    |> String.trim_leading("/")
+    |> String.trim_trailing("index.html")
+    |> String.trim_trailing("/")
+    |> case do
+      "" -> "/"
+      value -> "/" <> value
+    end
+  end
+
+  defp url_path_to_relative_index_path("/"), do: "index.html"
+
+  defp url_path_to_relative_index_path(url_path) do
+    url_path
+    |> normalize_url_path()
+    |> String.trim_leading("/")
+    |> Path.join("index.html")
+  end
+
+  defp mtime_ms(%{mtime: mtime}) when is_integer(mtime) do
+    mtime * 1000
+  end
+
+  defp mtime_ms(%{mtime: mtime}) do
+    mtime
+    |> NaiveDateTime.from_erl!()
+    |> DateTime.from_naive!("Etc/UTC")
+    |> DateTime.to_unix(:millisecond)
+  end
+
+  defp report_paths(report) do
+    Map.get(report, :missing_url_paths, []) ++ Map.get(report, :updated_post_url_paths, [])
+  end
+
+  defp additional_languages(plan) do
+    Enum.reject(plan.blog_languages, &(&1 == plan.language))
+  end
+
+  defp plan_validation_paths(paths, additional_languages) do
+    {main_plan, language_plans} =
+      Enum.reduce(paths, {empty_validation_path_plan(), %{}}, fn path, {plan, language_plans} ->
+        normalized_path = normalize_url_path(path)
+        {language, stripped_path} = extract_language_path(normalized_path, additional_languages)
+
+        if is_binary(language) do
+          language_plan = Map.get(language_plans, language, empty_validation_path_plan())
+          next_language_plan = classify_validation_path(stripped_path, language_plan)
+          {plan, Map.put(language_plans, language, next_language_plan)}
+        else
+          {classify_validation_path(normalized_path, plan), language_plans}
+        end
+      end)
+
+    Map.put(main_plan, :language_plans, language_plans)
+  end
+
+  defp empty_validation_path_plan do
+    %{
+      request_root_routes: false,
+      requires_fallback_section_render: false,
+      requested_category_slugs: MapSet.new(),
+      requested_tag_slugs: MapSet.new(),
+      requested_years: MapSet.new(),
+      requested_year_months: MapSet.new(),
+      requested_post_routes: [],
+      language_plans: %{}
+    }
+  end
+
+  defp classify_validation_path(path, plan) do
+    case Regex.run(~r|^/category/([^/]+)(?:/page/\d+)?$|, path) do
+      [_, slug] ->
+        update_in(plan.requested_category_slugs, &MapSet.put(&1, slug))
+
+      nil ->
+        case Regex.run(~r|^/tag/([^/]+)(?:/page/\d+)?$|, path) do
+          [_, slug] ->
+            update_in(plan.requested_tag_slugs, &MapSet.put(&1, slug))
+
+          nil ->
+            case Regex.run(~r|^/(\d{4})/(\d{2})/(\d{2})/([^/]+)$|, path) do
+              [_, year, month, day, slug] ->
+                update_in(plan.requested_post_routes, &[ %{year: String.to_integer(year), month: String.to_integer(month), day: String.to_integer(day), slug: slug} | &1 ])
+
+              nil ->
+                case Regex.run(~r|^/(\d{4})/(\d{2})(?:/page/\d+)?$|, path) do
+                  [_, year, month] ->
+                    update_in(plan.requested_year_months, &MapSet.put(&1, "#{year}/#{month}"))
+
+                  nil ->
+                    case Regex.run(~r|^/(\d{4})(?:/page/\d+)?$|, path) do
+                      [_, year] ->
+                        update_in(plan.requested_years, &MapSet.put(&1, String.to_integer(year)))
+
+                      nil ->
+                        if path == "/" or Regex.match?(~r|^/page/\d+$|, path) do
+                          %{plan | request_root_routes: true}
+                        else
+                          %{plan | requires_fallback_section_render: true}
+                        end
+                    end
+                end
+            end
+        end
+    end
+  end
+
+  defp build_targeted_validation_plan(initial_plan, published_posts) do
+    if initial_plan.requires_fallback_section_render do
+      initial_plan
+    else
+      available_category_slugs =
+        published_posts
+        |> Enum.flat_map(&(&1.categories || []))
+        |> Enum.map(&Slug.slugify/1)
+        |> MapSet.new()
+
+      available_tag_slugs =
+        published_posts
+        |> Enum.flat_map(&(&1.tags || []))
+        |> Enum.map(&Slug.slugify/1)
+        |> MapSet.new()
+
+      targeted_post_routes =
+        Enum.reduce(initial_plan.requested_post_routes, MapSet.new(), fn route, acc ->
+          MapSet.put(acc, route_key(route.year, route.month, route.day, route.slug))
+        end)
+
+      enriched =
+        Enum.reduce(initial_plan.requested_post_routes, %{initial_plan | requested_post_routes: targeted_post_routes}, fn route, acc ->
+          case Enum.find(published_posts, &post_matches_route?(&1, route)) do
+            nil ->
+              acc
+              |> update_in([:requested_years], &MapSet.put(&1, route.year))
+              |> update_in([:requested_year_months], &MapSet.put(&1, route_month_key(route.year, route.month)))
+              |> Map.put(:request_root_routes, true)
+
+            post ->
+              created_at = Persistence.from_unix_ms!(post.created_at)
+              year = created_at.year
+              month = created_at.month
+
+              acc
+              |> update_in([:requested_category_slugs], fn set ->
+                Enum.reduce(post.categories || [], set, &MapSet.put(&2, Slug.slugify(&1)))
+              end)
+              |> update_in([:requested_tag_slugs], fn set ->
+                Enum.reduce(post.tags || [], set, &MapSet.put(&2, Slug.slugify(&1)))
+              end)
+              |> update_in([:requested_years], &MapSet.put(&1, year))
+              |> update_in([:requested_year_months], &MapSet.put(&1, route_month_key(year, month)))
+              |> Map.put(:request_root_routes, true)
+          end
+        end)
+
+      language_plans =
+        initial_plan.language_plans
+        |> Enum.map(fn {language, language_plan} ->
+          {language, build_targeted_validation_plan(language_plan, published_posts)}
+        end)
+        |> Map.new()
+
+      %{
+        enriched
+        | requested_category_slugs: MapSet.intersection(enriched.requested_category_slugs, available_category_slugs),
+          requested_tag_slugs: MapSet.intersection(enriched.requested_tag_slugs, available_tag_slugs),
+          language_plans: language_plans
+      }
+    end
+  end
+
+  defp post_matches_route?(post, route) do
+    created_at = Persistence.from_unix_ms!(post.created_at)
+
+    post.slug == route.slug and created_at.year == route.year and created_at.month == route.month and
+      created_at.day == route.day
+  end
+
+  defp route_key(year, month, day, slug) do
+    "#{year}/#{String.pad_leading(Integer.to_string(month), 2, "0")}/#{String.pad_leading(Integer.to_string(day), 2, "0")}/#{slug}"
+  end
+
+  defp route_month_key(year, month) do
+    "#{year}/#{String.pad_leading(Integer.to_string(month), 2, "0")}"
+  end
+
+  defp extract_language_path(path, additional_languages) do
+    case Regex.run(~r|^/([a-z]{2,3})(/.*)?$|, path) do
+      [_, language, suffix] ->
+        if language in additional_languages do
+          {language, normalize_url_path(suffix || "/")}
+        else
+          {nil, path}
+        end
+
+      [_, language] ->
+        if language in additional_languages do
+          {language, "/"}
+        else
+          {nil, path}
+        end
+
+      _other -> {nil, path}
+    end
+  end
+
+  defp targeted_output?(relative_path, targeted_plan, main_language, additional_languages) do
+    {language, stripped_path} = extract_relative_output_language(relative_path, additional_languages)
+
+    plan =
+      case language do
+        nil -> targeted_plan
+        value -> Map.get(targeted_plan.language_plans, value, empty_validation_path_plan())
+      end
+
+    targeted_output_for_plan?(stripped_path, plan, main_language == language or is_nil(language))
+  end
+
+  defp extract_relative_output_language(relative_path, additional_languages) do
+    segments = String.split(relative_path, "/", trim: true)
+
+    case segments do
+      [language | rest] ->
+        if language in additional_languages do
+          {language, Path.join(rest)}
+        else
+          {nil, relative_path}
+        end
+
+      _other ->
+        {nil, relative_path}
+    end
+  end
+
+  defp targeted_output_for_plan?(_relative_path, %{requires_fallback_section_render: true}, _main?), do: true
+
+  defp targeted_output_for_plan?(relative_path, plan, _main?) do
+    cond do
+      relative_path in ["index.html", "404.html", "feed.xml", "atom.xml"] ->
+        plan.request_root_routes
+
+      Regex.match?(~r|^category/([^/]+)(?:/page/\d+)?/index\.html$|, relative_path) ->
+        [_, slug] = Regex.run(~r|^category/([^/]+)(?:/page/\d+)?/index\.html$|, relative_path)
+        MapSet.member?(plan.requested_category_slugs, slug)
+
+      Regex.match?(~r|^tag/([^/]+)/index\.html$|, relative_path) ->
+        [_, slug] = Regex.run(~r|^tag/([^/]+)/index\.html$|, relative_path)
+        MapSet.member?(plan.requested_tag_slugs, slug)
+
+      Regex.match?(~r|^(\d{4})/(\d{2})/(\d{2})/([^/]+)/index\.html$|, relative_path) ->
+        [_, year, month, day, slug] = Regex.run(~r|^(\d{4})/(\d{2})/(\d{2})/([^/]+)/index\.html$|, relative_path)
+        MapSet.member?(plan.requested_post_routes, route_key(String.to_integer(year), String.to_integer(month), String.to_integer(day), slug))
+
+      Regex.match?(~r|^(\d{4})/(\d{2})/index\.html$|, relative_path) ->
+        [_, year, month] = Regex.run(~r|^(\d{4})/(\d{2})/index\.html$|, relative_path)
+        MapSet.member?(plan.requested_year_months, "#{year}/#{month}")
+
+      Regex.match?(~r|^(\d{4})/index\.html$|, relative_path) ->
+        [_, year] = Regex.run(~r|^(\d{4})/index\.html$|, relative_path)
+        MapSet.member?(plan.requested_years, String.to_integer(year))
+
+      true ->
+        false
+    end
+  end
+
+  defp route_html_path?(relative_path), do: String.ends_with?(relative_path, "index.html")
+
+  defp delete_extra_validation_paths(project_id, project, extra_url_paths) do
+    Enum.reduce(extra_url_paths, {0, 0}, fn url_path, {deleted_count, removed_dir_count} ->
+      relative_path = url_path_to_relative_index_path(url_path)
+      full_path = output_path(project, relative_path)
+
+      case File.rm(full_path) do
+        :ok ->
+          Repo.delete_all(
+            from generated_file in GeneratedFileHash,
+              where:
+                generated_file.project_id == ^project_id and
+                  generated_file.relative_path == ^relative_path
+          )
+
+          {pruned_count, _last_dir} = prune_empty_parent_dirs(Path.dirname(full_path), output_path(project, ""))
+          {deleted_count + 1, removed_dir_count + pruned_count}
+
+        {:error, :enoent} ->
+          {deleted_count, removed_dir_count}
+
+        {:error, _reason} ->
+          {deleted_count, removed_dir_count}
+      end
+    end)
+  end
+
+  defp prune_empty_parent_dirs(current_dir, html_root) do
+    cond do
+      Path.expand(current_dir) == Path.expand(html_root) ->
+        {0, current_dir}
+
+      true ->
+        case File.ls(current_dir) do
+          {:ok, []} ->
+            case File.rmdir(current_dir) do
+              :ok ->
+                {count, last_dir} = prune_empty_parent_dirs(Path.dirname(current_dir), html_root)
+                {count + 1, last_dir}
+
+              {:error, _reason} ->
+                {0, current_dir}
+            end
+
+          _other ->
+            {0, current_dir}
+        end
+    end
+  end
+
+  defp write_ancillary_validation_outputs(project_id, expected_output_map) do
+    ancillary_paths =
+      Enum.filter(Map.keys(expected_output_map), fn relative_path ->
+        relative_path == "calendar.json" or String.contains?(relative_path, "pagefind/")
+      end)
+
+    Enum.each(ancillary_paths, fn relative_path ->
+      _ = write_generated_file(project_id, relative_path, Map.fetch!(expected_output_map, relative_path))
+    end)
+
+    :ok
   end
 
   defp output_path(project, relative_path) do
