@@ -387,9 +387,19 @@
           <% end %>
         </div>
       <% else %>
-        <div id={"post-editor-markdown-surface-#{@post_editor.id}"} class="post-editor-markdown-surface" data-testid="post-editor-markdown-surface" phx-hook="PostEditorContent" data-post-editor-id={@post_editor.id}>
-          <pre class="post-editor-markdown-highlight" aria-hidden="true"></pre>
-          <textarea id={"post-editor-content-#{@post_editor.id}"} class="post-editor-textarea post-editor-content" data-testid="post-editor-content" data-post-editor-id={@post_editor.id} name="post_editor[content]" rows="18"><%= @post_editor.form["content"] %></textarea>
+        <div
+          id={"post-editor-markdown-surface-#{@post_editor.id}"}
+          class="post-editor-markdown-surface monaco-editor-shell"
+          data-testid="post-editor-markdown-surface"
+          phx-hook="MonacoEditor"
+          data-monaco-editor-id={@post_editor.id}
+          data-monaco-input-id={"post-editor-content-#{@post_editor.id}"}
+          data-monaco-language="markdown"
+          data-monaco-word-wrap="on"
+          data-monaco-insert-event="post-editor-insert-content"
+        >
+          <div id={"post-editor-monaco-#{@post_editor.id}"} class="monaco-editor-instance" phx-update="ignore"></div>
+          <textarea id={"post-editor-content-#{@post_editor.id}"} class="monaco-editor-input post-editor-content" data-testid="post-editor-content" data-post-editor-id={@post_editor.id} name="post_editor[content]" rows="18" spellcheck="false"><%= @post_editor.form["content"] %></textarea>
         </div>
       <% end %>
     </div>

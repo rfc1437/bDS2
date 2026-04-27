@@ -2,6 +2,7 @@
   "name": "bds-ui-automation",
   "private": true,
   "devDependencies": {
+    "monaco-editor": "^0.55.1",
     "playwright": "^1.54.1"
   },
   "scripts": {

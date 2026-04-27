@@ -22,7 +22,18 @@
     </div>
     <div class="editor-body templates-editor">
       <div class="editor-toolbar templates-toolbar"><div class="editor-toolbar-left"><label><%= translated("Content") %></label></div></div>
-      <div class="templates-monaco"><textarea class="code-editor-textarea" name="template_editor[content]" spellcheck="false"><%= @template_editor.content %></textarea></div>
+      <div
+        id={"template-editor-monaco-shell-#{@template_editor.id}"}
+        class="templates-monaco monaco-editor-shell"
+        phx-hook="MonacoEditor"
+        data-monaco-editor-id={@template_editor.id}
+        data-monaco-input-id={"template-editor-content-#{@template_editor.id}"}
+        data-monaco-language="liquid"
+        data-monaco-word-wrap="off"
+      >
+        <div id={"template-editor-monaco-#{@template_editor.id}"} class="monaco-editor-instance" phx-update="ignore"></div>
+        <textarea id={"template-editor-content-#{@template_editor.id}"} class="monaco-editor-input code-editor-textarea" name="template_editor[content]" spellcheck="false"><%= @template_editor.content %></textarea>
+      </div>
     </div>
     <div class="editor-footer"><span class="text-muted text-small"><%= translated("Created") %>: <%= format_timestamp(@template_editor.created_at) %></span><span class="text-muted text-small"><%= translated("Updated") %>: <%= format_timestamp(@template_editor.updated_at) %></span></div>
   </form>

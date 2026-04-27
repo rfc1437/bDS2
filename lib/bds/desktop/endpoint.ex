@@ -18,7 +18,7 @@ defmodule BDS.Desktop.Endpoint do
   plug Plug.Static,
     at: "/assets",
     from: {:bds, "priv/ui"},
-    only: ["app.css", "live.js"]
+    only: ["app.css", "live.js", "monaco"]
 
   plug Plug.Static,
     at: "/vendor/phoenix",

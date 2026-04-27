@@ -155,90 +155,259 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   };
 
-  const escapeHtml = (value) =>
-    String(value || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+  let monacoLoaderPromise;
+  let liquidLanguageRegistered = false;
+  let monacoThemeSignature = null;
 
-  const stashTokens = (source, pattern, className, tokens) =>
-    source.replace(pattern, (match) => {
-      const marker = `@@token_${tokens.length}@@`;
-      tokens.push(`<span class="${className}">${match}</span>`);
-      return marker;
-    });
-
-  const restoreTokens = (source, tokens) =>
-    tokens.reduce((html, token, index) => html.replaceAll(`@@token_${index}@@`, token), source);
-
-  const highlightCodeLine = (line, language) => {
-    const tokens = [];
-    let html = escapeHtml(line);
-
-    html = stashTokens(html, /#.*/g, "token-comment", tokens);
-    html = stashTokens(html, /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "token-string", tokens);
-    html = html.replace(/\b\d+(?:\.\d+)?\b/g, '<span class="token-number">$&</span>');
-
-    if (language === "elixir") {
-      html = html.replace(/:\w+[!?]?/g, '<span class="token-atom">$&</span>');
-      html = html.replace(
-        /\b(?:defp?|do|end|fn|case|cond|if|else|with|when|receive|after|rescue|catch|try|use|alias|import|require|quote|unquote|for|in)\b/g,
-        '<span class="token-keyword">$&</span>'
-      );
-      html = html.replace(/\b[A-Z][A-Za-z0-9_.]*\b/g, '<span class="token-module">$&</span>');
-    }
-
-    return `<span class="md-code-line">${restoreTokens(html, tokens)}</span>`;
+  const cssVar = (name, fallback) => {
+    const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return value || fallback;
   };
 
-  const highlightMarkdownLine = (line) => {
-    let html = escapeHtml(line);
-
-    if (/^\s{0,3}#{1,6}\s/.test(line)) {
-      html = html.replace(/^((?:\s{0,3}#{1,6}))(\s+)(.*)$/, '<span class="md-heading-marker">$1</span>$2<span class="md-heading-text">$3</span>');
-    } else if (/^\s*&gt;\s?/.test(html)) {
-      html = html.replace(/^(\s*&gt;)(\s?)(.*)$/, '<span class="md-quote-marker">$1</span>$2<span class="md-quote-text">$3</span>');
-    } else if (/^\s*(?:[-*+]|\d+\.)\s+/.test(line)) {
-      html = html.replace(/^(\s*(?:[-*+]|\d+\.))(\s+)(.*)$/, '<span class="md-list-marker">$1</span>$2<span class="md-list-text">$3</span>');
+  const parseRgbColor = (value) => {
+    if (!value) {
+      return null;
     }
 
-    html = html.replace(/(`[^`]+`)/g, '<span class="md-inline-code">$1</span>');
-    html = html.replace(/(\[[^\]]+\]\([^\)]+\))/g, '<span class="md-link">$1</span>');
-    html = html.replace(/(\*\*[^*]+\*\*)/g, '<span class="md-strong">$1</span>');
-    html = html.replace(/(^|[^*])(\*[^*\n]+\*)/g, '$1<span class="md-emphasis">$2</span>');
+    const hex = value.match(/^#([0-9a-f]{6})$/i);
 
-    return html;
+    if (hex) {
+      return {
+        r: Number.parseInt(hex[1].slice(0, 2), 16),
+        g: Number.parseInt(hex[1].slice(2, 4), 16),
+        b: Number.parseInt(hex[1].slice(4, 6), 16)
+      };
+    }
+
+    const rgb = value.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+
+    if (!rgb) {
+      return null;
+    }
+
+    return {
+      r: Number.parseInt(rgb[1], 10),
+      g: Number.parseInt(rgb[2], 10),
+      b: Number.parseInt(rgb[3], 10)
+    };
   };
 
-  const highlightMarkdownSource = (source) => {
-    const lines = String(source || "").split("\n");
-    let inFence = false;
-    let fenceLanguage = "";
+  const colorIsDark = (value) => {
+    const rgb = parseRgbColor(value);
 
-    return lines
-      .map((line) => {
-        const trimmed = line.trimStart();
+    if (!rgb) {
+      return true;
+    }
 
-        if (trimmed.startsWith("```")) {
-          const nextLanguage = trimmed.slice(3).trim().toLowerCase();
-          const highlightedFence = `<span class="md-fence">${escapeHtml(line)}</span>`;
+    const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+    return luminance < 0.5;
+  };
 
-          if (!inFence) {
-            inFence = true;
-            fenceLanguage = nextLanguage;
-          } else {
-            inFence = false;
-            fenceLanguage = "";
-          }
+  const loadScript = (src) =>
+    new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[src="${src}"]`);
 
-          return highlightedFence;
+      if (existing) {
+        if (existing.dataset.loaded === "true") {
+          resolve();
+          return;
         }
 
-        return inFence ? highlightCodeLine(line, fenceLanguage) : highlightMarkdownLine(line);
-      })
-      .join("\n");
+        existing.addEventListener("load", () => resolve(), { once: true });
+        existing.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), {
+          once: true
+        });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.addEventListener(
+        "load",
+        () => {
+          script.dataset.loaded = "true";
+          resolve();
+        },
+        { once: true }
+      );
+      script.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), {
+        once: true
+      });
+      document.head.appendChild(script);
+    });
+
+  const registerLiquidLanguage = (monaco) => {
+    if (liquidLanguageRegistered) {
+      return;
+    }
+
+    monaco.languages.register({ id: "liquid" });
+    monaco.languages.setLanguageConfiguration("liquid", {
+      comments: {
+        blockComment: ["{% comment %}", "{% endcomment %}"]
+      },
+      brackets: [
+        ["{", "}"],
+        ["[", "]"],
+        ["(", ")"]
+      ],
+      autoClosingPairs: [
+        { open: "{", close: "}" },
+        { open: "[", close: "]" },
+        { open: "(", close: ")" },
+        { open: '"', close: '"' },
+        { open: "'", close: "'" }
+      ],
+      surroundingPairs: [
+        { open: "{", close: "}" },
+        { open: "[", close: "]" },
+        { open: "(", close: ")" },
+        { open: '"', close: '"' },
+        { open: "'", close: "'" }
+      ]
+    });
+
+    monaco.languages.setMonarchTokensProvider("liquid", {
+      defaultToken: "",
+      tokenizer: {
+        root: [
+          [/\{\{-?/, { token: "delimiter.output", next: "@liquidOutput" }],
+          [/\{%-?\s*comment\b[^%]*-?%\}/, { token: "comment.block", next: "@liquidComment" }],
+          [/\{%-?/, { token: "delimiter.tag", next: "@liquidTag" }],
+          [/<!DOCTYPE/i, "metatag"],
+          [/<!--/, { token: "comment", next: "@htmlComment" }],
+          [/(<)(script)/i, ["delimiter.html", "tag.html"], "@scriptTag"],
+          [/(<)(style)/i, ["delimiter.html", "tag.html"], "@styleTag"],
+          [/(<\/)([\w:-]+)/, ["delimiter.html", "tag.html"]],
+          [/(<)([\w:-]+)/, ["delimiter.html", "tag.html"], "@htmlTag"],
+          [/[^<{]+/, ""],
+          [/./, ""]
+        ],
+        liquidOutput: [
+          [/-?\}\}/, { token: "delimiter.output", next: "@pop" }],
+          [/\|\s*[a-zA-Z_][\w-]*/, "keyword"],
+          [/\b(?:true|false|nil|blank|empty)\b/, "keyword"],
+          [/\b\d+(?:\.\d+)?\b/, "number"],
+          [/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/, "string"],
+          [/[a-zA-Z_][\w.-]*/, "identifier"],
+          [/[,:()[\]]/, "delimiter"]
+        ],
+        liquidTag: [
+          [/-?%\}/, { token: "delimiter.tag", next: "@pop" }],
+          [/\b(?:assign|capture|case|comment|cycle|decrement|echo|elsif|else|endcase|endcapture|endif|endfor|endunless|endcomment|for|if|include|increment|liquid|paginate|raw|render|tablerow|unless|when)\b/, "keyword"],
+          [/\|\s*[a-zA-Z_][\w-]*/, "keyword"],
+          [/\b(?:true|false|nil|blank|empty|contains)\b/, "keyword"],
+          [/\b\d+(?:\.\d+)?\b/, "number"],
+          [/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/, "string"],
+          [/[><=!]=?|\.|:/, "operator"],
+          [/[a-zA-Z_][\w.-]*/, "identifier"],
+          [/[,:()[\]]/, "delimiter"]
+        ],
+        liquidComment: [
+          [/\{%-?\s*endcomment\s*-?%\}/, { token: "comment.block", next: "@pop" }],
+          [/./, "comment.block"]
+        ],
+        htmlComment: [
+          [/-->/, { token: "comment", next: "@pop" }],
+          [/./, "comment"]
+        ],
+        htmlTag: [
+          [/\/>/, { token: "delimiter.html", next: "@pop" }],
+          [/>/, { token: "delimiter.html", next: "@pop" }],
+          [/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/, "attribute.value"],
+          [/[\w:-]+/, "attribute.name"],
+          [/=/, "delimiter"]
+        ],
+        scriptTag: [
+          [/>/, { token: "delimiter.html", next: "@pop" }],
+          [/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/, "attribute.value"],
+          [/[\w:-]+/, "attribute.name"],
+          [/=/, "delimiter"]
+        ],
+        styleTag: [
+          [/>/, { token: "delimiter.html", next: "@pop" }],
+          [/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/, "attribute.value"],
+          [/[\w:-]+/, "attribute.name"],
+          [/=/, "delimiter"]
+        ]
+      }
+    });
+
+    liquidLanguageRegistered = true;
+  };
+
+  const ensureMonacoTheme = (monaco) => {
+    const background = cssVar("--vscode-editor-background", cssVar("--vscode-input-background", "#1e1e1e"));
+    const foreground = cssVar("--vscode-editor-foreground", "#d4d4d4");
+    const lineNumber = cssVar("--vscode-editorLineNumber-foreground", "#858585");
+    const activeLineNumber = cssVar("--vscode-editorLineNumber-activeForeground", foreground);
+    const selection = cssVar("--vscode-editor-selectionBackground", "#264f78");
+    const inactiveSelection = cssVar("--vscode-editor-inactiveSelectionBackground", "#3a3d41");
+    const cursor = cssVar("--vscode-editorCursor-foreground", foreground);
+    const border = cssVar("--vscode-panel-border", "#3c3c3c");
+    const signature = [background, foreground, lineNumber, activeLineNumber, selection, inactiveSelection, cursor, border].join("|");
+
+    if (signature === monacoThemeSignature) {
+      monaco.editor.setTheme("bds-theme");
+      return;
+    }
+
+    monaco.editor.defineTheme("bds-theme", {
+      base: colorIsDark(background) ? "vs-dark" : "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": background,
+        "editor.foreground": foreground,
+        "editor.lineHighlightBackground": cssVar("--vscode-editor-lineHighlightBackground", background),
+        "editorCursor.foreground": cursor,
+        "editor.selectionBackground": selection,
+        "editor.inactiveSelectionBackground": inactiveSelection,
+        "editorLineNumber.foreground": lineNumber,
+        "editorLineNumber.activeForeground": activeLineNumber,
+        "editorIndentGuide.background1": border,
+        "editorIndentGuide.activeBackground1": foreground,
+        "editorWidget.border": border,
+        "editorGutter.background": background,
+        "focusBorder": border,
+        "input.border": border
+      }
+    });
+
+    monacoThemeSignature = signature;
+    monaco.editor.setTheme("bds-theme");
+  };
+
+  const loadMonaco = () => {
+    if (window.monaco?.editor) {
+      ensureMonacoTheme(window.monaco);
+      registerLiquidLanguage(window.monaco);
+      return Promise.resolve(window.monaco);
+    }
+
+    if (monacoLoaderPromise) {
+      return monacoLoaderPromise;
+    }
+
+    monacoLoaderPromise = loadScript("/assets/monaco/vs/loader.js")
+      .then(
+        () =>
+          new Promise((resolve, reject) => {
+            window.require.config({ paths: { vs: "/assets/monaco/vs" } });
+            window.require(["vs/editor/editor.main"], () => {
+              ensureMonacoTheme(window.monaco);
+              registerLiquidLanguage(window.monaco);
+              resolve(window.monaco);
+            }, reject);
+          })
+      )
+      .catch((error) => {
+        monacoLoaderPromise = null;
+        throw error;
+      });
+
+    return monacoLoaderPromise;
   };
 
   const Hooks = {
@@ -459,70 +628,145 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     },
 
-    PostEditorContent: {
+    MonacoEditor: {
       mounted() {
-        this.textarea = this.el.querySelector("textarea");
-        this.highlight = this.el.querySelector(".post-editor-markdown-highlight");
+        this.textarea = document.getElementById(this.el.dataset.monacoInputId) || this.el.querySelector("textarea");
+        this.host = this.el.querySelector(".monaco-editor-instance");
+        this.language = this.el.dataset.monacoLanguage || "plaintext";
+        this.wordWrap = this.el.dataset.monacoWordWrap || "off";
+        this.editorId = this.el.dataset.monacoEditorId || "";
+        this.insertEvent = this.el.dataset.monacoInsertEvent || "";
+        this.syncTimer = null;
+        this.isApplyingRemoteUpdate = false;
+        this.lastKnownValue = this.textarea?.value || "";
 
-        this.renderHighlight = () => {
-          if (!this.textarea || !this.highlight) {
+        this.queueSync = () => {
+          if (!this.textarea || !this.editor) {
             return;
           }
 
-          this.highlight.innerHTML = `${highlightMarkdownSource(this.textarea.value)}\n`;
-          this.highlight.scrollTop = this.textarea.scrollTop;
-          this.highlight.scrollLeft = this.textarea.scrollLeft;
-        };
+          window.clearTimeout(this.syncTimer);
+          this.syncTimer = window.setTimeout(() => {
+            if (!this.textarea || !this.editor) {
+              return;
+            }
 
-        this.handleInput = () => this.renderHighlight();
-        this.handleScroll = () => {
-          if (!this.textarea || !this.highlight) {
-            return;
-          }
+            const value = this.editor.getValue();
 
-          this.highlight.scrollTop = this.textarea.scrollTop;
-          this.highlight.scrollLeft = this.textarea.scrollLeft;
+            if (this.textarea.value === value) {
+              return;
+            }
+
+            this.lastKnownValue = value;
+            this.textarea.value = value;
+            this.textarea.dispatchEvent(new Event("input", { bubbles: true }));
+          }, 120);
         };
 
         this.handleInsert = ({ id, content }) => {
-          if (!this.textarea || !content || String(id) !== String(this.el.dataset.postEditorId)) {
+          if (!this.editor || !content || String(id) !== String(this.editorId)) {
             return;
           }
 
-          const start = this.textarea.selectionStart ?? this.textarea.value.length;
-          const end = this.textarea.selectionEnd ?? start;
-          const before = this.textarea.value.slice(0, start);
-          const after = this.textarea.value.slice(end);
+          const model = this.editor.getModel();
+          const selection = this.editor.getSelection();
+
+          if (!model || !selection) {
+            return;
+          }
+
+          const value = this.editor.getValue();
+          const start = model.getOffsetAt(selection.getStartPosition());
+          const end = model.getOffsetAt(selection.getEndPosition());
+          const before = value.slice(0, start);
+          const after = value.slice(end);
           const separator = before !== "" && !before.endsWith("\n") ? "\n" : "";
           const suffix = after !== "" && !content.endsWith("\n") ? "\n" : "";
           const inserted = `${separator}${content}${suffix}`;
-          const nextValue = `${before}${inserted}${after}`;
-
-          this.textarea.focus();
-          this.textarea.value = nextValue;
-
-          const caret = before.length + inserted.length;
-          this.textarea.setSelectionRange(caret, caret);
-          this.textarea.dispatchEvent(new Event("input", { bubbles: true }));
-          this.textarea.dispatchEvent(new Event("change", { bubbles: true }));
+          this.editor.executeEdits("bds-insert-content", [
+            {
+              range: selection,
+              text: inserted,
+              forceMoveMarkers: true
+            }
+          ]);
+          this.editor.focus();
         };
 
-        this.el.classList.add("is-enhanced");
-        this.textarea?.addEventListener("input", this.handleInput);
-        this.textarea?.addEventListener("scroll", this.handleScroll);
-        this.handleEvent("post-editor-insert-content", this.handleInsert);
-        this.renderHighlight();
+        loadMonaco()
+          .then((monaco) => {
+            if (!this.host || !this.textarea) {
+              return;
+            }
+
+            ensureMonacoTheme(monaco);
+
+            this.editor = monaco.editor.create(this.host, {
+              value: this.textarea.value || "",
+              language: this.language,
+              theme: "bds-theme",
+              automaticLayout: true,
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              wordWrap: this.wordWrap,
+              lineNumbersMinChars: 3,
+              roundedSelection: false,
+              renderLineHighlight: "line",
+              tabSize: 2,
+              insertSpaces: true
+            });
+
+            this.changeSubscription = this.editor.onDidChangeModelContent(() => {
+              if (this.isApplyingRemoteUpdate) {
+                return;
+              }
+
+              this.queueSync();
+            });
+
+            if (this.insertEvent) {
+              this.handleEvent(this.insertEvent, this.handleInsert);
+            }
+          })
+          .catch((error) => {
+            console.error("Failed to load Monaco editor", error);
+          });
       },
 
       updated() {
-        this.textarea = this.el.querySelector("textarea");
-        this.highlight = this.el.querySelector(".post-editor-markdown-highlight");
-        this.renderHighlight();
+        this.textarea = document.getElementById(this.el.dataset.monacoInputId) || this.el.querySelector("textarea");
+        this.host = this.el.querySelector(".monaco-editor-instance");
+        this.language = this.el.dataset.monacoLanguage || this.language || "plaintext";
+        this.wordWrap = this.el.dataset.monacoWordWrap || this.wordWrap || "off";
+
+        if (!this.editor || !this.textarea) {
+          return;
+        }
+
+        loadMonaco().then((monaco) => {
+          ensureMonacoTheme(monaco);
+          monaco.editor.setTheme("bds-theme");
+
+          if (this.editor.getModel()?.getLanguageId() !== this.language) {
+            monaco.editor.setModelLanguage(this.editor.getModel(), this.language);
+          }
+
+          this.editor.updateOptions({ wordWrap: this.wordWrap });
+        });
+
+        if (this.editor.getValue() !== this.textarea.value && this.lastKnownValue !== this.textarea.value) {
+          this.isApplyingRemoteUpdate = true;
+          this.editor.setValue(this.textarea.value);
+          this.isApplyingRemoteUpdate = false;
+        }
+
+        this.lastKnownValue = this.textarea.value;
       },
 
       destroyed() {
-        this.textarea?.removeEventListener("input", this.handleInput);
-        this.textarea?.removeEventListener("scroll", this.handleScroll);
+        window.clearTimeout(this.syncTimer);
+        this.changeSubscription?.dispose();
+        this.editor?.dispose();
       }
     }
   };

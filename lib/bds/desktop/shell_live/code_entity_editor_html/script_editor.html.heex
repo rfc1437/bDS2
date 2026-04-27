@@ -24,7 +24,18 @@
     </div>
     <div class="editor-body scripts-editor">
       <div class="editor-toolbar scripts-toolbar"><div class="editor-toolbar-left"><label><%= translated("Content") %></label></div></div>
-      <div class="scripts-monaco"><textarea class="code-editor-textarea" name="script_editor[content]"><%= @script_editor.content %></textarea></div>
+      <div
+        id={"script-editor-monaco-shell-#{@script_editor.id}"}
+        class="scripts-monaco monaco-editor-shell"
+        phx-hook="MonacoEditor"
+        data-monaco-editor-id={@script_editor.id}
+        data-monaco-input-id={"script-editor-content-#{@script_editor.id}"}
+        data-monaco-language="lua"
+        data-monaco-word-wrap="off"
+      >
+        <div id={"script-editor-monaco-#{@script_editor.id}"} class="monaco-editor-instance" phx-update="ignore"></div>
+        <textarea id={"script-editor-content-#{@script_editor.id}"} class="monaco-editor-input code-editor-textarea" name="script_editor[content]" spellcheck="false"><%= @script_editor.content %></textarea>
+      </div>
     </div>
     <div class="editor-footer"><span class="text-muted text-small"><%= translated("Created") %>: <%= format_timestamp(@script_editor.created_at) %></span><span class="text-muted text-small"><%= translated("Updated") %>: <%= format_timestamp(@script_editor.updated_at) %></span></div>
   </form>
