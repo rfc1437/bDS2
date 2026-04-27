@@ -157,6 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let monacoLoaderPromise;
   let liquidLanguageRegistered = false;
+  let markdownWithMacrosRegistered = false;
   let monacoThemeSignature = null;
 
   const cssVar = (name, fallback) => {
@@ -337,6 +338,49 @@ document.addEventListener("DOMContentLoaded", () => {
     liquidLanguageRegistered = true;
   };
 
+  const registerMarkdownWithMacrosLanguage = (monaco) => {
+    if (markdownWithMacrosRegistered) {
+      return;
+    }
+
+    monaco.languages.register({ id: "markdown-with-macros" });
+    monaco.languages.setMonarchTokensProvider("markdown-with-macros", {
+      defaultToken: "",
+      tokenPostfix: ".md",
+      tokenizer: {
+        root: [
+          [/\[\[[a-zA-Z][\w-]*/, { token: "keyword.macro", next: "@macroParams" }],
+          [/^#{1,6}\s.*$/, "keyword.header"],
+          [/^\s*>+/, "string.quote"],
+          [/^\s*[-+*]\s/, "keyword"],
+          [/^\s*\d+\.\s/, "keyword"],
+          [/^\s*```\w*/, { token: "string.code", next: "@codeblock" }],
+          [/\*\*[^*]+\*\*/, "strong"],
+          [/\*[^*]+\*/, "emphasis"],
+          [/__[^_]+__/, "strong"],
+          [/_[^_]+_/, "emphasis"],
+          [/`[^`]+`/, "variable"],
+          [/!?\[[^\]]*\]\([^)]*\)/, "string.link"],
+          [/!?\[[^\]]*\]\[[^\]]*\]/, "string.link"]
+        ],
+        macroParams: [
+          [/\]\]/, { token: "keyword.macro", next: "@root" }],
+          [/[a-zA-Z][\w-]*(?=\s*=)/, "attribute.name"],
+          [/=/, "delimiter"],
+          [/"[^"]*"/, "string"],
+          [/\s+/, "white"],
+          [/[^\]"=\s]+/, "attribute.value"]
+        ],
+        codeblock: [
+          [/^\s*```\s*$/, { token: "string.code", next: "@root" }],
+          [/.*$/, "variable.source"]
+        ]
+      }
+    });
+
+    markdownWithMacrosRegistered = true;
+  };
+
   const ensureMonacoTheme = (monaco) => {
     const background = cssVar("--vscode-editor-background", cssVar("--vscode-input-background", "#1e1e1e"));
     const foreground = cssVar("--vscode-editor-foreground", "#d4d4d4");
@@ -356,7 +400,11 @@ document.addEventListener("DOMContentLoaded", () => {
     monaco.editor.defineTheme("bds-theme", {
       base: colorIsDark(background) ? "vs-dark" : "vs",
       inherit: true,
-      rules: [],
+      rules: [
+        { token: "keyword.macro", foreground: "C586C0", fontStyle: "bold" },
+        { token: "attribute.name", foreground: "9CDCFE" },
+        { token: "attribute.value", foreground: "CE9178" }
+      ],
       colors: {
         "editor.background": background,
         "editor.foreground": foreground,
@@ -383,6 +431,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (window.monaco?.editor) {
       ensureMonacoTheme(window.monaco);
       registerLiquidLanguage(window.monaco);
+      registerMarkdownWithMacrosLanguage(window.monaco);
       return Promise.resolve(window.monaco);
     }
 
@@ -398,6 +447,7 @@ document.addEventListener("DOMContentLoaded", () => {
             window.require(["vs/editor/editor.main"], () => {
               ensureMonacoTheme(window.monaco);
               registerLiquidLanguage(window.monaco);
+              registerMarkdownWithMacrosLanguage(window.monaco);
               resolve(window.monaco);
             }, reject);
           })
@@ -709,9 +759,17 @@ document.addEventListener("DOMContentLoaded", () => {
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
               wordWrap: this.wordWrap,
+              lineNumbers: "on",
               lineNumbersMinChars: 3,
+              fontSize: 14,
+              fontFamily: "'Cascadia Code', 'Consolas', 'Courier New', monospace",
+              padding: { top: 12, bottom: 12 },
               roundedSelection: false,
               renderLineHighlight: "line",
+              formatOnPaste: true,
+              cursorStyle: "line",
+              cursorBlinking: "smooth",
+              quickSuggestions: this.language === "markdown-with-macros" ? false : true,
               tabSize: 2,
               insertSpaces: true
             });

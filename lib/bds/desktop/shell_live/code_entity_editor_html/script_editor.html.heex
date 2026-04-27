@@ -31,7 +31,7 @@
         data-monaco-editor-id={@script_editor.id}
         data-monaco-input-id={"script-editor-content-#{@script_editor.id}"}
         data-monaco-language="lua"
-        data-monaco-word-wrap="off"
+        data-monaco-word-wrap="on"
       >
         <div id={"script-editor-monaco-#{@script_editor.id}"} class="monaco-editor-instance" phx-update="ignore"></div>
         <textarea id={"script-editor-content-#{@script_editor.id}"} class="monaco-editor-input code-editor-textarea" name="script_editor[content]" spellcheck="false"><%= @script_editor.content %></textarea>

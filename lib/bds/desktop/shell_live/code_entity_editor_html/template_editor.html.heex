@@ -29,7 +29,7 @@
         data-monaco-editor-id={@template_editor.id}
         data-monaco-input-id={"template-editor-content-#{@template_editor.id}"}
         data-monaco-language="liquid"
-        data-monaco-word-wrap="off"
+        data-monaco-word-wrap="on"
       >
         <div id={"template-editor-monaco-#{@template_editor.id}"} class="monaco-editor-instance" phx-update="ignore"></div>
         <textarea id={"template-editor-content-#{@template_editor.id}"} class="monaco-editor-input code-editor-textarea" name="template_editor[content]" spellcheck="false"><%= @template_editor.content %></textarea>

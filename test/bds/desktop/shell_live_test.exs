@@ -1315,7 +1315,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     html = render_click(view, "set_post_editor_mode", %{"id" => post.id, "mode" => "markdown"})
 
     assert html =~ ~s(data-testid="post-editor-content")
-    assert html =~ ~s(data-monaco-language="markdown")
+    assert html =~ ~s(data-monaco-language="markdown-with-macros")
     assert html =~ ~s(phx-hook="MonacoEditor")
     refute html =~ "post-editor-markdown-highlight"
 
@@ -1439,7 +1439,7 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ ~s(data-testid="post-editor-content")
     assert Regex.match?(~r/name="post_editor\[content\]"[^>]*># Heading\s+```elixir\s+IO\.puts\(:ok\)\s+```/s, html)
-    assert html =~ ~s(data-monaco-language="markdown")
+    assert html =~ ~s(data-monaco-language="markdown-with-macros")
     assert html =~ ~s(phx-hook="MonacoEditor")
     refute html =~ "post-editor-markdown-highlight"
     refute html =~ ~s(phx-value-mode="visual")
@@ -1704,6 +1704,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert script_html =~ ~s(class="scripts-view-shell")
     assert script_html =~ "scripts-monaco"
     assert script_html =~ ~s(data-monaco-language="lua")
+    assert script_html =~ ~s(data-monaco-word-wrap="on")
     assert script_html =~ ~s(phx-hook="MonacoEditor")
     refute script_html =~ "Desktop workbench content routed through the Elixir shell."
 
@@ -1718,6 +1719,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert template_html =~ ~s(class="templates-view-shell")
     assert template_html =~ "templates-monaco"
     assert template_html =~ ~s(data-monaco-language="liquid")
+    assert template_html =~ ~s(data-monaco-word-wrap="on")
     assert template_html =~ ~s(phx-hook="MonacoEditor")
     refute template_html =~ "Desktop workbench content routed through the Elixir shell."
 
