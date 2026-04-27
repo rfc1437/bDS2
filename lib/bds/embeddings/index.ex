@@ -74,12 +74,20 @@ defmodule BDS.Embeddings.Index do
     end
   end
 
-  def duplicate_pairs(project_id, threshold) when is_binary(project_id) do
+  def duplicate_pairs(project_id, threshold, opts \\ []) when is_binary(project_id) do
     with {:ok, snapshot} <- read(project_id) do
+      entries = Map.get(snapshot, "entries", %{})
+      entry_count = map_size(entries)
+      on_progress = progress_callback(opts)
+
+      :ok = report_scan_started(on_progress, entry_count, "embedding entries")
+
       pairs =
-        snapshot
-        |> Map.get("entries", %{})
-        |> Enum.flat_map(fn {post_id, entry} ->
+        entries
+        |> Enum.with_index(1)
+        |> Enum.flat_map(fn {{post_id, entry}, index} ->
+          :ok = report_scan_progress(on_progress, index, entry_count, "embedding entries")
+
           entry
           |> Map.get("neighbors", [])
           |> Enum.filter(&(&1["score"] >= threshold))
@@ -197,4 +205,31 @@ defmodule BDS.Embeddings.Index do
 
   defp sort_pair(post_id_a, post_id_b) when post_id_a <= post_id_b, do: {post_id_a, post_id_b}
   defp sort_pair(post_id_a, post_id_b), do: {post_id_b, post_id_a}
+
+  defp progress_callback(opts) do
+    case Keyword.get(opts, :on_progress) do
+      callback when is_function(callback, 2) -> callback
+      _other -> nil
+    end
+  end
+
+  defp report_scan_started(nil, _total, _label), do: :ok
+
+  defp report_scan_started(callback, 0, label) do
+    callback.(1.0, "No #{label} to scan")
+    :ok
+  end
+
+  defp report_scan_started(callback, total, label) do
+    callback.(0.0, "Scanning 0/#{total} #{label}")
+    :ok
+  end
+
+  defp report_scan_progress(nil, _current, _total, _label), do: :ok
+  defp report_scan_progress(_callback, _current, 0, _label), do: :ok
+
+  defp report_scan_progress(callback, current, total, label) do
+    callback.(current / total, "Scanning #{current}/#{total} #{label}")
+    :ok
+  end
 end

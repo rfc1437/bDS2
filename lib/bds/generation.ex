@@ -37,13 +37,22 @@ defmodule BDS.Generation do
      }}
   end
 
-  def generate_site(project_id, sections \\ [:core])
-      when is_binary(project_id) and is_list(sections) do
+  def generate_site(project_id, sections \\ [:core], opts \\ [])
+
+  def generate_site(project_id, sections, opts)
+      when is_binary(project_id) and is_list(sections) and is_list(opts) do
     with {:ok, plan} <- plan_generation(project_id, sections) do
       outputs = build_outputs(plan)
+      on_progress = progress_callback(opts)
+      total_outputs = length(outputs)
 
-      Enum.each(outputs, fn {relative_path, content} ->
+      :ok = report_generation_started(on_progress, total_outputs, "generated files")
+
+      outputs
+      |> Enum.with_index(1)
+      |> Enum.each(fn {{relative_path, content}, index} ->
         {:ok, _write} = write_generated_file(project_id, relative_path, content)
+        :ok = report_generation_progress(on_progress, index, total_outputs, "generated files")
       end)
 
       {:ok, generated_files} = list_generated_files(project_id)
@@ -51,13 +60,27 @@ defmodule BDS.Generation do
     end
   end
 
-  def validate_site(project_id, sections \\ @core_sections)
+  def validate_site(project_id, sections \\ @core_sections, opts \\ [])
 
-  def validate_site(project_id, sections) when is_binary(project_id) and is_list(sections) do
+  def validate_site(project_id, sections, opts) when is_binary(project_id) and is_list(sections) and is_list(opts) do
     with {:ok, plan} <- plan_generation(project_id, sections) do
       expected_outputs = build_outputs(plan)
+      on_progress = progress_callback(opts)
+      total_outputs = length(expected_outputs)
+
+      :ok = report_generation_started(on_progress, total_outputs, "generated files")
+
       expected_paths = MapSet.new(Enum.map(expected_outputs, &elem(&1, 0)))
-      expected_hashes = Map.new(expected_outputs, fn {relative_path, content} -> {relative_path, sha256(content)} end)
+
+      expected_hashes =
+        expected_outputs
+        |> Enum.with_index(1)
+        |> Enum.map(fn {{relative_path, content}, index} ->
+          :ok = report_generation_progress(on_progress, index, total_outputs, "generated files")
+          {relative_path, sha256(content)}
+        end)
+        |> Map.new()
+
       actual_files = disk_generated_files(project_id)
       actual_paths = MapSet.new(Map.keys(actual_files))
 
@@ -92,6 +115,33 @@ defmodule BDS.Generation do
          sections: affected_sections(missing_pages ++ extra_pages ++ stale_pages)
        }}
     end
+  end
+
+  defp progress_callback(opts) do
+    case Keyword.get(opts, :on_progress) do
+      callback when is_function(callback, 2) -> callback
+      _other -> nil
+    end
+  end
+
+  defp report_generation_started(nil, _total, _label), do: :ok
+
+  defp report_generation_started(callback, 0, label) do
+    callback.(1.0, "No #{label} to process")
+    :ok
+  end
+
+  defp report_generation_started(callback, total, label) do
+    callback.(0.0, "Processing 0/#{total} #{label}")
+    :ok
+  end
+
+  defp report_generation_progress(nil, _current, _total, _label), do: :ok
+  defp report_generation_progress(_callback, _current, 0, _label), do: :ok
+
+  defp report_generation_progress(callback, current, total, label) do
+    callback.(current / total, "Processing #{current}/#{total} #{label}")
+    :ok
   end
 
   def apply_validation(project_id, sections) when is_binary(project_id) and is_list(sections) do

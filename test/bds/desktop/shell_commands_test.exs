@@ -3,6 +3,21 @@ defmodule BDS.Desktop.ShellCommandsTest do
 
   alias BDS.Desktop.ShellCommands
 
+  defmodule SlowEmbeddingBackend do
+    @behaviour BDS.Embeddings.Backend
+
+    @impl true
+    def model_info do
+      BDS.Embeddings.Backends.InApp.model_info()
+    end
+
+    @impl true
+    def embed(text, opts) do
+      Process.sleep(10)
+      BDS.Embeddings.Backends.InApp.embed(text, opts)
+    end
+  end
+
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
@@ -175,6 +190,64 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert completed.result.kind == "open_editor"
     assert completed.result.route == "find_duplicates"
     assert is_map(completed.result.payload.summary)
+  end
+
+  test "rebuild_embedding_index exposes live in-task progress while rebuilding posts", %{project: project} do
+    original = Application.get_env(:bds, :tasks, [])
+    original_embeddings = Application.get_env(:bds, :embeddings)
+
+    Application.put_env(
+      :bds,
+      :tasks,
+      original
+      |> Keyword.put(:max_concurrent, 1)
+      |> Keyword.put(:progress_throttle_ms, 0)
+    )
+
+    Application.put_env(:bds, :embeddings, backend: SlowEmbeddingBackend)
+
+    on_exit(fn ->
+      Application.put_env(:bds, :tasks, original)
+
+      if is_nil(original_embeddings) do
+        Application.delete_env(:bds, :embeddings)
+      else
+        Application.put_env(:bds, :embeddings, original_embeddings)
+      end
+    end)
+
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    Enum.each(1..40, fn index ->
+      assert {:ok, post} =
+               BDS.Posts.create_post(%{
+                 project_id: project.id,
+                 title: "Embedding Progress #{index}",
+                 content: "space rocket orbit mission galaxy #{index}",
+                 language: "en"
+               })
+
+      assert {:ok, _published_post} = BDS.Posts.publish_post(post.id)
+    end)
+
+    BDS.Repo.delete_all(BDS.Embeddings.Key)
+
+    assert {:ok, result} = ShellCommands.execute("rebuild_embedding_index")
+
+    progressed =
+      wait_for_task(
+        result.task_id,
+        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.0 and &1.progress < 1.0 and
+            is_binary(&1.message) and String.contains?(&1.message, "/")),
+        10_000
+      )
+
+    assert progressed.group_name == "Embeddings"
+    assert String.contains?(progressed.message, "/")
+
+    assert wait_for_task(result.task_id, &(&1.status == :completed and &1.progress == 1.0), 10_000).status ==
+             :completed
   end
 
   test "rebuild_database fans out tracked maintenance tasks for the active project" do

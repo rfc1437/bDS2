@@ -183,12 +183,18 @@ defmodule BDS.Posts do
 
     if Keyword.get(opts, :reindex_search, true) do
       :ok = report_rebuild_phase(on_progress, 0.97, "Refreshing post search index")
-      :ok = Search.reindex_posts(project_id)
+      :ok =
+        Search.reindex_posts(project_id,
+          on_progress: scaled_progress_reporter(on_progress, 0.97, 0.99)
+        )
     end
 
     if Keyword.get(opts, :rebuild_embeddings, true) do
       :ok = report_rebuild_phase(on_progress, 0.99, "Refreshing post embeddings")
-      {:ok, _rebuilt_post_ids} = Embeddings.rebuild_project(project_id)
+      {:ok, _rebuilt_post_ids} =
+        Embeddings.rebuild_project(project_id,
+          on_progress: scaled_progress_reporter(on_progress, 0.99, 1.0)
+        )
     end
 
     {:ok, posts}
@@ -487,8 +493,9 @@ defmodule BDS.Posts do
     |> Enum.sort_by(fn %{year: year, month: month} -> {-year, -month} end)
   end
 
-  def rebuild_post_links(project_id) do
+  def rebuild_post_links(project_id, opts \\ []) do
     post_ids = Repo.all(from(post in Post, where: post.project_id == ^project_id, select: post.id))
+    on_progress = progress_callback(opts)
 
     Repo.delete_all(
       from(link in Link,
@@ -496,8 +503,16 @@ defmodule BDS.Posts do
       )
     )
 
-    Repo.all(from(post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at]))
-    |> Enum.each(&PostLinks.sync_post_links/1)
+    posts = Repo.all(from(post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at]))
+    total_posts = length(posts)
+    :ok = report_rebuild_started(on_progress, total_posts, "post links")
+
+    posts
+    |> Enum.with_index(1)
+    |> Enum.each(fn {post, index} ->
+      PostLinks.sync_post_links(post)
+      :ok = report_rebuild_progress(on_progress, index, total_posts, "post links")
+    end)
 
     :ok
   end
@@ -564,8 +579,9 @@ defmodule BDS.Posts do
     end
   end
 
-  def validate_translations(project_id) do
+  def validate_translations(project_id, opts \\ []) do
     {:ok, metadata} = Metadata.get_project_metadata(project_id)
+    on_progress = progress_callback(opts)
 
     posts =
       Repo.all(
@@ -573,6 +589,9 @@ defmodule BDS.Posts do
           where: post.project_id == ^project_id and post.status == :published,
           order_by: [asc: post.created_at, asc: post.slug]
       )
+
+        total_posts = length(posts)
+        :ok = report_rebuild_started(on_progress, total_posts, "published posts")
 
     translation_languages =
       Repo.all(
@@ -595,8 +614,11 @@ defmodule BDS.Posts do
 
     missing =
       posts
-      |> Enum.flat_map(fn post ->
+      |> Enum.with_index(1)
+      |> Enum.flat_map(fn {post, index} ->
         available = Map.get(translation_languages, post.id, [])
+
+        :ok = report_rebuild_progress(on_progress, index, total_posts, "published posts")
 
         cond do
           post.do_not_translate ->
@@ -1333,6 +1355,15 @@ defmodule BDS.Posts do
     case Keyword.get(opts, :on_progress) do
       callback when is_function(callback, 2) -> callback
       _other -> nil
+    end
+  end
+
+  defp scaled_progress_reporter(nil, _start_value, _end_value), do: nil
+
+  defp scaled_progress_reporter(report, start_value, end_value) when is_function(report, 2) do
+    fn value, message ->
+      scaled_value = start_value + (end_value - start_value) * value
+      report.(scaled_value, message)
     end
   end
 

@@ -128,26 +128,46 @@ defmodule BDS.Search do
     :ok
   end
 
-  def reindex_posts(project_id) do
+  def reindex_posts(project_id, opts \\ []) do
     Repo.query!(
       "DELETE FROM posts_fts WHERE post_id IN (SELECT id FROM posts WHERE project_id = ?)",
       [project_id]
     )
 
-    Repo.all(from post in Post, where: post.project_id == ^project_id)
-    |> Enum.each(&insert_post_index/1)
+    posts = Repo.all(from post in Post, where: post.project_id == ^project_id)
+    on_progress = progress_callback(opts)
+    total_posts = length(posts)
+
+    :ok = report_reindex_started(on_progress, total_posts, "posts")
+
+    posts
+    |> Enum.with_index(1)
+    |> Enum.each(fn {post, index} ->
+      insert_post_index(post)
+      :ok = report_reindex_progress(on_progress, index, total_posts, "posts")
+    end)
 
     :ok
   end
 
-  def reindex_media(project_id) do
+  def reindex_media(project_id, opts \\ []) do
     Repo.query!(
       "DELETE FROM media_fts WHERE media_id IN (SELECT id FROM media WHERE project_id = ?)",
       [project_id]
     )
 
-    Repo.all(from media in Media, where: media.project_id == ^project_id)
-    |> Enum.each(&insert_media_index/1)
+    media_items = Repo.all(from media in Media, where: media.project_id == ^project_id)
+    on_progress = progress_callback(opts)
+    total_media = length(media_items)
+
+    :ok = report_reindex_started(on_progress, total_media, "media items")
+
+    media_items
+    |> Enum.with_index(1)
+    |> Enum.each(fn {media, index} ->
+      insert_media_index(media)
+      :ok = report_reindex_progress(on_progress, index, total_media, "media items")
+    end)
 
     :ok
   end
@@ -189,6 +209,33 @@ defmodule BDS.Search do
 
   def delete_media(media_id) when is_binary(media_id) do
     Repo.query!("DELETE FROM media_fts WHERE media_id = ?", [media_id])
+    :ok
+  end
+
+  defp progress_callback(opts) do
+    case Keyword.get(opts, :on_progress) do
+      callback when is_function(callback, 2) -> callback
+      _other -> nil
+    end
+  end
+
+  defp report_reindex_started(nil, _total, _label), do: :ok
+
+  defp report_reindex_started(callback, 0, label) do
+    callback.(1.0, "No #{label} to reindex")
+    :ok
+  end
+
+  defp report_reindex_started(callback, total, label) do
+    callback.(0.0, "Reindexing 0/#{total} #{label}")
+    :ok
+  end
+
+  defp report_reindex_progress(nil, _current, _total, _label), do: :ok
+  defp report_reindex_progress(_callback, _current, 0, _label), do: :ok
+
+  defp report_reindex_progress(callback, current, total, label) do
+    callback.(current / total, "Reindexing #{current}/#{total} #{label}")
     :ok
   end
 

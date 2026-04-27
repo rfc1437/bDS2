@@ -81,16 +81,14 @@ defmodule BDS.Desktop.ShellCommands do
 
     {:ok, posts_task} =
       Tasks.submit_task("Reindex Search Text", fn report ->
-        report.(0.0, "Clearing and rebuilding post search indexes")
-        :ok = Search.reindex_posts(project.id)
+        :ok = Search.reindex_posts(project.id, on_progress: report)
         report.(1.0, "Post search text reindexed")
         %{project_id: project.id, entity: "posts"}
       end, attrs)
 
     {:ok, _media_task} =
       Tasks.submit_task("Reindex Media Search Text", fn report ->
-        report.(0.0, "Clearing and rebuilding media search indexes")
-        :ok = Search.reindex_media(project.id)
+        :ok = Search.reindex_media(project.id, on_progress: report)
         report.(1.0, "Media search text reindexed")
         %{project_id: project.id, entity: "media"}
       end, attrs)
@@ -110,8 +108,7 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp dispatch("rebuild_embedding_index", project, _params) do
     queue_task(project, "rebuild_embedding_index", "Rebuild Embedding Index", "Embeddings", fn report ->
-      report.(0.2, "Rebuilding semantic index")
-      {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id)
+      {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id, on_progress: report)
       report.(1.0, "Embedding index rebuilt")
       %{project_id: project.id, rebuilt_post_ids: rebuilt_post_ids, rebuilt_count: length(rebuilt_post_ids)}
     end)
@@ -151,8 +148,7 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp dispatch("rebuild_post_links", project, _params) do
     queue_task(project, "rebuild_post_links", "Rebuild Post Links", "Maintenance", fn report ->
-      report.(0.0, "Rebuilding link graph")
-      :ok = Posts.rebuild_post_links(project.id)
+      :ok = Posts.rebuild_post_links(project.id, on_progress: report)
       report.(1.0, "Post links rebuilt")
       %{project_id: project.id}
     end)
@@ -160,8 +156,7 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp dispatch("regenerate_missing_thumbnails", project, _params) do
     queue_task(project, "regenerate_missing_thumbnails", "Regenerate Missing Thumbnails", "Maintenance", fn report ->
-      report.(0.0, "Checking missing thumbnails")
-      result = BDS.Media.regenerate_missing_thumbnails(project.id)
+      result = BDS.Media.regenerate_missing_thumbnails(project.id, on_progress: report)
       report.(1.0, "Missing thumbnails regenerated")
       Map.put(result, :project_id, project.id)
     end)
@@ -197,8 +192,7 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp dispatch("generate_sitemap", project, _params) do
     queue_task(project, "generate_sitemap", "Generate Sitemap", "Generation", fn report ->
-      report.(0.2, "Generating site output")
-      {:ok, generation} = Generation.generate_site(project.id, @site_sections)
+      {:ok, generation} = Generation.generate_site(project.id, @site_sections, on_progress: report)
       report.(1.0, "Generated site output")
       %{project_id: project.id, sections: generation.sections, generated_count: length(generation.generated_files)}
     end)
@@ -206,8 +200,7 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp dispatch("validate_site", project, _params) do
     queue_task(project, "validate_site", "Validate Site", "Validation", fn report ->
-      report.(0.2, "Validating generated site output")
-      {:ok, validation} = Generation.validate_site(project.id, @site_sections)
+      {:ok, validation} = Generation.validate_site(project.id, @site_sections, on_progress: report)
       report.(1.0, "Site validation complete")
       site_validation_result(project.id, validation)
     end)
@@ -270,8 +263,7 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp dispatch("validate_translations", project, _params) do
     queue_task(project, "validate_translations", "Validate Translations", "Validation", fn report ->
-      report.(0.2, "Checking published translations")
-      {:ok, translation_report} = Posts.validate_translations(project.id)
+      {:ok, translation_report} = Posts.validate_translations(project.id, on_progress: report)
       report.(1.0, "Translation validation complete")
       translation_validation_result(project.id, translation_report)
     end)
@@ -279,8 +271,7 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp dispatch("find_duplicates", project, _params) do
     queue_task(project, "find_duplicates", "Find Duplicate Posts", "Embeddings", fn report ->
-      report.(0.2, "Checking for duplicate posts")
-      {:ok, pairs} = Embeddings.find_duplicates(project.id)
+      {:ok, pairs} = Embeddings.find_duplicates(project.id, on_progress: report)
       report.(1.0, "Duplicate search complete")
       duplicate_search_result(project.id, pairs)
     end)
@@ -376,8 +367,7 @@ defmodule BDS.Desktop.ShellCommands do
       %{
         name: "Rebuild Post Links",
         work: fn report ->
-          report.(0.0, "Rebuilding link graph")
-          :ok = Posts.rebuild_post_links(project.id)
+          :ok = Posts.rebuild_post_links(project.id, on_progress: report)
           report.(1.0, "Post links rebuilt")
           %{project_id: project.id}
         end
@@ -385,8 +375,7 @@ defmodule BDS.Desktop.ShellCommands do
       %{
         name: "Regenerate Missing Thumbnails",
         work: fn report ->
-          report.(0.0, "Checking missing thumbnails")
-          result = BDS.Media.regenerate_missing_thumbnails(project.id)
+          result = BDS.Media.regenerate_missing_thumbnails(project.id, on_progress: report)
           report.(1.0, "Missing thumbnails regenerated")
           Map.put(result, :project_id, project.id)
         end
@@ -394,8 +383,7 @@ defmodule BDS.Desktop.ShellCommands do
       %{
         name: "Rebuild Embedding Index",
         work: fn report ->
-          report.(0.0, "Rebuilding semantic index")
-          {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id)
+          {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id, on_progress: report)
           report.(1.0, "Embedding index rebuilt")
           %{project_id: project.id, rebuilt_post_ids: rebuilt_post_ids, rebuilt_count: length(rebuilt_post_ids)}
         end

@@ -80,19 +80,33 @@ defmodule BDS.Embeddings do
     end
   end
 
-  def rebuild_project(project_id) when is_binary(project_id) do
+  def rebuild_project(project_id, opts \\ [])
+
+  def rebuild_project(project_id, opts) when is_binary(project_id) and is_list(opts) do
     if enabled_for_project?(project_id) do
+      on_progress = progress_callback(opts)
+
       posts =
         Repo.all(from post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at, asc: post.slug])
 
       post_ids = Enum.map(posts, & &1.id)
+      total_posts = length(posts)
+
+      :ok = report_rebuild_started(on_progress, total_posts, "embedding entries")
 
       Repo.delete_all(
         from key in Key,
           where: key.project_id == ^project_id and key.post_id not in ^post_ids
       )
 
-      Enum.each(posts, &sync_post_if_enabled(&1, refresh_index: false))
+      posts
+      |> Enum.with_index(1)
+      |> Enum.each(fn {post, index} ->
+        sync_post_if_enabled(post, refresh_index: false)
+        :ok = report_rebuild_progress(on_progress, index, total_posts, "embedding entries")
+      end)
+
+      :ok = report_rebuild_phase(on_progress, 0.99, "Persisting embedding snapshot")
       :ok = rebuild_snapshot(project_id)
       {:ok, post_ids}
     else
@@ -293,12 +307,13 @@ defmodule BDS.Embeddings do
     end
   end
 
-  def find_duplicates(project_id) when is_binary(project_id) do
+  def find_duplicates(project_id, opts \\ []) when is_binary(project_id) do
     if enabled_for_project?(project_id) do
+      on_progress = progress_callback(opts)
       dismissed = dismissed_pair_keys(project_id)
 
       duplicates =
-        case Index.duplicate_pairs(project_id, @duplicate_threshold) do
+        case Index.duplicate_pairs(project_id, @duplicate_threshold, on_progress: on_progress) do
           {:ok, pairs} ->
             pairs
             |> Enum.reject(fn pair -> pair_key(pair.post_id_a, pair.post_id_b) in dismissed end)
@@ -306,22 +321,31 @@ defmodule BDS.Embeddings do
 
           {:error, :missing} ->
             keys = Repo.all(from key in Key, where: key.project_id == ^project_id, order_by: [asc: key.post_id])
+            total_keys = length(keys)
 
-            for left <- keys,
-                right <- keys,
-                left.post_id < right.post_id,
-                pair_key(left.post_id, right.post_id) not in dismissed,
-                similarity = cosine_similarity(decode_vector(left.vector), decode_vector(right.vector)),
-                similarity >= @duplicate_threshold do
-              %{
-                post_id_a: left.post_id,
-                post_id_b: right.post_id,
-                score: similarity
-              }
-            end
+            :ok = report_rebuild_started(on_progress, total_keys, "embedding entries")
+
+            keys
+            |> Enum.with_index(1)
+            |> Enum.flat_map(fn {left, index} ->
+              :ok = report_rebuild_progress(on_progress, index, total_keys, "embedding entries")
+
+              for right <- keys,
+                  left.post_id < right.post_id,
+                  pair_key(left.post_id, right.post_id) not in dismissed,
+                  similarity = cosine_similarity(decode_vector(left.vector), decode_vector(right.vector)),
+                  similarity >= @duplicate_threshold do
+                %{
+                  post_id_a: left.post_id,
+                  post_id_b: right.post_id,
+                  score: similarity
+                }
+              end
+            end)
             |> enrich_duplicate_pairs(project_id)
         end
 
+      :ok = report_rebuild_phase(on_progress, 0.99, "Resolving duplicate candidates")
       {:ok, duplicates}
     else
       {:ok, []}
@@ -501,6 +525,40 @@ defmodule BDS.Embeddings do
     Index.rebuild(project_id, model_id: model_id(), dimensions: dimensions())
   end
 
+  defp progress_callback(opts) do
+    case Keyword.get(opts, :on_progress) do
+      callback when is_function(callback, 2) -> callback
+      _other -> nil
+    end
+  end
+
+  defp report_rebuild_started(nil, _total, _label), do: :ok
+
+  defp report_rebuild_started(callback, 0, label) do
+    callback.(1.0, "No #{label} to rebuild")
+    :ok
+  end
+
+  defp report_rebuild_started(callback, total, label) do
+    callback.(0.0, "Rebuilding 0/#{total} #{label}")
+    :ok
+  end
+
+  defp report_rebuild_progress(nil, _current, _total, _label), do: :ok
+  defp report_rebuild_progress(_callback, _current, 0, _label), do: :ok
+
+  defp report_rebuild_progress(callback, current, total, label) do
+    callback.(current / total, "Rebuilding #{current}/#{total} #{label}")
+    :ok
+  end
+
+  defp report_rebuild_phase(nil, _value, _label), do: :ok
+
+  defp report_rebuild_phase(callback, value, label) do
+    callback.(value, label)
+    :ok
+  end
+
   defp snapshot_content_hash(project_id, post_id) do
     case Index.read(project_id) do
       {:ok, snapshot} -> get_in(snapshot, ["entries", post_id, "content_hash"])
@@ -527,8 +585,8 @@ defmodule BDS.Embeddings do
   end
 
   defp diff_field(name, db_value, file_value) do
-    db_value = if(is_binary(db_value), do: db_value, else: db_value || "")
-    file_value = if(is_binary(file_value), do: file_value, else: file_value || "")
+    db_value = normalize_diff_value(db_value)
+    file_value = normalize_diff_value(file_value)
 
     if db_value == file_value do
       nil
@@ -536,6 +594,10 @@ defmodule BDS.Embeddings do
       %{name: name, db_value: db_value, file_value: file_value}
     end
   end
+
+  defp normalize_diff_value(value) when is_binary(value), do: value
+  defp normalize_diff_value(nil), do: ""
+  defp normalize_diff_value(value), do: value
 
   defp hash_text(text), do: :crypto.hash(:sha256, text) |> Base.encode16(case: :lower)
 

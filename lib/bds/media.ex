@@ -467,42 +467,54 @@ defmodule BDS.Media do
     end
   end
 
-  def regenerate_missing_thumbnails(project_id) do
+  def regenerate_missing_thumbnails(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
+    on_progress = progress_callback(opts)
 
-    Repo.all(
+    media_items =
+      Repo.all(
       from(media in Media,
         where: media.project_id == ^project_id,
         order_by: [asc: media.created_at]
       )
-    )
-    |> Enum.filter(fn media ->
-      String.starts_with?(media.mime_type || "", "image/") and
-        not String.contains?(media.mime_type || "", "svg")
-    end)
-    |> Enum.reduce(%{processed: 0, generated: 0, failed: 0}, fn media, acc ->
+      )
+      |> Enum.filter(fn media ->
+        String.starts_with?(media.mime_type || "", "image/") and
+          not String.contains?(media.mime_type || "", "svg")
+      end)
+
+    total_media = length(media_items)
+    :ok = report_rebuild_started(on_progress, total_media, "image assets")
+
+    media_items
+    |> Enum.with_index(1)
+    |> Enum.reduce(%{processed: 0, generated: 0, failed: 0}, fn {media, index}, acc ->
       missing_paths =
         media
         |> thumbnail_paths()
         |> Enum.map(fn {_size, relative_path} -> Path.join(Projects.project_data_dir(project), relative_path) end)
         |> Enum.reject(&File.exists?/1)
 
-      if missing_paths == [] do
-        %{acc | processed: acc.processed + 1}
-      else
-        try do
-          :ok = ensure_thumbnails(project, media)
+      next_acc =
+        if missing_paths == [] do
+          %{acc | processed: acc.processed + 1}
+        else
+          try do
+            :ok = ensure_thumbnails(project, media)
 
-          %{
-            processed: acc.processed + 1,
-            generated: acc.generated + length(missing_paths),
-            failed: acc.failed
-          }
-        rescue
-          _error ->
-            %{acc | processed: acc.processed + 1, failed: acc.failed + 1}
+            %{
+              processed: acc.processed + 1,
+              generated: acc.generated + length(missing_paths),
+              failed: acc.failed
+            }
+          rescue
+            _error ->
+              %{acc | processed: acc.processed + 1, failed: acc.failed + 1}
+          end
         end
-      end
+
+      :ok = report_rebuild_progress(on_progress, index, total_media, "image assets")
+      next_acc
     end)
   end
 
@@ -553,7 +565,10 @@ defmodule BDS.Media do
 
     if Keyword.get(opts, :reindex_search, true) do
       :ok = report_rebuild_phase(on_progress, 0.99, "Refreshing media search index")
-      :ok = Search.reindex_media(project.id)
+      :ok =
+        Search.reindex_media(project.id,
+          on_progress: scaled_progress_reporter(on_progress, 0.99, 1.0)
+        )
     end
 
     {:ok, media_items}
@@ -883,6 +898,15 @@ defmodule BDS.Media do
     case Keyword.get(opts, :on_progress) do
       callback when is_function(callback, 2) -> callback
       _other -> nil
+    end
+  end
+
+  defp scaled_progress_reporter(nil, _start_value, _end_value), do: nil
+
+  defp scaled_progress_reporter(report, start_value, end_value) when is_function(report, 2) do
+    fn value, message ->
+      scaled_value = start_value + (end_value - start_value) * value
+      report.(scaled_value, message)
     end
   end
 

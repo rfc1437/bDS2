@@ -83,7 +83,7 @@ defmodule BDS.Maintenance do
       :media -> BDS.Media.rebuild_media_from_files(project_id, opts)
       :script -> BDS.Scripts.rebuild_scripts_from_files(project_id, opts)
       :template -> BDS.Templates.rebuild_templates_from_files(project_id, opts)
-      :embedding -> Embeddings.rebuild_project(project_id)
+      :embedding -> Embeddings.rebuild_project(project_id, opts)
       :unsupported -> {:error, :unsupported_entity_type}
     end
   end
@@ -686,17 +686,12 @@ defmodule BDS.Maintenance do
           :file_to_db ->
             post_ids = Enum.map(items, &metadata_diff_item_entity_id/1)
 
-            case Embeddings.repair_posts(project_id, post_ids) do
-              {:ok, repaired_post_ids} ->
-                repaired_post_ids = MapSet.new(repaired_post_ids)
+            {:ok, repaired_post_ids} = Embeddings.repair_posts(project_id, post_ids)
+            repaired_post_ids = MapSet.new(repaired_post_ids)
 
-                build_batch_repair_result(items, total, on_progress, fn item ->
-                  MapSet.member?(repaired_post_ids, metadata_diff_item_entity_id(item))
-                end)
-
-              _other ->
-                build_batch_repair_result(items, total, on_progress, fn _item -> false end)
-            end
+            build_batch_repair_result(items, total, on_progress, fn item ->
+              MapSet.member?(repaired_post_ids, metadata_diff_item_entity_id(item))
+            end)
 
           :db_to_file ->
             repaired? = Embeddings.refresh_snapshot(project_id) == :ok
