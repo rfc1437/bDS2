@@ -89,7 +89,7 @@ defmodule BDS.DesktopTest do
     assert menu_item(groups, :toggle_assistant_sidebar).native_label == "Toggle Assistant Sidebar\tCTRL+\\"
     assert menu_item(groups, :publish_selected).native_label == "Publish Selected\tCTRL+SHIFT+P"
     assert menu_item(groups, :preview_post).native_label == "Preview Post\tCTRL+SHIFT+V"
-    assert menu_item(groups, :generate_sitemap).native_label == "Generate Sitemap\tCTRL+R"
+    assert menu_item(groups, :generate_sitemap).native_label == "Generate Site\tCTRL+R"
     assert menu_item(groups, :validate_site).native_label == "Validate Site\tCTRL+SHIFT+L"
     assert menu_item(groups, :upload_site).native_label == "Upload Site\tCTRL+SHIFT+U"
     assert menu_item(groups, :metadata_diff).shortcut == nil

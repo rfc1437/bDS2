@@ -94,6 +94,8 @@ defmodule BDS.Desktop.ShellCommandsTest do
     completed = wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)))
 
     assert completed.group_name == "Validation"
+    assert is_binary(completed.message)
+    assert String.starts_with?(completed.message, "Validation complete (")
     assert completed.result.kind == "open_editor"
     assert completed.result.route == "site_validation"
     assert is_map(completed.result.payload.summary)

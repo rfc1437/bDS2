@@ -172,7 +172,7 @@ defmodule BDS.Desktop.MenuBar do
   defp item_label(:validate_translations), do: "Validate Translations"
   defp item_label(:fill_missing_translations), do: "Fill Missing Translations"
   defp item_label(:find_duplicates), do: "Find Duplicate Posts"
-  defp item_label(:generate_sitemap), do: "Generate Sitemap"
+  defp item_label(:generate_sitemap), do: "Generate Site"
   defp item_label(:validate_site), do: "Validate Site"
   defp item_label(:upload_site), do: "Upload Site"
   defp item_label(:about), do: "About"

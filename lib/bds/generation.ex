@@ -64,40 +64,46 @@ defmodule BDS.Generation do
 
   def validate_site(project_id, sections, opts) when is_binary(project_id) and is_list(sections) and is_list(opts) do
     with {:ok, plan} <- plan_generation(project_id, sections) do
-      expected_outputs = build_outputs(plan)
-      expected_output_map = Map.new(expected_outputs)
       on_progress = progress_callback(opts)
-      total_outputs = length(expected_outputs)
       project = Projects.get_project!(project_id)
+      project_data_dir = Projects.project_data_dir(project)
       published_posts = list_published_posts(project_id)
       published_translations = list_published_translations(project_id)
       generated_file_updated_at = generated_file_updated_at_map(project_id)
 
-      :ok = report_generation_started(on_progress, total_outputs, "generated files")
+      :ok = report_validation_progress(on_progress, 0.0, "Collecting sitemap URLs...")
 
-      Enum.each(1..total_outputs, fn index ->
-        :ok = report_generation_progress(on_progress, index, total_outputs, "generated files")
-      end)
-
-      sitemap_content = Map.fetch!(expected_output_map, "sitemap.xml")
+      sitemap_content =
+        plan
+        |> build_validation_route_paths(published_posts, published_translations, on_progress)
+        |> Enum.map(&url_for_output(plan.base_url, &1))
+        |> render_sitemap()
 
       {:ok, sitemap_write} =
         write_generated_file(project_id, "sitemap.xml", sitemap_content)
+
+      :ok = report_validation_progress(on_progress, 0.5, "Comparing sitemap to html pages...")
 
       diff_result =
         compare_sitemap_to_html(%{
           sitemap_xml: sitemap_content,
           base_url: plan.base_url,
           html_dir: output_path(project, ""),
+          on_progress: on_progress,
           post_timestamp_checks:
             build_post_timestamp_checks(
-              project_id,
+              project_data_dir,
               plan.language,
               published_posts,
               published_translations,
               generated_file_updated_at
             )
         })
+
+      completion_message =
+        "Validation complete (#{length(diff_result.missing_url_paths)} missing, #{length(diff_result.extra_url_paths)} extra, #{length(diff_result.updated_post_url_paths)} updated)"
+
+      :ok = report_validation_progress(on_progress, 1.0, completion_message)
 
       {:ok,
        %{
@@ -136,6 +142,22 @@ defmodule BDS.Generation do
 
   defp report_generation_progress(callback, current, total, label) do
     callback.(current / total, "Processing #{current}/#{total} #{label}")
+    :ok
+  end
+
+  defp report_validation_progress(nil, _progress, _message), do: :ok
+
+  defp report_validation_progress(callback, progress, message) do
+    callback.(progress, message)
+    :ok
+  end
+
+  defp report_validation_collection_progress(nil, _current, _total), do: :ok
+  defp report_validation_collection_progress(_callback, _current, total) when total <= 0, do: :ok
+
+  defp report_validation_collection_progress(callback, current, total) do
+    progress = min(0.49, current / total * 0.5)
+    callback.(progress, "Collecting sitemap URLs... #{current}/#{total}")
     :ok
   end
 
@@ -371,6 +393,140 @@ defmodule BDS.Generation do
       end
 
     core_outputs ++ single_outputs ++ archive_outputs ++ sitemap ++ pagefind_outputs ++ asset_outputs
+  end
+
+  defp build_validation_route_paths(plan, published_posts, published_translations, on_progress) do
+    route_paths = [
+      core_route_paths(plan),
+      single_route_paths(plan, published_posts, published_translations),
+      category_route_paths(plan, published_posts),
+      tag_route_paths(plan, published_posts),
+      date_route_paths(plan, published_posts)
+    ]
+
+    total_route_count =
+      route_paths
+      |> Enum.map(&length/1)
+      |> Enum.sum()
+
+    route_paths
+    |> List.flatten()
+    |> Enum.with_index(1)
+    |> Enum.map(fn {relative_path, index} ->
+      :ok = report_validation_collection_progress(on_progress, index, total_route_count)
+      relative_path
+    end)
+  end
+
+  defp core_route_paths(plan) do
+    if :core in plan.sections do
+      ["index.html"] ++
+        (plan.blog_languages
+         |> Enum.reject(&(&1 == plan.language))
+         |> Enum.map(&Path.join(&1, "index.html")))
+    else
+      []
+    end
+  end
+
+  defp single_route_paths(plan, published_posts, published_translations) do
+    if :single in plan.sections do
+      post_by_id = Map.new(published_posts, &{&1.id, &1})
+
+      translation_paths =
+        Enum.flat_map(published_posts, fn post ->
+          post_variant =
+            if post.language == plan.language do
+              []
+            else
+              [post_output_path(post, post.language)]
+            end
+
+          translation_variant_paths =
+            published_translations
+            |> Enum.filter(&(&1.translation_for == post.id and &1.language != plan.language))
+            |> Enum.map(fn translation ->
+              canonical_post = Map.get(post_by_id, post.id, post)
+              post_output_path(canonical_post, translation.language)
+            end)
+
+          post_variant ++ translation_variant_paths
+        end)
+
+      Enum.map(published_posts, &post_output_path/1) ++ translation_paths
+    else
+      []
+    end
+  end
+
+  defp category_route_paths(plan, published_posts) do
+    if :category in plan.sections do
+      published_posts
+      |> Enum.flat_map(fn post -> Enum.map(post.categories || [], &{&1, post}) end)
+      |> Enum.group_by(fn {category, _post} -> category end, fn {_category, post} -> post end)
+      |> Enum.flat_map(fn {category, posts} ->
+        category_slug = Slug.slugify(category)
+
+        posts
+        |> Enum.chunk_every(max(plan.max_posts_per_page, 1))
+        |> Enum.with_index(1)
+        |> Enum.flat_map(fn {_page_posts, page_number} ->
+          Enum.map(plan.blog_languages, fn language ->
+            archive_path(route_language(plan.language, language), ["category", category_slug], page_number)
+          end)
+        end)
+      end)
+    else
+      []
+    end
+  end
+
+  defp tag_route_paths(plan, published_posts) do
+    if :tag in plan.sections do
+      published_posts
+      |> Enum.flat_map(fn post -> Enum.map(post.tags || [], &{&1, post}) end)
+      |> Enum.group_by(fn {tag, _post} -> tag end, fn {_tag, post} -> post end)
+      |> Enum.flat_map(fn {tag, posts} ->
+        tag_slug = Slug.slugify(tag)
+
+        posts
+        |> Enum.chunk_every(max(plan.max_posts_per_page, 1))
+        |> Enum.with_index(1)
+        |> Enum.flat_map(fn {_page_posts, page_number} ->
+          Enum.map(plan.blog_languages, fn language ->
+            archive_path(route_language(plan.language, language), ["tag", tag_slug], page_number)
+          end)
+        end)
+      end)
+    else
+      []
+    end
+  end
+
+  defp date_route_paths(plan, published_posts) do
+    if :date in plan.sections do
+      year_paths =
+        published_posts
+        |> Enum.group_by(&year_key(&1.created_at))
+        |> Enum.flat_map(fn {year, _posts} ->
+          Enum.map(plan.blog_languages, fn language ->
+            archive_path(route_language(plan.language, language), [year], 1)
+          end)
+        end)
+
+      month_paths =
+        published_posts
+        |> Enum.group_by(&month_key(&1.created_at))
+        |> Enum.flat_map(fn {{year, month}, _posts} ->
+          Enum.map(plan.blog_languages, fn language ->
+            archive_path(route_language(plan.language, language), [year, month], 1)
+          end)
+        end)
+
+      year_paths ++ month_paths
+    else
+      []
+    end
   end
 
   defp disk_generated_files(project_id) do
@@ -1128,14 +1284,11 @@ defmodule BDS.Generation do
   defp generated_file_updated_at_map(project_id) do
     project_id
     |> list_generated_files()
-    |> case do
-      {:ok, files} -> Map.new(files, &{&1.relative_path, &1.updated_at})
-      _other -> %{}
-    end
+    |> then(fn {:ok, files} -> Map.new(files, &{&1.relative_path, &1.updated_at}) end)
   end
 
   defp build_post_timestamp_checks(
-         project_id,
+      project_data_dir,
          main_language,
          published_posts,
          published_translations,
@@ -1155,7 +1308,7 @@ defmodule BDS.Generation do
 
         %{
           post_url_path: relative_path_to_url_path(relative_path),
-          post_file_path: source_full_path(project_id, canonical_variant.file_path),
+          post_file_path: source_full_path(project_data_dir, canonical_variant.file_path),
           generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
         }
       end)
@@ -1180,7 +1333,7 @@ defmodule BDS.Generation do
 
           %{
             post_url_path: relative_path_to_url_path(relative_path),
-            post_file_path: source_full_path(project_id, variant.file_path),
+            post_file_path: source_full_path(project_data_dir, variant.file_path),
             generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
           }
         end)
@@ -1189,21 +1342,25 @@ defmodule BDS.Generation do
     canonical_checks ++ translation_checks
   end
 
-  defp source_full_path(_project_id, file_path) when file_path in [nil, ""], do: nil
+  defp source_full_path(_project_data_dir, file_path) when file_path in [nil, ""], do: nil
 
-  defp source_full_path(project_id, file_path) do
-    project = Projects.get_project!(project_id)
-    Path.join(Projects.project_data_dir(project), file_path)
+  defp source_full_path(project_data_dir, file_path) do
+    Path.join(project_data_dir, file_path)
   end
 
   defp compare_sitemap_to_html(params) do
+    post_timestamp_checks = Map.get(params, :post_timestamp_checks, [])
+    index_paths = Path.wildcard(Path.join(params.html_dir, "**/index.html"))
+    total_compare_steps = max(length(index_paths) + length(post_timestamp_checks), 1)
+
     expected_path_set =
       params.sitemap_xml
       |> extract_sitemap_locs()
       |> Enum.map(&sitemap_loc_to_project_path(&1, params.base_url))
       |> MapSet.new()
 
-    {existing_html_path_set, zero_byte_html_path_set} = collect_html_index_paths(params.html_dir)
+    {existing_html_path_set, zero_byte_html_path_set} =
+      collect_html_index_paths(index_paths, params.html_dir, params.on_progress, total_compare_steps)
 
     missing_url_paths =
       expected_path_set
@@ -1224,9 +1381,16 @@ defmodule BDS.Generation do
       |> Enum.sort()
 
     updated_post_url_paths =
-      params
-      |> Map.get(:post_timestamp_checks, [])
-      |> Enum.reduce(MapSet.new(), fn check, acc ->
+      post_timestamp_checks
+      |> Enum.with_index(1)
+      |> Enum.reduce(MapSet.new(), fn {check, index}, acc ->
+        :ok =
+          report_validation_compare_progress(
+            params.on_progress,
+            length(index_paths) + index,
+            total_compare_steps
+          )
+
         normalized_url_path = normalize_url_path(check.post_url_path)
 
         cond do
@@ -1297,10 +1461,12 @@ defmodule BDS.Generation do
     end
   end
 
-  defp collect_html_index_paths(html_dir) do
-    index_paths = Path.wildcard(Path.join(html_dir, "**/index.html"))
+  defp collect_html_index_paths(index_paths, html_dir, on_progress, total_compare_steps) do
+    index_paths
+    |> Enum.with_index(1)
+    |> Enum.reduce({MapSet.new(), MapSet.new()}, fn {path, index}, {existing, zero_byte} ->
+      :ok = report_validation_compare_progress(on_progress, index, total_compare_steps)
 
-    Enum.reduce(index_paths, {MapSet.new(), MapSet.new()}, fn path, {existing, zero_byte} ->
       relative_dir =
         path
         |> Path.relative_to(html_dir)
@@ -1318,6 +1484,15 @@ defmodule BDS.Generation do
         {:error, _reason} -> {existing, MapSet.put(zero_byte, url_path)}
       end
     end)
+  end
+
+  defp report_validation_compare_progress(nil, _current, _total), do: :ok
+  defp report_validation_compare_progress(_callback, _current, total) when total <= 0, do: :ok
+
+  defp report_validation_compare_progress(callback, current, total) do
+    progress = min(0.99, 0.5 + current / total * 0.49)
+    callback.(progress, "Comparing sitemap to html pages... #{current}/#{total}")
+    :ok
   end
 
   defp normalize_url_path(nil), do: "/"
@@ -1533,7 +1708,7 @@ defmodule BDS.Generation do
     case Regex.run(~r|^/([a-z]{2,3})(/.*)?$|, path) do
       [_, language, suffix] ->
         if language in additional_languages do
-          {language, normalize_url_path(suffix || "/")}
+          {language, normalize_url_path(suffix)}
         else
           {nil, path}
         end

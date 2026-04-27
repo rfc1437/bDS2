@@ -2,6 +2,7 @@ defmodule BDS.GenerationTest do
   use ExUnit.Case, async: false
 
   import Ecto.Query
+  import ExUnit.CaptureIO
 
   alias BDS.Media
   alias BDS.Metadata
@@ -350,6 +351,116 @@ defmodule BDS.GenerationTest do
     assert post_html =~ ~s(<strong>Rendered</strong> body)
     assert post_html =~ "Taxonomy"
     assert post_html =~ "Language"
+  end
+
+  test "validate_site does not crash on unknown macros with quoted params", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Gallery Macro Post",
+               content: "[[gallery link=\"file\"]]",
+               language: "en"
+             })
+
+    assert {:ok, _published_post} = Posts.publish_post(post.id)
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core, :single])
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id, [:core, :single])
+    assert report.missing_url_paths == []
+    assert report.extra_url_paths == []
+  end
+
+  test "validate_site reports old-app phase progress", %{project: project} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Progress Post",
+               content: "Progress body",
+               language: "en"
+             })
+
+    assert {:ok, _published_post} = Posts.publish_post(post.id)
+
+    parent = self()
+
+    on_progress = fn value, message ->
+      send(parent, {:validate_progress, value, message})
+    end
+
+    assert {:ok, _report} =
+             BDS.Generation.validate_site(project.id, [:core, :single], on_progress: on_progress)
+
+    events = collect_validate_progress_events()
+
+    assert {0.0, "Collecting sitemap URLs..."} in events
+    assert Enum.any?(events, fn
+             {value, message}
+             when is_number(value) and value > 0.0 and value < 0.5 and
+                    is_binary(message) ->
+               String.starts_with?(message, "Collecting sitemap URLs")
+
+             _other ->
+               false
+           end)
+
+    assert {0.5, "Comparing sitemap to html pages..."} in events
+    assert Enum.any?(events, fn
+             {value, message}
+             when is_number(value) and value > 0.5 and value < 1.0 and is_binary(message) ->
+               String.starts_with?(message, "Comparing sitemap to html pages")
+
+             _other ->
+               false
+           end)
+
+    assert Enum.any?(events, fn
+             {1.0, message} -> String.starts_with?(message, "Validation complete (")
+             _other -> false
+           end)
+  end
+
+  test "validate_site does not emit markdown parser warnings for unclosed fenced blocks", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Malformed Markdown",
+               content: "```elixir\nIO.puts(:broken)",
+               language: "en"
+             })
+
+    assert {:ok, _published_post} = Posts.publish_post(post.id)
+
+    stderr =
+      capture_io(:stderr, fn ->
+        assert {:ok, _report} = BDS.Generation.validate_site(project.id, [:core, :single])
+      end)
+
+    assert stderr == ""
   end
 
   test "generation falls back to bundled default templates when the project has no template files or template rows",
@@ -889,6 +1000,15 @@ defmodule BDS.GenerationTest do
       "/"
     else
       "/" <> cleaned
+    end
+  end
+
+  defp collect_validate_progress_events(acc \\ []) do
+    receive do
+      {:validate_progress, value, message} ->
+        collect_validate_progress_events([{value, message} | acc])
+    after
+      0 -> Enum.reverse(acc)
     end
   end
 end

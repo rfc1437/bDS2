@@ -191,7 +191,7 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp dispatch("generate_sitemap", project, _params) do
-    queue_task(project, "generate_sitemap", "Generate Sitemap", "Generation", fn report ->
+    queue_task(project, "generate_sitemap", "Generate Site", "Generation", fn report ->
       {:ok, generation} = Generation.generate_site(project.id, @site_sections, on_progress: report)
       report.(1.0, "Generated site output")
       %{project_id: project.id, sections: generation.sections, generated_count: length(generation.generated_files)}
@@ -201,7 +201,6 @@ defmodule BDS.Desktop.ShellCommands do
   defp dispatch("validate_site", project, _params) do
     queue_task(project, "validate_site", "Validate Site", "Validation", fn report ->
       {:ok, validation} = Generation.validate_site(project.id, @site_sections, on_progress: report)
-      report.(1.0, "Site validation complete")
       site_validation_result(project.id, validation)
     end)
   end

@@ -33,7 +33,7 @@ defmodule BDS.Rendering.Filters do
     value
     |> to_string()
     |> replace_built_in_macros(language, context)
-    |> Earmark.as_html!()
+    |> render_markdown_html()
     |> rewrite_rendered_html_urls(canonical_post_paths || %{}, canonical_media_paths || %{})
   end
 
@@ -94,10 +94,19 @@ defmodule BDS.Rendering.Filters do
   defp parse_macro_params(""), do: %{}
 
   defp parse_macro_params(raw_params) do
-    Regex.scan(~r/(\w+)=(?:"([^"]*)"|'([^']*)'|([^\s\]]+))/, raw_params)
-    |> Enum.reduce(%{}, fn [_match, key, double_quoted, single_quoted, bare], acc ->
-      value = Enum.find([double_quoted, single_quoted, bare], &(&1 not in [nil, ""])) || ""
-      Map.put(acc, key, value)
+    Regex.scan(~r/(\w+)=(?:"([^"]*)"|'([^']*)'|([^\s\]]+))/, raw_params, capture: :all_but_first)
+    |> Enum.reduce(%{}, fn captures, acc ->
+      case captures do
+        [key, value] ->
+          Map.put(acc, key, value)
+
+        [key, double_quoted, single_quoted, bare] ->
+          value = Enum.find([double_quoted, single_quoted, bare], &(&1 not in [nil, ""])) || ""
+          Map.put(acc, key, value)
+
+        _other ->
+          acc
+      end
     end)
   end
 
@@ -118,6 +127,13 @@ defmodule BDS.Rendering.Filters do
     end
   rescue
     _error -> ""
+  end
+
+  defp render_markdown_html(markdown) do
+    case Earmark.as_html(markdown) do
+      {:ok, html, _messages} -> html
+      {:error, html, _messages} -> html
+    end
   end
 
   defp rewrite_rendered_html_urls(html, canonical_post_paths, canonical_media_paths) do
