@@ -293,6 +293,11 @@ defmodule BDS.EmbeddingsTest do
 
     index_path = BDS.Embeddings.index_path(project.id)
     assert File.exists?(index_path)
+    refute String.starts_with?(index_path, BDS.Projects.project_data_dir(project))
+
+    cache_root = Application.fetch_env!(:bds, :project_cache_root) |> Path.expand()
+
+    assert index_path == Path.join([cache_root, "projects", project.id, "embeddings.usearch"])
 
     snapshot = index_path |> File.read!() |> Jason.decode!()
     assert snapshot["project_id"] == project.id
@@ -306,7 +311,7 @@ defmodule BDS.EmbeddingsTest do
            end)
   end
 
-  test "embedding index uses the old-app persisted file name", %{project: project} do
+  test "embedding index uses the app-internal persisted file name", %{project: project} do
     assert BDS.Embeddings.index_path(project.id) =~ "/embeddings.usearch"
   end
 
@@ -342,5 +347,40 @@ defmodule BDS.EmbeddingsTest do
     refreshed_key = BDS.Repo.get_by!(BDS.Embeddings.Key, project_id: project.id, post_id: post.id)
     assert refreshed_key.content_hash == stale_key.content_hash
     assert File.exists?(BDS.Embeddings.index_path(project.id))
+  end
+
+  test "sync_post refreshes snapshot drift when the embedding hash is already current", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Snapshot Repair",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, post} = BDS.Posts.publish_post(post.id)
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
+
+    key = BDS.Repo.get_by!(BDS.Embeddings.Key, project_id: project.id, post_id: post.id)
+    index_path = BDS.Embeddings.index_path(project.id)
+
+    snapshot = index_path |> File.read!() |> Jason.decode!()
+
+    drifted_snapshot =
+      put_in(snapshot, ["entries", post.id, "content_hash"], "stale-snapshot-hash")
+
+    File.write!(index_path, Jason.encode!(drifted_snapshot))
+
+    refute Enum.any?(BDS.Embeddings.diff_reports(project.id), &(&1.entity_id == post.id))
+
+    assert :ok = BDS.Embeddings.sync_post(post.id)
+
+    repaired_snapshot = index_path |> File.read!() |> Jason.decode!()
+    assert get_in(repaired_snapshot, ["entries", post.id, "content_hash"]) == key.content_hash
+
+    refute Enum.any?(BDS.Embeddings.diff_reports(project.id), &(&1.entity_id == post.id))
   end
 end

@@ -11,8 +11,7 @@ defmodule BDS.Embeddings.Index do
   @neighbor_limit 21
 
   def path(project_id) when is_binary(project_id) do
-    project = Projects.get_project!(project_id)
-    Path.join(Projects.project_data_dir(project), "embeddings.usearch")
+    Path.join(Projects.project_cache_dir(project_id), "embeddings.usearch")
   end
 
   def rebuild(project_id, opts) when is_binary(project_id) and is_list(opts) do
@@ -48,17 +47,13 @@ defmodule BDS.Embeddings.Index do
       "entries" => entries
     }
 
-    write_snapshot(path(project_id), payload)
+    write_snapshot(path(project_id), payload, project_id)
   end
 
   def read(project_id) when is_binary(project_id) do
-    snapshot_path = path(project_id)
-
-    case File.read(snapshot_path) do
-      {:ok, contents} -> {:ok, Jason.decode!(contents)}
-      {:error, :enoent} -> read_legacy_snapshot(project_id)
-      {:error, reason} -> {:error, reason}
-    end
+    project_id
+    |> candidate_paths()
+    |> read_snapshot_paths()
   end
 
   def neighbors(project_id, post_id, limit) when is_binary(project_id) and is_binary(post_id) do
@@ -123,7 +118,7 @@ defmodule BDS.Embeddings.Index do
     |> Enum.take(@neighbor_limit)
   end
 
-  defp write_snapshot(snapshot_path, payload) do
+  defp write_snapshot(snapshot_path, payload, project_id) do
     :ok = Persistence.atomic_write(snapshot_path, Jason.encode!(payload))
     legacy_path = legacy_path(snapshot_path)
 
@@ -131,16 +126,56 @@ defmodule BDS.Embeddings.Index do
       File.rm(legacy_path)
     end
 
+    cleanup_legacy_project_snapshots(project_id, snapshot_path)
+
     :ok
   end
 
-  defp read_legacy_snapshot(project_id) do
-    legacy_snapshot_path = project_id |> path() |> legacy_path()
+  defp candidate_paths(project_id) do
+    current_snapshot_path = path(project_id)
+    legacy_project_snapshot_path = legacy_project_snapshot_path(project_id)
 
-    case File.read(legacy_snapshot_path) do
+    [
+      current_snapshot_path,
+      legacy_path(current_snapshot_path),
+      legacy_project_snapshot_path,
+      legacy_project_snapshot_path && legacy_path(legacy_project_snapshot_path)
+    ]
+    |> Enum.filter(&is_binary/1)
+    |> Enum.uniq()
+  end
+
+  defp read_snapshot_paths([]), do: {:error, :missing}
+
+  defp read_snapshot_paths([snapshot_path | rest]) do
+    case File.read(snapshot_path) do
       {:ok, contents} -> {:ok, Jason.decode!(contents)}
-      {:error, :enoent} -> {:error, :missing}
+      {:error, :enoent} -> read_snapshot_paths(rest)
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp cleanup_legacy_project_snapshots(project_id, snapshot_path) do
+    current_paths = [snapshot_path, legacy_path(snapshot_path)]
+
+    project_id
+    |> legacy_project_snapshot_path()
+    |> then(fn legacy_snapshot_path ->
+      [legacy_snapshot_path, legacy_snapshot_path && legacy_path(legacy_snapshot_path)]
+    end)
+    |> Enum.filter(&is_binary/1)
+    |> Enum.reject(&(&1 in current_paths))
+    |> Enum.each(fn legacy_snapshot_path ->
+      if File.exists?(legacy_snapshot_path) do
+        File.rm(legacy_snapshot_path)
+      end
+    end)
+  end
+
+  defp legacy_project_snapshot_path(project_id) do
+    case Projects.get_project(project_id) do
+      nil -> nil
+      project -> Path.join(Projects.project_data_dir(project), "embeddings.usearch")
     end
   end
 

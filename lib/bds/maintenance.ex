@@ -26,20 +26,28 @@ defmodule BDS.Maintenance do
     total = length(items)
     :ok = report_started(on_progress, total, "Repairing metadata differences")
 
-    result =
-      items
-      |> Enum.with_index(1)
-      |> Enum.reduce(%{repaired: 0, failed: 0}, fn {item, index}, acc ->
-        next_acc =
-          case repair_metadata_diff_item(project_id, direction, item) do
-            :ok -> %{acc | repaired: acc.repaired + 1}
-            {:ok, _value} -> %{acc | repaired: acc.repaired + 1}
-            _error -> %{acc | failed: acc.failed + 1}
-          end
+    normalized_direction = normalize_repair_direction(direction)
 
-        :ok = report_progress(on_progress, index, total, "Repairing metadata differences")
-        next_acc
-      end)
+    result =
+      case repair_embedding_batch(project_id, normalized_direction, items, on_progress, total) do
+        {:ok, batch_result} ->
+          batch_result
+
+        :unsupported ->
+          items
+          |> Enum.with_index(1)
+          |> Enum.reduce(%{repaired: 0, failed: 0}, fn {item, index}, acc ->
+            next_acc =
+              case repair_metadata_diff_item(project_id, normalized_direction, item) do
+                :ok -> %{acc | repaired: acc.repaired + 1}
+                {:ok, _value} -> %{acc | repaired: acc.repaired + 1}
+                _error -> %{acc | failed: acc.failed + 1}
+              end
+
+            :ok = report_progress(on_progress, index, total, "Repairing metadata differences")
+            next_acc
+          end)
+      end
 
     {:ok, result}
   end
@@ -668,6 +676,63 @@ defmodule BDS.Maintenance do
       {:db_to_file, "embedding"} -> BDS.Embeddings.refresh_snapshot(project_id)
       _other -> {:error, :unsupported}
     end
+  end
+
+  defp repair_embedding_batch(project_id, direction, items, on_progress, total)
+       when direction in [:file_to_db, :db_to_file] do
+    if items != [] and Enum.all?(items, &(metadata_diff_item_entity_type(&1) == "embedding")) do
+      result =
+        case direction do
+          :file_to_db ->
+            post_ids = Enum.map(items, &metadata_diff_item_entity_id/1)
+
+            case Embeddings.repair_posts(project_id, post_ids) do
+              {:ok, repaired_post_ids} ->
+                repaired_post_ids = MapSet.new(repaired_post_ids)
+
+                build_batch_repair_result(items, total, on_progress, fn item ->
+                  MapSet.member?(repaired_post_ids, metadata_diff_item_entity_id(item))
+                end)
+
+              _other ->
+                build_batch_repair_result(items, total, on_progress, fn _item -> false end)
+            end
+
+          :db_to_file ->
+            repaired? = Embeddings.refresh_snapshot(project_id) == :ok
+            build_batch_repair_result(items, total, on_progress, fn _item -> repaired? end)
+        end
+
+      {:ok, result}
+    else
+      :unsupported
+    end
+  end
+
+  defp repair_embedding_batch(_project_id, _direction, _items, _on_progress, _total), do: :unsupported
+
+  defp build_batch_repair_result(items, total, on_progress, repaired?) do
+    items
+    |> Enum.with_index(1)
+    |> Enum.reduce(%{repaired: 0, failed: 0}, fn {item, index}, acc ->
+      next_acc =
+        if repaired?.(item) do
+          %{acc | repaired: acc.repaired + 1}
+        else
+          %{acc | failed: acc.failed + 1}
+        end
+
+      :ok = report_progress(on_progress, index, total, "Repairing metadata differences")
+      next_acc
+    end)
+  end
+
+  defp metadata_diff_item_entity_type(item) do
+    Map.get(item, :entity_type) || Map.get(item, "entity_type")
+  end
+
+  defp metadata_diff_item_entity_id(item) do
+    Map.get(item, :entity_id) || Map.get(item, "entity_id")
   end
 
   defp import_metadata_diff_orphan(project_id, orphan) do

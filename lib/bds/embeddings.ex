@@ -61,6 +61,25 @@ defmodule BDS.Embeddings do
     end
   end
 
+  def repair_posts(project_id, post_ids) when is_binary(project_id) and is_list(post_ids) do
+    if enabled_for_project?(project_id) do
+      post_ids = Enum.uniq(post_ids)
+
+      posts =
+        Repo.all(
+          from post in Post,
+            where: post.project_id == ^project_id and post.id in ^post_ids,
+            order_by: [asc: post.created_at, asc: post.slug]
+        )
+
+      Enum.each(posts, &sync_post_if_enabled(&1, refresh_index: false))
+      :ok = rebuild_snapshot(project_id)
+      {:ok, Enum.map(posts, & &1.id)}
+    else
+      {:ok, []}
+    end
+  end
+
   def rebuild_project(project_id) when is_binary(project_id) do
     if enabled_for_project?(project_id) do
       posts =
@@ -83,12 +102,6 @@ defmodule BDS.Embeddings do
 
   def diff_reports(project_id) when is_binary(project_id) do
     if enabled_for_project?(project_id) do
-      snapshot_entries =
-        case Index.read(project_id) do
-          {:ok, snapshot} -> Map.get(snapshot, "entries", %{})
-          _other -> %{}
-        end
-
       keys_by_post =
         Repo.all(from key in Key, where: key.project_id == ^project_id)
         |> Map.new(&{&1.post_id, &1})
@@ -97,15 +110,14 @@ defmodule BDS.Embeddings do
       |> Enum.flat_map(fn post ->
         expected_hash = post_content_hash(post)
         key = Map.get(keys_by_post, post.id)
-        snapshot_entry = Map.get(snapshot_entries, post.id)
 
         differences =
           [
             diff_field("content_hash", key && key.content_hash, expected_hash),
             diff_field(
-              "snapshot_content_hash",
-              snapshot_entry && snapshot_entry["content_hash"],
-              key && key.content_hash
+              "embedding",
+              current_embedding_status(key, expected_hash),
+              expected_embedding_status(key, expected_hash)
             )
           ]
           |> Enum.reject(&is_nil/1)
@@ -136,6 +148,10 @@ defmodule BDS.Embeddings do
 
     case Repo.get_by(Key, post_id: post.id, project_id: post.project_id) do
       %Key{content_hash: ^content_hash} ->
+        if Keyword.get(opts, :refresh_index, true) and snapshot_content_hash(post.project_id, post.id) != content_hash do
+          :ok = rebuild_snapshot(post.project_id)
+        end
+
         :ok
 
       existing_key ->
@@ -483,6 +499,31 @@ defmodule BDS.Embeddings do
 
   defp rebuild_snapshot(project_id) do
     Index.rebuild(project_id, model_id: model_id(), dimensions: dimensions())
+  end
+
+  defp snapshot_content_hash(project_id, post_id) do
+    case Index.read(project_id) do
+      {:ok, snapshot} -> get_in(snapshot, ["entries", post_id, "content_hash"])
+      _other -> nil
+    end
+  end
+
+  defp current_embedding_status(nil, _expected_hash), do: "missing"
+
+  defp current_embedding_status(%Key{vector: vector}, _expected_hash) when vector in [nil, ""],
+    do: "missing"
+
+  defp current_embedding_status(%Key{content_hash: content_hash}, expected_hash)
+       when content_hash != expected_hash,
+       do: "stale"
+
+  defp current_embedding_status(%Key{}, _expected_hash), do: "ready"
+
+  defp expected_embedding_status(key, expected_hash) do
+    case current_embedding_status(key, expected_hash) do
+      "ready" -> "ready"
+      _other -> "re-embed required"
+    end
   end
 
   defp diff_field(name, db_value, file_value) do

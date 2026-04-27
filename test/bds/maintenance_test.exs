@@ -390,12 +390,13 @@ defmodule BDS.MaintenanceTest do
     assert File.exists?(index_path)
 
     Repo.delete_all(from key in BDS.Embeddings.Key, where: key.project_id == ^project.id)
-    File.rm!(index_path)
 
     assert {:ok, %{diff_reports: diff_reports}} = BDS.Maintenance.metadata_diff(project.id)
 
     assert Enum.any?(diff_reports, fn report ->
-             report.entity_type == "embedding" and report.entity_id == post.id
+             report.entity_type == "embedding" and report.entity_id == post.id and
+               Enum.any?(report.differences, &(&1.name == "content_hash" and &1.file_value != "")) and
+               Enum.any?(report.differences, &(&1.name == "embedding" and &1.db_value == "missing" and &1.file_value == "re-embed required"))
            end)
 
     assert {:ok, rebuilt_post_ids} = BDS.Maintenance.rebuild_from_filesystem(project.id, "embedding")

@@ -73,6 +73,12 @@ defmodule BDS.Projects do
     project.data_path || Path.expand("../../priv/data/projects/#{project.id}", __DIR__)
   end
 
+  def project_cache_dir(%Project{} = project), do: project_cache_dir(project.id)
+
+  def project_cache_dir(project_id) when is_binary(project_id) do
+    Path.join([project_cache_root(), "projects", project_id])
+  end
+
   def create_project(attrs) do
     now = Persistence.now_ms()
     name = attr(attrs, :name) || ""
@@ -140,6 +146,7 @@ defmodule BDS.Projects do
 
       %Project{} = project ->
         internal_dir = if is_nil(project.data_path), do: project_data_dir(project), else: nil
+        cleanup_dirs = [internal_dir, project_cache_dir(project)] |> Enum.filter(&is_binary/1) |> Enum.uniq()
 
         Repo.transaction(fn ->
           Repo.delete!(project)
@@ -147,9 +154,9 @@ defmodule BDS.Projects do
         end)
         |> case do
           {:ok, deleted_project} ->
-            if is_binary(internal_dir) do
-              _ = File.rm_rf(internal_dir)
-            end
+            Enum.each(cleanup_dirs, fn dir ->
+              _ = File.rm_rf(dir)
+            end)
 
             {:ok, deleted_project}
 
@@ -200,6 +207,20 @@ defmodule BDS.Projects do
 
   defp slug_available?(slug) do
     not Repo.exists?(from project in Project, where: project.slug == ^slug)
+  end
+
+  defp repo_data_dir do
+    Application.fetch_env!(:bds, BDS.Repo)
+    |> Keyword.fetch!(:database)
+    |> Path.expand()
+    |> Path.dirname()
+  end
+
+  defp project_cache_root do
+    case Application.get_env(:bds, :project_cache_root) do
+      root when is_binary(root) -> Path.expand(root)
+      _other -> repo_data_dir()
+    end
   end
 
   defp attr(attrs, key) do
