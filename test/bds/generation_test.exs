@@ -409,6 +409,7 @@ defmodule BDS.GenerationTest do
     events = collect_validate_progress_events()
 
     assert {0.0, "Collecting sitemap URLs..."} in events
+
     assert Enum.any?(events, fn
              {value, message}
              when is_number(value) and value > 0.0 and value < 0.5 and
@@ -980,6 +981,52 @@ defmodule BDS.GenerationTest do
                BDS.Generation.post_output_path(published_post)
              ])
            )
+  end
+
+  test "validate_site follows old language subtree expectations and combined sitemap output", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en", "de"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Localized Post",
+               content: "Canonical body",
+               language: "en"
+             })
+
+    created_at = DateTime.to_unix(~U[2026-04-15 12:00:00Z])
+
+    Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^post.id),
+      set: [created_at: created_at, updated_at: created_at]
+    )
+
+    assert {:ok, _translation} =
+             Posts.upsert_post_translation(post.id, "de", %{
+               title: "Lokalisierter Beitrag",
+               content: "Deutscher Inhalt"
+             })
+
+    assert {:ok, _published_post} = Posts.publish_post(post.id)
+    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core, :single])
+    assert {:ok, report} = BDS.Generation.validate_site(project.id, [:core, :single])
+
+    assert report.missing_url_paths == []
+    assert report.extra_url_paths == []
+    assert report.updated_post_url_paths == []
+
+    sitemap_xml = File.read!(Path.join([temp_dir, "html", "sitemap.xml"]))
+
+    assert sitemap_xml =~ "hreflang=\"de\""
+    assert sitemap_xml =~ "https://example.com/blog/de/2026/04/15/localized-post/"
+    refute sitemap_xml =~ "localized-post.de"
   end
 
   test "generation and validation include old-app pagination and day archive routes", %{

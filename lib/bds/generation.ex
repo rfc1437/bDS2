@@ -68,19 +68,30 @@ defmodule BDS.Generation do
   def validate_site(project_id, sections, opts) when is_binary(project_id) and is_list(sections) and is_list(opts) do
     with {:ok, plan} <- plan_generation(project_id, sections) do
       on_progress = progress_callback(opts)
-      data = generation_data(plan)
-      generated_file_updated_at = generated_file_updated_at_map(project_id)
-
       :ok = report_validation_progress(on_progress, 0.0, "Collecting sitemap URLs...")
 
-      sitemap_content =
-        plan
-        |> build_validation_route_paths(data, on_progress)
-        |> Enum.map(&url_for_output(plan.base_url, &1))
-        |> render_sitemap()
+      data =
+        generation_data(plan,
+          on_snapshot_progress: fn stage, current, total ->
+            report_validation_snapshot_progress(on_progress, stage, current, total)
+          end
+        )
+
+      generated_file_updated_at = generated_file_updated_at_map(project_id)
+      additional_languages = additional_languages(plan)
+      published_route_posts = suppress_subtree_translation_variants(data.published_route_posts, additional_languages)
+
+      {sitemap_content, sitemap_to_write, additional_expected_paths, additional_post_timestamp_checks} =
+        build_validation_sitemap_artifacts(
+          plan,
+          data,
+          published_route_posts,
+          generated_file_updated_at,
+          on_progress
+        )
 
       {:ok, sitemap_write} =
-        write_generated_file(project_id, "sitemap.xml", sitemap_content)
+        write_generated_file(project_id, "sitemap.xml", sitemap_to_write)
 
       :ok = report_validation_progress(on_progress, 0.5, "Comparing sitemap to html pages...")
 
@@ -93,11 +104,10 @@ defmodule BDS.Generation do
           post_timestamp_checks:
             build_post_timestamp_checks(
               data.project_data_dir,
-              plan.language,
-              data.published_posts,
-              flattened_generation_translations(data.translations_by_post),
+              published_route_posts,
               generated_file_updated_at
-            )
+            ) ++ additional_post_timestamp_checks,
+          additional_expected_paths: additional_expected_paths
         })
 
       completion_message =
@@ -152,11 +162,29 @@ defmodule BDS.Generation do
     :ok
   end
 
+  defp report_validation_snapshot_progress(nil, _stage, _current, _total), do: :ok
+
+  defp report_validation_snapshot_progress(_callback, _stage, _current, total)
+       when total <= 0,
+       do: :ok
+
+  defp report_validation_snapshot_progress(callback, :posts, current, total) do
+    progress = min(0.18, current / total * 0.18)
+    callback.(progress, "Collecting sitemap URLs... #{current}/#{total}")
+    :ok
+  end
+
+  defp report_validation_snapshot_progress(callback, :translations, current, total) do
+    progress = 0.18 + min(0.12, current / total * 0.12)
+    callback.(progress, "Collecting sitemap URLs... #{current}/#{total}")
+    :ok
+  end
+
   defp report_validation_collection_progress(nil, _current, _total), do: :ok
   defp report_validation_collection_progress(_callback, _current, total) when total <= 0, do: :ok
 
   defp report_validation_collection_progress(callback, current, total) do
-    progress = min(0.49, current / total * 0.5)
+    progress = min(0.49, 0.30 + current / total * 0.19)
     callback.(progress, "Collecting sitemap URLs... #{current}/#{total}")
     :ok
   end
@@ -336,10 +364,11 @@ defmodule BDS.Generation do
     :ok
   end
 
-  defp generation_data(plan) do
+  defp generation_data(plan, opts \\ []) do
     project = Projects.get_project!(plan.project_id)
     project_data_dir = Projects.project_data_dir(project)
     list_excluded_categories = excluded_list_categories(plan)
+    on_snapshot_progress = Keyword.get(opts, :on_snapshot_progress)
 
     published_candidates =
       Repo.all(
@@ -355,9 +384,14 @@ defmodule BDS.Generation do
           order_by: [desc: post.created_at, desc: post.published_at, asc: post.slug]
       )
 
+    post_snapshot_candidates = published_candidates ++ draft_candidates
+
     snapshots_by_id =
-      (published_candidates ++ draft_candidates)
-      |> Enum.reduce(%{}, fn post, acc ->
+      post_snapshot_candidates
+      |> Enum.with_index(1)
+      |> Enum.reduce(%{}, fn {post, index}, acc ->
+        :ok = report_snapshot_stage_progress(on_snapshot_progress, :posts, index, length(post_snapshot_candidates))
+
         case published_post_snapshot(project_data_dir, post) do
           nil -> acc
           snapshot -> Map.put(acc, post.id, snapshot)
@@ -383,7 +417,12 @@ defmodule BDS.Generation do
       |> Enum.sort_by(&{-(&1.created_at || 0), -(&1.published_at || 0), to_string(&1.slug)})
 
     {published_route_posts, translations_by_post} =
-      build_generation_route_posts(plan.project_id, project_data_dir, published_posts)
+      build_generation_route_posts(
+        plan.project_id,
+        project_data_dir,
+        published_posts,
+        on_snapshot_progress
+      )
 
     %{
       project: project,
@@ -481,7 +520,7 @@ defmodule BDS.Generation do
     end
   end
 
-  defp build_generation_route_posts(project_id, project_data_dir, published_posts) do
+  defp build_generation_route_posts(project_id, project_data_dir, published_posts, on_snapshot_progress) do
     source_post_ids = Enum.map(published_posts, & &1.id)
 
     translation_candidates =
@@ -494,7 +533,10 @@ defmodule BDS.Generation do
 
     translations_by_post =
       translation_candidates
-      |> Enum.reduce(%{}, fn translation, acc ->
+      |> Enum.with_index(1)
+      |> Enum.reduce(%{}, fn {translation, index}, acc ->
+        :ok = report_snapshot_stage_progress(on_snapshot_progress, :translations, index, length(translation_candidates))
+
         case published_translation_snapshot(project_data_dir, translation) do
           nil -> acc
           snapshot -> Map.update(acc, translation.translation_for, [snapshot], &[snapshot | &1])
@@ -675,24 +717,208 @@ defmodule BDS.Generation do
     core_outputs ++ page_outputs ++ single_outputs ++ archive_outputs ++ sitemap ++ pagefind_outputs ++ asset_outputs
   end
 
-  defp build_validation_route_paths(plan, data, on_progress) do
-    _ = data
+  defp build_validation_sitemap_artifacts(
+         plan,
+         data,
+         published_route_posts,
+         generated_file_updated_at,
+         on_progress
+       ) do
+    main_paths =
+      build_validation_route_paths(
+        plan,
+        published_route_posts,
+        data.published_list_posts,
+        data.post_index,
+        nil
+      )
 
-    route_paths =
-      plan
-      |> build_outputs()
-      |> Enum.map(&elem(&1, 0))
-      |> Enum.filter(&route_html_path?/1)
+    additional_language_sets =
+      Enum.map(additional_languages(plan), fn language ->
+        language_posts = Enum.reject(data.published_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
+        language_list_posts = Enum.reject(data.published_list_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
+        language_post_index = build_generation_post_index(language_list_posts)
 
-    total_route_count = length(route_paths)
+        {language,
+         language_posts,
+         build_validation_route_paths(plan, language_posts, language_list_posts, language_post_index, language)}
+      end)
 
-    route_paths
+    all_collection_paths =
+      main_paths ++ Enum.flat_map(additional_language_sets, fn {_language, _posts, paths} -> paths end)
+
+    total_route_count = max(length(all_collection_paths), 1)
+
+    all_collection_paths
     |> Enum.with_index(1)
-    |> Enum.map(fn {relative_path, index} ->
+    |> Enum.each(fn {_relative_path, index} ->
       :ok = report_validation_collection_progress(on_progress, index, total_route_count)
-      relative_path
+    end)
+
+    sitemap_content =
+      main_paths
+      |> Enum.map(&url_for_output(plan.base_url, &1))
+      |> render_sitemap()
+
+    additional_expected_paths =
+      additional_language_sets
+      |> Enum.flat_map(fn {_language, _posts, paths} -> paths end)
+      |> Enum.map(&relative_path_to_url_path/1)
+
+    additional_post_timestamp_checks =
+      additional_language_sets
+      |> Enum.flat_map(fn {language, posts, _paths} ->
+        build_language_post_timestamp_checks(
+          data.project_data_dir,
+          language,
+          posts,
+          generated_file_updated_at
+        )
+      end)
+
+    sitemap_to_write =
+      case additional_languages(plan) do
+        [] -> sitemap_content
+
+        languages ->
+          render_multi_language_sitemap(
+            plan,
+            Enum.reject(data.published_posts, &truthy_flag?(Map.get(&1, :do_not_translate))),
+            Enum.filter(data.published_posts, &truthy_flag?(Map.get(&1, :do_not_translate))),
+            data.published_list_posts,
+            data.post_index,
+            languages
+          )
+      end
+
+    {sitemap_content, sitemap_to_write, additional_expected_paths, additional_post_timestamp_checks}
+  end
+
+  defp build_validation_route_paths(plan, route_posts, published_list_posts, post_index, route_language) do
+    [
+      core_route_paths(plan, published_list_posts, route_language),
+      page_route_paths(plan, route_posts, route_language),
+      single_route_paths(plan, route_posts, route_language),
+      category_route_paths(plan, post_index.posts_by_category, route_language),
+      tag_route_paths(plan, post_index.posts_by_tag, route_language),
+      date_route_paths(plan, post_index, route_language)
+    ]
+    |> List.flatten()
+    |> Enum.uniq()
+  end
+
+  defp core_route_paths(plan, published_list_posts, route_language) do
+    if :core in plan.sections do
+      root_route_paths(route_language, length(published_list_posts), plan.max_posts_per_page)
+    else
+      []
+    end
+  end
+
+  defp page_route_paths(plan, route_posts, route_language) do
+    if :core in plan.sections do
+      route_posts
+      |> Enum.filter(&("page" in (&1.categories || [])))
+      |> Enum.map(&page_output_path(&1.slug, route_language))
+    else
+      []
+    end
+  end
+
+  defp single_route_paths(plan, route_posts, route_language) do
+    if :single in plan.sections do
+      Enum.map(route_posts, &route_post_output_path(&1, route_language))
+    else
+      []
+    end
+  end
+
+  defp category_route_paths(plan, posts_by_category, route_language) do
+    if :category in plan.sections do
+      Enum.flat_map(posts_by_category, fn {category, posts} ->
+        paginated_archive_paths(
+          route_language,
+          ["category", Slug.slugify(category)],
+          length(posts),
+          plan.max_posts_per_page
+        )
+      end)
+    else
+      []
+    end
+  end
+
+  defp tag_route_paths(plan, posts_by_tag, route_language) do
+    if :tag in plan.sections do
+      Enum.flat_map(posts_by_tag, fn {tag, posts} ->
+        paginated_archive_paths(
+          route_language,
+          ["tag", Slug.slugify(tag)],
+          length(posts),
+          plan.max_posts_per_page
+        )
+      end)
+    else
+      []
+    end
+  end
+
+  defp date_route_paths(plan, post_index, route_language) do
+    if :date in plan.sections do
+      year_paths =
+        Enum.flat_map(post_index.posts_by_year, fn {year, posts} ->
+          paginated_archive_paths(
+            route_language,
+            [Integer.to_string(year)],
+            length(posts),
+            plan.max_posts_per_page
+          )
+        end)
+
+      month_paths =
+        Enum.flat_map(post_index.posts_by_year_month, fn {year_month, posts} ->
+          [year, month] = String.split(year_month, "/", parts: 2)
+
+          paginated_archive_paths(
+            route_language,
+            [year, month],
+            length(posts),
+            plan.max_posts_per_page
+          )
+        end)
+
+      day_paths =
+        Enum.flat_map(post_index.posts_by_year_month_day, fn {year_month_day, posts} ->
+          [year, month, day] = String.split(year_month_day, "/", parts: 3)
+
+          paginated_archive_paths(
+            route_language,
+            [year, month, day],
+            length(posts),
+            plan.max_posts_per_page
+          )
+        end)
+
+      year_paths ++ month_paths ++ day_paths
+    else
+      []
+    end
+  end
+
+  defp route_post_output_path(post, nil), do: post_output_path(post)
+  defp route_post_output_path(post, ""), do: post_output_path(post)
+  defp route_post_output_path(post, route_language), do: post_output_path(post, route_language)
+
+  defp suppress_subtree_translation_variants(route_posts, additional_languages) do
+    subtree_languages = MapSet.new(additional_languages)
+
+    Enum.reject(route_posts, fn post ->
+      is_binary(Map.get(post, :translation_source_slug)) and
+        MapSet.member?(subtree_languages, to_string(Map.get(post, :language)))
     end)
   end
+
+  defp truthy_flag?(value), do: value not in [false, nil]
 
   defp disk_generated_files(project_id) do
     project = Projects.get_project!(project_id)
@@ -1019,6 +1245,22 @@ defmodule BDS.Generation do
     end)
   end
 
+  defp paginated_archive_paths(route_language, segments, total_items, max_posts_per_page) do
+    total_pages = page_count(total_items, max_posts_per_page)
+
+    Enum.map(1..total_pages, fn page_number ->
+      archive_path(route_language, segments, page_number)
+    end)
+  end
+
+  defp root_route_paths(route_language, total_items, max_posts_per_page) do
+    total_pages = page_count(total_items, max_posts_per_page)
+
+    Enum.map(1..total_pages, fn page_number ->
+      root_output_path(route_language, page_number)
+    end)
+  end
+
   defp root_output_path(nil, 1), do: "index.html"
   defp root_output_path("", 1), do: "index.html"
   defp root_output_path(route_language, 1), do: Path.join(route_language, "index.html")
@@ -1078,6 +1320,14 @@ defmodule BDS.Generation do
       [] -> [[]]
       chunks -> chunks
     end
+  end
+
+  defp report_snapshot_stage_progress(nil, _stage, _current, _total), do: :ok
+  defp report_snapshot_stage_progress(_callback, _stage, _current, total) when total <= 0, do: :ok
+
+  defp report_snapshot_stage_progress(callback, stage, current, total) do
+    callback.(stage, current, total)
+    :ok
   end
 
   defp build_single_outputs(
@@ -1270,6 +1520,199 @@ defmodule BDS.Generation do
   defp render_sitemap(urls) do
     entries = Enum.map_join(urls, "", fn url -> "<url><loc>#{xml_escape(url)}</loc></url>" end)
     "<urlset>#{entries}</urlset>"
+  end
+
+  defp render_multi_language_sitemap(
+         plan,
+         translatable_posts,
+         do_not_translate_posts,
+         published_list_posts,
+         post_index,
+         additional_languages
+       ) do
+    all_languages = [plan.language | additional_languages]
+    latest_post_updated_at = latest_post_updated_at_iso(published_list_posts)
+
+    urls =
+      [
+        render_multi_language_sitemap_url(
+          url_for_path(plan.base_url, "/"),
+          latest_post_updated_at,
+          "daily",
+          "1.0",
+          build_hreflang_links(plan.base_url, "/", plan.language, all_languages)
+        )
+      ] ++
+        Enum.map(root_pagination_pages(length(published_list_posts), plan.max_posts_per_page), fn page_number ->
+          page_path = "/page/#{page_number}"
+
+          render_multi_language_sitemap_url(
+            url_for_path(plan.base_url, page_path),
+            latest_post_updated_at,
+            "daily",
+            "0.9",
+            build_hreflang_links(plan.base_url, page_path, plan.language, all_languages)
+          )
+        end) ++
+        Enum.map(translatable_posts, fn post ->
+          post_path = relative_path_to_url_path(post_output_path(post))
+
+          render_multi_language_sitemap_url(
+            url_for_path(plan.base_url, post_path),
+            unix_ms_to_iso8601(post.updated_at),
+            "monthly",
+            "0.8",
+            build_hreflang_links(plan.base_url, post_path, plan.language, all_languages)
+          )
+        end) ++
+        Enum.map(do_not_translate_posts, fn post ->
+          post_path = relative_path_to_url_path(post_output_path(post))
+
+          render_multi_language_sitemap_url(
+            url_for_path(plan.base_url, post_path),
+            unix_ms_to_iso8601(post.updated_at),
+            "monthly",
+            "0.8",
+            build_hreflang_links(plan.base_url, post_path, plan.language, [plan.language])
+          )
+        end) ++
+        Enum.flat_map(translatable_posts ++ do_not_translate_posts, fn post ->
+          if "page" in (post.categories || []) and to_string(post.slug) != "" do
+            page_path = relative_path_to_url_path(page_output_path(post.slug, nil))
+            languages = if truthy_flag?(Map.get(post, :do_not_translate)), do: [plan.language], else: all_languages
+
+            [
+              render_multi_language_sitemap_url(
+                url_for_path(plan.base_url, page_path),
+                unix_ms_to_iso8601(post.updated_at),
+                "weekly",
+                "0.7",
+                build_hreflang_links(plan.base_url, page_path, plan.language, languages)
+              )
+            ]
+          else
+            []
+          end
+        end) ++
+        Enum.map(Enum.sort_by(post_index.posts_by_year, &elem(&1, 0), :desc), fn {year, _posts} ->
+          year_path = "/#{year}"
+
+          render_multi_language_sitemap_url(
+            url_for_path(plan.base_url, year_path),
+            latest_post_updated_at,
+            "monthly",
+            "0.5",
+            build_hreflang_links(plan.base_url, year_path, plan.language, all_languages)
+          )
+        end) ++
+        Enum.map(Enum.sort_by(post_index.posts_by_year_month, &elem(&1, 0), :desc), fn {year_month, _posts} ->
+          month_path = "/#{year_month}"
+
+          render_multi_language_sitemap_url(
+            url_for_path(plan.base_url, month_path),
+            latest_post_updated_at,
+            "monthly",
+            "0.5",
+            build_hreflang_links(plan.base_url, month_path, plan.language, all_languages)
+          )
+        end) ++
+        Enum.map(Enum.sort_by(post_index.posts_by_year_month_day, &elem(&1, 0), :desc), fn {year_month_day, _posts} ->
+          day_path = "/#{year_month_day}"
+
+          render_multi_language_sitemap_url(
+            url_for_path(plan.base_url, day_path),
+            latest_post_updated_at,
+            "monthly",
+            "0.4",
+            build_hreflang_links(plan.base_url, day_path, plan.language, all_languages)
+          )
+        end) ++
+        Enum.map(Enum.sort_by(post_index.posts_by_category, &elem(&1, 0)), fn {category, _posts} ->
+          category_path = "/category/#{Slug.slugify(category)}"
+
+          render_multi_language_sitemap_url(
+            url_for_path(plan.base_url, category_path),
+            latest_post_updated_at,
+            "weekly",
+            "0.6",
+            build_hreflang_links(plan.base_url, category_path, plan.language, all_languages)
+          )
+        end) ++
+        Enum.map(Enum.sort_by(post_index.posts_by_tag, &elem(&1, 0)), fn {tag, _posts} ->
+          tag_path = "/tag/#{Slug.slugify(tag)}"
+
+          render_multi_language_sitemap_url(
+            url_for_path(plan.base_url, tag_path),
+            latest_post_updated_at,
+            "weekly",
+            "0.6",
+            build_hreflang_links(plan.base_url, tag_path, plan.language, all_languages)
+          )
+        end)
+
+    [
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+      "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">",
+      Enum.join(urls, "\n"),
+      "</urlset>",
+      ""
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp latest_post_updated_at_iso([]), do: DateTime.utc_now() |> DateTime.to_iso8601()
+  defp latest_post_updated_at_iso([post | _rest]), do: unix_ms_to_iso8601(post.updated_at)
+
+  defp root_pagination_pages(total_items, max_posts_per_page) do
+    case page_count(total_items, max_posts_per_page) do
+      total_pages when total_pages > 1 -> Enum.to_list(2..total_pages)
+      _other -> []
+    end
+  end
+
+  defp unix_ms_to_iso8601(nil), do: DateTime.utc_now() |> DateTime.to_iso8601()
+  defp unix_ms_to_iso8601(value), do: value |> Persistence.from_unix_ms!() |> DateTime.to_iso8601()
+
+  defp url_for_path(nil, path), do: ensure_trailing_slash(path)
+
+  defp url_for_path(base_url, path) do
+    String.trim_trailing(base_url, "/") <> ensure_trailing_slash(path)
+  end
+
+  defp ensure_trailing_slash(path) do
+    normalized_path = normalize_url_path(path)
+    if normalized_path == "/", do: "/", else: normalized_path <> "/"
+  end
+
+  defp build_hreflang_links(base_url, url_path, main_language, languages) do
+    Enum.map(languages, fn language ->
+      prefixed_path =
+        if language == main_language do
+          url_path
+        else
+          normalize_url_path("/#{language}#{url_path}")
+        end
+
+      canonical_href = url_for_path(base_url, prefixed_path)
+
+      "    <xhtml:link rel=\"alternate\" hreflang=\"#{xml_escape(language)}\" href=\"#{xml_escape(canonical_href)}\" />"
+    end) ++
+      [
+        "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"#{xml_escape(url_for_path(base_url, url_path))}\" />"
+      ]
+  end
+
+  defp render_multi_language_sitemap_url(loc, lastmod, changefreq, priority, hreflang_links) do
+    [
+      "  <url>",
+      "    <loc>#{xml_escape(loc)}</loc>",
+      "    <lastmod>#{xml_escape(lastmod)}</lastmod>",
+      "    <changefreq>#{changefreq}</changefreq>",
+      "    <priority>#{priority}</priority>",
+      Enum.join(hreflang_links, "\n"),
+      "  </url>"
+    ]
+    |> Enum.join("\n")
   end
 
   defp sitemap_route_output?("404.html"), do: false
@@ -1561,59 +2004,37 @@ defmodule BDS.Generation do
     |> then(fn {:ok, files} -> Map.new(files, &{&1.relative_path, &1.updated_at}) end)
   end
 
-  defp build_post_timestamp_checks(
-      project_data_dir,
-         main_language,
+  defp build_post_timestamp_checks(project_data_dir, published_route_posts, generated_file_updated_at) do
+    Enum.map(published_route_posts, fn post ->
+      relative_path = post_output_path(post)
+
+      %{
+        post_url_path: relative_path_to_url_path(relative_path),
+        post_file_path:
+          source_full_path(
+            project_data_dir,
+            Map.get(post, :translation_file_path) || Map.get(post, :file_path)
+          ),
+        generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
+      }
+    end)
+  end
+
+  defp build_language_post_timestamp_checks(
+         project_data_dir,
+         language,
          published_posts,
-         published_translations,
          generated_file_updated_at
        ) do
-    translations_by_post_language =
-      Map.new(published_translations, fn translation ->
-        {{translation.translation_for, translation.language}, translation}
-      end)
+    Enum.map(published_posts, fn post ->
+      relative_path = post_output_path(post, language)
 
-    post_by_id = Map.new(published_posts, &{&1.id, &1})
-
-    canonical_checks =
-      Enum.map(published_posts, fn post ->
-        canonical_variant = Map.get(translations_by_post_language, {post.id, main_language}, post)
-        relative_path = post_output_path(post)
-
-        %{
-          post_url_path: relative_path_to_url_path(relative_path),
-          post_file_path: source_full_path(project_data_dir, canonical_variant.file_path),
-          generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
-        }
-      end)
-
-    translation_checks =
-      Enum.flat_map(published_posts, fn post ->
-        post_variant =
-          if post.language == main_language do
-            []
-          else
-            [{post.language, post}]
-          end
-
-        translation_variants =
-          published_translations
-          |> Enum.filter(&(&1.translation_for == post.id and &1.language != main_language))
-          |> Enum.map(&{&1.language, &1})
-
-        Enum.map(post_variant ++ translation_variants, fn {language, variant} ->
-          canonical_post = Map.get(post_by_id, post.id, post)
-          relative_path = post_output_path(canonical_post, language)
-
-          %{
-            post_url_path: relative_path_to_url_path(relative_path),
-            post_file_path: source_full_path(project_data_dir, variant.file_path),
-            generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
-          }
-        end)
-      end)
-
-    canonical_checks ++ translation_checks
+      %{
+        post_url_path: relative_path_to_url_path(relative_path),
+        post_file_path: source_full_path(project_data_dir, Map.get(post, :file_path)),
+        generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
+      }
+    end)
   end
 
   defp source_full_path(_project_data_dir, file_path) when file_path in [nil, ""], do: nil
@@ -1631,7 +2052,12 @@ defmodule BDS.Generation do
       params.sitemap_xml
       |> extract_sitemap_locs()
       |> Enum.map(&sitemap_loc_to_project_path(&1, params.base_url))
-      |> MapSet.new()
+      |> Enum.reduce(MapSet.new(), &MapSet.put(&2, normalize_url_path(&1)))
+      |> then(fn expected_paths ->
+        Enum.reduce(Map.get(params, :additional_expected_paths, []), expected_paths, fn path, acc ->
+          MapSet.put(acc, normalize_url_path(path))
+        end)
+      end)
 
     {existing_html_path_set, zero_byte_html_path_set} =
       collect_html_index_paths(index_paths, params.html_dir, params.on_progress, total_compare_steps)
