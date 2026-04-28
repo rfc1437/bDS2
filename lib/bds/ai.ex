@@ -318,14 +318,7 @@ defmodule BDS.AI do
   end
 
   def available_chat_models(current_model \\ nil) do
-    endpoint_models =
-      [:online, :airplane]
-      |> Enum.flat_map(fn kind ->
-        case get_endpoint(kind) do
-          {:ok, %{model: model}} when is_binary(model) and model != "" -> [model]
-          _other -> []
-        end
-      end)
+    endpoint_models = configured_chat_models()
 
     preference_models =
       [:chat, :airplane_chat]
@@ -336,10 +329,19 @@ defmodule BDS.AI do
         end
       end)
 
-    [current_model | endpoint_models ++ preference_models]
+    provider_names = catalog_provider_name_map()
+    endpoint_provider_map = Map.new(endpoint_models, &{&1.id, &1.provider})
+
+    [current_model | Enum.map(endpoint_models, & &1.id) ++ preference_models]
     |> Enum.filter(&(is_binary(&1) and String.trim(&1) != ""))
     |> Enum.uniq()
-    |> Enum.map(&%{id: &1, name: &1})
+    |> Enum.map(&build_available_chat_model(&1, endpoint_provider_map, provider_names))
+    |> Enum.sort_by(fn model ->
+      {
+        String.downcase(to_string(model.provider_name || model.provider || "")),
+        String.downcase(to_string(model.name || model.id))
+      }
+    end)
   end
 
   def set_conversation_model(conversation_id, model_id)
@@ -478,6 +480,81 @@ defmodule BDS.AI do
       created_at: message.created_at
     }
   end
+
+  defp configured_chat_models do
+    [:online, :airplane]
+    |> Enum.flat_map(fn kind ->
+      case get_endpoint(kind) do
+        {:ok, %{model: model, url: url}} when is_binary(model) and model != "" ->
+          [%{id: model, provider: infer_endpoint_provider(kind, url)}]
+
+        _other ->
+          []
+      end
+    end)
+  end
+
+  defp build_available_chat_model(model_id, endpoint_provider_map, provider_names) do
+    case get_catalog_model(model_id) do
+      {:ok, model} ->
+        provider = model.provider || Map.get(endpoint_provider_map, model_id, "other")
+
+        %{
+          id: model.model_id,
+          name: model.name || model.model_id,
+          provider: provider,
+          provider_name: Map.get(provider_names, provider, fallback_provider_name(provider)),
+          context_window: model.context_window,
+          max_output_tokens: model.max_output_tokens
+        }
+
+      {:error, :not_found} ->
+        provider = Map.get(endpoint_provider_map, model_id, "other")
+
+        %{
+          id: model_id,
+          name: model_id,
+          provider: provider,
+          provider_name: Map.get(provider_names, provider, fallback_provider_name(provider)),
+          context_window: nil,
+          max_output_tokens: nil
+        }
+    end
+  end
+
+  defp catalog_provider_name_map do
+    Repo.all(from provider in CatalogProvider, select: {provider.id, provider.name})
+    |> Map.new()
+  end
+
+  defp infer_endpoint_provider(:online, _url), do: "generic-openai"
+
+  defp infer_endpoint_provider(:airplane, url) when is_binary(url) do
+    normalized_url = String.downcase(url)
+
+    cond do
+      String.contains?(normalized_url, "11434") or String.contains?(normalized_url, "ollama") -> "ollama"
+      String.contains?(normalized_url, "1234") or String.contains?(normalized_url, "lmstudio") -> "lmstudio"
+      true -> "generic-openai"
+    end
+  end
+
+  defp infer_endpoint_provider(:airplane, _url), do: "generic-openai"
+
+  defp fallback_provider_name("generic-openai"), do: "Generic OpenAI"
+  defp fallback_provider_name("lmstudio"), do: "LM Studio"
+  defp fallback_provider_name("mistral"), do: "Mistral"
+  defp fallback_provider_name("ollama"), do: "Ollama"
+  defp fallback_provider_name("openai"), do: "OpenAI"
+
+  defp fallback_provider_name(provider) when is_binary(provider) and provider != "" do
+    provider
+    |> String.split(["-", "_"], trim: true)
+    |> Enum.map(&String.capitalize/1)
+    |> Enum.join(" ")
+  end
+
+  defp fallback_provider_name(_provider), do: "Other"
 
   defp run_one_shot(operation, payload, opts, formatter) do
     runtime = Keyword.get(opts, :runtime, OpenAICompatibleRuntime)

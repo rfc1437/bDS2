@@ -1829,6 +1829,82 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Posts"
   end
 
+  test "chat editor groups selector models by provider and uses catalog labels" do
+    updated_at = Persistence.now_ms()
+
+    Repo.insert!(
+      BDS.AI.CatalogProvider.changeset(%BDS.AI.CatalogProvider{}, %{
+        id: "openai",
+        name: "OpenAI",
+        updated_at: updated_at
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.CatalogProvider.changeset(%BDS.AI.CatalogProvider{}, %{
+        id: "ollama",
+        name: "Ollama",
+        updated_at: updated_at
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.Model.changeset(%BDS.AI.Model{}, %{
+        provider: "openai",
+        model_id: "gpt-4o",
+        name: "GPT-4o",
+        context_window: 128_000,
+        max_input_tokens: 128_000,
+        max_output_tokens: 16_384,
+        updated_at: updated_at
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.Model.changeset(%BDS.AI.Model{}, %{
+        provider: "ollama",
+        model_id: "llama3.3",
+        name: "Llama 3.3",
+        context_window: 128_000,
+        max_input_tokens: 128_000,
+        max_output_tokens: 8_192,
+        updated_at: updated_at
+      })
+    )
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:airplane, %{
+               url: "http://localhost:11434/v1",
+               api_key: nil,
+               model: "llama3.3"
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "Grouped Models", model: "gpt-4o"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    html =
+      view
+      |> element("[data-testid='chat-model-selector-button']")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="chat-model-provider-group")
+    assert html =~ ~s(data-provider="openai")
+    assert html =~ ~s(data-provider="ollama")
+    assert html =~ ">OpenAI<"
+    assert html =~ ">Ollama<"
+    assert html =~ ">GPT-4o<"
+    assert html =~ ">Llama 3.3<"
+  end
+
   test "chat editor renders API-key-required state when online chat is not configured" do
     assert :ok = AI.set_airplane_mode(false)
 

@@ -201,12 +201,14 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
       %ChatConversation{} = conversation ->
         messages = AI.list_chat_messages(conversation.id)
         request = Map.get(assigns.chat_editor_requests, conversation.id)
+        available_models = AI.available_chat_models(conversation.model)
 
         %{
           id: conversation.id,
           title: conversation.title || translated("chat.newChat"),
           model: conversation.model,
-          available_models: AI.available_chat_models(conversation.model),
+          available_models: available_models,
+          available_model_groups: group_available_models(available_models),
           model_selector_open?: Map.get(assigns.chat_model_selectors_open, conversation.id, false),
           input: Map.get(assigns.chat_editor_inputs, conversation.id, ""),
           messages: build_entries(messages, assigns),
@@ -249,6 +251,24 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   end
 
   def markdown_html(_content), do: ""
+
+  defp group_available_models(models) when is_list(models) do
+    models
+    |> Enum.group_by(&Map.get(&1, :provider, "other"))
+    |> Enum.map(fn {provider, entries} ->
+      %{
+        provider: provider,
+        label: provider_group_label(entries, provider),
+        models: Enum.sort_by(entries, &String.downcase(to_string(Map.get(&1, :name) || Map.get(&1, :id))))
+      }
+    end)
+    |> Enum.sort_by(&String.downcase(to_string(&1.label)))
+  end
+
+  defp provider_group_label([%{provider_name: name} | _entries], _provider) when is_binary(name) and name != "",
+    do: name
+
+  defp provider_group_label(_entries, provider) when is_binary(provider), do: provider
 
   def payload_json(nil), do: "{}"
   def payload_json(payload) when is_map(payload), do: Jason.encode!(payload)

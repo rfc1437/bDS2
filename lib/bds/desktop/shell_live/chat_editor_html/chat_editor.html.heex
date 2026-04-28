@@ -22,18 +22,28 @@
 
         <%= if @chat_editor.model_selector_open? and @chat_editor.available_models != [] do %>
           <div class="chat-model-selector-menu">
-            <%= for model <- @chat_editor.available_models do %>
-              <button
-                class={[
-                  "chat-model-selector-option",
-                  if(model.id == @chat_editor.model, do: "active")
-                ]}
-                type="button"
-                phx-click="select_chat_model"
-                phx-value-model={model.id}
-              >
-                <%= model.name %>
-              </button>
+            <%= for group <- @chat_editor.available_model_groups do %>
+              <section class="chat-model-provider-group" data-testid="chat-model-provider-group" data-provider={group.provider}>
+                <%= if length(@chat_editor.available_model_groups) > 1 do %>
+                  <div class="chat-model-provider-header"><%= group.label %></div>
+                <% end %>
+
+                <%= for model <- group.models do %>
+                  <button
+                    class={[
+                      "chat-model-selector-option",
+                      if(model.id == @chat_editor.model, do: "active")
+                    ]}
+                    type="button"
+                    phx-click="select_chat_model"
+                    phx-value-model={model.id}
+                    data-testid="chat-model-selector-option"
+                    data-provider={group.provider}
+                  >
+                    <span class="chat-model-selector-option-name"><%= model.name || model.id %></span>
+                  </button>
+                <% end %>
+              </section>
             <% end %>
           </div>
         <% end %>

@@ -4894,7 +4894,7 @@ button svg * {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   padding: 6px;
   border: 1px solid var(--vscode-dropdown-border, var(--line, #3c3c3c));
   border-radius: 4px;
@@ -4903,11 +4903,31 @@ button svg * {
   z-index: 100;
 }
 
+.chat-model-provider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-model-provider-header {
+  padding: 2px 6px 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground, rgba(255, 255, 255, 0.6));
+}
+
 .chat-model-selector-option {
+  display: block;
   width: 100%;
   padding: 8px 12px;
   font-size: 12px;
   text-align: left;
+}
+
+.chat-model-selector-option-name {
+  display: block;
 }
 
 .chat-model-selector-option.active {
