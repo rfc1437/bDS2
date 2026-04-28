@@ -32,6 +32,32 @@ defmodule BDS.Desktop.ShellLiveTest do
     def get(_url, _headers), do: {:error, :not_found}
   end
 
+  defmodule DelayedChatServer do
+    use Plug.Router
+    import Phoenix.ConnTest, except: [post: 2]
+
+    plug :match
+    plug :dispatch
+
+    post "/v1/chat/completions" do
+      Process.sleep(300)
+
+      body =
+        Jason.encode!(%{
+          "choices" => [%{"message" => %{"content" => "Delayed **response**"}}],
+          "usage" => %{"prompt_tokens" => 8, "completion_tokens" => 5}
+        })
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> send_resp(200, body)
+    end
+
+    match _ do
+      send_resp(conn, 404, "not found")
+    end
+  end
+
   @endpoint BDS.Desktop.Endpoint
 
   setup do
@@ -1801,6 +1827,155 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Blog Stats"
     assert html =~ "Metric"
     assert html =~ "Posts"
+  end
+
+  test "chat editor renders API-key-required state when online chat is not configured" do
+    assert :ok = AI.set_airplane_mode(false)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "https://api.example.test/v1",
+               api_key: nil,
+               model: "gpt-4.1"
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "Needs Setup", model: "gpt-4.1"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert html =~ "AI Chat Setup"
+    assert html =~ "API Key Required"
+    assert html =~ "Open Settings"
+    refute html =~ ~s(data-testid="chat-input-container")
+  end
+
+  test "chat editor renders assistant markdown and dispatches assistant navigation actions", %{project: project} do
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Action Post",
+               content: "Body",
+               language: "en"
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "Action Chat", model: "gpt-4.1"})
+
+    now = Persistence.now_ms()
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :user,
+        content: "Open the post",
+        created_at: now
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :assistant,
+        content: "Use **markdown** to jump to the editor.",
+        tool_calls:
+          Jason.encode!([
+            %{
+              "id" => "call-card",
+              "name" => "render_card",
+              "arguments" => %{
+                "title" => "Quick Action",
+                "body" => "Open the related post editor.",
+                "actions" => [
+                  %{
+                    "label" => "Open Post",
+                    "action" => "openPost",
+                    "payload" => %{"postId" => post.id}
+                  }
+                ]
+              }
+            }
+          ]),
+        created_at: now + 1
+      })
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert html =~ "<strong>markdown</strong>"
+    assert html =~ ~s(data-testid="chat-inline-surface")
+    assert html =~ "Quick Action"
+    assert html =~ "Open Post"
+
+    html =
+      view
+      |> element("[data-testid='chat-surface-action'][data-action='openPost']")
+      |> render_click()
+
+    assert html =~ ~s(data-tab-type="post")
+    assert html =~ ~s(data-tab-id="#{post.id}")
+  end
+
+  test "chat editor shows in-flight stop state and can abort a running turn" do
+    assert :ok = AI.set_airplane_mode(false)
+
+    server =
+      start_supervised!({Bandit, plug: DelayedChatServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "online-secret",
+               model: "gpt-4.1"
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "Slow Chat", model: "gpt-4.1"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    _html = render_change(view, "change_chat_editor_input", %{"message" => "Please wait"})
+
+    html =
+      view
+      |> element("[data-testid='chat-send-button']")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="chat-abort-button")
+    assert html =~ ~s(data-testid="chat-streaming-thinking")
+
+    html =
+      view
+      |> element("[data-testid='chat-abort-button']")
+      |> render_click()
+
+    refute html =~ ~s(data-testid="chat-abort-button")
+
+    Process.sleep(350)
+    refute render(view) =~ "Delayed response"
   end
 
   test "translation validation route renders dedicated cards and fix controls", %{project: project, temp_dir: temp_dir} do

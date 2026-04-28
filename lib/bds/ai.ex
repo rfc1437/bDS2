@@ -521,11 +521,19 @@ defmodule BDS.AI do
     with {:ok, response} <- runtime.generate(endpoint_with_model(endpoint, model), request, opts),
          {:ok, assistant_message} <- persist_assistant_response(conversation.id, response),
          :ok <- touch_conversation(conversation.id) do
+      if is_binary(Map.get(response, :content)) and String.trim(Map.get(response, :content)) != "" do
+        notify_chat_event(opts, {:chat_streaming_content, conversation.id, Map.get(response, :content)})
+      end
+
       tool_calls = decode_tool_calls(Map.get(response, :tool_calls))
+
+      Enum.each(tool_calls, fn tool_call ->
+        notify_chat_event(opts, {:chat_tool_call, conversation.id, tool_call})
+      end)
 
       cond do
         tool_calls != [] and tools != [] ->
-          with {:ok, tool_messages} <- execute_tool_calls(conversation.id, tool_calls, project_id),
+          with {:ok, tool_messages} <- execute_tool_calls(conversation.id, tool_calls, project_id, opts),
                updated_messages <- load_chat_messages(conversation.id),
                {:ok, reply} <-
                  chat_round(
@@ -575,7 +583,7 @@ defmodule BDS.AI do
     })
   end
 
-  defp execute_tool_calls(conversation_id, tool_calls, project_id) do
+  defp execute_tool_calls(conversation_id, tool_calls, project_id, opts) do
     tool_messages =
       Enum.map(tool_calls, fn tool_call ->
         result = execute_tool(tool_call.name, tool_call.arguments || %{}, project_id)
@@ -588,6 +596,8 @@ defmodule BDS.AI do
             tool_call_id: tool_call.id,
             created_at: Persistence.now_ms()
           })
+
+        notify_chat_event(opts, {:chat_tool_result, conversation_id, tool_call.name})
 
         format_chat_message(message)
       end)
@@ -652,7 +662,51 @@ defmodule BDS.AI do
     %{
       type: "form",
       title: arguments["title"],
-      fields: arguments["fields"] || []
+      fields: arguments["fields"] || [],
+      submit_label: arguments["submit_label"] || arguments["submitLabel"],
+      submit_action: arguments["submit_action"] || arguments["submitAction"]
+    }
+  end
+
+  defp execute_tool("render_card", arguments, _project_id) do
+    %{
+      type: "card",
+      title: arguments["title"],
+      subtitle: arguments["subtitle"],
+      body: arguments["body"],
+      actions: arguments["actions"] || []
+    }
+  end
+
+  defp execute_tool("render_metric", arguments, _project_id) do
+    %{
+      type: "metric",
+      label: arguments["label"],
+      value: arguments["value"]
+    }
+  end
+
+  defp execute_tool("render_list", arguments, _project_id) do
+    %{
+      type: "list",
+      title: arguments["title"],
+      items: arguments["items"] || []
+    }
+  end
+
+  defp execute_tool("render_tabs", arguments, _project_id) do
+    %{
+      type: "tabs",
+      title: arguments["title"],
+      tabs: arguments["tabs"] || []
+    }
+  end
+
+  defp execute_tool("render_mindmap", arguments, _project_id) do
+    %{
+      type: "mindmap",
+      title: arguments["title"],
+      nodes: arguments["nodes"] || []
     }
   end
 
@@ -736,9 +790,14 @@ defmodule BDS.AI do
 
       project_tools ++
         [
+          %{name: "render_card", spec: tool_spec("render_card", "Return a structured card payload", render_card_schema())},
           %{name: "render_table", spec: tool_spec("render_table", "Return a structured table payload", render_table_schema())},
           %{name: "render_chart", spec: tool_spec("render_chart", "Return a structured chart payload", render_chart_schema())},
-          %{name: "render_form", spec: tool_spec("render_form", "Return a structured form payload", render_form_schema())}
+          %{name: "render_form", spec: tool_spec("render_form", "Return a structured form payload", render_form_schema())},
+          %{name: "render_metric", spec: tool_spec("render_metric", "Return a structured metric payload", render_metric_schema())},
+          %{name: "render_list", spec: tool_spec("render_list", "Return a structured list payload", render_list_schema())},
+          %{name: "render_tabs", spec: tool_spec("render_tabs", "Return a structured tabs payload", render_tabs_schema())},
+          %{name: "render_mindmap", spec: tool_spec("render_mindmap", "Return a structured mindmap payload", render_mindmap_schema())}
         ]
     else
       []
@@ -1162,13 +1221,77 @@ defmodule BDS.AI do
       "type" => "object",
       "properties" => %{
         "title" => %{"type" => "string"},
-        "fields" => %{"type" => "array"}
+        "fields" => %{"type" => "array"},
+        "submitLabel" => %{"type" => "string"},
+        "submitAction" => %{"type" => "string"}
+      }
+    }
+  end
+
+  defp render_card_schema do
+    %{
+      "type" => "object",
+      "properties" => %{
+        "title" => %{"type" => "string"},
+        "subtitle" => %{"type" => "string"},
+        "body" => %{"type" => "string"},
+        "actions" => %{"type" => "array"}
+      }
+    }
+  end
+
+  defp render_metric_schema do
+    %{
+      "type" => "object",
+      "properties" => %{
+        "label" => %{"type" => "string"},
+        "value" => %{"type" => "string"}
+      }
+    }
+  end
+
+  defp render_list_schema do
+    %{
+      "type" => "object",
+      "properties" => %{
+        "title" => %{"type" => "string"},
+        "items" => %{"type" => "array"}
+      }
+    }
+  end
+
+  defp render_tabs_schema do
+    %{
+      "type" => "object",
+      "properties" => %{
+        "title" => %{"type" => "string"},
+        "tabs" => %{"type" => "array"}
+      }
+    }
+  end
+
+  defp render_mindmap_schema do
+    %{
+      "type" => "object",
+      "properties" => %{
+        "title" => %{"type" => "string"},
+        "nodes" => %{"type" => "array"}
       }
     }
   end
 
   defp normalize_limit(value) when is_integer(value) and value > 0 and value <= 50, do: value
   defp normalize_limit(_value), do: 10
+
+  defp notify_chat_event(opts, event) do
+    case Keyword.get(opts, :event_target) do
+      pid when is_pid(pid) -> send(pid, event)
+      callback when is_function(callback, 1) -> callback.(event)
+      _other -> :ok
+    end
+
+    :ok
+  end
 
   defp truncate_text(nil, _max_length), do: ""
 

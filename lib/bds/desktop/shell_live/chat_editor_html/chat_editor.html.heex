@@ -1,40 +1,58 @@
-<div class="chat-panel" data-testid="chat-editor">
+<div id={"chat-editor-#{@chat_editor.id}"} class="chat-panel" data-testid="chat-editor" phx-hook="ChatSurface">
   <div class="chat-panel-header">
-    <div class="chat-panel-title"><%= @chat_editor.title %></div>
-
-    <div class="chat-panel-header-actions">
-      <button
-        class="chat-model-selector-button"
-        type="button"
-        phx-click="toggle_chat_model_selector"
-        data-testid="chat-model-selector-button"
-      >
-        <span><%= @chat_editor.model || translated("chat.newChat") %></span>
-        <span class="chat-model-selector-caret">▾</span>
-      </button>
-
-      <%= if @chat_editor.model_selector_open? and @chat_editor.available_models != [] do %>
-        <div class="chat-model-selector-menu">
-          <%= for model <- @chat_editor.available_models do %>
-            <button
-              class={[
-                "chat-model-selector-option",
-                if(model.id == @chat_editor.model, do: "active")
-              ]}
-              type="button"
-              phx-click="select_chat_model"
-              phx-value-model={model.id}
-            >
-              <%= model.name %>
-            </button>
-          <% end %>
-        </div>
+    <div class="chat-panel-title">
+      <%= if @chat_editor.needs_api_key? do %>
+        <%= translated("chat.setupTitle") %>
+      <% else %>
+        <%= @chat_editor.title %>
       <% end %>
     </div>
+
+    <%= unless @chat_editor.needs_api_key? do %>
+      <div class="chat-panel-header-actions">
+        <button
+          class="chat-model-selector-button"
+          type="button"
+          phx-click="toggle_chat_model_selector"
+          data-testid="chat-model-selector-button"
+        >
+          <span><%= @chat_editor.model || translated("chat.newChat") %></span>
+          <span class="chat-model-selector-caret">▾</span>
+        </button>
+
+        <%= if @chat_editor.model_selector_open? and @chat_editor.available_models != [] do %>
+          <div class="chat-model-selector-menu">
+            <%= for model <- @chat_editor.available_models do %>
+              <button
+                class={[
+                  "chat-model-selector-option",
+                  if(model.id == @chat_editor.model, do: "active")
+                ]}
+                type="button"
+                phx-click="select_chat_model"
+                phx-value-model={model.id}
+              >
+                <%= model.name %>
+              </button>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
   </div>
 
-  <div class="chat-messages">
-    <%= if Enum.empty?(@chat_editor.messages) do %>
+  <div class="chat-messages chat-surface-scroll">
+    <%= if @chat_editor.needs_api_key? do %>
+      <div class="chat-welcome chat-api-key-state" data-testid="chat-api-key-required">
+        <div class="chat-welcome-icon">🔑</div>
+        <h2><%= translated("chat.apiKeyRequiredTitle") %></h2>
+        <p><%= translated("chat.apiKeyRequiredDescription") %></p>
+        <div class="api-key-form">
+          <button class="api-key-submit" type="button" phx-click="open_chat_settings"><%= translated("chat.openSettings") %></button>
+        </div>
+      </div>
+    <% else %>
+    <%= if Enum.empty?(@chat_editor.messages) and not @chat_editor.is_streaming do %>
       <div class="chat-welcome">
         <div class="chat-welcome-icon">🤖</div>
         <h2><%= translated("chat.welcomeTitle") %></h2>
@@ -48,24 +66,38 @@
         </ul>
       </div>
     <% else %>
-      <%= for message <- @chat_editor.messages do %>
-        <div class={["chat-message", to_string(message.role || "assistant")]}>
+      <%= if @chat_editor.pending_user_message do %>
+        <div class="chat-message user pending" data-testid="chat-pending-user-message">
+          <div class="chat-message-avatar">👤</div>
           <div class="chat-message-content">
-            <div class="chat-message-header"><span class="chat-message-role"><%= message_role_label(message.role) %></span></div>
-
-            <%= if message.tool_markers != [] do %>
-              <div class="chat-tool-markers">
-                <%= for tool_call <- message.tool_markers do %>
-                  <div class="chat-tool-marker" data-testid="chat-tool-marker">
-                    <span class="chat-tool-marker-name"><%= tool_call_name(tool_call) %></span>
-                  </div>
-                <% end %>
-              </div>
-            <% end %>
-
-            <div class="chat-message-text"><%= message.content || "" %></div>
+            <div class="chat-message-header">
+              <span class="chat-message-role"><%= message_role_label(:user) %></span>
+            </div>
+            <div class="chat-message-text"><%= @chat_editor.pending_user_message %></div>
           </div>
         </div>
+      <% end %>
+
+      <%= for message <- @chat_editor.messages do %>
+        <div class={["chat-message", to_string(message.role || "assistant")]}>
+          <div class="chat-message-avatar"><%= if message.role == :user, do: "👤", else: "🤖" %></div>
+          <div class="chat-message-content">
+            <div class="chat-message-header"><span class="chat-message-role"><%= message_role_label(message.role) %></span></div>
+            <.chat_tool_markers markers={message.tool_markers} />
+
+            <div class="chat-message-text">
+              <%= if message.role == :assistant do %>
+                <%= markdown_html(message.content || "") %>
+              <% else %>
+                <%= message.content || "" %>
+              <% end %>
+            </div>
+          </div>
+        </div>
+
+        <%= for surface <- message.inline_surfaces do %>
+          <.chat_surface surface={surface} />
+        <% end %>
 
         <%= for surface <- message.tool_surfaces do %>
           <article class="chat-tool-surface" data-testid="chat-tool-surface">
@@ -102,13 +134,52 @@
           </article>
         <% end %>
       <% end %>
+
+      <%= if @chat_editor.is_streaming and (@chat_editor.streaming_content != "" or @chat_editor.streaming_tool_markers != []) do %>
+        <div class="chat-message assistant streaming" data-testid="chat-streaming-message">
+          <div class="chat-message-avatar">🤖</div>
+          <div class="chat-message-content">
+            <div class="chat-message-header">
+              <span class="chat-message-role"><%= message_role_label(:assistant) %></span>
+              <span class="streaming-indicator">●</span>
+            </div>
+            <.chat_tool_markers markers={@chat_editor.streaming_tool_markers} />
+
+            <%= if @chat_editor.streaming_content != "" do %>
+              <div class="chat-message-text"><%= markdown_html(@chat_editor.streaming_content) %></div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <%= if @chat_editor.is_streaming and @chat_editor.streaming_content == "" and @chat_editor.streaming_tool_markers == [] do %>
+        <div class="chat-message assistant thinking" data-testid="chat-streaming-thinking">
+          <div class="chat-message-avatar">🤖</div>
+          <div class="chat-message-content">
+            <div class="chat-thinking-indicator">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
     <% end %>
   </div>
 
-  <div class="chat-input-container">
-    <form class="chat-input-wrapper" phx-change="change_chat_editor_input">
-      <textarea class="chat-input chat-surface-input" name="message" rows="1" placeholder={translated("chat.inputPlaceholder")}><%= @chat_editor.input %></textarea>
-      <button class="chat-send-button" type="button" phx-click="send_chat_editor_message" disabled={String.trim(@chat_editor.input || "") == "" or @chat_editor.offline?}>↑</button>
-    </form>
-  </div>
+  <%= unless @chat_editor.needs_api_key? do %>
+    <div class="chat-input-container" data-testid="chat-input-container">
+      <%= if @chat_editor.is_streaming do %>
+        <button class="chat-abort-button" data-testid="chat-abort-button" type="button" phx-click="abort_chat_editor_message">◼ <%= translated("chat.stop") %></button>
+      <% end %>
+
+      <form class="chat-input-wrapper" phx-change="change_chat_editor_input" phx-submit="send_chat_editor_message">
+        <textarea class="chat-input chat-surface-input" name="message" rows="1" placeholder={translated("chat.inputPlaceholder")}><%= @chat_editor.input %></textarea>
+        <button class="chat-send-button" data-testid="chat-send-button" type="button" phx-click="send_chat_editor_message" disabled={@chat_editor.send_disabled?}>↑</button>
+      </form>
+
+      <%= if @chat_editor.action_error do %>
+        <p class="chat-surface-error"><%= @chat_editor.action_error %></p>
+      <% end %>
+    </div>
+  <% end %>
 </div>

@@ -98,6 +98,11 @@ defmodule BDS.Desktop.ShellLive do
         |> assign(:template_editor_drafts, %{})
         |> assign(:chat_editor_inputs, %{})
         |> assign(:chat_model_selectors_open, %{})
+        |> assign(:chat_editor_requests, %{})
+        |> assign(:chat_editor_request_refs, %{})
+        |> assign(:chat_editor_surface_data, %{})
+        |> assign(:chat_editor_surface_tabs, %{})
+        |> assign(:chat_editor_action_errors, %{})
         |> assign(:misc_editor_selected_pairs, %{})
         |> assign(:misc_editor_git_selected_files, %{})
         |> assign(:metadata_diff_active_tabs, %{})
@@ -697,6 +702,29 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, ChatEditor.send_message(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
+  def handle_event("abort_chat_editor_message", _params, socket) do
+    {:noreply, ChatEditor.abort_message(socket, &reload_shell/2)}
+  end
+
+  def handle_event("open_chat_settings", _params, socket) do
+    {:noreply,
+     socket
+     |> clear_chat_action_error()
+     |> open_sidebar_item(%{"route" => "settings", "id" => "settings-ai", "title" => "Settings", "subtitle" => "AI"}, :pin)}
+  end
+
+  def handle_event("change_chat_surface_form", %{"surface" => %{"id" => surface_id, "fields" => fields}}, socket) do
+    {:noreply, ChatEditor.update_surface_form(socket, surface_id, fields, &reload_shell/2)}
+  end
+
+  def handle_event("select_chat_surface_tab", %{"surface-id" => surface_id, "index" => index}, socket) do
+    {:noreply, ChatEditor.select_surface_tab(socket, surface_id, parse_integer(index), &reload_shell/2)}
+  end
+
+  def handle_event("chat_surface_action", params, socket) do
+    {:noreply, handle_chat_surface_action(socket, params)}
+  end
+
   def handle_event("rerun_misc_editor", _params, socket) do
     case MiscEditor.rerun(socket) do
       {:command, action} -> {:noreply, apply_shell_command(socket, action)}
@@ -1068,6 +1096,33 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   @impl true
+  def handle_info({ref, result}, socket) when is_reference(ref) do
+    Process.demonitor(ref, [:flush])
+    {:noreply, ChatEditor.finish_request(socket, ref, result, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, reason}, socket) when is_reference(ref) do
+    next_socket =
+      case reason do
+        :normal -> socket
+        _other -> ChatEditor.finish_request(socket, ref, {:error, :cancelled}, &reload_shell/2, &append_output_entry/5)
+      end
+
+    {:noreply, next_socket}
+  end
+
+  def handle_info({:chat_tool_call, conversation_id, tool_call}, socket) do
+    {:noreply, ChatEditor.note_tool_call(socket, conversation_id, tool_call, &reload_shell/2)}
+  end
+
+  def handle_info({:chat_tool_result, conversation_id, name}, socket) do
+    {:noreply, ChatEditor.note_tool_result(socket, conversation_id, name, &reload_shell/2)}
+  end
+
+  def handle_info({:chat_streaming_content, conversation_id, content}, socket) do
+    {:noreply, ChatEditor.note_streaming_content(socket, conversation_id, content, &reload_shell/2)}
+  end
+
   def handle_info(:refresh_task_status, socket) do
     raw_task_status = BDS.Tasks.status_snapshot()
 
@@ -2010,6 +2065,166 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp git_history_target(_tab), do: nil
+
+  defp handle_chat_surface_action(socket, params) do
+    surface_id = Map.get(params, "surface-id", "")
+
+    payload =
+      params
+      |> Map.get("payload")
+      |> decode_chat_surface_payload()
+      |> maybe_put_chat_surface_form_data(socket, surface_id)
+
+    case normalize_chat_action(Map.get(params, "action", "")) do
+      :open_post ->
+        case Map.get(payload, "postId") || Map.get(payload, "post_id") do
+          post_id when is_binary(post_id) and post_id != "" ->
+            socket
+            |> clear_chat_action_error()
+            |> open_sidebar_item(%{"route" => "post", "id" => post_id, "title" => post_title(post_id), "subtitle" => post_subtitle(post_id)}, :pin)
+
+          _other ->
+            ChatEditor.set_action_error(socket, socket.assigns.current_tab.id, "Invalid payload for openPost action", &reload_shell/2)
+        end
+
+      :open_media ->
+        case Map.get(payload, "mediaId") || Map.get(payload, "media_id") do
+          media_id when is_binary(media_id) and media_id != "" ->
+            socket
+            |> clear_chat_action_error()
+            |> open_sidebar_item(%{"route" => "media", "id" => media_id, "title" => media_title(media_id), "subtitle" => media_subtitle(media_id)}, :pin)
+
+          _other ->
+            ChatEditor.set_action_error(socket, socket.assigns.current_tab.id, "Invalid payload for openMedia action", &reload_shell/2)
+        end
+
+      :open_settings ->
+        socket
+        |> clear_chat_action_error()
+        |> open_sidebar_item(%{"route" => "settings", "id" => "settings-ai", "title" => "Settings", "subtitle" => "AI"}, :pin)
+
+      :open_chat ->
+        chat_id = Map.get(payload, "conversationId") || Map.get(payload, "conversation_id") || socket.assigns.current_tab.id
+
+        socket
+        |> clear_chat_action_error()
+        |> open_sidebar_item(%{"route" => "chat", "id" => chat_id, "title" => Map.get(payload, "title", "Chat"), "subtitle" => Map.get(payload, "subtitle", "")}, :pin)
+
+      :switch_view ->
+        case safe_existing_atom(Map.get(payload, "view")) do
+          nil -> ChatEditor.set_action_error(socket, socket.assigns.current_tab.id, "Invalid payload for switchView action", &reload_shell/2)
+          view ->
+            socket
+            |> clear_chat_action_error()
+            |> reload_shell(Workbench.click_activity(socket.assigns.workbench, view))
+        end
+
+      :toggle_sidebar ->
+        socket
+        |> clear_chat_action_error()
+        |> reload_shell(Workbench.toggle_sidebar(socket.assigns.workbench))
+
+      :toggle_panel ->
+        socket
+        |> clear_chat_action_error()
+        |> reload_shell(Workbench.toggle_panel(socket.assigns.workbench))
+
+      :toggle_assistant_sidebar ->
+        socket
+        |> clear_chat_action_error()
+        |> reload_shell(Workbench.toggle_assistant_sidebar(socket.assigns.workbench))
+
+      :unknown ->
+        ChatEditor.set_action_error(socket, socket.assigns.current_tab.id, "Unsupported assistant action", &reload_shell/2)
+    end
+  end
+
+  defp clear_chat_action_error(%{assigns: %{current_tab: %{type: :chat, id: conversation_id}}} = socket) do
+    assign(socket, :chat_editor_action_errors, Map.delete(socket.assigns.chat_editor_action_errors, conversation_id))
+  end
+
+  defp clear_chat_action_error(socket), do: socket
+
+  defp decode_chat_surface_payload(nil), do: %{}
+  defp decode_chat_surface_payload(""), do: %{}
+
+  defp decode_chat_surface_payload(payload) when is_binary(payload) do
+    case Jason.decode(payload) do
+      {:ok, decoded} when is_map(decoded) -> decoded
+      _other -> %{}
+    end
+  end
+
+  defp decode_chat_surface_payload(_payload), do: %{}
+
+  defp maybe_put_chat_surface_form_data(payload, socket, surface_id) when is_binary(surface_id) and surface_id != "" do
+    form_data = ChatEditor.current_surface_data(socket, surface_id)
+
+    if form_data == %{} do
+      payload
+    else
+      Map.put(payload, "formData", form_data)
+    end
+  end
+
+  defp maybe_put_chat_surface_form_data(payload, _socket, _surface_id), do: payload
+
+  defp normalize_chat_action(action) do
+    action
+    |> to_string()
+    |> String.replace("_", "")
+    |> String.downcase()
+    |> case do
+      "openpost" -> :open_post
+      "openmedia" -> :open_media
+      "opensettings" -> :open_settings
+      "openchat" -> :open_chat
+      "switchview" -> :switch_view
+      "setactiveview" -> :switch_view
+      "togglesidebar" -> :toggle_sidebar
+      "togglepanel" -> :toggle_panel
+      "openpanel" -> :toggle_panel
+      "toggleassistantsidebar" -> :toggle_assistant_sidebar
+      _other -> :unknown
+    end
+  end
+
+  defp post_title(post_id) do
+    case Repo.get(Post, post_id) do
+      %Post{} = post -> post.title || post.slug || post.id
+      _other -> "Post"
+    end
+  end
+
+  defp post_subtitle(post_id) do
+    case Repo.get(Post, post_id) do
+      %Post{} = post -> post.slug || "draft"
+      _other -> "draft"
+    end
+  end
+
+  defp media_title(media_id) do
+    case Repo.get(Media, media_id) do
+      %Media{} = media -> media.title || media.filename || media.id
+      _other -> "Media"
+    end
+  end
+
+  defp media_subtitle(media_id) do
+    case Repo.get(Media, media_id) do
+      %Media{} = media -> media.filename || media.mime_type || "media"
+      _other -> "media"
+    end
+  end
+
+  defp parse_integer(value) when is_integer(value), do: value
+
+  defp parse_integer(value) do
+    case Integer.parse(to_string(value || "0")) do
+      {parsed, _rest} -> parsed
+      :error -> 0
+    end
+  end
 
   defp short_commit_hash(hash) when is_binary(hash), do: String.slice(hash, 0, 7)
   defp short_commit_hash(_hash), do: "-------"

@@ -683,6 +683,113 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     },
 
+    ChatSurface: {
+      mounted() {
+        this.stickToBottom = true;
+        this.scrollContainer = null;
+
+        this.autoResize = () => {
+          const textarea = this.el.querySelector(".chat-input");
+
+          if (!textarea) {
+            return;
+          }
+
+          textarea.style.height = "auto";
+          textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+        };
+
+        this.syncScrollContainer = () => {
+          const nextContainer = this.el.querySelector(".chat-messages");
+
+          if (nextContainer === this.scrollContainer) {
+            return;
+          }
+
+          if (this.scrollContainer) {
+            this.scrollContainer.removeEventListener("scroll", this.handleScroll);
+          }
+
+          this.scrollContainer = nextContainer;
+
+          if (this.scrollContainer) {
+            this.scrollContainer.addEventListener("scroll", this.handleScroll);
+          }
+        };
+
+        this.scrollToBottom = (force = false) => {
+          if (!this.scrollContainer) {
+            return;
+          }
+
+          if (force || this.stickToBottom) {
+            this.scrollContainer.scrollTop = this.scrollContainer.scrollHeight;
+          }
+        };
+
+        this.handleScroll = () => {
+          if (!this.scrollContainer) {
+            this.stickToBottom = true;
+            return;
+          }
+
+          const distanceFromBottom =
+            this.scrollContainer.scrollHeight -
+            this.scrollContainer.scrollTop -
+            this.scrollContainer.clientHeight;
+
+          this.stickToBottom = distanceFromBottom < 48;
+        };
+
+        this.handleInput = (event) => {
+          if (!event.target.closest(".chat-input")) {
+            return;
+          }
+
+          this.stickToBottom = true;
+          this.autoResize();
+        };
+
+        this.handleKeyDown = (event) => {
+          if (!event.target.closest(".chat-input")) {
+            return;
+          }
+
+          if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+            event.preventDefault();
+
+            const sendButton = this.el.querySelector("[data-testid='chat-send-button']");
+
+            if (sendButton && !sendButton.disabled) {
+              sendButton.click();
+            }
+          }
+        };
+
+        this.el.addEventListener("input", this.handleInput);
+        this.el.addEventListener("keydown", this.handleKeyDown);
+
+        this.syncScrollContainer();
+        this.autoResize();
+        window.requestAnimationFrame(() => this.scrollToBottom(true));
+      },
+
+      updated() {
+        this.syncScrollContainer();
+        this.autoResize();
+        window.requestAnimationFrame(() => this.scrollToBottom());
+      },
+
+      destroyed() {
+        this.el.removeEventListener("input", this.handleInput);
+        this.el.removeEventListener("keydown", this.handleKeyDown);
+
+        if (this.scrollContainer) {
+          this.scrollContainer.removeEventListener("scroll", this.handleScroll);
+        }
+      }
+    },
+
     MonacoEditor: {
       mounted() {
         this.textarea = document.getElementById(this.el.dataset.monacoInputId) || this.el.querySelector("textarea");
