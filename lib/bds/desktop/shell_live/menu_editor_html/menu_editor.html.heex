@@ -1,0 +1,56 @@
+<div class="menu-editor-view" data-testid="menu-editor" phx-window-keydown={if(@menu_editor.draft, do: "menu_editor_keydown")}>
+  <div class="menu-editor-header">
+    <div>
+      <h2><%= @menu_editor.title %></h2>
+      <p><%= @menu_editor.description %></p>
+    </div>
+  </div>
+
+  <div class="menu-editor-main">
+    <div class="menu-editor-tree-wrap">
+      <div class="menu-editor-toolbar" data-testid="menu-editor-toolbar" role="toolbar" aria-label={@menu_editor.title}>
+        <button class="menu-editor-tool" data-testid="menu-editor-toolbar-button" data-action="add-entry" type="button" phx-click="menu_editor_toolbar_action" phx-value-action="add-entry" title={translated("menuEditor.addEntry")}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7 2h2v5h5v2H9v5H7V9H2V7h5V2z" /></svg>
+        </button>
+
+        <button class="menu-editor-tool" data-testid="menu-editor-toolbar-button" data-action="save" type="button" phx-click="menu_editor_toolbar_action" phx-value-action="save" title={translated("menuEditor.save")}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h9l3 3v9H2V2zm2 1v3h6V3H4zm0 9h8V7H4v5z" /></svg>
+        </button>
+
+        <button class="menu-editor-tool" data-testid="menu-editor-toolbar-button" data-action="add-category-archive" type="button" phx-click="menu_editor_toolbar_action" phx-value-action="add-category-archive" title={translated("menuEditor.addCategoryArchive")}>
+          <span aria-hidden="true"><%= translated("menuEditor.addCategoryArchiveShort") %></span>
+        </button>
+
+        <button class="menu-editor-tool" data-testid="menu-editor-toolbar-button" data-action="move-up" type="button" phx-click="menu_editor_toolbar_action" phx-value-action="move-up" title={translated("menuEditor.moveUp")} disabled={not @menu_editor.can_move_up?}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3l4 4H9v6H7V7H4l4-4z" /></svg>
+        </button>
+
+        <button class="menu-editor-tool" data-testid="menu-editor-toolbar-button" data-action="move-down" type="button" phx-click="menu_editor_toolbar_action" phx-value-action="move-down" title={translated("menuEditor.moveDown")} disabled={not @menu_editor.can_move_down?}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7 3h2v6h3l-4 4-4-4h3V3z" /></svg>
+        </button>
+
+        <button class="menu-editor-tool" data-testid="menu-editor-toolbar-button" data-action="indent" type="button" phx-click="menu_editor_toolbar_action" phx-value-action="indent" title={translated("menuEditor.indent")} disabled={not @menu_editor.can_indent?}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 4h8v2H2V4zm0 3h4v2H2V7zm0 3h8v2H2v-2zm6-1 3 2-3 2V9z" /></svg>
+        </button>
+
+        <button class="menu-editor-tool" data-testid="menu-editor-toolbar-button" data-action="unindent" type="button" phx-click="menu_editor_toolbar_action" phx-value-action="unindent" title={translated("menuEditor.unindent")} disabled={not @menu_editor.can_unindent?}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 4h8v2H2V4zm0 3h4v2H2V7zm0 3h8v2H2v-2zm3-1-3 2 3 2V9z" /></svg>
+        </button>
+
+        <button class="menu-editor-tool" data-testid="menu-editor-toolbar-button" data-action="delete" type="button" phx-click="menu_editor_toolbar_action" phx-value-action="delete" title={translated("menuEditor.delete")} disabled={not @menu_editor.can_delete?}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M6 2h4l1 1h3v2H2V3h3l1-1zm-1 4h2v6H5V6zm4 0h2v6H9V6z" /></svg>
+        </button>
+      </div>
+
+      <%= if @menu_editor.items == [] do %>
+        <div class="menu-editor-empty"><%= translated("menuEditor.empty") %></div>
+      <% else %>
+        <div id="menu-editor-tree-shell" class="menu-editor-tree-shell" phx-hook="MenuEditorTree">
+          <ul class="menu-editor-tree-level">
+            <.menu_tree_level items={@menu_editor.items} menu_editor={@menu_editor} depth={0} />
+          </ul>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

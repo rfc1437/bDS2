@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLiveTest do
 
   alias BDS.Persistence
   alias BDS.AI
+  alias BDS.Menu
   alias BDS.Media
   alias BDS.Metadata
   alias BDS.Posts
@@ -373,6 +374,114 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-tab-type="settings")
     assert html =~ ">Settings<"
     refute html =~ ~s(data-testid="window-titlebar-menu-dropdown")
+  end
+
+  test "native edit menu action opens the dedicated menu editor surface", %{project: project} do
+    assert {:ok, _menu} =
+             Menu.update_menu(project.id, [
+               %{kind: :page, label: "About", slug: "about"},
+               %{
+                 kind: :submenu,
+                 label: "Sections",
+                 children: [
+                   %{kind: :page, label: "Contact", slug: "contact"}
+                 ]
+               }
+             ])
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html = render_hook(view, "native_menu_action", %{"action" => "edit_menu"})
+
+    assert html =~ ~s(data-testid="menu-editor")
+    assert html =~ "Blog Menu Editor"
+    assert html =~ "meta/menu.opml"
+    assert html =~ ~s(data-testid="menu-editor-toolbar")
+    assert html =~ ~s(data-testid="menu-editor-toolbar-button")
+    assert html =~ ~s(data-action="add-entry")
+    assert html =~ ~s(data-action="save")
+    assert html =~ ~s(data-action="indent")
+    assert html =~ ~s(data-action="unindent")
+    assert html =~ ~s(data-testid="menu-editor-row")
+    assert html =~ ~s(data-menu-label="Home")
+    assert html =~ ~s(data-menu-label="About")
+    assert html =~ ~s(data-menu-label="Sections")
+    refute html =~ "Desktop workbench content routed through the Elixir shell."
+  end
+
+  test "menu editor adds a submenu, nests an entry, and saves the opml", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _menu} =
+             Menu.update_menu(project.id, [
+               %{kind: :page, label: "Contact", slug: "contact"}
+             ])
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+    _html = render_hook(view, "native_menu_action", %{"action" => "edit_menu"})
+
+    html =
+      view
+      |> element("[data-testid='menu-editor-toolbar-button'][data-action='add-entry']")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="menu-editor-entry-form")
+
+    html =
+      view
+      |> form("[data-testid='menu-editor-entry-form']", %{
+        menu_editor_entry: %{"query" => "Sections"}
+      })
+      |> render_change()
+
+    assert html =~ ~s(value="Sections")
+
+    html =
+      view
+      |> form("[data-testid='menu-editor-entry-form']", %{
+        menu_editor_entry: %{"query" => "Sections"}
+      })
+      |> render_submit()
+
+    assert html =~ ~s(data-menu-label="Sections")
+
+    html =
+      view
+      |> element("[data-testid='menu-editor-row'][data-menu-label='Contact']")
+      |> render_click()
+
+    assert html =~ ~s(data-selected="true")
+
+    _html =
+      view
+      |> element("[data-testid='menu-editor-toolbar-button'][data-action='indent']")
+      |> render_click()
+
+    _html =
+      view
+      |> element("[data-testid='menu-editor-toolbar-button'][data-action='save']")
+      |> render_click()
+
+    assert {:ok, menu} = Menu.get_menu(project.id)
+
+    assert menu.items == [
+             %{kind: :home, label: "Home", slug: nil},
+             %{
+               kind: :submenu,
+               label: "Sections",
+               slug: nil,
+               children: [
+                 %{kind: :page, label: "Contact", slug: "contact"}
+               ]
+             }
+           ]
+
+    opml_path = Path.join([temp_dir, "meta", "menu.opml"])
+    contents = File.read!(opml_path)
+
+    assert contents =~ ~s(<outline text="Sections" type="submenu">)
+    assert contents =~ ~s(<outline text="Contact" type="page" pageSlug="contact")
   end
 
   test "workbench session restore reopens permanent and transient tabs and selected activity" do

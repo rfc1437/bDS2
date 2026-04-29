@@ -394,6 +394,9 @@
             <% @current_tab.type == :style and @style_editor -> %>
               <SettingsEditor.style_editor style_editor={@style_editor} />
 
+            <% @current_tab.type == :menu_editor and @menu_editor -> %>
+              <MenuEditor.menu_editor menu_editor={@menu_editor} />
+
             <% @current_tab.type == :tags and @tags_editor -> %>
               <TagsEditor.tags_editor tags_editor={@tags_editor} />
 

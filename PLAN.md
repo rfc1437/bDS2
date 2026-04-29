@@ -4,10 +4,10 @@ This document tracks the current implementation state of bDS2 against the Allium
 
 ## Open Work Summary
 
-- Completed plan steps: 1, 2, 3, 4, 5, 6, 7, 8, 9.
-- Open plan steps: 10, 11, 12.
-- Next actionable step: 10. The batch-3 and batch-4 parity backlog is now closed, so the next implementation work is menu editor parity on the existing menu data model.
-- Scheduled after the current parity pass: 11 desktop-side CLI mutation watching, 12 import execution/editor parity.
+- Completed plan steps: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10.
+- Open plan steps: 11, 12.
+- Next actionable step: 11. The remaining open parity backlog now starts with desktop-side CLI mutation watching.
+- Scheduled after the current parity pass: 12 import execution/editor parity.
 
 ## Current State
 
@@ -31,7 +31,6 @@ The rewrite already implements most of the backend and compatibility-critical su
 ### Missing Or Materially Incomplete
 
 - Import remains definition-only: stored import definitions exist, but the old WXR analysis/execution pipeline and its dedicated editor surface are not present.
-- Menu data exists, but the `menu_editor` route still lacks a dedicated editor surface comparable to the old app.
 - CLI sync notification persistence exists, but old-app parity for desktop-side watching/broadcasting of external DB mutations is not yet proven.
 - The remaining parity write-up gap is now keeping the chat row and the final minimal backlog in sync with the current implementation.
 
@@ -46,11 +45,11 @@ Ordered from base contracts upward:
 | Integrations | `git`, `mcp`, `ai`, `embedding`, `cli_sync`, `metadata_diff` | Implemented | Service layer and test coverage exist for these domains. |
 | Desktop shell primitives | `layout`, `tabs`, `sidebar_views` | Implemented | Route state, registry-backed sidebar/editor coverage, panel fallback rules, menu/native-command wiring, and a LiveView-owned shell frame are in place. |
 | Cross-cutting flows | `ui_data_flow`, `engine_side_effects`, `action_patterns`, `media_processing` | Partial | Most backend behavior exists, but UI coordination, explicit engine event modeling, and some parity details are still incomplete. |
-| Editor UX layer | `editor_post`, `editor_media`, `editor_settings`, `editor_tags`, `editor_chat`, `editor_script`, `editor_template`, `editor_misc`, `modals` | Partial | The existing editor routes now render dedicated surfaces and have focused tests; import/menu parity and full old-app behavior scoring are still outstanding. |
+| Editor UX layer | `editor_post`, `editor_media`, `editor_settings`, `editor_tags`, `editor_chat`, `editor_script`, `editor_template`, `editor_misc`, `modals`, `menu` | Partial | The existing editor routes now render dedicated surfaces and have focused tests; import parity and any later not-yet-implemented old-app behavior remain outstanding. |
 
 ## Batch 3 And 4 Focus
 
-Only these two audit tracks matter for the current pass. The follow-on missing-feature tracks now sit explicitly after this pass as steps 10, 11, and 12.
+Only these two audit tracks matter for the current pass. The follow-on missing-feature tracks now sit explicitly after this pass as steps 11 and 12.
 
 1. Lock compatibility contracts. Completed 2026-04-25.
    Schema, frontmatter, sidecars, template context, generation output, preview behavior, metadata diff, and rebuild behavior are now pinned against the Allium specs and the old bDS application with executable parity tests.
@@ -79,8 +78,8 @@ Only these two audit tracks matter for the current pass. The follow-on missing-f
 9. Fix any remaining batch 3 and batch 4 parity gaps that the audit proves. Completed 2026-04-29.
    No further proven batch-3 or batch-4 gaps remained after the focused chat parity pass, so the minimal backlog now begins with the later menu, CLI-mutation-watching, and import tracks.
 
-10. Restore menu editor parity on the implemented data model.
-   Build the dedicated menu editor surface against the existing menu data using the old app as the blueprint for workflow, behavior, UI structure, and styling.
+10. Restore menu editor parity on the implemented data model. Completed 2026-04-29.
+   The shell now renders a dedicated menu editor with old-app-inspired structure, toolbar flow, inline page/category insertion, drag/drop plus move/indent controls, localized copy, and focused shell-live coverage on the existing menu persistence model.
 
 11. Restore desktop-side CLI mutation watching parity.
    Add the old desktop-side watching and invalidation behavior for external database mutations so CLI sync notifications propagate through the shell with the same timing and UX expectations as the old app.

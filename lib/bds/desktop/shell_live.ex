@@ -7,7 +7,7 @@ defmodule BDS.Desktop.ShellLive do
 
   alias BDS.AI
   alias BDS.Desktop.{FilePicker, FolderPicker, Overlay, ShellCommands, ShellData}
-  alias BDS.Desktop.ShellLive.{ChatEditor, CodeEntityEditor, MediaEditor, MiscEditor, SettingsEditor, TagsEditor}
+  alias BDS.Desktop.ShellLive.{ChatEditor, CodeEntityEditor, MediaEditor, MenuEditor, MiscEditor, SettingsEditor, TagsEditor}
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
   alias BDS.Desktop.ShellLive.PostEditor
   alias BDS.Desktop.ShellLive.SidebarComponents, as: ShellSidebarComponents
@@ -614,6 +614,46 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, SettingsEditor.apply_style_theme(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
+  def handle_event("menu_editor_select_item", %{"item_id" => item_id}, socket) do
+    {:noreply, MenuEditor.select_item(socket, item_id, &reload_shell/2)}
+  end
+
+  def handle_event("change_menu_editor_entry", %{"menu_editor_entry" => params}, socket) do
+    {:noreply, MenuEditor.change_entry(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("submit_menu_editor_entry", _params, socket) do
+    {:noreply, MenuEditor.submit_entry(socket, &reload_shell/2)}
+  end
+
+  def handle_event("cancel_menu_editor_entry", _params, socket) do
+    {:noreply, MenuEditor.cancel_entry(socket, &reload_shell/2)}
+  end
+
+  def handle_event("select_menu_editor_page", %{"post_id" => post_id}, socket) do
+    {:noreply, MenuEditor.select_page(socket, post_id, &reload_shell/2)}
+  end
+
+  def handle_event("select_menu_editor_category", %{"name" => name}, socket) do
+    {:noreply, MenuEditor.select_category(socket, name, &reload_shell/2)}
+  end
+
+  def handle_event("menu_editor_toolbar_action", %{"action" => action}, socket) do
+    {:noreply, MenuEditor.toolbar_action(socket, action, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event(
+        "menu_editor_drop_item",
+        %{"drag_item_id" => drag_item_id, "target_item_id" => target_item_id, "position" => position},
+        socket
+      ) do
+    {:noreply, MenuEditor.drop_item(socket, drag_item_id, target_item_id, position, &reload_shell/2)}
+  end
+
+  def handle_event("menu_editor_keydown", %{"key" => key}, socket) do
+    {:noreply, MenuEditor.handle_keydown(socket, key, &reload_shell/2)}
+  end
+
   def handle_event("toggle_tag_selection", %{"name" => tag_name}, socket) do
     {:noreply, TagsEditor.toggle_selection(socket, tag_name, &reload_shell/2)}
   end
@@ -1205,6 +1245,7 @@ defmodule BDS.Desktop.ShellLive do
     |> assign_post_editor()
     |> assign_media_editor()
     |> assign_settings_editor()
+    |> assign_menu_editor()
     |> assign_tags_editor()
     |> assign_code_entity_editor()
     |> assign_chat_editor()
@@ -1442,6 +1483,10 @@ defmodule BDS.Desktop.ShellLive do
 
   defp assign_settings_editor(socket) do
     SettingsEditor.assign_socket(socket)
+  end
+
+  defp assign_menu_editor(socket) do
+    MenuEditor.assign_socket(socket)
   end
 
   defp assign_tags_editor(socket) do
