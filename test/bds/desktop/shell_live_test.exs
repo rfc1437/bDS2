@@ -2054,6 +2054,66 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute render(view) =~ "Delayed response"
   end
 
+  test "chat editor keeps the in-flight user turn visible and disables input while streaming" do
+    assert :ok = AI.set_airplane_mode(false)
+
+    server =
+      start_supervised!({Bandit, plug: DelayedChatServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "online-secret",
+               model: "gpt-4.1"
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "Pending Chat", model: "gpt-4.1"})
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :assistant,
+        content: "Earlier answer",
+        created_at: Persistence.now_ms()
+      })
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    _html = render_change(view, "change_chat_editor_input", %{"message" => "Newest question"})
+
+    html =
+      view
+      |> element("[data-testid='chat-send-button']")
+      |> render_click()
+
+    {assistant_index, _length} = :binary.match(html, "Earlier answer")
+    {user_index, _length} = :binary.match(html, "Newest question")
+
+    assert assistant_index < user_index
+    assert html =~ ~r/<textarea[^>]*class="chat-input chat-surface-input"[^>]*disabled/
+
+    html =
+      view
+      |> element("[data-testid='chat-abort-button']")
+      |> render_click()
+
+    refute html =~ ~s(data-testid="chat-abort-button")
+
+    Process.sleep(350)
+    refute render(view) =~ "Delayed response"
+  end
+
   test "translation validation route renders dedicated cards and fix controls", %{project: project, temp_dir: temp_dir} do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{

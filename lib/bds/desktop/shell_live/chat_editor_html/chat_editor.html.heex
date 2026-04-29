@@ -183,7 +183,7 @@
       <% end %>
 
       <form class="chat-input-wrapper" phx-change="change_chat_editor_input" phx-submit="send_chat_editor_message">
-        <textarea class="chat-input chat-surface-input" name="message" rows="1" placeholder={translated("chat.inputPlaceholder")}><%= @chat_editor.input %></textarea>
+        <textarea class="chat-input chat-surface-input" name="message" rows="1" placeholder={translated("chat.inputPlaceholder")} disabled={@chat_editor.is_streaming}><%= @chat_editor.input %></textarea>
         <button class="chat-send-button" data-testid="chat-send-button" type="button" phx-click="send_chat_editor_message" disabled={@chat_editor.send_disabled?}>↑</button>
       </form>
 

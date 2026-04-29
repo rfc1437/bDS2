@@ -4,10 +4,10 @@ This document tracks the current implementation state of bDS2 against the Allium
 
 ## Open Work Summary
 
-- Completed plan steps: 1, 2, 3, 4, 5, 6, 8.
-- Open plan steps: 7, 9, 10, 11, 12.
-- Next actionable step: 7. The batch-4 audit is already recorded in this file, so the next implementation work is the remaining chat editor parity pass.
-- Scheduled after the current parity pass: 10 menu editor parity, 11 desktop-side CLI mutation watching, 12 import execution/editor parity.
+- Completed plan steps: 1, 2, 3, 4, 5, 6, 7, 8, 9.
+- Open plan steps: 10, 11, 12.
+- Next actionable step: 10. The batch-3 and batch-4 parity backlog is now closed, so the next implementation work is menu editor parity on the existing menu data model.
+- Scheduled after the current parity pass: 11 desktop-side CLI mutation watching, 12 import execution/editor parity.
 
 ## Current State
 
@@ -25,9 +25,8 @@ The rewrite already implements most of the backend and compatibility-critical su
 
 ### Implemented But Not Yet At Parity
 
-- The remaining implemented UI parity work is now concentrated in the chat route; the other implemented batch-3 surfaces have already been audited and scored.
-- The batch-4 backend and integration audit is recorded below; any further service work should now come only from proven drift, not from missing audit coverage.
-- Shared workbench/session state exists, but any remaining UI-data-flow work should now be treated as a concrete parity gap only when it can be tied back to a proven old-app behavior.
+- The currently implemented batch-3 and batch-4 surfaces now score green in this plan snapshot; follow-on work should come only from later missing-feature tracks or newly proven drift.
+- Shared workbench/session state exists, but any future UI-data-flow work should now be treated as a concrete parity gap only when it can be tied back to a proven old-app behavior.
 
 ### Missing Or Materially Incomplete
 
@@ -71,14 +70,14 @@ Only these two audit tracks matter for the current pass. The follow-on missing-f
 6. Audit batch 4: lower-risk backend and integration services behind those surfaces. Completed 2026-04-29.
    Tied each old engine contract to its bDS2 replacement, verified the executable proof set, probed the relevant owning UI/editor entry points, and recorded the batch-4 parity scores in the snapshot below.
 
-7. Restore remaining chat editor parity on the implemented route.
-   Use the old `ChatPanel` and chat surface code as the blueprint, refresh the chat parity row to the current implementation, and close only the remaining proven live-turn/UI drift without widening into unrelated AI features.
+7. Restore remaining chat editor parity on the implemented route. Completed 2026-04-29.
+   Re-ran the focused chat parity pass against the old `ChatPanel`/`ChatTranscript` surface, closed the remaining in-flight input-state drift on the implemented route, and refreshed the parity row to green without widening into backend streaming work.
 
 8. Restore misc maintenance editor parity on the implemented routes. Completed 2026-04-28.
    Translation validation now uses the old dedicated validate-and-fix card surface again, and git diff now renders through the structured Monaco diff viewer while keeping the current metadata-diff, site-validation, and duplicate flows intact.
 
-9. Fix any remaining batch 3 and batch 4 parity gaps that the audit proves.
-   Do not widen step 9 into the later menu, CLI-mutation-watching, import, or release-packaging tracks unless one of those blocks a batch 3 or batch 4 parity scenario.
+9. Fix any remaining batch 3 and batch 4 parity gaps that the audit proves. Completed 2026-04-29.
+   No further proven batch-3 or batch-4 gaps remained after the focused chat parity pass, so the minimal backlog now begins with the later menu, CLI-mutation-watching, and import tracks.
 
 10. Restore menu editor parity on the implemented data model.
    Build the dedicated menu editor surface against the existing menu data using the old app as the blueprint for workflow, behavior, UI structure, and styling.
@@ -127,7 +126,7 @@ Current batch 3 parity scores for existing implemented UI/editor code only. Miss
 | Tags editor | green | `src/renderer/components/TagsView/TagsView.tsx` | `lib/bds/desktop/shell_live/tags_editor.ex`, `lib/bds/desktop/shell_live/tags_editor_html/*` | `mix test test/bds/desktop/shell_live_test.exs`; tags editor implementation compared | No material implemented-code parity drift found in the current create/edit/delete/merge flows, color handling, or post-template selection behavior. |
 | Script editor | green | `src/renderer/components/ScriptsView/ScriptsView.tsx` | `lib/bds/desktop/shell_live/code_entity_editor.ex`, `lib/bds/desktop/shell_live/code_entity_editor_html/script_editor.html.heex` | `mix test test/bds/desktop/shell_live_test.exs`; script editor implementation compared | No material implemented-code parity drift found in the current Monaco editor, metadata form, syntax check, run, save, delete, and entrypoint selection flow. |
 | Template editor | green | `src/renderer/components/TemplatesView/TemplatesView.tsx` | `lib/bds/desktop/shell_live/code_entity_editor.ex`, `lib/bds/desktop/shell_live/code_entity_editor_html/template_editor.html.heex` | `mix test test/bds/desktop/shell_live_test.exs`; template editor implementation compared | No material implemented-code parity drift found in the current Monaco editor, metadata form, validate, save, and delete flow. |
-| Chat editor | yellow | `src/renderer/components/ChatPanel/ChatPanel.tsx` | `lib/bds/desktop/shell_live/chat_editor.ex`, `lib/bds/desktop/shell_live/chat_editor_html/chat_editor.html.heex` | `mix test test/bds/desktop/shell_live_test.exs`; chat editor implementation compared | The current bDS2 chat route now covers the old model selector with provider grouping, welcome state, persisted transcript, airplane-mode gating, API-key-required state, assistant markdown rendering, tool markers, structured tool surfaces, assistant navigation actions, and the in-flight stop/abort flow. Step 7 remains open because the chat row still needs one fresh focused pass against the old live-turn surface to pin any remaining proven drift before it can be scored green. |
+| Chat editor | green | `src/renderer/components/ChatPanel/ChatPanel.tsx`, `src/renderer/components/ChatSurface/ChatTranscript.tsx` | `lib/bds/desktop/shell_live/chat_editor.ex`, `lib/bds/desktop/shell_live/chat_editor_html/chat_editor.html.heex`, `priv/ui/live.js` | `mix test test/bds/desktop/shell_live_test.exs`; chat editor implementation and hook flow compared | The current bDS2 chat route now matches the implemented old-panel surface for provider-grouped model selection, welcome state, persisted transcript, airplane-mode gating, API-key-required state, assistant markdown rendering, tool markers, structured tool surfaces, assistant navigation actions, Enter/Shift+Enter handling, auto-grow/auto-scroll, and in-flight stop/input-lock behavior. No further proven implemented-route drift remains in batch 3. |
 | Misc maintenance editors | green | `src/renderer/components/SiteValidationView`, `TranslationValidationView`, `MetadataDiffPanel`, `DuplicatesView`, `GitDiffView` | `lib/bds/desktop/shell_live/misc_editor.ex`, `lib/bds/desktop/shell_live/misc_editor_html/misc_editor.html.heex` | `mix test test/bds/desktop/shell_live_test.exs`; misc editor implementation compared | No material implemented-code parity drift found in the current metadata diff, site validation, duplicate dismissal, translation validation, or working-tree git diff flows. Translation validation again uses dedicated issue cards with revalidate/fix actions, and git diff now uses the structured Monaco diff surface. |
 
 ## Batch 4 Audit Matrix
