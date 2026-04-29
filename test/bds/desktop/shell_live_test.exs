@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLiveTest do
 
   alias BDS.Persistence
   alias BDS.AI
+  alias BDS.CliSync.Watcher
   alias BDS.Menu
   alias BDS.Media
   alias BDS.Metadata
@@ -201,6 +202,71 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert created_definition.name == "New Import Definition"
     assert html =~ ~s(data-tab-type="import")
     assert html =~ ~s(data-tab-id="#{created_definition.id}")
+  end
+
+  test "shell live refreshes the posts sidebar when the CLI watcher broadcasts an entity change", %{project: project} do
+    {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    refute html =~ "CLI Added Post"
+
+    assert {:ok, post} = Posts.create_post(%{project_id: project.id, title: "CLI Added Post"})
+
+    Phoenix.PubSub.broadcast(BDS.PubSub, Watcher.topic(), {:entity_changed, %{entity: "post", entity_id: post.id, action: :created}})
+
+    assert render(view) =~ "CLI Added Post"
+  end
+
+  test "shell live closes stale post and media tabs when the CLI watcher broadcasts deletions", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, post} = Posts.create_post(%{project_id: project.id, title: "CLI Delete Post"})
+
+    source_path = Path.join(temp_dir, "cli-delete-media.txt")
+    File.write!(source_path, "media body")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "CLI Delete Media"
+             })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='#{post.id}']")
+      |> render_click()
+
+    assert html =~ ~s(data-tab-type="post")
+    assert html =~ ~s(data-tab-id="#{post.id}")
+
+    assert {:ok, :deleted} = Posts.delete_post(post.id)
+
+    Phoenix.PubSub.broadcast(BDS.PubSub, Watcher.topic(), {:entity_changed, %{entity: "post", entity_id: post.id, action: :deleted}})
+
+    html = render(view)
+    refute html =~ ~s(data-tab-type="post")
+    refute html =~ "CLI Delete Post"
+
+    _html =
+      view
+      |> element("[data-testid='activity-button'][data-view='media']")
+      |> render_click()
+
+    html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='#{media.id}']")
+      |> render_click()
+
+    assert html =~ ~s(data-tab-type="media")
+    assert html =~ ~s(data-tab-id="#{media.id}")
+
+    assert {:ok, :deleted} = Media.delete_media(media.id)
+
+    Phoenix.PubSub.broadcast(BDS.PubSub, Watcher.topic(), {:entity_changed, %{entity: "media", entity_id: media.id, action: :deleted}})
+
+    html = render(view)
+    refute html =~ ~s(data-tab-type="media")
+    refute html =~ "CLI Delete Media"
   end
 
   test "shell live owns pane visibility and activity selection on the server" do

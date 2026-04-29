@@ -17,7 +17,7 @@ defmodule BDS.Application do
 
   def desktop_children(_env) do
     if Application.get_env(:bds, BDS.Application)[:desktop_adapter] == :desktop do
-      [{BDS.Desktop.Server, []} | desktop_window_children()]
+      [{BDS.Desktop.Server, []}, BDS.CliSync.Watcher | desktop_window_children()]
     else
       []
     end

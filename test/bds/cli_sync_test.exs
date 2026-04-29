@@ -4,6 +4,7 @@ defmodule BDS.CliSyncTest do
   import Ecto.Query
 
   alias BDS.CliSync
+  alias BDS.CliSync.Watcher
   alias BDS.Repo
 
   setup do
@@ -19,6 +20,25 @@ defmodule BDS.CliSyncTest do
 
     assert {:ok, processed} = CliSync.db_file_change_detected()
     assert [%{entity_type: "post", entity_id: "post-1", action: :updated}] = processed
+
+    seen_notification = Repo.get!(BDS.CliSync.Notification, notification.id)
+    assert is_integer(seen_notification.seen_at)
+  end
+
+  test "watcher broadcasts entity change events after database mutations are detected" do
+    Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+    Phoenix.PubSub.subscribe(BDS.PubSub, Watcher.topic())
+
+    watcher =
+      start_supervised!({Watcher, poll_interval_ms: 60_000, debounce_ms: 0})
+
+    Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), watcher)
+
+    assert {:ok, notification} = CliSync.cli_mutation_performed("post", "post-1", :updated)
+
+    :ok = Watcher.poll_now(watcher)
+
+    assert_receive {:entity_changed, %{entity: "post", entity_id: "post-1", action: :updated}}, 500
 
     seen_notification = Repo.get!(BDS.CliSync.Notification, notification.id)
     assert is_integer(seen_notification.seen_at)

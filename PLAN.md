@@ -4,10 +4,10 @@ This document tracks the current implementation state of bDS2 against the Allium
 
 ## Open Work Summary
 
-- Completed plan steps: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10.
-- Open plan steps: 11, 12.
-- Next actionable step: 11. The remaining open parity backlog now starts with desktop-side CLI mutation watching.
-- Scheduled after the current parity pass: 12 import execution/editor parity.
+- Completed plan steps: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11.
+- Open plan steps: 12.
+- Next actionable step: 12. The remaining open parity backlog is now import execution/editor parity.
+- Scheduled after the current parity pass: none.
 
 ## Current State
 
@@ -20,7 +20,7 @@ The rewrite already implements most of the backend and compatibility-critical su
 - Compatibility parity locks: executable parity coverage now pins the old-bDS behavior for serializer/file contracts, metadata-diff ordering, canonical generation routes, feed output, localized archive rendering, preview draft language selection, taxonomy archive links, and media URL rewriting.
 - Core editorial domains: projects, posts, post translations, media, media translations, tags, templates, scripts, menu data, and project metadata.
 - Output and infrastructure: search, Liquid rendering, site generation, preview server, publishing, background tasks, i18n, git support, MCP server, AI operations, embeddings, and CLI sync.
-- Desktop shell foundation: native menu definitions, LiveView shell endpoint, activity bar, sidebar views, tab/workbench state, task panel, assistant sidebar, status bar, project switcher, shell command routing, template-backed shell rendering, sidebar search/filter/load-more controls, dashboard recent-post opening, UI language switching, project dropdown actions, output/post-link/git lower-panel content, browser-native menu bridging, and the shared modal/overlay layer for AI suggestions, picker flows, confirmations, and gallery/lightbox interactions.
+- Desktop shell foundation: native menu definitions, LiveView shell endpoint, activity bar, sidebar views, tab/workbench state, task panel, assistant sidebar, status bar, project switcher, shell command routing, template-backed shell rendering, sidebar search/filter/load-more controls, dashboard recent-post opening, UI language switching, project dropdown actions, output/post-link/git lower-panel content, browser-native menu bridging, desktop-side CLI mutation watching/broadcasting, and the shared modal/overlay layer for AI suggestions, picker flows, confirmations, and gallery/lightbox interactions.
 - Dedicated editor surfaces now exist for posts, media, settings, style, tags, scripts, templates, chat, and the misc maintenance views, with focused shell-live tests covering real rendering and core save/preview/publish flows.
 
 ### Implemented But Not Yet At Parity
@@ -31,7 +31,6 @@ The rewrite already implements most of the backend and compatibility-critical su
 ### Missing Or Materially Incomplete
 
 - Import remains definition-only: stored import definitions exist, but the old WXR analysis/execution pipeline and its dedicated editor surface are not present.
-- CLI sync notification persistence exists, but old-app parity for desktop-side watching/broadcasting of external DB mutations is not yet proven.
 - The remaining parity write-up gap is now keeping the chat row and the final minimal backlog in sync with the current implementation.
 
 ## Spec Coverage Snapshot
@@ -81,8 +80,8 @@ Only these two audit tracks matter for the current pass. The follow-on missing-f
 10. Restore menu editor parity on the implemented data model. Completed 2026-04-29.
    The shell now renders a dedicated menu editor with old-app-inspired structure, toolbar flow, inline page/category insertion, drag/drop plus move/indent controls, localized copy, and focused shell-live coverage on the existing menu persistence model.
 
-11. Restore desktop-side CLI mutation watching parity.
-   Add the old desktop-side watching and invalidation behavior for external database mutations so CLI sync notifications propagate through the shell with the same timing and UX expectations as the old app.
+11. Restore desktop-side CLI mutation watching parity. Completed 2026-04-29.
+   A supervised CLI-sync watcher now polls the persisted notification store on the old-app timing budget, broadcasts `entity:changed` events through PubSub, and the LiveView shell refreshes sidebar/editor state while closing stale post/media tabs on external deletes.
 
 12. Restore import execution and editor parity.
    Extend the existing stored import definitions into the old WXR analysis/execution pipeline and add the dedicated editor surface so import behavior, workflow, and look and feel match the old app.
