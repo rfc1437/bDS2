@@ -7158,6 +7158,509 @@ button svg * {
   transition: background-color 0.2s;
 }
 
+.import-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 20px 26px;
+  color: var(--vscode-foreground);
+}
+
+.import-analysis-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.import-analysis-header p {
+  margin: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.import-definition-name {
+  width: min(480px, 100%);
+  border: 1px solid var(--vscode-input-border, transparent);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground, var(--vscode-foreground));
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.import-file-selectors {
+  display: grid;
+  gap: 12px;
+}
+
+.import-file-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 76%, var(--vscode-input-background));
+}
+
+.import-file-row label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.import-file-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  font-size: 12px;
+}
+
+.import-file-path.placeholder {
+  color: var(--vscode-descriptionForeground);
+}
+
+.import-analysis button,
+.import-analysis select {
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.import-analysis button {
+  background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.import-analysis button:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
+}
+
+.import-analyze-btn,
+.import-execute-btn {
+  background: var(--vscode-button-background) !important;
+  color: var(--vscode-button-foreground) !important;
+}
+
+.import-analysis button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.import-site-info {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.import-site-info-item,
+.import-stat-card,
+.import-date-distribution,
+.import-detail-section,
+.import-execute-section {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 84%, var(--vscode-input-background));
+}
+
+.import-site-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+}
+
+.info-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.info-value {
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.import-stat-cards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.import-stat-card {
+  padding: 14px;
+}
+
+.import-stat-card h3,
+.import-date-distribution h3,
+.import-detail-section h3,
+.taxonomy-group h4 {
+  margin: 0;
+}
+
+.import-stat-number {
+  margin-top: 10px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.import-stat-breakdown,
+.import-execute-summary,
+.import-taxonomy-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.import-stat-breakdown {
+  margin-top: 12px;
+}
+
+.import-stat-tag,
+.import-count-tag,
+.import-taxonomy-pill,
+.macro-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.stat-new,
+.import-taxonomy-pill.new-tax {
+  background: rgba(117, 190, 255, 0.16);
+  color: #75beff;
+}
+
+.stat-update,
+.stat-mapped,
+.import-taxonomy-pill.exists,
+.import-taxonomy-pill.mapped,
+.macro-status-badge.mapped,
+.import-execution-complete {
+  background: rgba(115, 201, 145, 0.16);
+  color: #73c991;
+}
+
+.stat-conflict {
+  background: rgba(255, 166, 87, 0.16);
+  color: #ffb169;
+}
+
+.stat-duplicate,
+.stat-missing,
+.macro-status-badge.unmapped,
+.import-execution-error {
+  background: rgba(204, 167, 0, 0.16);
+  color: #cca700;
+}
+
+.import-date-distribution,
+.import-detail-section,
+.import-execute-section {
+  padding: 16px;
+}
+
+.import-section-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0;
+  border: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  font-size: 16px !important;
+  font-weight: 600;
+  text-align: left;
+}
+
+.import-section-toggle:hover {
+  background: transparent !important;
+  opacity: 0.9;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.distribution-bars {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.distribution-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 72px;
+  gap: 10px;
+  align-items: center;
+}
+
+.distribution-year,
+.distribution-count,
+.slug-cell {
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.distribution-bar-container {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--vscode-input-background);
+}
+
+.distribution-bar {
+  height: 100%;
+  min-width: 8px;
+  border-radius: inherit;
+}
+
+.distribution-bar-posts {
+  background: linear-gradient(90deg, rgba(117, 190, 255, 0.8), rgba(117, 190, 255, 0.35));
+}
+
+.import-execute-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.import-execute-summary {
+  color: var(--vscode-descriptionForeground);
+}
+
+.import-execution-complete,
+.import-execution-error {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.import-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 14px;
+}
+
+.import-detail-table th,
+.import-detail-table td {
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  vertical-align: middle;
+  font-size: 12px;
+}
+
+.import-detail-table th {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.resolution-select,
+.import-taxonomy-form select {
+  min-width: 150px;
+  background: var(--vscode-dropdown-background, var(--vscode-input-background));
+  color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  padding: 6px 8px;
+}
+
+.taxonomy-analyze-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 12px;
+  margin-top: 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.taxonomy-analyze-dropdown {
+  position: relative;
+}
+
+.taxonomy-analyze-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.taxonomy-model-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--vscode-dropdown-background, var(--vscode-sideBar-background));
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  border-radius: 6px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  z-index: 20;
+}
+
+.taxonomy-model-option {
+  width: 100%;
+  display: block;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--vscode-foreground) !important;
+  text-align: left;
+  padding: 8px 12px !important;
+}
+
+.taxonomy-model-option:hover {
+  background: var(--vscode-list-hoverBackground) !important;
+}
+
+.taxonomy-analyze-hint {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.import-taxonomy-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.taxonomy-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.import-taxonomy-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.macros-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.macro-item {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 8px;
+  background: var(--vscode-input-background);
+}
+
+.macro-item.unmapped {
+  border-left: 3px solid #cca700;
+}
+
+.macro-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.macro-name,
+.import-taxonomy-pill {
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+}
+
+.macro-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.import-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 56px 20px;
+  color: var(--vscode-descriptionForeground);
+  border: 1px dashed var(--vscode-panel-border);
+  border-radius: 12px;
+}
+
+.import-empty-state p {
+  margin: 0;
+  font-size: 13px;
+}
+
+@media (max-width: 1100px) {
+  .import-site-info,
+  .import-stat-cards,
+  .import-taxonomy-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+  .import-analysis {
+    padding: 14px;
+  }
+
+  .import-file-row,
+  .distribution-row,
+  .import-execute-section,
+  .import-site-info,
+  .import-stat-cards,
+  .import-taxonomy-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .import-execute-section {
+    align-items: stretch;
+  }
+
+  .import-file-row {
+    align-items: stretch;
+  }
+
+  .import-analysis button,
+  .resolution-select,
+  .import-taxonomy-form select {
+    width: 100%;
+  }
+
+  .taxonomy-analyze-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .import-taxonomy-form {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .load-more-button:hover:not(:disabled) {
   background-color: var(--vscode-button-secondaryHoverBackground);
 }

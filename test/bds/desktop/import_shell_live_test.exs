@@ -1,0 +1,108 @@
+defmodule BDS.Desktop.ImportShellLiveTest do
+  use ExUnit.Case, async: false
+
+  import Phoenix.ConnTest
+  import Phoenix.LiveViewTest
+
+  alias BDS.ImportDefinitions
+  alias BDS.Projects
+
+  @endpoint BDS.Desktop.Endpoint
+
+  setup do
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+    Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+
+    temp_dir = Path.join(System.tmp_dir!(), "bds-import-shell-live-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    {:ok, project} = Projects.create_project(%{name: "Import Shell", data_path: temp_dir})
+    {:ok, _project} = Projects.set_active_project(project.id)
+
+    %{project: project, temp_dir: temp_dir}
+  end
+
+  test "opening an import definition renders the dedicated import analysis editor instead of the fallback shell frame", %{project: project, temp_dir: temp_dir} do
+    uploads_dir = Path.join(temp_dir, "uploads")
+    wxr_path = Path.join(temp_dir, "legacy.xml")
+
+    assert {:ok, definition} =
+             ImportDefinitions.create_definition(%{
+               project_id: project.id,
+               name: "Legacy Import",
+               wxr_file_path: wxr_path,
+               uploads_folder_path: uploads_dir,
+               last_analysis_result: Jason.encode!(cached_report(wxr_path, uploads_dir))
+             })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html = render_click(view, "select_view", %{"view" => "import"})
+
+    html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='#{definition.id}']")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="import-editor")
+    assert html =~ ~s(data-testid="import-editor-form")
+    assert html =~ "Legacy Import"
+    assert html =~ "Uploads Folder"
+    assert html =~ "WXR File"
+    assert html =~ "Ready to import:"
+    assert html =~ "Import 5 Items"
+    assert html =~ "Post Slug Conflicts"
+      assert html =~ "Analyze with..."
+      refute html =~ "Desktop workbench content routed through the Elixir shell."
+  end
+
+  defp cached_report(wxr_path, uploads_dir) do
+    %{
+      source_file: wxr_path,
+      site_info: %{
+        title: "Legacy Blog",
+        url: "https://legacy.example",
+        language: "en",
+        source_file: wxr_path
+      },
+      post_stats: %{new_count: 1, update_count: 0, conflict_count: 1, duplicate_count: 0},
+      page_stats: %{new_count: 1, update_count: 0, conflict_count: 0, duplicate_count: 0},
+      media_stats: %{new_count: 1, update_count: 0, conflict_count: 0, duplicate_count: 0, missing_count: 0},
+      category_stats: %{existing_count: 0, mapped_count: 0, new_count: 1},
+      tag_stats: %{existing_count: 0, mapped_count: 0, new_count: 1},
+      date_distribution: [%{year: 2024, post_count: 2, media_count: 1}],
+      conflicts: [
+        %{
+          item_type: "post",
+          item_name: "hello-world",
+          resolution: "skip",
+          source_title: "Hello World",
+          existing_title: "Existing Hello"
+        }
+      ],
+      macros: [%{name: "gallery", usage_count: 1, parameters: ["ids"], validation_status: "unknown"}],
+      items: %{
+        posts: [
+          %{item_type: "post", title: "Hello World", slug: "hello-world", status: "new"},
+          %{item_type: "post", title: "Conflict Me", slug: "conflict-me", status: "conflict", resolution: "skip"}
+        ],
+        pages: [
+          %{item_type: "page", title: "About", slug: "about", status: "new"}
+        ],
+        media: [
+          %{
+            item_type: "media",
+            title: "Import Asset",
+            filename: "import-asset.txt",
+            relative_path: "2024/05/import-asset.txt",
+            source_file: Path.join(uploads_dir, "2024/05/import-asset.txt"),
+            status: "new"
+          }
+        ],
+        categories: [%{name: "General", exists_in_project: false, mapped_to: nil}],
+        tags: [%{name: "News", exists_in_project: false, mapped_to: nil}]
+      }
+    }
+  end
+end

@@ -409,6 +409,9 @@
             <% @current_tab.type == :chat and @chat_editor -> %>
               <ChatEditor.chat_editor chat_editor={@chat_editor} />
 
+            <% @current_tab.type == :import and @import_editor -> %>
+              <ImportEditor.import_editor import_editor={@import_editor} />
+
             <% @current_tab.type in [:site_validation, :metadata_diff, :translation_validation, :find_duplicates, :git_diff] and @misc_editor -> %>
               <MiscEditor.misc_editor misc_editor={@misc_editor} />
 

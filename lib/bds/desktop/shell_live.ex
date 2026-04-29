@@ -8,7 +8,7 @@ defmodule BDS.Desktop.ShellLive do
   alias BDS.AI
   alias BDS.CliSync.Watcher
   alias BDS.Desktop.{FilePicker, FolderPicker, Overlay, ShellCommands, ShellData}
-  alias BDS.Desktop.ShellLive.{ChatEditor, CodeEntityEditor, MediaEditor, MenuEditor, MiscEditor, SettingsEditor, TagsEditor}
+  alias BDS.Desktop.ShellLive.{ChatEditor, CodeEntityEditor, ImportEditor, MediaEditor, MenuEditor, MiscEditor, SettingsEditor, TagsEditor}
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
   alias BDS.Desktop.ShellLive.PostEditor
   alias BDS.Desktop.ShellLive.SidebarComponents, as: ShellSidebarComponents
@@ -105,6 +105,10 @@ defmodule BDS.Desktop.ShellLive do
         |> assign(:chat_editor_surface_data, %{})
         |> assign(:chat_editor_surface_tabs, %{})
         |> assign(:chat_editor_action_errors, %{})
+        |> assign(:import_editor_execution_states, %{})
+        |> assign(:import_editor_sections, %{})
+        |> assign(:import_editor_model_selectors_open, %{})
+        |> assign(:import_editor_selected_models, %{})
         |> assign(:misc_editor_selected_pairs, %{})
         |> assign(:misc_editor_git_selected_files, %{})
         |> assign(:metadata_diff_active_tabs, %{})
@@ -767,6 +771,46 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, handle_chat_surface_action(socket, params)}
   end
 
+  def handle_event("change_import_editor_definition", %{"import_definition" => params}, socket) do
+    {:noreply, ImportEditor.change_definition(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("select_import_uploads_folder", _params, socket) do
+    {:noreply, ImportEditor.select_uploads_folder(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("select_import_wxr_file", _params, socket) do
+    {:noreply, ImportEditor.select_and_analyze(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("execute_import_editor", _params, socket) do
+    {:noreply, ImportEditor.execute_import(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("change_import_conflict_resolution", params, socket) do
+    {:noreply, ImportEditor.change_conflict_resolution(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("change_import_taxonomy_mapping", params, socket) do
+    {:noreply, ImportEditor.change_taxonomy_mapping(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("toggle_import_section", %{"section" => section}, socket) do
+    {:noreply, ImportEditor.toggle_section(socket, section, &reload_shell/2)}
+  end
+
+  def handle_event("toggle_import_ai_model_selector", _params, socket) do
+    {:noreply, ImportEditor.toggle_model_selector(socket, &reload_shell/2)}
+  end
+
+  def handle_event("select_import_ai_model", %{"model" => model_id}, socket) do
+    {:noreply, ImportEditor.select_ai_model(socket, model_id, &reload_shell/2)}
+  end
+
+  def handle_event("analyze_import_taxonomy_ai", _params, socket) do
+    {:noreply, ImportEditor.analyze_taxonomy_ai(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
   def handle_event("rerun_misc_editor", _params, socket) do
     case MiscEditor.rerun(socket) do
       {:command, action} -> {:noreply, apply_shell_command(socket, action)}
@@ -1255,6 +1299,7 @@ defmodule BDS.Desktop.ShellLive do
     |> assign_tags_editor()
     |> assign_code_entity_editor()
     |> assign_chat_editor()
+    |> assign_import_editor()
     |> assign_misc_editor()
   end
 
@@ -1616,6 +1661,10 @@ defmodule BDS.Desktop.ShellLive do
 
   defp assign_chat_editor(socket) do
     ChatEditor.assign_socket(socket)
+  end
+
+  defp assign_import_editor(socket) do
+    ImportEditor.assign_socket(socket)
   end
 
   defp assign_misc_editor(socket) do

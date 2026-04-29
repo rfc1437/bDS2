@@ -17,12 +17,59 @@ defmodule BDS.ImportDefinitions do
       name: attr(attrs, :name) || "",
       wxr_file_path: attr(attrs, :wxr_file_path),
       uploads_folder_path: attr(attrs, :uploads_folder_path),
-      last_analysis_result: attr(attrs, :last_analysis_result),
+      last_analysis_result: normalize_analysis_result(attr(attrs, :last_analysis_result)),
       created_at: now,
       updated_at: now
     })
     |> Repo.insert()
   end
+
+  def get_definition(definition_id) when is_binary(definition_id) do
+    Repo.get(ImportDefinition, definition_id)
+  end
+
+  def update_definition(definition_id, attrs) when is_binary(definition_id) and is_map(attrs) do
+    case Repo.get(ImportDefinition, definition_id) do
+      nil ->
+        {:error, :not_found}
+
+      %ImportDefinition{} = definition ->
+        updates =
+          %{}
+          |> maybe_put(:name, attr(attrs, :name))
+          |> maybe_put(:wxr_file_path, attr(attrs, :wxr_file_path))
+          |> maybe_put(:uploads_folder_path, attr(attrs, :uploads_folder_path))
+          |> maybe_put(:last_analysis_result, normalize_analysis_result(attr(attrs, :last_analysis_result)))
+          |> Map.put(:updated_at, Persistence.now_ms())
+
+        definition
+        |> ImportDefinition.changeset(updates)
+        |> Repo.update()
+    end
+  end
+
+  def delete_definition(definition_id) when is_binary(definition_id) do
+    case Repo.get(ImportDefinition, definition_id) do
+      nil -> {:error, :not_found}
+      %ImportDefinition{} = definition ->
+        Repo.delete(definition)
+        |> case do
+          {:ok, _deleted} -> {:ok, :deleted}
+          error -> error
+        end
+    end
+  end
+
+  def decode_analysis_result(%ImportDefinition{last_analysis_result: result}), do: decode_analysis_result(result)
+
+  def decode_analysis_result(result) when is_binary(result) do
+    case Jason.decode(result) do
+      {:ok, value} -> atomize_keys(value)
+      {:error, _reason} -> nil
+    end
+  end
+
+  def decode_analysis_result(_result), do: nil
 
   def list_definitions(project_id) do
     Repo.all(
@@ -34,4 +81,23 @@ defmodule BDS.ImportDefinitions do
   end
 
   defp attr(attrs, key), do: Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp normalize_analysis_result(nil), do: nil
+  defp normalize_analysis_result(value) when is_binary(value), do: value
+  defp normalize_analysis_result(value), do: Jason.encode!(value)
+
+  defp atomize_keys(value) when is_map(value) do
+    value
+    |> Enum.map(fn {key, nested_value} ->
+      normalized_key = if(is_binary(key), do: String.to_atom(key), else: key)
+      {normalized_key, atomize_keys(nested_value)}
+    end)
+    |> Map.new()
+  end
+
+  defp atomize_keys(value) when is_list(value), do: Enum.map(value, &atomize_keys/1)
+  defp atomize_keys(value), do: value
 end
