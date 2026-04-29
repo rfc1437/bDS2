@@ -12,17 +12,30 @@ defmodule BDS.ImportAnalysis do
   @shortcode_regex ~r/(?<!\[)\[(\w+)([^\]]*?)(?:\s*\/)?\](?!\])/u
   @param_regex ~r/(\w+)=(?:"([^"]*)"|'([^']*)'|([^\s\]"']+))/u
 
-  def analyze_wxr(project_id, wxr_file_path, uploads_folder_path \\ nil)
+  def analyze_wxr(project_id, wxr_file_path), do: analyze_wxr(project_id, wxr_file_path, nil, [])
+
+  def analyze_wxr(project_id, wxr_file_path, uploads_folder_path)
       when is_binary(project_id) and is_binary(wxr_file_path) do
+    analyze_wxr(project_id, wxr_file_path, uploads_folder_path, [])
+  end
+
+  def analyze_wxr(project_id, wxr_file_path, uploads_folder_path, opts)
+      when is_binary(project_id) and is_binary(wxr_file_path) and is_list(opts) do
+    on_progress = Keyword.get(opts, :on_progress, fn _step, _detail -> :ok end)
     wxr_data = WxrParser.parse_file(wxr_file_path)
-    {:ok, build_report(project_id, wxr_data, wxr_file_path, uploads_folder_path)}
+    {:ok, build_report(project_id, wxr_data, wxr_file_path, uploads_folder_path, on_progress)}
   rescue
     error -> {:error, %{message: Exception.message(error)}}
   end
 
-  defp build_report(project_id, wxr_data, wxr_file_path, uploads_folder_path) do
+  defp build_report(project_id, wxr_data, wxr_file_path, uploads_folder_path, on_progress) do
+    notify_progress(on_progress, "Loading existing posts...")
     existing_posts = Repo.all(from post in Post, where: post.project_id == ^project_id)
+
+    notify_progress(on_progress, "Loading existing media...", "#{length(existing_posts)} posts in project")
     existing_media = Repo.all(from media in Media, where: media.project_id == ^project_id)
+
+    notify_progress(on_progress, "Loading existing tags...", "#{length(existing_media)} media in project")
     existing_tag_names = Repo.all(from tag in Tag, where: tag.project_id == ^project_id, select: tag.name)
     existing_tag_set = existing_tag_names |> Enum.map(&String.downcase/1) |> MapSet.new()
 
@@ -40,14 +53,21 @@ defmodule BDS.ImportAnalysis do
       |> Enum.reject(&is_nil(&1.checksum))
       |> Map.new(&{&1.checksum, &1})
 
+    notify_progress(on_progress, "Analyzing posts...", "#{length(wxr_data.posts)} posts to analyze")
     analyzed_posts = Enum.map(wxr_data.posts, &analyze_post_item(&1, posts_by_slug, posts_by_checksum, "post"))
+
+    notify_progress(on_progress, "Analyzing pages...", "#{length(wxr_data.pages)} pages to analyze")
     analyzed_pages = Enum.map(wxr_data.pages, &analyze_post_item(&1, posts_by_slug, posts_by_checksum, "page"))
 
+    notify_progress(on_progress, "Analyzing media files...", "#{length(wxr_data.media)} media files to analyze")
     analyzed_media =
       Enum.map(wxr_data.media, &analyze_media_item(&1, uploads_folder_path, media_by_name, media_by_checksum))
 
+    notify_progress(on_progress, "Processing categories and tags...")
     category_items = Enum.map(wxr_data.categories, &analyze_taxonomy_item(&1, existing_tag_set))
     tag_items = Enum.map(wxr_data.tags, &analyze_taxonomy_item(&1, existing_tag_set))
+
+    notify_progress(on_progress, "Discovering macros...")
 
     %{
       source_file: wxr_file_path,
@@ -311,6 +331,16 @@ defmodule BDS.ImportAnalysis do
   defp year_from(_value), do: nil
 
   defp count_status(items, status), do: Enum.count(items, &(&1.status == status))
+
+  defp notify_progress(callback, step, detail \\ nil) when is_function(callback, 2) do
+    try do
+      callback.(step, detail)
+    rescue
+      _error -> :ok
+    end
+
+    :ok
+  end
 
   defp sha256(value) do
     :sha256

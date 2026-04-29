@@ -7256,6 +7256,48 @@ button svg * {
   cursor: not-allowed;
 }
 
+.import-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 84%, var(--vscode-input-background));
+}
+
+.import-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--vscode-descriptionForeground);
+  border-top-color: var(--vscode-button-background);
+  border-radius: 50%;
+  animation: import-spinner-rotate 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.import-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.import-progress-step {
+  font-size: 13px;
+  color: var(--vscode-foreground);
+}
+
+.import-progress-detail {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+@keyframes import-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .import-site-info {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -7458,6 +7500,56 @@ button svg * {
   font-weight: 600;
 }
 
+.import-execution-progress {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 84%, var(--vscode-input-background));
+}
+
+.import-execution-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.import-execution-header h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.import-progress-bar {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--vscode-input-background);
+}
+
+.import-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(117, 190, 255, 0.85), rgba(117, 190, 255, 0.45));
+}
+
+.import-progress-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.import-phase {
+  font-weight: 600;
+}
+
+.import-detail,
+.import-counter {
+  color: var(--vscode-descriptionForeground);
+}
+
 .import-detail-table {
   width: 100%;
   border-collapse: collapse;
@@ -7480,8 +7572,55 @@ button svg * {
   letter-spacing: 0.04em;
 }
 
+.import-detail-table .status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.import-detail-table .status-badge.new {
+  background: rgba(117, 190, 255, 0.16);
+  color: #75beff;
+}
+
+.import-detail-table .status-badge.update {
+  background: rgba(115, 201, 145, 0.16);
+  color: #73c991;
+}
+
+.import-detail-table .status-badge.conflict {
+  background: rgba(255, 166, 87, 0.16);
+  color: #ffb169;
+}
+
+.import-detail-table .status-badge.duplicate,
+.import-detail-table .status-badge.missing {
+  background: rgba(204, 167, 0, 0.16);
+  color: #cca700;
+}
+
+.categories-cell,
+.existing-match,
+.mime-type-cell,
+.post-type-cell {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.mime-type-cell,
+.post-type-cell,
+.existing-match,
+.slug-cell {
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+}
+
 .resolution-select,
-.import-taxonomy-form select {
+.taxonomy-mapping-input {
   min-width: 150px;
   background: var(--vscode-dropdown-background, var(--vscode-input-background));
   color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
@@ -7556,10 +7695,56 @@ button svg * {
   gap: 12px;
 }
 
-.import-taxonomy-form {
+.import-taxonomy-entry,
+.import-taxonomy-edit-form {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.import-taxonomy-entry,
+.import-taxonomy-edit-form {
+  flex-wrap: wrap;
+}
+
+.import-taxonomy-pill {
+  border: none;
+  cursor: default;
+}
+
+button.import-taxonomy-pill {
+  cursor: pointer;
+}
+
+.mapped-target {
+  background: rgba(115, 201, 145, 0.1);
+}
+
+.taxonomy-mapping-arrow {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.taxonomy-mapping-input {
+  min-width: 170px;
+  border-radius: 6px;
+}
+
+.taxonomy-edit-btn,
+.taxonomy-clear-btn {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0 8px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.taxonomy-edit-btn.ghost,
+.taxonomy-clear-btn {
+  background: transparent !important;
+  border: 1px solid var(--vscode-panel-border) !important;
+  color: var(--vscode-descriptionForeground) !important;
 }
 
 .macros-list {
@@ -7645,7 +7830,7 @@ button svg * {
 
   .import-analysis button,
   .resolution-select,
-  .import-taxonomy-form select {
+  .taxonomy-mapping-input {
     width: 100%;
   }
 
@@ -7654,7 +7839,8 @@ button svg * {
     align-items: stretch;
   }
 
-  .import-taxonomy-form {
+  .import-taxonomy-entry,
+  .import-taxonomy-edit-form {
     width: 100%;
     flex-direction: column;
     align-items: stretch;

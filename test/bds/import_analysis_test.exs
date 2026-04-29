@@ -149,6 +149,28 @@ defmodule BDS.ImportAnalysisTest do
     assert Enum.any?(report.items.media, &(&1.filename == "missing-asset.txt" and &1.status == "missing"))
   end
 
+  test "analyze_wxr reports legacy progress steps while building the import report", %{project: project, temp_dir: temp_dir} do
+    uploads_dir = Path.join(temp_dir, "uploads")
+    File.mkdir_p!(Path.join(uploads_dir, "2024/05"))
+    File.write!(Path.join(uploads_dir, "2024/05/import-asset.txt"), "legacy attachment")
+
+    wxr_path = Path.join(temp_dir, "legacy.xml")
+    File.write!(wxr_path, basic_wxr_xml())
+
+    assert {:ok, _report} =
+             ImportAnalysis.analyze_wxr(project.id, wxr_path, uploads_dir,
+               on_progress: fn step, detail ->
+                 send(self(), {:analysis_progress, step, detail})
+               end
+             )
+
+    assert_received {:analysis_progress, "Loading existing posts...", nil}
+    assert_received {:analysis_progress, "Analyzing posts...", "1 posts to analyze"}
+    assert_received {:analysis_progress, "Analyzing pages...", "1 pages to analyze"}
+    assert_received {:analysis_progress, "Analyzing media files...", "1 media files to analyze"}
+    assert_received {:analysis_progress, "Discovering macros...", nil}
+  end
+
   defp sha256(value) do
     :sha256
     |> :crypto.hash(value)

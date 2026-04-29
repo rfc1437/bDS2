@@ -119,6 +119,16 @@ defmodule BDS.AITest do
              usage: usage(13, 9, 0, 0)
            }}
 
+        :import_taxonomy_mapping ->
+          {:ok,
+           %{
+             json: %{
+               "categoryMappings" => %{"General" => "article", "Unknown" => "missing"},
+               "tagMappings" => %{"News" => "updates", "Ghost" => "missing"}
+             },
+             usage: usage(19, 7, 0, 0)
+           }}
+
         :chat ->
           if Enum.any?(request.messages, &(&1["role"] == "tool")) do
             {:ok,
@@ -307,6 +317,36 @@ defmodule BDS.AITest do
     assert endpoint.kind == :online
     assert request.operation == :translate_post
     assert request.model == "gpt-4.1-mini"
+  end
+
+  test "analyze_import_taxonomy uses the selected model override and returns only valid existing-term mappings" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(:online, %{
+               url: "https://api.example.test/v1",
+               api_key: "online-secret",
+               model: "gpt-4o-mini"
+             }, secret_backend: FakeSecretBackend)
+
+    assert :ok = BDS.AI.set_airplane_mode(false)
+    assert :ok = BDS.AI.put_model_preference(:title, "gpt-4.1-mini")
+
+    assert {:ok, result} =
+             BDS.AI.analyze_import_taxonomy(
+               %{categories: ["General"], tags: ["News"]},
+               %{categories: ["article", "page"], tags: ["updates"]},
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend,
+               model: "gpt-4o"
+             )
+
+    assert result.category_mappings == %{"General" => "article"}
+    assert result.tag_mappings == %{"News" => "updates"}
+
+    assert_received {:runtime_request, endpoint, request}
+    assert endpoint.kind == :online
+    assert request.operation == :import_taxonomy_mapping
+    assert request.model == "gpt-4o"
   end
 
   test "analyze_image requires a vision-capable airplane model before sending image input" do

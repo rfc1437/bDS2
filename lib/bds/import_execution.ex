@@ -11,6 +11,12 @@ defmodule BDS.ImportExecution do
   def execute_import(project_id, report, opts \\ []) when is_binary(project_id) and is_map(report) do
     normalized_report = normalize_report(report)
     default_author = Keyword.get(opts, :default_author) || project_default_author(project_id)
+    uploads_folder_path = Keyword.get(opts, :uploads_folder_path)
+    on_progress = Keyword.get(opts, :on_progress, fn _phase, _current, _total, _detail -> :ok end)
+    taxonomies = taxonomy_items(normalized_report)
+    post_items = import_items(normalized_report, :posts)
+    page_items = import_items(normalized_report, :pages)
+    media_items = import_items(normalized_report, :media)
 
     result = %{
       success: true,
@@ -21,49 +27,73 @@ defmodule BDS.ImportExecution do
       errors: []
     }
 
-    result = execute_taxonomies(normalized_report, project_id, result)
-    result = execute_posts(normalized_report, project_id, default_author, result)
-    result = execute_pages(normalized_report, project_id, default_author, result)
+    notify_progress(on_progress, "tags", 0, length(taxonomies), "Creating tags...")
+    result = execute_taxonomies(taxonomies, project_id, result, on_progress)
 
-    {:ok, execute_media(normalized_report, project_id, default_author, result)}
+    notify_progress(on_progress, "posts", 0, length(post_items), "Importing posts...")
+    result = execute_posts(post_items, project_id, default_author, result, on_progress)
+
+    notify_progress(on_progress, "pages", 0, length(page_items), "Importing pages...")
+    result = execute_pages(page_items, project_id, default_author, result, on_progress)
+
+    notify_progress(on_progress, "media", 0, length(media_items), "Importing media...")
+    result = execute_media(media_items, project_id, default_author, result, on_progress, uploads_folder_path)
+
+    notify_progress(on_progress, "complete", 1, 1, "Import complete")
+    {:ok, result}
   rescue
     error -> {:error, %{message: Exception.message(error)}}
   end
 
-  defp execute_taxonomies(report, project_id, result) do
-    taxonomies = List.wrap(get_in(report, [:items, :categories])) ++ List.wrap(get_in(report, [:items, :tags]))
-
+  defp execute_taxonomies(taxonomies, project_id, result, on_progress) do
     Enum.reduce(taxonomies, result, fn item, acc ->
+      current = acc.tags.created + acc.tags.skipped + 1
+
       if item.exists_in_project || item.mapped_to do
+        notify_progress(on_progress, "tags", current, length(taxonomies), "Skipping tag: #{item.name}")
         put_in(acc, [:tags, :skipped], acc.tags.skipped + 1)
       else
         case Tags.create_tag(%{project_id: project_id, name: item.name}) do
-          {:ok, _tag} -> put_in(acc, [:tags, :created], acc.tags.created + 1)
-          {:error, _reason} -> put_in(acc, [:tags, :skipped], acc.tags.skipped + 1)
+          {:ok, _tag} ->
+            notify_progress(on_progress, "tags", current, length(taxonomies), "Created tag: #{item.name}")
+            put_in(acc, [:tags, :created], acc.tags.created + 1)
+
+          {:error, _reason} ->
+            notify_progress(on_progress, "tags", current, length(taxonomies), "Skipping tag: #{item.name}")
+            put_in(acc, [:tags, :skipped], acc.tags.skipped + 1)
         end
       end
     end)
   end
 
-  defp execute_posts(report, project_id, default_author, result) do
-    items = import_items(report, :posts)
+  defp execute_posts(items, project_id, default_author, result, on_progress) do
+    total = length(items)
 
-    Enum.reduce(items, result, fn item, acc ->
+    Enum.with_index(items, 1)
+    |> Enum.reduce(result, fn {item, index}, acc ->
+      notify_progress(on_progress, "posts", index, total, "Processing: #{item.title}")
       execute_post_item(project_id, item, acc, :posts, default_author)
     end)
   end
 
-  defp execute_pages(report, project_id, default_author, result) do
-    items = import_items(report, :pages)
+  defp execute_pages(items, project_id, default_author, result, on_progress) do
+    total = length(items)
 
-    Enum.reduce(items, result, fn item, acc ->
+    Enum.with_index(items, 1)
+    |> Enum.reduce(result, fn {item, index}, acc ->
+      notify_progress(on_progress, "pages", index, total, "Processing: #{item.title}")
       execute_post_item(project_id, ensure_page_category(item), acc, :pages, default_author)
     end)
   end
 
-  defp execute_media(report, project_id, default_author, result) do
-    import_items(report, :media)
-    |> Enum.reduce(result, fn item, acc ->
+  defp execute_media(items, project_id, default_author, result, on_progress, uploads_folder_path) do
+    total = length(items)
+
+    items
+    |> Enum.with_index(1)
+    |> Enum.reduce(result, fn {item, index}, acc ->
+      notify_progress(on_progress, "media", index, total, "Processing: #{item.filename}")
+
       cond do
         item.status in ["update", "duplicate", "missing"] ->
           put_in(acc, [:media, :skipped], acc.media.skipped + 1)
@@ -72,7 +102,7 @@ defmodule BDS.ImportExecution do
           put_in(acc, [:media, :skipped], acc.media.skipped + 1)
 
         true ->
-          case import_media_item(project_id, item, default_author) do
+          case import_media_item(project_id, item, default_author, uploads_folder_path) do
             {:ok, _media} -> put_in(acc, [:media, :imported], acc.media.imported + 1)
             {:error, reason} ->
               acc
@@ -141,8 +171,8 @@ defmodule BDS.ImportExecution do
     end
   end
 
-  defp import_media_item(project_id, item, default_author) do
-    source_path = item.source_file || Path.join("", item.relative_path)
+  defp import_media_item(project_id, item, default_author, uploads_folder_path) do
+    source_path = item.source_file || uploads_source_path(item.relative_path, uploads_folder_path)
     checksum = if(source_path != nil and File.exists?(source_path), do: md5(File.read!(source_path)), else: nil)
 
     if source_path && File.exists?(source_path) do
@@ -292,6 +322,29 @@ defmodule BDS.ImportExecution do
   end
 
   defp parse_timestamp(_value), do: nil
+
+  defp taxonomy_items(report) do
+    List.wrap(get_in(report, [:items, :categories])) ++ List.wrap(get_in(report, [:items, :tags]))
+  end
+
+  defp uploads_source_path(relative_path, uploads_folder_path)
+
+  defp uploads_source_path(relative_path, uploads_folder_path)
+       when is_binary(relative_path) and is_binary(uploads_folder_path) and uploads_folder_path != "" do
+    Path.join(uploads_folder_path, relative_path)
+  end
+
+  defp uploads_source_path(_relative_path, _uploads_folder_path), do: nil
+
+  defp notify_progress(callback, phase, current, total, detail) when is_function(callback, 4) do
+    try do
+      callback.(phase, current, total, detail)
+    rescue
+      _error -> :ok
+    end
+
+    :ok
+  end
 
   defp md5(binary) do
     :md5

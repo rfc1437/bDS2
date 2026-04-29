@@ -105,8 +105,12 @@ defmodule BDS.Desktop.ShellLive do
         |> assign(:chat_editor_surface_data, %{})
         |> assign(:chat_editor_surface_tabs, %{})
         |> assign(:chat_editor_action_errors, %{})
+        |> assign(:import_editor_analysis_states, %{})
+        |> assign(:import_editor_analysis_task_refs, %{})
         |> assign(:import_editor_execution_states, %{})
+        |> assign(:import_editor_execution_task_refs, %{})
         |> assign(:import_editor_sections, %{})
+        |> assign(:import_editor_taxonomy_edits, %{})
         |> assign(:import_editor_model_selectors_open, %{})
         |> assign(:import_editor_selected_models, %{})
         |> assign(:misc_editor_selected_pairs, %{})
@@ -791,8 +795,20 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, ImportEditor.change_conflict_resolution(socket, params, &reload_shell/2)}
   end
 
-  def handle_event("change_import_taxonomy_mapping", params, socket) do
-    {:noreply, ImportEditor.change_taxonomy_mapping(socket, params, &reload_shell/2)}
+  def handle_event("start_import_taxonomy_edit", params, socket) do
+    {:noreply, ImportEditor.start_taxonomy_edit(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("save_import_taxonomy_edit", params, socket) do
+    {:noreply, ImportEditor.save_taxonomy_edit(socket, params, &reload_shell/2)}
+  end
+
+  def handle_event("cancel_import_taxonomy_edit", _params, socket) do
+    {:noreply, ImportEditor.cancel_taxonomy_edit(socket, &reload_shell/2)}
+  end
+
+  def handle_event("clear_import_taxonomy_mapping", params, socket) do
+    {:noreply, ImportEditor.clear_taxonomy_mapping(socket, params, &reload_shell/2)}
   end
 
   def handle_event("toggle_import_section", %{"section" => section}, socket) do
@@ -1184,17 +1200,44 @@ defmodule BDS.Desktop.ShellLive do
   @impl true
   def handle_info({ref, result}, socket) when is_reference(ref) do
     Process.demonitor(ref, [:flush])
-    {:noreply, ChatEditor.finish_request(socket, ref, result, &reload_shell/2, &append_output_entry/5)}
+
+    cond do
+      Map.has_key?(socket.assigns.import_editor_analysis_task_refs, ref) ->
+        {:noreply, ImportEditor.finish_analysis(socket, ref, result, &reload_shell/2, &append_output_entry/5)}
+
+      Map.has_key?(socket.assigns.import_editor_execution_task_refs, ref) ->
+        {:noreply, ImportEditor.finish_execution(socket, ref, result, &reload_shell/2, &append_output_entry/5)}
+
+      true ->
+        {:noreply, ChatEditor.finish_request(socket, ref, result, &reload_shell/2, &append_output_entry/5)}
+    end
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, socket) when is_reference(ref) do
     next_socket =
-      case reason do
-        :normal -> socket
-        _other -> ChatEditor.finish_request(socket, ref, {:error, :cancelled}, &reload_shell/2, &append_output_entry/5)
+      cond do
+        Map.has_key?(socket.assigns.import_editor_analysis_task_refs, ref) ->
+          ImportEditor.handle_task_down(socket, :analysis, ref, reason, &reload_shell/2, &append_output_entry/5)
+
+        Map.has_key?(socket.assigns.import_editor_execution_task_refs, ref) ->
+          ImportEditor.handle_task_down(socket, :execution, ref, reason, &reload_shell/2, &append_output_entry/5)
+
+        true ->
+          case reason do
+            :normal -> socket
+            _other -> ChatEditor.finish_request(socket, ref, {:error, :cancelled}, &reload_shell/2, &append_output_entry/5)
+          end
       end
 
     {:noreply, next_socket}
+  end
+
+  def handle_info({:import_analysis_progress, definition_id, step, detail}, socket) do
+    {:noreply, ImportEditor.note_analysis_progress(socket, definition_id, step, detail, &reload_shell/2)}
+  end
+
+  def handle_info({:import_execution_progress, definition_id, phase, current, total, detail}, socket) do
+    {:noreply, ImportEditor.note_execution_progress(socket, definition_id, phase, current, total, detail, &reload_shell/2)}
   end
 
   def handle_info({:chat_tool_call, conversation_id, tool_call}, socket) do

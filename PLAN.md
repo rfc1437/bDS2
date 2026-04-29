@@ -83,8 +83,8 @@ Only these two audit tracks matter for the current pass. The follow-on missing-f
 11. Restore desktop-side CLI mutation watching parity. Completed 2026-04-29.
    A supervised CLI-sync watcher now polls the persisted notification store on the old-app timing budget, broadcasts `entity:changed` events through PubSub, and the LiveView shell refreshes sidebar/editor state while closing stale post/media tabs on external deletes.
 
-12. Restore import execution and editor parity.
-   Extend the existing stored import definitions into the old WXR analysis/execution pipeline and add the dedicated editor surface so import behavior, workflow, and look and feel match the old app.
+12. Restore import execution and editor parity. Completed 2026-04-29.
+   The stored import-definition flow now runs through the old analysis/execution pipeline again with progress callbacks, dedicated import-editor detail sections, inline taxonomy mapping pills plus AI-backed mapping, and focused import proof plus clean compile, dialyzer, and full-suite validation.
 
 ## Batch 3 Audit Matrix
 

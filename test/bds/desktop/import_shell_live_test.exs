@@ -53,8 +53,29 @@ defmodule BDS.Desktop.ImportShellLiveTest do
     assert html =~ "Ready to import:"
     assert html =~ "Import 5 Items"
     assert html =~ "Post Slug Conflicts"
-      assert html =~ "Analyze with..."
-      refute html =~ "Desktop workbench content routed through the Elixir shell."
+    assert html =~ "Analyze with..."
+    assert html =~ "Posts (2)"
+    assert html =~ "Pages (1)"
+    assert html =~ "Media (1)"
+    assert html =~ "Click to add mapping"
+    refute html =~ ~s(name="mapped_to")
+    refute html =~ "Desktop workbench content routed through the Elixir shell."
+
+    posts_html =
+      view
+      |> element("button[phx-value-section='posts']")
+      |> render_click()
+
+    assert posts_html =~ "Existing Match"
+    assert posts_html =~ "WP Status"
+
+    media_html =
+      view
+      |> element("button[phx-value-section='media']")
+      |> render_click()
+
+    assert media_html =~ "Filename"
+    assert media_html =~ "Path"
   end
 
   defp cached_report(wxr_path, uploads_dir) do
@@ -102,6 +123,70 @@ defmodule BDS.Desktop.ImportShellLiveTest do
         ],
         categories: [%{name: "General", exists_in_project: false, mapped_to: nil}],
         tags: [%{name: "News", exists_in_project: false, mapped_to: nil}]
+      },
+      details: %{
+        posts: [
+          %{
+            item_type: "post",
+            title: "Hello World",
+            slug: "hello-world",
+            status: "new",
+            wp_status: "publish",
+            author: "Importer",
+            categories: ["General"],
+            tags: ["News"],
+            published_at: "2024-05-01 12:00:00",
+            excerpt: "Legacy hello",
+            content_markdown: "Hello world",
+            content_preview: "Hello world"
+          },
+          %{
+            item_type: "post",
+            title: "Conflict Me",
+            slug: "conflict-me",
+            status: "conflict",
+            resolution: "skip",
+            wp_status: "publish",
+            author: "Importer",
+            categories: ["General"],
+            tags: ["News"],
+            published_at: "2024-05-02 12:00:00",
+            excerpt: "Legacy conflict",
+            existing_title: "Existing Conflict",
+            content_markdown: "Incoming conflict body",
+            content_preview: "Incoming conflict body"
+          }
+        ],
+        pages: [
+          %{
+            item_type: "page",
+            title: "About",
+            slug: "about",
+            status: "new",
+            wp_status: "publish",
+            author: "Importer",
+            categories: ["General"],
+            tags: [],
+            published_at: "2024-05-03 12:00:00",
+            excerpt: "About page",
+            content_markdown: "About page",
+            content_preview: "About page"
+          }
+        ],
+        media: [
+          %{
+            item_type: "media",
+            title: "Import Asset",
+            filename: "import-asset.txt",
+            relative_path: "2024/05/import-asset.txt",
+            source_file: Path.join(uploads_dir, "2024/05/import-asset.txt"),
+            status: "new",
+            mime_type: "text/plain",
+            description: "Legacy text attachment",
+            parent_wp_id: 101,
+            created_at: "2024-05-03 12:00:00"
+          }
+        ]
       }
     }
   end

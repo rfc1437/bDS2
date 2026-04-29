@@ -97,6 +97,32 @@ defmodule BDS.ImportExecutionTest do
     assert Enum.any?(slugs, &(&1 != "conflict-me"))
   end
 
+  test "execute_import reports phase progress while importing", %{project: project, temp_dir: temp_dir} do
+    uploads_dir = Path.join(temp_dir, "uploads")
+    File.mkdir_p!(Path.join(uploads_dir, "2024/05"))
+    File.write!(Path.join(uploads_dir, "2024/05/import-asset.txt"), "legacy attachment")
+
+    wxr_path = Path.join(temp_dir, "legacy.xml")
+    File.write!(wxr_path, basic_wxr_xml())
+
+    assert {:ok, report} = ImportAnalysis.analyze_wxr(project.id, wxr_path, uploads_dir)
+
+    assert {:ok, _result} =
+             ImportExecution.execute_import(project.id, report,
+               uploads_folder_path: uploads_dir,
+               default_author: "Imported Author",
+               on_progress: fn phase, current, total, detail ->
+                 send(self(), {:execution_progress, phase, current, total, detail})
+               end
+             )
+
+    assert_received {:execution_progress, "tags", 0, 2, "Creating tags..."}
+    assert_received {:execution_progress, "posts", 0, 1, "Importing posts..."}
+    assert_received {:execution_progress, "media", 0, 1, "Importing media..."}
+    assert_received {:execution_progress, "pages", 0, 1, "Importing pages..."}
+    assert_received {:execution_progress, "complete", 1, 1, "Import complete"}
+  end
+
   defp sha256(value) do
     :sha256
     |> :crypto.hash(value)

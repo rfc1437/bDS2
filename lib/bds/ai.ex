@@ -212,6 +212,40 @@ defmodule BDS.AI do
     end
   end
 
+  def analyze_import_taxonomy(import_terms, existing_terms, opts \\ [])
+      when is_map(import_terms) and is_map(existing_terms) and is_list(opts) do
+    payload = %{
+      import_categories: normalize_string_list(Map.get(import_terms, :categories) || Map.get(import_terms, "categories")),
+      import_tags: normalize_string_list(Map.get(import_terms, :tags) || Map.get(import_terms, "tags")),
+      existing_categories: normalize_string_list(Map.get(existing_terms, :categories) || Map.get(existing_terms, "categories")),
+      existing_tags: normalize_string_list(Map.get(existing_terms, :tags) || Map.get(existing_terms, "tags"))
+    }
+
+    run_one_shot(
+      :import_taxonomy_mapping,
+      payload,
+      opts,
+      fn json, usage ->
+        {:ok,
+         %{
+           category_mappings:
+             filter_taxonomy_mapping_response(
+               json["categoryMappings"] || json["category_mappings"],
+               payload.import_categories,
+               payload.existing_categories
+             ),
+           tag_mappings:
+             filter_taxonomy_mapping_response(
+               json["tagMappings"] || json["tag_mappings"],
+               payload.import_tags,
+               payload.existing_tags
+             ),
+           usage: usage
+         }}
+      end
+    )
+  end
+
   def analyze_post(post_input, opts \\ []) when is_list(opts) do
     with {:ok, post} <- normalize_post_input(post_input) do
       run_one_shot(
@@ -559,7 +593,7 @@ defmodule BDS.AI do
   defp run_one_shot(operation, payload, opts, formatter) do
     runtime = Keyword.get(opts, :runtime, OpenAICompatibleRuntime)
 
-    with {:ok, endpoint, model, mode} <- resolve_runtime_target(operation, secret_backend: Keyword.get(opts, :secret_backend, SecretBackend)),
+    with {:ok, endpoint, model, mode} <- resolve_runtime_target(operation, opts),
          :ok <- validate_runtime_target(operation, model, mode),
          request <- build_one_shot_request(operation, payload, model),
          {:ok, response} <- runtime.generate(endpoint_with_model(endpoint, model), request, opts),
@@ -903,20 +937,20 @@ defmodule BDS.AI do
     {:ok, get_model_preference_value(:chat) || endpoint.model}
   end
 
-  defp resolve_model_for_operation(:analyze_image, :airplane, endpoint, _extra) do
-    {:ok, get_model_preference_value(:airplane_image_analysis) || endpoint.model}
+  defp resolve_model_for_operation(:analyze_image, :airplane, endpoint, extra) do
+    {:ok, Keyword.get(extra, :model) || get_model_preference_value(:airplane_image_analysis) || endpoint.model}
   end
 
-  defp resolve_model_for_operation(:analyze_image, :online, endpoint, _extra) do
-    {:ok, get_model_preference_value(:image_analysis) || endpoint.model}
+  defp resolve_model_for_operation(:analyze_image, :online, endpoint, extra) do
+    {:ok, Keyword.get(extra, :model) || get_model_preference_value(:image_analysis) || endpoint.model}
   end
 
-  defp resolve_model_for_operation(_operation, :airplane, endpoint, _extra) do
-    {:ok, get_model_preference_value(:airplane_title) || endpoint.model}
+  defp resolve_model_for_operation(_operation, :airplane, endpoint, extra) do
+    {:ok, Keyword.get(extra, :model) || get_model_preference_value(:airplane_title) || endpoint.model}
   end
 
-  defp resolve_model_for_operation(_operation, :online, endpoint, _extra) do
-    {:ok, get_model_preference_value(:title) || endpoint.model}
+  defp resolve_model_for_operation(_operation, :online, endpoint, extra) do
+    {:ok, Keyword.get(extra, :model) || get_model_preference_value(:title) || endpoint.model}
   end
 
   defp validate_runtime_target(:analyze_image, model, _mode) do
@@ -990,12 +1024,59 @@ defmodule BDS.AI do
     |> MapSet.size()
   end
 
+  defp normalize_string_list(values) do
+    values
+    |> List.wrap()
+    |> Enum.map(&to_string/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+  end
+
+  defp filter_taxonomy_mapping_response(mappings, import_terms, existing_terms) when is_map(mappings) do
+    import_lookup = canonical_term_lookup(import_terms)
+    existing_lookup = canonical_term_lookup(existing_terms)
+
+    Enum.reduce(mappings, %{}, fn {source, target}, acc ->
+      with {:ok, canonical_source} <- resolve_canonical_term(source, import_lookup),
+           {:ok, canonical_target} <- resolve_canonical_term(target, existing_lookup) do
+        Map.put(acc, canonical_source, canonical_target)
+      else
+        _other -> acc
+      end
+    end)
+  end
+
+  defp filter_taxonomy_mapping_response(_mappings, _import_terms, _existing_terms), do: %{}
+
+  defp canonical_term_lookup(terms) do
+    Map.new(terms, fn term -> {normalize_term(term), term} end)
+  end
+
+  defp resolve_canonical_term(term, lookup) do
+    case Map.get(lookup, normalize_term(term)) do
+      nil -> :error
+      canonical -> {:ok, canonical}
+    end
+  end
+
+  defp normalize_term(term) do
+    term
+    |> to_string()
+    |> String.trim()
+    |> String.downcase()
+  end
+
   defp one_shot_system_prompt(:detect_language) do
     "Return JSON with exactly one key: language_code."
   end
 
   defp one_shot_system_prompt(:analyze_taxonomy) do
     "Return JSON with keys tags and categories, each an array of short strings."
+  end
+
+  defp one_shot_system_prompt(:import_taxonomy_mapping) do
+    "You are helping import WordPress taxonomy into an existing blog. Return JSON with exactly two keys: categoryMappings and tagMappings. Each value must be an object mapping imported term names to existing project term names. Only map when the imported term should reuse an existing term to avoid duplicates. Do not invent target terms. Leave unmapped items out of the objects."
   end
 
   defp one_shot_system_prompt(:analyze_post) do
@@ -1020,6 +1101,27 @@ defmodule BDS.AI do
 
   defp one_shot_user_content(:analyze_taxonomy, post) do
     "Suggest categories and tags for the following post.\nTitle: #{post.title}\nExcerpt: #{post.excerpt}\nContent: #{truncate_text(post.content, 2000)}"
+  end
+
+  defp one_shot_user_content(:import_taxonomy_mapping, payload) do
+    [
+      "Analyze these imported taxonomy terms and suggest which ones should map to existing project terms.",
+      "",
+      "Imported categories:",
+      Enum.join(payload.import_categories, ", "),
+      "",
+      "Imported tags:",
+      Enum.join(payload.import_tags, ", "),
+      "",
+      "Existing project categories:",
+      Enum.join(payload.existing_categories, ", "),
+      "",
+      "Existing project tags:",
+      Enum.join(payload.existing_tags, ", "),
+      "",
+      "Return JSON only."
+    ]
+    |> Enum.join("\n")
   end
 
   defp one_shot_user_content(:analyze_post, post) do
