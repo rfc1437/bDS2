@@ -353,10 +353,10 @@ defmodule BDS.MCP do
               proposal.data["template_id"] |> Templates.publish_template()
 
             "propose_media_metadata" ->
-              Media.update_media(proposal.data["media_id"], atomize_keys(proposal.data["changes"]))
+              Media.update_media(proposal.data["media_id"], proposal.data["changes"] || %{})
 
             "propose_post_metadata" ->
-              Posts.update_post(proposal.data["post_id"], atomize_keys(proposal.data["changes"]))
+              Posts.update_post(proposal.data["post_id"], proposal.data["changes"] || %{})
 
             _other ->
               {:error, :unsupported_proposal}
@@ -645,10 +645,6 @@ defmodule BDS.MCP do
   defp parse_template_kind("not-found"), do: :not_found
   defp parse_template_kind("not_found"), do: :not_found
   defp parse_template_kind("partial"), do: :partial
-
-  defp atomize_keys(map) when is_map(map) do
-    Map.new(map, fn {key, value} -> {String.to_atom(key), value} end)
-  end
 
   defp sanitize(%_struct{} = struct) do
     struct

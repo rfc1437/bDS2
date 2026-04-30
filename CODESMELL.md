@@ -260,7 +260,7 @@ This suggests data isn't normalized at boundaries. Prefer atoms for internal str
 
 1. **Add `@spec` to public APIs of core contexts.** ✅ **DONE 2026-04-30.** See "Priority #1 Completion" section below.
 2. **Extract filesystem / Search side effects out of `Repo.transaction` in `BDS.Media`.** ✅ **DONE 2026-04-30.** See "Priority #2 Completion" section below.
-3. **Fix `MCP.atomize_keys`** to use `String.to_existing_atom/1` with a string-fallback. Removes a real atom-table DoS vector.
+3. **Fix `MCP.atomize_keys`** to use `String.to_existing_atom/1` with a string-fallback. ✅ **DONE 2026-04-30.** See "Priority #3 Completion" section below.
 4. **Introduce `BDS.PostMedia` Ecto schema** and migrate the 6–8 raw `post_media` queries. Direct type-safety win.
 5. **Replace `Repo.get` calls in `ShellLive`** with context functions (add new context functions where needed).
 6. **Move locale from `Process.put` into assigns**, then ban `Process.put` via Credo.
@@ -347,6 +347,29 @@ SQLite has a single global write lock. Holding the transaction open while we cop
 **Spec correction surfaced by Dialyzer:**
 
 - `BDS.Media.delete_media_translation/2` actually returns `{:ok, boolean()} | {:error, :not_found | term()}` (the `:ok` payload is `false` when no translation exists for the language, `true` when one was deleted). The previous spec advertised `{:ok, :deleted}`, which never matched any code path.
+
+**Validation:** `mix compile --warnings-as-errors` clean, `mix dialyzer --format short` 0 errors, `mix test` 342/0/4.
+
+---
+
+## Priority #3 Completion (2026-04-30)
+
+Removed `BDS.MCP.atomize_keys/1` entirely instead of just narrowing it to `String.to_existing_atom/1`. The function existed only to convert MCP-proposal JSON keys (attacker-controlled strings) into atoms before passing them to `Media.update_media/2` and `Posts.update_post/2`. Both contexts already accept string-keyed maps natively through their `attr/2` helper (`%{optional(atom()) => term(), optional(String.t()) => term()}`), so the conversion was both unnecessary and a textbook unbounded-atom-table DoS vector.
+
+**Change:**
+
+- Deleted `defp atomize_keys/1` from [lib/bds/mcp.ex](lib/bds/mcp.ex).
+- The two `accept_proposal` call sites now pass `proposal.data["changes"] || %{}` straight through to `Media.update_media/2` and `Posts.update_post/2`.
+
+**Why removal beats whitelisting:**
+
+- `String.to_existing_atom/1` would still need a whitelist or a `try/rescue` wrapper, both of which add code without buying type safety — the downstream contexts already key on either form.
+- Removing the function eliminates the only place in MCP that converts external JSON to atoms; the surface area for atom-table attacks via the MCP tool API is now zero.
+- The `attr/2` helpers in `BDS.Posts` and `BDS.Media` are the *single* canonical place where attribute key normalization happens, which is exactly the invariant we want.
+
+**Other `String.to_atom/1` call sites considered:**
+
+The codebase has nine other `String.to_atom/1` call sites; all of them operate on bounded inputs (`Workbench` type names, release platforms, route IDs from the router config, `:supports_attachment` / `:supports_tool_calls` capability keys we ourselves wrote, `parse_modality` from a fixed AI catalog). None of them are reachable from attacker-controlled JSON the way `MCP.accept_proposal` was. They are safe to leave as a follow-up if a stricter sweep is wanted later.
 
 **Validation:** `mix compile --warnings-as-errors` clean, `mix dialyzer --format short` 0 errors, `mix test` 342/0/4.
 
