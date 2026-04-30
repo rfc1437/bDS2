@@ -21,6 +21,35 @@ defmodule BDS.Posts do
   alias BDS.Slug
   alias BDS.Tasks
 
+  @typedoc "An attribute map that may use atom or string keys."
+  @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
+
+  @typedoc "Options accepted by long-running rebuild operations."
+  @type rebuild_opts :: keyword()
+
+  @typedoc "Aggregate counts returned by `dashboard_stats/1`."
+  @type dashboard_stats :: %{
+          total_posts: non_neg_integer(),
+          draft_count: non_neg_integer(),
+          published_count: non_neg_integer(),
+          archived_count: non_neg_integer()
+        }
+
+  @typedoc "Per-month post count entry returned by `post_counts_by_year_month/1`."
+  @type month_count :: %{year: integer(), month: integer(), count: non_neg_integer()}
+
+  @typedoc "Translation validation report returned by `validate_translations/2`."
+  @type translation_validation_report :: %{
+          checked_database_row_count: non_neg_integer(),
+          checked_filesystem_file_count: non_neg_integer(),
+          invalid_database_rows: [map()],
+          invalid_filesystem_files: [map()],
+          missing: [map()],
+          orphan_files: [map()],
+          do_not_translate_posts: [map()]
+        }
+
+  @spec create_post(attrs()) :: {:ok, Post.t()} | {:error, Ecto.Changeset.t()}
   def create_post(attrs) do
     now = Persistence.now_ms()
     project_id = attr(attrs, :project_id)
@@ -66,6 +95,8 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec update_post(String.t(), attrs()) ::
+          {:ok, Post.t()} | {:error, :not_found | Ecto.Changeset.t()}
   def update_post(post_id, attrs) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -107,6 +138,8 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec publish_post(String.t()) ::
+          {:ok, Post.t()} | {:error, :not_found | Ecto.Changeset.t()}
   def publish_post(post_id) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -149,6 +182,7 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec rebuild_posts_from_files(String.t(), rebuild_opts()) :: {:ok, [Post.t()]}
   def rebuild_posts_from_files(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
     on_progress = progress_callback(opts)
@@ -200,6 +234,8 @@ defmodule BDS.Posts do
     {:ok, posts}
   end
 
+  @spec discard_post_changes(String.t()) ::
+          {:ok, Post.t()} | {:error, :not_found}
   def discard_post_changes(post_id) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -222,6 +258,7 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec editor_body(Post.t() | Translation.t() | term()) :: String.t()
   def editor_body(%Post{content: content}) when is_binary(content), do: content
 
   def editor_body(%Post{project_id: project_id, file_path: file_path})
@@ -246,6 +283,7 @@ defmodule BDS.Posts do
 
   def editor_body(_record), do: ""
 
+  @spec sync_post_from_file(String.t()) :: {:ok, Post.t()} | {:error, :not_found}
   def sync_post_from_file(post_id) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -268,6 +306,8 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec sync_post_translation_from_file(String.t()) ::
+          {:ok, Translation.t()} | {:error, :not_found}
   def sync_post_translation_from_file(translation_id) do
     case Repo.get(Translation, translation_id) do
       nil ->
@@ -289,6 +329,8 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec rewrite_published_post_translation(String.t()) ::
+          {:ok, Translation.t()} | {:error, :not_found}
   def rewrite_published_post_translation(translation_id) do
     case Repo.get(Translation, translation_id) do
       nil ->
@@ -305,6 +347,8 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec import_orphan_post_file(String.t(), String.t()) ::
+          {:ok, Post.t()} | {:error, :not_found | :unsupported_file}
   def import_orphan_post_file(project_id, relative_path) do
     project = Projects.get_project!(project_id)
     full_path = Path.join(Projects.project_data_dir(project), relative_path)
@@ -327,6 +371,8 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec import_orphan_post_translation_file(String.t(), String.t()) ::
+          {:ok, Translation.t()} | {:error, :not_found | :unsupported_file | :conflict}
   def import_orphan_post_translation_file(project_id, relative_path) do
     project = Projects.get_project!(project_id)
     full_path = Path.join(Projects.project_data_dir(project), relative_path)
@@ -359,6 +405,7 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec delete_post(String.t()) :: {:ok, :deleted} | {:error, :not_found}
   def delete_post(post_id) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -376,6 +423,8 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec archive_post(String.t()) ::
+          {:ok, Post.t()} | {:error, :not_found | Ecto.Changeset.t()}
   def archive_post(post_id) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -402,10 +451,14 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec get_post!(String.t()) :: Post.t()
   def get_post!(post_id), do: Repo.get!(Post, post_id)
 
+  @spec get_post_translation!(String.t()) :: Translation.t()
   def get_post_translation!(translation_id), do: Repo.get!(Translation, translation_id)
 
+  @spec publish_post_translation(String.t(), String.t() | atom()) ::
+          {:ok, Translation.t()} | {:error, :not_found | term()}
   def publish_post_translation(post_id, language) do
     normalized_language = language |> to_string() |> String.trim() |> String.downcase()
 
@@ -424,6 +477,7 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec slug_available(String.t(), String.t(), String.t() | nil) :: boolean()
   def slug_available(project_id, slug, exclude_post_id \\ nil) do
     normalized_slug = slug |> to_string() |> String.trim()
 
@@ -441,6 +495,7 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec unique_slug_for_title(String.t(), String.t(), String.t() | nil) :: String.t()
   def unique_slug_for_title(project_id, title, exclude_post_id \\ nil) do
     base_slug = title |> default_slug_source() |> Slug.slugify()
 
@@ -455,6 +510,7 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec dashboard_stats(String.t()) :: dashboard_stats()
   def dashboard_stats(project_id) do
     Repo.all(
       from(post in Post,
@@ -477,6 +533,7 @@ defmodule BDS.Posts do
     )
   end
 
+  @spec post_counts_by_year_month(String.t()) :: [month_count()]
   def post_counts_by_year_month(project_id) do
     Repo.all(
       from(post in Post,
@@ -493,6 +550,7 @@ defmodule BDS.Posts do
     |> Enum.sort_by(fn %{year: year, month: month} -> {-year, -month} end)
   end
 
+  @spec rebuild_post_links(String.t(), rebuild_opts()) :: :ok
   def rebuild_post_links(project_id, opts \\ []) do
     post_ids = Repo.all(from(post in Post, where: post.project_id == ^project_id, select: post.id))
     on_progress = progress_callback(opts)
@@ -517,6 +575,7 @@ defmodule BDS.Posts do
     :ok
   end
 
+  @spec list_post_translations(String.t()) :: {:ok, [Translation.t()]}
   def list_post_translations(post_id) do
     {:ok,
      Repo.all(
@@ -526,6 +585,8 @@ defmodule BDS.Posts do
      )}
   end
 
+  @spec upsert_post_translation(String.t(), String.t() | atom(), attrs()) ::
+          {:ok, Translation.t()} | {:error, :not_found | Ecto.Changeset.t()}
   def upsert_post_translation(post_id, language, attrs) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -566,6 +627,7 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec delete_post_translation(String.t()) :: {:ok, :deleted} | {:error, :not_found}
   def delete_post_translation(translation_id) do
     case Repo.get(Translation, translation_id) do
       nil ->
@@ -579,6 +641,7 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec validate_translations(String.t(), rebuild_opts()) :: {:ok, translation_validation_report()}
   def validate_translations(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
     {:ok, metadata} = Metadata.get_project_metadata(project_id)
@@ -657,6 +720,13 @@ defmodule BDS.Posts do
      }}
   end
 
+  @spec fix_invalid_translations(map()) ::
+          {:ok,
+           %{
+             deleted_database_rows: non_neg_integer(),
+             deleted_files: non_neg_integer(),
+             flushed_translations: non_neg_integer()
+           }}
   def fix_invalid_translations(report) when is_map(report) do
     normalized_report = normalize_translation_validation_report(report)
 
@@ -693,6 +763,7 @@ defmodule BDS.Posts do
      }}
   end
 
+  @spec rewrite_published_post(String.t()) :: :ok
   def rewrite_published_post(post_id) do
     post = Repo.get!(Post, post_id)
 
@@ -1256,7 +1327,6 @@ defmodule BDS.Posts do
             %{post_id: post.id, translation_id: saved_translation.id, language: language}
           else
             {:error, reason} -> {:error, reason}
-            other -> {:error, other}
           end
         end,
         auto_translation_task_attrs(post)
@@ -1294,7 +1364,6 @@ defmodule BDS.Posts do
             %{media_id: media_id, translation_id: saved_translation.id, language: language}
           else
             {:error, reason} -> {:error, reason}
-            other -> {:error, other}
           end
         end,
         auto_translation_task_attrs(post)

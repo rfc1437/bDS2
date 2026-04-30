@@ -9,6 +9,29 @@ defmodule BDS.Media.Media do
   @primary_key {:id, :string, autogenerate: false}
   @foreign_key_type :string
 
+  @type t :: %__MODULE__{
+          id: String.t() | nil,
+          project_id: String.t() | nil,
+          project: term(),
+          filename: String.t() | nil,
+          original_name: String.t() | nil,
+          mime_type: String.t() | nil,
+          size: integer() | nil,
+          width: integer() | nil,
+          height: integer() | nil,
+          title: String.t() | nil,
+          alt: String.t() | nil,
+          caption: String.t() | nil,
+          author: String.t() | nil,
+          language: String.t() | nil,
+          file_path: String.t() | nil,
+          sidecar_path: String.t() | nil,
+          checksum: String.t() | nil,
+          tags: [String.t()],
+          created_at: integer() | nil,
+          updated_at: integer() | nil
+        }
+
   schema "media" do
     belongs_to :project, BDS.Projects.Project, type: :string
 
@@ -31,6 +54,7 @@ defmodule BDS.Media.Media do
     field :updated_at, :integer
   end
 
+  @spec changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def changeset(media, attrs) do
     media
     |> cast(

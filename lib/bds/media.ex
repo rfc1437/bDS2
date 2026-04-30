@@ -13,6 +13,13 @@ defmodule BDS.Media do
   alias BDS.Search
   alias BDS.Sidecar
 
+  @typedoc "An attribute map that may use atom or string keys."
+  @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
+
+  @typedoc "Options accepted by long-running rebuild operations."
+  @type rebuild_opts :: keyword()
+
+  @spec import_media(attrs()) :: {:ok, Media.t()} | {:error, Ecto.Changeset.t() | term()}
   def import_media(attrs) do
     project = Projects.get_project!(attr(attrs, :project_id))
     source_path = attr(attrs, :source_path)
@@ -65,6 +72,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec update_media(String.t(), attrs()) ::
+          {:ok, Media.t()} | {:error, :not_found | Ecto.Changeset.t()}
   def update_media(media_id, attrs) do
     case Repo.get(Media, media_id) do
       nil ->
@@ -102,6 +111,7 @@ defmodule BDS.Media do
     end
   end
 
+  @spec sync_media_sidecar(String.t()) :: :ok | {:error, :not_found | term()}
   def sync_media_sidecar(media_id) do
     case Repo.get(Media, media_id) do
       nil ->
@@ -114,6 +124,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec sync_media_from_sidecar(String.t()) ::
+          {:ok, Media.t()} | {:error, :not_found | term()}
   def sync_media_from_sidecar(media_id) do
     case Repo.get(Media, media_id) do
       nil ->
@@ -131,6 +143,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec sync_media_translation_sidecar(String.t()) ::
+          {:ok, Translation.t()} | {:error, :not_found | term()}
   def sync_media_translation_sidecar(translation_id) do
     case Repo.get(Translation, translation_id) do
       nil ->
@@ -144,6 +158,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec sync_media_translation_from_sidecar(String.t()) ::
+          {:ok, Translation.t()} | {:error, :not_found | term()}
   def sync_media_translation_from_sidecar(translation_id) do
     case Repo.get(Translation, translation_id) do
       nil ->
@@ -171,6 +187,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec import_orphan_media_sidecar(String.t(), String.t()) ::
+          {:ok, Media.t()} | {:error, term()}
   def import_orphan_media_sidecar(project_id, relative_path) do
     project = Projects.get_project!(project_id)
     sidecar_path = Path.join(Projects.project_data_dir(project), relative_path)
@@ -182,6 +200,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec import_orphan_media_translation_sidecar(String.t(), String.t()) ::
+          {:ok, Translation.t()} | {:error, term()}
   def import_orphan_media_translation_sidecar(project_id, relative_path) do
     project = Projects.get_project!(project_id)
     sidecar_path = Path.join(Projects.project_data_dir(project), relative_path)
@@ -214,6 +234,7 @@ defmodule BDS.Media do
     end
   end
 
+  @spec delete_media(String.t()) :: {:ok, :deleted} | {:error, :not_found}
   def delete_media(media_id) do
     case Repo.get(Media, media_id) do
       nil ->
@@ -244,6 +265,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec upsert_media_translation(String.t(), String.t() | atom(), attrs()) ::
+          {:ok, Translation.t()} | {:error, :not_found | Ecto.Changeset.t()}
   def upsert_media_translation(media_id, language, attrs) do
     case Repo.get(Media, media_id) do
       nil ->
@@ -286,6 +309,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec delete_media_translation(String.t(), String.t() | atom()) ::
+          {:ok, :deleted} | {:error, :not_found}
   def delete_media_translation(media_id, language) do
     normalized_language = language |> to_string() |> String.trim() |> String.downcase()
 
@@ -316,6 +341,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec replace_media_file(String.t(), String.t()) ::
+          {:ok, Media.t() | nil} | {:error, :not_found | Ecto.Changeset.t() | term()}
   def replace_media_file(media_id, new_source_path) do
     case Repo.get(Media, media_id) do
       nil ->
@@ -363,6 +390,7 @@ defmodule BDS.Media do
     end
   end
 
+  @spec list_media_translations(String.t()) :: [Translation.t()]
   def list_media_translations(media_id) when is_binary(media_id) do
     Repo.all(
       from translation in Translation,
@@ -371,6 +399,7 @@ defmodule BDS.Media do
     )
   end
 
+  @spec list_linked_posts(String.t()) :: [%{post_id: String.t(), title: String.t(), sort_order: integer()}]
   def list_linked_posts(media_id) when is_binary(media_id) do
     Repo.all(
       from post in BDS.Posts.Post,
@@ -386,6 +415,8 @@ defmodule BDS.Media do
     )
   end
 
+  @spec link_media_to_post(String.t(), String.t()) ::
+          {:ok, :linked} | {:error, :not_found | term()}
   def link_media_to_post(media_id, post_id) when is_binary(media_id) and is_binary(post_id) do
     case {Repo.get(Media, media_id), Repo.get(BDS.Posts.Post, post_id)} do
       {nil, _post} ->
@@ -424,6 +455,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec unlink_media_from_post(String.t(), String.t()) ::
+          {:ok, :unlinked} | {:error, :not_found | term()}
   def unlink_media_from_post(media_id, post_id) when is_binary(media_id) and is_binary(post_id) do
     case Repo.get(Media, media_id) do
       nil ->
@@ -444,6 +477,7 @@ defmodule BDS.Media do
     end
   end
 
+  @spec thumbnail_paths(Media.t()) :: %{required(atom()) => String.t()}
   def thumbnail_paths(%Media{id: id}) do
     prefix = String.slice(id, 0, 2)
 
@@ -455,6 +489,7 @@ defmodule BDS.Media do
     }
   end
 
+  @spec regenerate_thumbnails(String.t()) :: {:ok, Media.t()} | {:error, :not_found | term()}
   def regenerate_thumbnails(media_id) do
     case Repo.get(Media, media_id) do
       nil ->
@@ -467,6 +502,8 @@ defmodule BDS.Media do
     end
   end
 
+  @spec regenerate_missing_thumbnails(String.t(), rebuild_opts()) ::
+          %{processed: non_neg_integer(), generated: non_neg_integer(), failed: non_neg_integer()}
   def regenerate_missing_thumbnails(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
     on_progress = progress_callback(opts)
@@ -518,6 +555,7 @@ defmodule BDS.Media do
     end)
   end
 
+  @spec rebuild_media_from_files(String.t(), rebuild_opts()) :: {:ok, [Media.t()]}
   def rebuild_media_from_files(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
     on_progress = progress_callback(opts)

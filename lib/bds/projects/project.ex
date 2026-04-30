@@ -7,6 +7,18 @@ defmodule BDS.Projects.Project do
   @primary_key {:id, :string, autogenerate: false}
   @foreign_key_type :string
 
+  @type t :: %__MODULE__{
+          id: String.t() | nil,
+          name: String.t() | nil,
+          slug: String.t() | nil,
+          description: String.t() | nil,
+          data_path: String.t() | nil,
+          created_at: integer() | nil,
+          updated_at: integer() | nil,
+          is_active: boolean(),
+          posts: term()
+        }
+
   schema "projects" do
     field :name, :string
     field :slug, :string
@@ -19,6 +31,7 @@ defmodule BDS.Projects.Project do
     has_many :posts, BDS.Posts.Post, foreign_key: :project_id
   end
 
+  @spec changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def changeset(project, attrs) do
     project
     |> cast(

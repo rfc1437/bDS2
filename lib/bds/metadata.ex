@@ -36,16 +36,26 @@ defmodule BDS.Metadata do
                            "zinc"
                          ])
 
+  @typedoc "Project metadata state map."
+  @type metadata_state :: map()
+
+  @typedoc "Attribute map for `update_project_metadata/2`."
+  @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
+
+  @spec get_project_metadata(String.t()) :: {:ok, metadata_state()}
   def get_project_metadata(project_id) do
     project = Projects.get_project!(project_id)
     {:ok, load_state(project)}
   end
 
+  @spec read_project_metadata_from_filesystem(String.t()) :: {:ok, metadata_state()}
   def read_project_metadata_from_filesystem(project_id) do
     project = Projects.get_project!(project_id)
     {:ok, load_state_from_filesystem(project)}
   end
 
+  @spec update_project_metadata(String.t(), attrs()) ::
+          {:ok, metadata_state()} | {:error, term()}
   def update_project_metadata(project_id, attrs) do
     project = Projects.get_project!(project_id)
     state = load_state(project)
@@ -85,6 +95,7 @@ defmodule BDS.Metadata do
     |> maybe_backfill_embeddings(project_id, state, project_metadata)
   end
 
+  @spec add_category(String.t(), String.t()) :: {:ok, metadata_state()} | {:error, term()}
   def add_category(project_id, name) do
     update_state(project_id, fn project, state, now ->
       categories =
@@ -100,6 +111,7 @@ defmodule BDS.Metadata do
     end)
   end
 
+  @spec remove_category(String.t(), String.t()) :: {:ok, metadata_state()} | {:error, term()}
   def remove_category(project_id, name) do
     update_state(project_id, fn project, state, now ->
       categories = Enum.reject(state.categories, &(&1 == name))
@@ -113,6 +125,8 @@ defmodule BDS.Metadata do
     end)
   end
 
+  @spec update_category_settings(String.t(), String.t(), map()) ::
+          {:ok, metadata_state()} | {:error, term()}
   def update_category_settings(project_id, category, settings) do
     update_state(project_id, fn project, state, now ->
       normalized = normalize_category_settings(settings)
@@ -124,6 +138,8 @@ defmodule BDS.Metadata do
     end)
   end
 
+  @spec set_publishing_preferences(String.t(), map()) ::
+          {:ok, metadata_state()} | {:error, term()}
   def set_publishing_preferences(project_id, prefs) do
     update_state(project_id, fn project, state, now ->
       publishing_preferences = normalize_publishing_preferences(prefs)
@@ -133,6 +149,8 @@ defmodule BDS.Metadata do
     end)
   end
 
+  @spec sync_project_metadata_from_filesystem(String.t()) ::
+          {:ok, metadata_state()} | {:error, term()}
   def sync_project_metadata_from_filesystem(project_id) do
     project = Projects.get_project!(project_id)
     now = Persistence.now_ms()
@@ -167,6 +185,7 @@ defmodule BDS.Metadata do
     |> unwrap_transaction()
   end
 
+  @spec flush_project_metadata_to_filesystem(String.t()) :: {:ok, metadata_state()}
   def flush_project_metadata_to_filesystem(project_id) do
     project = Projects.get_project!(project_id)
     state = load_state(project)

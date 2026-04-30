@@ -7,6 +7,19 @@ defmodule BDS.Media.Translation do
   @primary_key {:id, :string, autogenerate: false}
   @foreign_key_type :string
 
+  @type t :: %__MODULE__{
+          id: String.t() | nil,
+          translation_for: String.t() | nil,
+          media: term(),
+          project_id: String.t() | nil,
+          language: String.t() | nil,
+          title: String.t() | nil,
+          alt: String.t() | nil,
+          caption: String.t() | nil,
+          created_at: integer() | nil,
+          updated_at: integer() | nil
+        }
+
   schema "media_translations" do
     belongs_to :media, BDS.Media.Media,
       foreign_key: :translation_for,
@@ -22,6 +35,7 @@ defmodule BDS.Media.Translation do
     field :updated_at, :integer
   end
 
+  @spec changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def changeset(translation, attrs) do
     translation
     |> cast(

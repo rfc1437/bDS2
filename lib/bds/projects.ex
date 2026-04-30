@@ -13,14 +13,35 @@ defmodule BDS.Projects do
   @default_project_id "default"
   @default_project_name "My Blog"
 
+  @typedoc "An attribute map that may use atom or string keys."
+  @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
+
+  @typedoc "Summary map returned for the shell projects panel."
+  @type project_summary :: %{
+          id: String.t(),
+          name: String.t(),
+          slug: String.t(),
+          data_path: String.t() | nil,
+          is_active: boolean()
+        }
+
+  @typedoc "Snapshot returned to the desktop shell."
+  @type shell_snapshot :: %{
+          active_project_id: String.t() | nil,
+          projects: [project_summary()]
+        }
+
+  @spec list_projects() :: [Project.t()]
   def list_projects do
     Repo.all(from project in Project, order_by: [asc: project.created_at])
   end
 
+  @spec get_active_project() :: Project.t() | nil
   def get_active_project do
     Repo.one(from project in Project, where: project.is_active == true, limit: 1)
   end
 
+  @spec shell_snapshot() :: shell_snapshot()
   def shell_snapshot do
     _ = ensure_default_project()
     projects = list_projects()
@@ -32,9 +53,13 @@ defmodule BDS.Projects do
     }
   end
 
+  @spec get_project(String.t()) :: Project.t() | nil
   def get_project(id), do: Repo.get(Project, id)
+
+  @spec get_project!(String.t()) :: Project.t()
   def get_project!(id), do: Repo.get!(Project, id)
 
+  @spec ensure_default_project() :: {:ok, Project.t()} | {:error, term()}
   def ensure_default_project do
     case Repo.get(Project, @default_project_id) do
       %Project{} = project ->
@@ -69,16 +94,19 @@ defmodule BDS.Projects do
     end
   end
 
+  @spec project_data_dir(Project.t()) :: String.t()
   def project_data_dir(%Project{} = project) do
     project.data_path || Path.expand("../../priv/data/projects/#{project.id}", __DIR__)
   end
 
+  @spec project_cache_dir(Project.t() | String.t()) :: String.t()
   def project_cache_dir(%Project{} = project), do: project_cache_dir(project.id)
 
   def project_cache_dir(project_id) when is_binary(project_id) do
     Path.join([project_cache_root(), "projects", project_id])
   end
 
+  @spec create_project(attrs()) :: {:ok, Project.t()} | {:error, term()}
   def create_project(attrs) do
     now = Persistence.now_ms()
     name = attr(attrs, :name) || ""
@@ -108,6 +136,7 @@ defmodule BDS.Projects do
     end
   end
 
+  @spec set_active_project(String.t()) :: {:ok, Project.t()} | {:error, :not_found | term()}
   def set_active_project(project_id) do
     case Repo.get(Project, project_id) do
       nil ->
@@ -133,6 +162,9 @@ defmodule BDS.Projects do
     end
   end
 
+  @spec delete_project(String.t()) ::
+          {:ok, Project.t()}
+          | {:error, :not_found | :cannot_delete_default_project | :cannot_delete_active_project | term()}
   def delete_project(project_id) when is_binary(project_id) do
     case Repo.get(Project, project_id) do
       nil ->

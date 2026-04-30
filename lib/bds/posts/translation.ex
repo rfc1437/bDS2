@@ -8,6 +8,25 @@ defmodule BDS.Posts.Translation do
   @foreign_key_type :string
   @statuses [:draft, :published]
 
+  @type status :: :draft | :published
+
+  @type t :: %__MODULE__{
+          id: String.t() | nil,
+          translation_for: String.t() | nil,
+          post: term(),
+          project_id: String.t() | nil,
+          language: String.t() | nil,
+          title: String.t() | nil,
+          excerpt: String.t() | nil,
+          content: String.t() | nil,
+          status: status(),
+          created_at: integer() | nil,
+          updated_at: integer() | nil,
+          published_at: integer() | nil,
+          file_path: String.t(),
+          checksum: String.t() | nil
+        }
+
   schema "post_translations" do
     belongs_to :post, BDS.Posts.Post,
       foreign_key: :translation_for,
@@ -27,6 +46,7 @@ defmodule BDS.Posts.Translation do
     field :checksum, :string
   end
 
+  @spec changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def changeset(translation, attrs) do
     translation
     |> cast(

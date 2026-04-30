@@ -915,7 +915,6 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   defp blank?(value) when is_binary(value), do: String.trim(value) == ""
   defp blank?(nil), do: true
-  defp blank?(_value), do: false
 
   defp rewrite_external_images(html) do
     html =

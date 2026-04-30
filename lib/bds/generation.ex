@@ -18,6 +18,19 @@ defmodule BDS.Generation do
 
   @core_sections [:core, :single, :category, :tag, :date]
 
+  @typedoc "A section identifier accepted by `generate_site/3` and friends."
+  @type section :: :core | :single | :category | :tag | :date
+
+  @typedoc "Options accepted by long-running generation operations."
+  @type generation_opts :: keyword()
+
+  @typedoc "Plan returned by `plan_generation/2`."
+  @type plan :: map()
+
+  @typedoc "Validation report returned by `validate_site/3`."
+  @type validation_report :: map()
+
+  @spec plan_generation(String.t(), [section()]) :: {:ok, plan()}
   def plan_generation(project_id, sections \\ [:core])
       when is_binary(project_id) and is_list(sections) do
     project = Projects.get_project!(project_id)
@@ -40,6 +53,8 @@ defmodule BDS.Generation do
      }}
   end
 
+  @spec generate_site(String.t(), [section()], generation_opts()) ::
+          {:ok, %{sections: [section()], generated_files: [map()]}} | {:error, term()}
   def generate_site(project_id, sections \\ [:core], opts \\ [])
 
   def generate_site(project_id, sections, opts)
@@ -63,6 +78,8 @@ defmodule BDS.Generation do
     end
   end
 
+  @spec validate_site(String.t(), [section()], generation_opts()) ::
+          {:ok, validation_report()} | {:error, term()}
   def validate_site(project_id, sections \\ @core_sections, opts \\ [])
 
   def validate_site(project_id, sections, opts) when is_binary(project_id) and is_list(sections) and is_list(opts) do
@@ -189,6 +206,7 @@ defmodule BDS.Generation do
     :ok
   end
 
+  @spec apply_validation(String.t(), [section()] | map()) :: {:ok, map()} | {:error, term()}
   def apply_validation(project_id, sections) when is_binary(project_id) and is_list(sections) do
     with {:ok, plan} <- plan_generation(project_id, sections) do
       expected_outputs = build_outputs(plan)
@@ -283,8 +301,10 @@ defmodule BDS.Generation do
     end
   end
 
+  @spec post_output_path(map()) :: String.t()
   def post_output_path(post), do: post_output_path(post, nil)
 
+  @spec post_output_path(map(), String.t() | nil) :: String.t()
   def post_output_path(post, language) when is_map(post) do
     {year, month, day} = local_date_parts!(post.created_at)
     year = Integer.to_string(year)
@@ -300,9 +320,14 @@ defmodule BDS.Generation do
     end
   end
 
+  @typedoc "Result returned by `write_generated_file/3,4`."
+  @type write_result :: %{relative_path: String.t(), content_hash: String.t(), written?: boolean()}
+
+  @spec write_generated_file(String.t(), String.t(), String.t()) :: {:ok, write_result()}
   def write_generated_file(project_id, relative_path, content),
     do: write_generated_file(project_id, relative_path, content, [])
 
+  @spec write_generated_file(String.t(), String.t(), String.t(), keyword()) :: {:ok, write_result()}
   def write_generated_file(project_id, relative_path, content, opts)
       when is_binary(project_id) and is_binary(relative_path) and is_binary(content) and is_list(opts) do
     project = Projects.get_project!(project_id)
@@ -335,6 +360,7 @@ defmodule BDS.Generation do
     end
   end
 
+  @spec list_generated_files(String.t()) :: {:ok, [map()]}
   def list_generated_files(project_id) when is_binary(project_id) do
     {:ok,
      Repo.all(
@@ -344,6 +370,7 @@ defmodule BDS.Generation do
      )}
   end
 
+  @spec delete_generated_file(String.t(), String.t()) :: :ok | {:error, term()}
   def delete_generated_file(project_id, relative_path)
       when is_binary(project_id) and is_binary(relative_path) do
     project = Projects.get_project!(project_id)

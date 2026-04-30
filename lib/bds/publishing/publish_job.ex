@@ -7,6 +7,24 @@ defmodule BDS.Publishing.PublishJob do
   @primary_key {:id, :string, autogenerate: false}
   @foreign_key_type :string
 
+  @type ssh_mode :: :scp | :rsync
+  @type status :: :pending | :running | :completed | :failed
+
+  @type t :: %__MODULE__{
+          id: String.t() | nil,
+          project_id: String.t() | nil,
+          ssh_host: String.t() | nil,
+          ssh_user: String.t() | nil,
+          ssh_remote_path: String.t() | nil,
+          ssh_mode: ssh_mode(),
+          status: status(),
+          task_id: String.t() | nil,
+          targets: [String.t()],
+          error: String.t() | nil,
+          inserted_at: integer() | nil,
+          updated_at: integer() | nil
+        }
+
   schema "publish_jobs" do
     field :project_id, :string
     field :ssh_host, :string
@@ -21,6 +39,7 @@ defmodule BDS.Publishing.PublishJob do
     field :updated_at, :integer
   end
 
+  @spec changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def changeset(job, attrs) do
     job
     |> cast(

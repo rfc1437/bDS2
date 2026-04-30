@@ -62,10 +62,18 @@ defmodule BDS.Search do
     {"it", ~w(il lo la gli le un una uno e che per con ogni mattina)}
   ]
 
+  @typedoc "Filters and pagination accepted by the search functions."
+  @type search_filters :: %{optional(atom()) => term(), optional(String.t()) => term()}
+
+  @typedoc "Reindex/long-running progress options."
+  @type reindex_opts :: keyword()
+
+  @spec list_stemmer_languages() :: [String.t()]
   def list_stemmer_languages do
     @stemmer_languages
   end
 
+  @spec detect_language(String.t() | nil) :: String.t()
   def detect_language(text) do
     normalized_text = text |> to_string() |> String.downcase()
 
@@ -78,6 +86,7 @@ defmodule BDS.Search do
     end
   end
 
+  @spec stem(String.t() | nil, String.t() | nil) :: String.t()
   def stem(text, language \\ nil) do
     language = normalize_language(language || detect_language(text))
 
@@ -86,6 +95,14 @@ defmodule BDS.Search do
     |> Enum.map_join(" ", &stem_token(&1, language))
   end
 
+  @spec search_posts(String.t(), String.t() | nil, search_filters()) ::
+          {:ok,
+           %{
+             posts: [Post.t()],
+             total: non_neg_integer(),
+             offset: non_neg_integer(),
+             limit: non_neg_integer()
+           }}
   def search_posts(project_id, query, filters \\ %{}) do
     filters = normalize_filters(filters)
 
@@ -104,6 +121,14 @@ defmodule BDS.Search do
      }}
   end
 
+  @spec search_media(String.t(), String.t() | nil, search_filters()) ::
+          {:ok,
+           %{
+             media: [Media.t()],
+             total: non_neg_integer(),
+             offset: non_neg_integer(),
+             limit: non_neg_integer()
+           }}
   def search_media(project_id, query, filters \\ %{}) do
     filters = normalize_filters(filters)
 
@@ -121,6 +146,7 @@ defmodule BDS.Search do
      }}
   end
 
+  @spec reindex_project(String.t()) :: :ok
   def reindex_project(project_id) do
     :ok = reindex_posts(project_id)
     :ok = reindex_media(project_id)
@@ -128,6 +154,7 @@ defmodule BDS.Search do
     :ok
   end
 
+  @spec reindex_posts(String.t(), reindex_opts()) :: :ok
   def reindex_posts(project_id, opts \\ []) do
     Repo.query!(
       "DELETE FROM posts_fts WHERE post_id IN (SELECT id FROM posts WHERE project_id = ?)",
@@ -150,6 +177,7 @@ defmodule BDS.Search do
     :ok
   end
 
+  @spec reindex_media(String.t(), reindex_opts()) :: :ok
   def reindex_media(project_id, opts \\ []) do
     Repo.query!(
       "DELETE FROM media_fts WHERE media_id IN (SELECT id FROM media WHERE project_id = ?)",
@@ -172,6 +200,7 @@ defmodule BDS.Search do
     :ok
   end
 
+  @spec sync_post(Post.t() | String.t()) :: :ok
   def sync_post(%Post{} = post) do
     delete_post(post.id)
     insert_post_index(post)
@@ -185,6 +214,7 @@ defmodule BDS.Search do
     end
   end
 
+  @spec delete_post(Post.t() | String.t()) :: :ok
   def delete_post(%Post{id: post_id}), do: delete_post(post_id)
 
   def delete_post(post_id) when is_binary(post_id) do
@@ -192,6 +222,7 @@ defmodule BDS.Search do
     :ok
   end
 
+  @spec sync_media(Media.t() | String.t()) :: :ok
   def sync_media(%Media{} = media) do
     delete_media(media.id)
     insert_media_index(media)
@@ -205,6 +236,7 @@ defmodule BDS.Search do
     end
   end
 
+  @spec delete_media(Media.t() | String.t()) :: :ok
   def delete_media(%Media{id: media_id}), do: delete_media(media_id)
 
   def delete_media(media_id) when is_binary(media_id) do

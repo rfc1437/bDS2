@@ -21,6 +21,13 @@ defmodule BDS.MCP do
   @page_size 50
   @proposal_ttl_app_ms 30 * 60 * 1000
 
+  @typedoc "Tool descriptor returned by `list_tools/0`."
+  @type tool_descriptor :: %{name: String.t(), annotations: map()}
+
+  @typedoc "Resource descriptor returned by `list_resources/0`."
+  @type resource_descriptor :: %{name: String.t(), uri: String.t()}
+
+  @spec list_tools() :: [tool_descriptor()]
   def list_tools do
     [
       tool("check_term", true),
@@ -37,6 +44,7 @@ defmodule BDS.MCP do
     ]
   end
 
+  @spec list_resources() :: [resource_descriptor()]
   def list_resources do
     [
       %{name: "posts", uri: "bds://posts"},
@@ -46,6 +54,7 @@ defmodule BDS.MCP do
     ]
   end
 
+  @spec call_tool(String.t(), map()) :: {:ok, term()} | {:error, term()}
   def call_tool(name, params) when is_binary(name) and is_map(params) do
     ProposalStore.ensure_started()
 
@@ -65,6 +74,7 @@ defmodule BDS.MCP do
     end
   end
 
+  @spec read_resource(String.t()) :: {:ok, term()} | {:error, term()}
   def read_resource(uri) when is_binary(uri) do
     ProposalStore.ensure_started()
 
@@ -79,6 +89,7 @@ defmodule BDS.MCP do
     end
   end
 
+  @spec validate_template(String.t()) :: {:ok, %{valid: boolean(), errors: [String.t()]}}
   def validate_template(source) when is_binary(source) do
     case Liquex.parse(source) do
       {:ok, _ast} -> {:ok, %{valid: true, errors: []}}

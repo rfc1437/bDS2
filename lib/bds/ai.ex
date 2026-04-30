@@ -34,6 +34,17 @@ defmodule BDS.AI do
     airplane_image_analysis: "ai.airplane.model.image_analysis"
   }
 
+  @typedoc "Endpoint kind such as :chat, :airplane_chat, :embedding, etc."
+  @type endpoint_kind :: atom()
+
+  @typedoc "Endpoint configuration map."
+  @type endpoint :: %{kind: endpoint_kind(), url: String.t() | nil, api_key: String.t() | nil, model: String.t() | nil}
+
+  @typedoc "Attribute map for endpoint operations."
+  @type endpoint_attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
+
+  @spec put_endpoint(endpoint_kind(), endpoint_attrs(), keyword()) ::
+          {:ok, endpoint()} | {:error, term()}
   def put_endpoint(kind, attrs, opts \\ []) when is_atom(kind) and is_map(attrs) and is_list(opts) do
     backend = Keyword.get(opts, :secret_backend, SecretBackend)
     kind_key = Atom.to_string(kind)
@@ -49,6 +60,8 @@ defmodule BDS.AI do
     end
   end
 
+  @spec get_endpoint(endpoint_kind(), keyword()) ::
+          {:ok, endpoint() | nil} | {:error, term()}
   def get_endpoint(kind, opts \\ []) when is_atom(kind) and is_list(opts) do
     backend = Keyword.get(opts, :secret_backend, SecretBackend)
     kind_key = Atom.to_string(kind)
@@ -67,6 +80,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec delete_endpoint(endpoint_kind()) :: :ok
   def delete_endpoint(kind) when is_atom(kind) do
     kind_key = Atom.to_string(kind)
     delete_setting("ai.#{kind_key}.url")
@@ -75,11 +89,15 @@ defmodule BDS.AI do
     :ok
   end
 
+  @spec list_endpoint_models(map(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def list_endpoint_models(endpoint, opts \\ []) when is_map(endpoint) and is_list(opts) do
     http_client = Keyword.get(opts, :http_client, Application.get_env(:bds, :ai_http_client, BDS.AI.HttpClient))
     OpenAICompatibleRuntime.list_models(endpoint, http_client: http_client)
   end
 
+  @spec refresh_model_catalog(keyword()) ::
+          {:ok, %{success: boolean(), models_updated: non_neg_integer(), not_modified: boolean()}}
+          | {:error, term()}
   def refresh_model_catalog(opts \\ []) when is_list(opts) do
     http_client = Keyword.get(opts, :http_client, BDS.AI.HttpClient)
 
@@ -111,6 +129,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec list_catalog_providers() :: [map()]
   def list_catalog_providers do
     Repo.all(from provider in CatalogProvider, order_by: [asc: provider.id])
     |> Enum.map(fn provider ->
@@ -126,6 +145,7 @@ defmodule BDS.AI do
     end)
   end
 
+  @spec get_catalog_model(String.t(), String.t() | nil) :: {:ok, map()} | {:error, :not_found}
   def get_catalog_model(model_id, provider_id \\ nil) when is_binary(model_id) do
     query =
       from model in Model,
@@ -144,14 +164,17 @@ defmodule BDS.AI do
     end
   end
 
+  @spec catalog_meta(String.t()) :: {:ok, String.t() | nil}
   def catalog_meta(key) when is_binary(key) do
     {:ok, get_catalog_meta_value(key)}
   end
 
+  @spec set_airplane_mode(boolean()) :: :ok | {:error, term()}
   def set_airplane_mode(enabled) when is_boolean(enabled) do
     put_setting("ai.airplane_mode_enabled", Atom.to_string(enabled))
   end
 
+  @spec airplane_mode?(boolean()) :: boolean()
   def airplane_mode?(default \\ false) when is_boolean(default) do
     case get_setting("ai.airplane_mode_enabled") do
       nil -> default
@@ -160,6 +183,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec put_model_preference(atom(), String.t()) :: :ok | {:error, :unknown_model_preference | term()}
   def put_model_preference(key, model) when is_atom(key) and is_binary(model) do
     case Map.fetch(@model_preference_keys, key) do
       {:ok, setting_key} -> put_setting(setting_key, model)
@@ -167,6 +191,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec get_model_preference(atom()) :: {:ok, String.t() | nil} | {:error, :unknown_model_preference}
   def get_model_preference(key) when is_atom(key) do
     case Map.fetch(@model_preference_keys, key) do
       {:ok, setting_key} -> {:ok, get_setting(setting_key)}
@@ -174,6 +199,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec put_model_capabilities(String.t(), map()) :: :ok | {:error, term()}
   def put_model_capabilities(model_id, attrs) when is_binary(model_id) and is_map(attrs) do
     capabilities = %{
       supports_attachment: truthy?(Map.get(attrs, :supports_attachment) || Map.get(attrs, "supports_attachment")),
@@ -183,6 +209,7 @@ defmodule BDS.AI do
     put_setting("ai.model_capabilities.#{model_id}", Jason.encode!(capabilities))
   end
 
+  @spec detect_language(String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def detect_language(text, opts \\ []) when is_binary(text) and is_list(opts) do
     run_one_shot(
       :detect_language,
@@ -194,6 +221,7 @@ defmodule BDS.AI do
     )
   end
 
+  @spec analyze_taxonomy(map() | String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def analyze_taxonomy(post_input, opts \\ []) when is_list(opts) do
     with {:ok, post} <- normalize_post_input(post_input) do
       run_one_shot(
@@ -212,6 +240,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec analyze_import_taxonomy(map(), map(), keyword()) :: {:ok, map()} | {:error, term()}
   def analyze_import_taxonomy(import_terms, existing_terms, opts \\ [])
       when is_map(import_terms) and is_map(existing_terms) and is_list(opts) do
     payload = %{
@@ -246,6 +275,7 @@ defmodule BDS.AI do
     )
   end
 
+  @spec analyze_post(map() | String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def analyze_post(post_input, opts \\ []) when is_list(opts) do
     with {:ok, post} <- normalize_post_input(post_input) do
       run_one_shot(
@@ -265,6 +295,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec translate_post(map() | String.t(), String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def translate_post(post_input, target_language, opts \\ [])
       when is_binary(target_language) and is_list(opts) do
     with {:ok, post} <- normalize_post_input(post_input) do
@@ -285,6 +316,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec analyze_image(map() | String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def analyze_image(media_input, opts \\ []) when is_list(opts) do
     with {:ok, media} <- normalize_media_input(media_input),
          :ok <- ensure_image_media(media) do
@@ -305,6 +337,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec translate_media(map() | String.t(), String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def translate_media(media_input, target_language, opts \\ [])
       when is_binary(target_language) and is_list(opts) do
     with {:ok, media} <- normalize_media_input(media_input) do
@@ -325,6 +358,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec start_chat(map()) :: {:ok, map()} | {:error, Ecto.Changeset.t()}
   def start_chat(attrs \\ %{}) when is_map(attrs) do
     now = Persistence.now_ms()
     model = Map.get(attrs, :model) || Map.get(attrs, "model")
@@ -346,11 +380,13 @@ defmodule BDS.AI do
     end
   end
 
+  @spec list_chat_conversations() :: [map()]
   def list_chat_conversations do
     Repo.all(from conversation in ChatConversation, order_by: [desc: conversation.updated_at])
     |> Enum.map(&format_conversation/1)
   end
 
+  @spec available_chat_models(String.t() | nil) :: [map()]
   def available_chat_models(current_model \\ nil) do
     endpoint_models = configured_chat_models()
 
@@ -378,6 +414,8 @@ defmodule BDS.AI do
     end)
   end
 
+  @spec set_conversation_model(String.t(), String.t()) ::
+          {:ok, map()} | {:error, :not_found | Ecto.Changeset.t()}
   def set_conversation_model(conversation_id, model_id)
       when is_binary(conversation_id) and is_binary(model_id) do
     case Repo.get(ChatConversation, conversation_id) do
@@ -395,6 +433,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec list_chat_messages(String.t()) :: [map()]
   def list_chat_messages(conversation_id) when is_binary(conversation_id) do
     Repo.all(
       from message in ChatMessage,
@@ -404,6 +443,8 @@ defmodule BDS.AI do
     |> Enum.map(&format_chat_message/1)
   end
 
+  @spec send_chat_message(String.t(), String.t(), keyword()) ::
+          {:ok, map()} | {:error, :not_found | term()}
   def send_chat_message(conversation_id, content, opts \\ [])
       when is_binary(conversation_id) and is_binary(content) and is_list(opts) do
     with %ChatConversation{} = conversation <- Repo.get(ChatConversation, conversation_id),
@@ -437,6 +478,7 @@ defmodule BDS.AI do
     end
   end
 
+  @spec cancel_chat(String.t()) :: :ok
   def cancel_chat(conversation_id) when is_binary(conversation_id) do
     case InFlight.lookup(conversation_id) do
       nil -> :ok

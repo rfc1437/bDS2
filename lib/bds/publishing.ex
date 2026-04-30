@@ -9,10 +9,15 @@ defmodule BDS.Publishing do
   alias BDS.Repo
   alias BDS.Tasks
 
+  @typedoc "Credentials map for an upload destination."
+  @type credentials :: map()
+
+  @spec start_link(term()) :: GenServer.on_start()
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
+  @spec upload_site(String.t(), credentials(), keyword()) :: {:ok, String.t()} | {:error, term()}
   def upload_site(project_id, credentials, opts \\ [])
       when is_binary(project_id) and is_map(credentials) and is_list(opts) do
     project = Projects.get_project!(project_id)
@@ -21,6 +26,7 @@ defmodule BDS.Publishing do
     GenServer.call(__MODULE__, {:upload_site, project_id, normalized_credentials, targets, opts})
   end
 
+  @spec get_job(String.t()) :: PublishJob.t() | nil
   def get_job(job_id) when is_binary(job_id) do
     GenServer.call(__MODULE__, {:get_job, job_id})
   end
