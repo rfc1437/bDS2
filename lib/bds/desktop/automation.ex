@@ -243,11 +243,15 @@ defmodule BDS.Desktop.Automation do
     {messages, buffer} = split_driver_buffer(state.driver_buffer)
 
     case Enum.reduce_while(messages, {%{state | driver_buffer: buffer}, nil}, fn message, {acc, _} ->
-           decoded = Jason.decode!(message)
+           case decode_driver_message(message) do
+             :skip ->
+               {:cont, {acc, nil}}
 
-           case matcher.(decoded) do
-             {:ok, reply} -> {:halt, {acc, reply}}
-             :continue -> {:cont, {acc, nil}}
+             {:ok, decoded} ->
+               case matcher.(decoded) do
+                 {:ok, reply} -> {:halt, {acc, reply}}
+                 :continue -> {:cont, {acc, nil}}
+               end
            end
          end) do
       {state, nil} ->
@@ -279,6 +283,24 @@ defmodule BDS.Desktop.Automation do
       [] -> {[], ""}
       [single] -> {[], single}
       parts -> {Enum.drop(parts, -1), List.last(parts)}
+    end
+  end
+
+  defp decode_driver_message(message) do
+    trimmed = String.trim(message)
+
+    cond do
+      trimmed == "" ->
+        :skip
+
+      not String.starts_with?(trimmed, "{") ->
+        :skip
+
+      true ->
+        case Jason.decode(trimmed) do
+          {:ok, decoded} -> {:ok, decoded}
+          {:error, _reason} -> :skip
+        end
     end
   end
 

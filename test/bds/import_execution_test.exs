@@ -90,7 +90,6 @@ defmodule BDS.ImportExecutionTest do
 
     assert {:ok, imported_result} = ImportExecution.execute_import(project.id, import_report, default_author: "Imported Author")
     assert imported_result.posts == %{imported: 1, skipped: 0, errors: 0}
-
     slugs = Repo.all(from post in Posts.Post, where: post.project_id == ^project.id, select: post.slug, order_by: [asc: post.slug])
     assert length(slugs) == 2
     assert "conflict-me" in slugs
@@ -116,11 +115,11 @@ defmodule BDS.ImportExecutionTest do
                end
              )
 
-    assert_received {:execution_progress, "tags", 0, 2, "Creating tags..."}
-    assert_received {:execution_progress, "posts", 0, 1, "Importing posts..."}
-    assert_received {:execution_progress, "media", 0, 1, "Importing media..."}
-    assert_received {:execution_progress, "pages", 0, 1, "Importing pages..."}
-    assert_received {:execution_progress, "complete", 1, 1, "Import complete"}
+    assert_received {:execution_progress, "tags", 0, 2, %{detail: "creating_tags"}}
+    assert_received {:execution_progress, "posts", 0, 1, %{detail: "importing_posts"}}
+    assert_received {:execution_progress, "media", 0, 1, %{detail: "importing_media"}}
+    assert_received {:execution_progress, "pages", 0, 1, %{detail: "importing_pages"}}
+    assert_received {:execution_progress, "complete", 1, 1, %{detail: "import_complete"}}
   end
 
   defp sha256(value) do

@@ -68,6 +68,10 @@ defmodule BDS.ImportAnalysis do
     tag_items = Enum.map(wxr_data.tags, &analyze_taxonomy_item(&1, existing_tag_set))
 
     notify_progress(on_progress, "Discovering macros...")
+    macro_summary = analyze_macros(wxr_data.posts ++ wxr_data.pages)
+
+    posts_only = Enum.filter(analyzed_posts, &(&1.post_type == "post"))
+    other_posts = Enum.reject(analyzed_posts, &(&1.post_type == "post"))
 
     %{
       source_file: wxr_file_path,
@@ -77,14 +81,15 @@ defmodule BDS.ImportAnalysis do
         language: wxr_data.site.language,
         source_file: wxr_file_path
       },
-      post_stats: summarize_post_items(analyzed_posts),
+      post_stats: summarize_post_items(posts_only),
+      other_stats: summarize_other_items(other_posts),
       page_stats: summarize_post_items(analyzed_pages),
       media_stats: summarize_media_items(analyzed_media),
       category_stats: summarize_taxonomy_items(category_items),
       tag_stats: summarize_taxonomy_items(tag_items),
       date_distribution: date_distribution(analyzed_posts, analyzed_pages, analyzed_media),
       conflicts: conflicts(analyzed_posts, analyzed_pages, analyzed_media),
-      macros: macros(wxr_data.posts ++ wxr_data.pages),
+      macros: macro_summary,
       items: %{
         posts: Enum.map(analyzed_posts, &summary_item/1),
         pages: Enum.map(analyzed_pages, &summary_item/1),
@@ -110,17 +115,18 @@ defmodule BDS.ImportAnalysis do
       cond do
         existing_by_slug && existing_by_slug.checksum == content_checksum && not is_nil(existing_by_slug.checksum) -> {"update", existing_by_slug}
         existing_by_slug -> {"conflict", existing_by_slug}
-        existing_by_checksum -> {"duplicate", existing_by_checksum}
+        existing_by_checksum -> {"content-duplicate", existing_by_checksum}
         true -> {"new", nil}
       end
 
     %{
       item_type: item_type,
+      post_type: wxr_post.post_type || item_type,
       wp_id: wxr_post.wp_id,
       title: wxr_post.title,
       slug: wxr_post.slug,
       status: status,
-      resolution: if(status == "conflict", do: "skip", else: nil),
+      resolution: if(status == "conflict", do: "ignore", else: nil),
       existing_id: existing && existing.id,
       existing_title: existing && existing.title,
       author: blank_to_nil(wxr_post.creator),
@@ -159,7 +165,7 @@ defmodule BDS.ImportAnalysis do
           cond do
             existing_by_name && existing_by_name.checksum == file_checksum && not is_nil(existing_by_name.checksum) -> {"update", file_checksum, existing_by_name}
             existing_by_name -> {"conflict", file_checksum, existing_by_name}
-            existing_by_checksum -> {"duplicate", file_checksum, existing_by_checksum}
+            existing_by_checksum -> {"content-duplicate", file_checksum, existing_by_checksum}
             true -> {"new", file_checksum, nil}
           end
       end
@@ -170,8 +176,9 @@ defmodule BDS.ImportAnalysis do
       title: wxr_media.title,
       filename: wxr_media.filename,
       relative_path: wxr_media.relative_path,
+      url: wxr_media.url,
       status: status,
-      resolution: if(status == "conflict", do: "skip", else: nil),
+      resolution: if(status == "conflict", do: "ignore", else: nil),
       existing_id: existing && existing.id,
       existing_title: existing && existing.title,
       mime_type: wxr_media.mime_type,
@@ -209,6 +216,7 @@ defmodule BDS.ImportAnalysis do
   defp summary_item(item) do
     base = %{
       item_type: item.item_type,
+      post_type: Map.get(item, :post_type, item.item_type),
       title: item.title,
       slug: item.slug,
       status: item.status
@@ -222,7 +230,17 @@ defmodule BDS.ImportAnalysis do
       new_count: count_status(items, "new"),
       update_count: count_status(items, "update"),
       conflict_count: count_status(items, "conflict"),
-      duplicate_count: count_status(items, "duplicate")
+      duplicate_count: count_status(items, "content-duplicate")
+    }
+  end
+
+  defp summarize_other_items(items) do
+    %{
+      new_count: count_status(items, "new"),
+      update_count: count_status(items, "update"),
+      conflict_count: count_status(items, "conflict"),
+      duplicate_count: count_status(items, "content-duplicate"),
+      types: items |> Enum.map(&Map.get(&1, :post_type)) |> Enum.reject(&is_nil/1) |> Enum.uniq()
     }
   end
 
@@ -231,7 +249,7 @@ defmodule BDS.ImportAnalysis do
       new_count: count_status(items, "new"),
       update_count: count_status(items, "update"),
       conflict_count: count_status(items, "conflict"),
-      duplicate_count: count_status(items, "duplicate"),
+      duplicate_count: count_status(items, "content-duplicate"),
       missing_count: count_status(items, "missing")
     }
   end
@@ -271,43 +289,97 @@ defmodule BDS.ImportAnalysis do
       %{
         item_type: item.item_type,
         item_name: Map.get(item, :slug) || Map.get(item, :filename),
-        resolution: item.resolution || "skip",
+        resolution: item.resolution || "ignore",
         source_title: item.title,
         existing_title: item.existing_title
       }
     end)
   end
 
-  defp macros(items) do
-    items
-    |> Enum.flat_map(&discover_item_macros/1)
-    |> Enum.group_by(& &1.name)
-    |> Enum.map(fn {name, usages} ->
-      %{
-        name: name,
-        usage_count: length(usages),
-        parameters: usages |> Enum.flat_map(& &1.parameters) |> Enum.uniq() |> Enum.sort(),
-        validation_status: "unknown"
-      }
-    end)
-    |> Enum.sort_by(& &1.name)
+  defp analyze_macros(items) do
+    macro_map =
+      Enum.reduce(items, %{}, fn item, acc ->
+        slug = Map.get(item, :slug)
+
+        Regex.scan(@shortcode_regex, item.content || "")
+        |> Enum.reduce(acc, fn [_match, name, raw_params], inner_acc ->
+          name = String.downcase(name)
+          params = parse_macro_params(raw_params)
+          params_key = serialize_params(params)
+
+          existing =
+            Map.get(inner_acc, name, %{
+              name: name,
+              total_count: 0,
+              usages: %{},
+              post_slugs: MapSet.new()
+            })
+
+          usage =
+            existing.usages
+            |> Map.get(params_key, %{params: params, count: 0})
+            |> Map.update(:count, 1, &(&1 + 1))
+
+          updated = %{
+            existing
+            | total_count: existing.total_count + 1,
+              usages: Map.put(existing.usages, params_key, usage),
+              post_slugs:
+                if(is_binary(slug), do: MapSet.put(existing.post_slugs, slug), else: existing.post_slugs)
+          }
+
+          Map.put(inner_acc, name, updated)
+        end)
+      end)
+
+    discovered =
+      macro_map
+      |> Map.values()
+      |> Enum.map(fn macro ->
+        %{
+          name: macro.name,
+          mapped: false,
+          total_count: macro.total_count,
+          usages:
+            macro.usages
+            |> Map.values()
+            |> Enum.map(fn usage ->
+              %{
+                params: usage.params,
+                count: usage.count,
+                validation_status: "unknown"
+              }
+            end),
+          post_slugs: MapSet.to_list(macro.post_slugs) |> Enum.sort()
+        }
+      end)
+      |> Enum.sort_by(& &1.name)
+
+    %{
+      total: length(discovered),
+      mapped_count: Enum.count(discovered, & &1.mapped),
+      unmapped_count: Enum.count(discovered, &(not &1.mapped)),
+      discovered: discovered
+    }
   end
 
-  defp discover_item_macros(item) do
-    Regex.scan(@shortcode_regex, item.content || "")
-    |> Enum.map(fn [_match, name, raw_params] ->
-      %{
-        name: String.downcase(name),
-        parameters: macro_parameters(raw_params)
-      }
-    end)
-  end
-
-  defp macro_parameters(raw_params) do
+  defp parse_macro_params(raw_params) do
     Regex.scan(@param_regex, raw_params)
-    |> Enum.map(fn [_, key | _rest] -> key end)
-    |> Enum.uniq()
-    |> Enum.sort()
+    |> Enum.map(fn captures ->
+      key = Enum.at(captures, 1)
+      value = Enum.at(captures, 2) || Enum.at(captures, 3) || Enum.at(captures, 4) || ""
+      {key, value}
+    end)
+    |> Map.new()
+  end
+
+  defp serialize_params(params) when params == %{}, do: ""
+
+  defp serialize_params(params) do
+    params
+    |> Enum.sort_by(fn {k, _v} -> k end)
+    |> Enum.map(fn {k, v} -> "#{k}=#{v}" end)
+    |> Enum.join("|")
   end
 
   defp increment_year(nil, acc), do: acc
@@ -319,12 +391,30 @@ defmodule BDS.ImportAnalysis do
     end
   end
 
-  defp year_from(value) when is_integer(value), do: value
+  defp year_from(value) when is_integer(value) do
+    cond do
+      value > 100_000_000_000 -> value |> DateTime.from_unix!(:millisecond) |> DateTime.shift_zone!("Etc/UTC") |> Map.get(:year)
+      value > 1_000_000_000 -> value |> DateTime.from_unix!(:second) |> Map.get(:year)
+      true -> value
+    end
+  rescue
+    _error -> nil
+  end
 
   defp year_from(value) when is_binary(value) do
-    case Regex.run(~r/(\d{4})/, value) do
-      [_, year] -> String.to_integer(year)
-      _other -> nil
+    normalized = String.replace(value, " ", "T")
+
+    case NaiveDateTime.from_iso8601(normalized) do
+      {:ok, naive} -> naive.year
+      _other ->
+        case DateTime.from_iso8601(value) do
+          {:ok, datetime, _offset} -> datetime.year
+          _ ->
+            case Regex.run(~r/(\d{4})/, value) do
+              [_, year] -> String.to_integer(year)
+              _other -> nil
+            end
+        end
     end
   end
 

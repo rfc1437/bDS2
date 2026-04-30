@@ -106,7 +106,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
             Task.Supervisor.async_nolink(BDS.Tasks.TaskSupervisor, fn ->
               ImportAnalysis.analyze_wxr(project_id, wxr_file_path, definition.uploads_folder_path,
                 on_progress: fn step, detail ->
-                  send(live_view_pid, {:import_analysis_progress, definition_id, step, detail})
+                  send(live_view_pid, {:import_analysis_progress, definition_id, translate_phase(step), detail})
                 end
               )
             end)
@@ -165,6 +165,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
             )
           end)
 
+        progress_phase = translate_execution_phase("posts")
+
         :ok = allow_repo_sandbox(task.pid)
 
         socket
@@ -176,10 +178,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
             error: nil,
             count: counts.total,
             result: nil,
-            phase: translated("importAnalysis.executionStarting"),
+            phase: progress_phase,
             current: 0,
             total: counts.total,
             detail: nil,
+            eta: nil,
             ref: task.ref
           })
         )
@@ -344,16 +347,20 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   end
 
   def note_execution_progress(socket, definition_id, phase, current, total, detail, reload) do
+    {detail_text, eta} = decompose_progress_detail(detail)
+    translated_phase = translate_execution_phase(phase)
+
     socket
     |> assign(
       :import_editor_execution_states,
       Map.update(socket.assigns.import_editor_execution_states, definition_id, default_execution_state(), fn state ->
         state
         |> Map.put(:is_executing, true)
-        |> Map.put(:phase, phase)
+        |> Map.put(:phase, translated_phase)
         |> Map.put(:current, current)
         |> Map.put(:total, total)
-        |> Map.put(:detail, detail)
+        |> Map.put(:detail, detail_text)
+        |> Map.put(:eta, eta)
       end)
     )
     |> reload.(socket.assigns.workbench)
@@ -595,6 +602,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
         <div class="import-stat-cards">
           <.stat_card label={translated("importAnalysis.posts")} stats={@report.post_stats} />
+          <%= if Map.get(@report, :other_stats) && Map.get(@report.other_stats, :total, 0) > 0 do %>
+            <.other_stat_card label={translated("importAnalysis.other")} stats={@report.other_stats} />
+          <% end %>
           <.stat_card label={translated("importAnalysis.pages")} stats={@report.page_stats} />
           <.media_stat_card label={translated("importAnalysis.media")} stats={@report.media_stats} />
           <.taxonomy_stat_card label={translated("importAnalysis.categories")} stats={@report.category_stats} />
@@ -610,6 +620,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                   <span class="distribution-year"><%= row.year %></span>
                   <div class="distribution-bar-container">
                     <div class="distribution-bar distribution-bar-posts" style={"width: #{distribution_width(row.post_count, @report.date_distribution, :post_count)}%;"}></div>
+                    <div class="distribution-bar distribution-bar-media" style={"width: #{distribution_width(row.media_count, @report.date_distribution, :media_count)}%;"}></div>
                   </div>
                   <span class="distribution-count"><%= row.post_count %> / <%= row.media_count %></span>
                 </div>
@@ -632,6 +643,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                 <span class="import-detail"><%= @execution_state.detail %></span>
               <% end %>
               <span class="import-counter"><%= @execution_state.current || 0 %> / <%= @execution_state.total || @counts.total %></span>
+              <%= if eta = format_eta(Map.get(@execution_state, :eta)) do %>
+                <span class="import-eta"><%= eta %></span>
+              <% end %>
             </div>
           </div>
         <% end %>
@@ -741,22 +755,52 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           </section>
         <% end %>
 
-        <%= if Enum.any?(Map.get(@report, :macros, [])) do %>
+        <% macros = Map.get(@report, :macros, %{}) %>
+        <%= if Enum.any?(Map.get(macros, :discovered, [])) do %>
           <section class="import-detail-section">
             <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-value-section="macros">
-              <span><%= translated("importAnalysis.macrosWithCount", %{count: length(@report.macros)}) %></span>
+              <span><%= translated("importAnalysis.macrosWithCount", %{count: macros.total || length(macros.discovered)}) %></span>
               <span class="toggle-icon"><%= if @sections.macros, do: "▾", else: "▸" %></span>
             </button>
 
             <%= if @sections.macros do %>
+              <div class="macros-summary">
+                <span class="macros-mapped"><%= translated("importAnalysis.mappedCount", %{count: macros.mapped_count || 0}) %></span>
+                <span class="macros-unmapped"><%= translated("importAnalysis.unmappedCount", %{count: macros.unmapped_count || 0}) %></span>
+              </div>
               <div class="macros-list">
-                <%= for macro <- @report.macros do %>
-                  <div class="macro-item unmapped">
+                <%= for macro <- macros.discovered do %>
+                  <div class={"macro-item #{if macro.mapped, do: "mapped", else: "unmapped"}"}>
                     <div class="macro-header">
                       <span class="macro-name"><%= macro.name %></span>
-                      <span class="macro-status-badge unmapped"><%= translated("importAnalysis.macroStatusUnknown") %></span>
-                      <span class="macro-count"><%= translated("importAnalysis.macroUses", %{count: macro.usage_count}) %></span>
+                      <span class={"macro-status-badge #{if macro.mapped, do: "mapped", else: "unmapped"}"}>
+                        <%= if macro.mapped, do: translated("importAnalysis.macroStatusMapped"), else: translated("importAnalysis.macroStatusUnknown") %>
+                      </span>
+                      <span class="macro-count"><%= translated("importAnalysis.macroUses", %{count: macro.total_count}) %></span>
                     </div>
+                    <%= if Enum.any?(Map.get(macro, :usages, [])) do %>
+                      <div class="macro-usages">
+                        <%= for usage <- macro.usages do %>
+                          <div class="macro-usage">
+                            <span class="macro-usage-params">
+                              <%= if Enum.any?(Map.get(usage, :params, %{})) do %>
+                                <%= for {k, v} <- usage.params do %>
+                                  <span class="macro-usage-param"><%= k %>=<%= v %></span>
+                                <% end %>
+                              <% else %>
+                                <%= translated("importAnalysis.noParameters") %>
+                              <% end %>
+                            </span>
+                            <span class="macro-usage-count"><%= translated("importAnalysis.macroUses", %{count: usage.count}) %></span>
+                          </div>
+                        <% end %>
+                      </div>
+                    <% end %>
+                    <%= if Enum.any?(Map.get(macro, :post_slugs, [])) do %>
+                      <div class="macro-post-slugs">
+                        <%= translated("importAnalysis.usedIn", %{items: Enum.join(Enum.take(macro.post_slugs, 5), ", "), more: if(length(macro.post_slugs) > 5, do: translated("importAnalysis.moreSuffix", %{count: length(macro.post_slugs) - 5}), else: "")}) %>
+                      </div>
+                    <% end %>
                   </div>
                 <% end %>
               </div>
@@ -931,6 +975,23 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         <%= if @stats.update_count > 0 do %><span class="import-stat-tag stat-update"><%= @stats.update_count %> <%= translated("importAnalysis.update") %></span><% end %>
         <%= if @stats.conflict_count > 0 do %><span class="import-stat-tag stat-conflict"><%= @stats.conflict_count %> <%= translated("importAnalysis.conflict") %></span><% end %>
         <%= if @stats.duplicate_count > 0 do %><span class="import-stat-tag stat-duplicate"><%= @stats.duplicate_count %> <%= translated("importAnalysis.duplicate") %></span><% end %>
+      </div>
+    </div>
+    """
+  end
+
+  attr :label, :string, required: true
+  attr :stats, :map, required: true
+
+  def other_stat_card(assigns) do
+    ~H"""
+    <div class="import-stat-card import-stat-card-other">
+      <h3><%= @label %></h3>
+      <div class="import-stat-number"><%= Map.get(@stats, :total, 0) %></div>
+      <div class="import-stat-breakdown">
+        <%= for type <- Map.get(@stats, :types, []) do %>
+          <span class="import-stat-tag stat-other"><%= type %></span>
+        <% end %>
       </div>
     </div>
     """
@@ -1123,7 +1184,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   defp importable_entity_count(items) do
     Enum.count(items || [], fn item ->
-      item.status == "new" or (item.status == "conflict" and Map.get(item, :resolution, "skip") != "skip")
+      item.status == "new" or (item.status == "conflict" and Map.get(item, :resolution, "ignore") not in ["ignore", "skip"])
     end)
   end
 
@@ -1177,6 +1238,58 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   end
 
   defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+
+  defp translate_phase(step) when is_binary(step) do
+    case step do
+      "parsing" -> translated("importAnalysis.analysisPhase.parsing")
+      "scanning" -> translated("importAnalysis.analysisPhase.scanning")
+      "taxonomies" -> translated("importAnalysis.analysisPhase.taxonomies")
+      "posts" -> translated("importAnalysis.analysisPhase.posts")
+      "media" -> translated("importAnalysis.analysisPhase.media")
+      "complete" -> translated("importAnalysis.analysisPhase.complete")
+      other -> other
+    end
+  end
+
+  defp translate_phase(other), do: other
+
+  defp translate_execution_phase(phase) when is_binary(phase) do
+    case phase do
+      "tags" -> translated("importAnalysis.phase.tags")
+      "posts" -> translated("importAnalysis.phase.posts")
+      "media" -> translated("importAnalysis.phase.media")
+      "pages" -> translated("importAnalysis.phase.pages")
+      "complete" -> translated("importAnalysis.phase.complete")
+      other -> other
+    end
+  end
+
+  defp translate_execution_phase(other), do: other
+
+  defp decompose_progress_detail(%{detail: detail, eta: eta}), do: {to_string_or_nil(detail), eta}
+  defp decompose_progress_detail(detail) when is_binary(detail) or is_nil(detail), do: {detail, nil}
+  defp decompose_progress_detail(detail), do: {to_string_or_nil(detail), nil}
+
+  defp to_string_or_nil(nil), do: nil
+  defp to_string_or_nil(value) when is_binary(value), do: value
+  defp to_string_or_nil(value), do: inspect(value)
+
+  def format_eta(nil), do: nil
+
+  def format_eta(ms) when is_integer(ms) and ms >= 0 do
+    seconds = div(ms, 1000)
+
+    if seconds < 60 do
+      translated("importAnalysis.eta", %{value: translated("importAnalysis.etaSeconds", %{count: seconds})})
+    else
+      m = div(seconds, 60)
+      s = rem(seconds, 60)
+      translated("importAnalysis.eta", %{value: translated("importAnalysis.etaMinutes", %{minutes: m, seconds: s})})
+    end
+  end
+
+  def format_eta(_other), do: nil
+
   defp present?(value), do: value not in [nil, ""]
   defp blank?(value), do: value in [nil, ""]
   defp blank_to_nil(""), do: nil
@@ -1210,6 +1323,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       current: 0,
       total: 0,
       detail: nil,
+      eta: nil,
       ref: nil
     }
   end

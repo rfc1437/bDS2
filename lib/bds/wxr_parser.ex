@@ -20,7 +20,7 @@ defmodule BDS.WxrParser do
       [channel] ->
         %{
           site: parse_site(channel),
-          posts: parse_items(channel, "post"),
+          posts: parse_post_like_items(channel),
           pages: parse_items(channel, "page"),
           media: parse_media(channel),
           categories: parse_categories(channel),
@@ -70,6 +70,16 @@ defmodule BDS.WxrParser do
     channel
     |> direct_children_named("item")
     |> Enum.filter(&(child_text(&1, "post_type") == expected_type))
+    |> Enum.map(&parse_post_item/1)
+  end
+
+  defp parse_post_like_items(channel) do
+    channel
+    |> direct_children_named("item")
+    |> Enum.filter(fn item ->
+      type = child_text(item, "post_type")
+      type not in ["", "attachment", "page"]
+    end)
     |> Enum.map(&parse_post_item/1)
   end
 

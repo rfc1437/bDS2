@@ -50,36 +50,30 @@ defmodule BDS.ImportAnalysisTest do
              row.year == 2024 and row.post_count == 2 and row.media_count == 1
            end)
 
-    assert [%{name: "gallery", usage_count: 1, parameters: ["ids"], validation_status: "unknown"}] = report.macros
+    assert %{
+             total: 1,
+             mapped_count: 0,
+             unmapped_count: 1,
+             discovered: [
+               %{
+                 name: "gallery",
+                 mapped: false,
+                 total_count: 1,
+                 usages: [%{params: %{"ids" => "1,2"}, count: 1, validation_status: "unknown"}],
+                 post_slugs: ["hello-world"]
+               }
+             ]
+           } = report.macros
     assert report.conflicts == []
 
-    assert report.items.posts == [
-             %{
-               title: "Hello World",
-               slug: "hello-world",
-               status: "new",
-               item_type: "post"
-             }
-           ]
+    assert [%{title: "Hello World", slug: "hello-world", status: "new", item_type: "post", post_type: "post"}] =
+             report.items.posts
 
-    assert report.items.pages == [
-             %{
-               title: "About",
-               slug: "about",
-               status: "new",
-               item_type: "page"
-             }
-           ]
+    assert [%{title: "About", slug: "about", status: "new", item_type: "page"} = page_item] = report.items.pages
+    assert Map.get(page_item, :post_type) == "page"
 
-    assert report.items.media == [
-             %{
-               title: "Import Asset",
-               filename: "import-asset.txt",
-               relative_path: "2024/05/import-asset.txt",
-               status: "new",
-               item_type: "media"
-             }
-           ]
+    assert [%{title: "Import Asset", filename: "import-asset.txt", relative_path: "2024/05/import-asset.txt", status: "new", item_type: "media"}] =
+             report.items.media
   end
 
   test "analyze_wxr detects update, conflict, duplicate, existing taxonomy, and missing uploads", %{project: project, temp_dir: temp_dir} do
@@ -140,12 +134,12 @@ defmodule BDS.ImportAnalysisTest do
     assert report.tag_stats == %{existing_count: 1, mapped_count: 0, new_count: 0}
 
     assert Enum.any?(report.conflicts, fn conflict ->
-             conflict.item_type == "post" and conflict.item_name == "conflict-me" and conflict.resolution == "skip"
+             conflict.item_type == "post" and conflict.item_name == "conflict-me" and conflict.resolution == "ignore"
            end)
 
     assert Enum.any?(report.items.posts, &(&1.slug == "update-me" and &1.status == "update"))
     assert Enum.any?(report.items.posts, &(&1.slug == "conflict-me" and &1.status == "conflict"))
-    assert Enum.any?(report.items.posts, &(&1.slug == "duplicate-me" and &1.status == "duplicate"))
+    assert Enum.any?(report.items.posts, &(&1.slug == "duplicate-me" and &1.status == "content-duplicate"))
     assert Enum.any?(report.items.media, &(&1.filename == "missing-asset.txt" and &1.status == "missing"))
   end
 

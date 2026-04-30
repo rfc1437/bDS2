@@ -97,16 +97,29 @@ defmodule BDS.Desktop.ImportShellLiveTest do
         %{
           item_type: "post",
           item_name: "hello-world",
-          resolution: "skip",
+          resolution: "ignore",
           source_title: "Hello World",
           existing_title: "Existing Hello"
         }
       ],
-      macros: [%{name: "gallery", usage_count: 1, parameters: ["ids"], validation_status: "unknown"}],
+      macros: %{
+        total: 1,
+        mapped_count: 0,
+        unmapped_count: 1,
+        discovered: [
+          %{
+            name: "gallery",
+            mapped: false,
+            total_count: 1,
+            usages: [%{params: %{"ids" => "1,2"}, count: 1, validation_status: "unknown"}],
+            post_slugs: ["hello-world"]
+          }
+        ]
+      },
       items: %{
         posts: [
           %{item_type: "post", title: "Hello World", slug: "hello-world", status: "new"},
-          %{item_type: "post", title: "Conflict Me", slug: "conflict-me", status: "conflict", resolution: "skip"}
+          %{item_type: "post", title: "Conflict Me", slug: "conflict-me", status: "conflict", resolution: "ignore"}
         ],
         pages: [
           %{item_type: "page", title: "About", slug: "about", status: "new"}
@@ -145,7 +158,7 @@ defmodule BDS.Desktop.ImportShellLiveTest do
             title: "Conflict Me",
             slug: "conflict-me",
             status: "conflict",
-            resolution: "skip",
+            resolution: "ignore",
             wp_status: "publish",
             author: "Importer",
             categories: ["General"],

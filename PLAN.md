@@ -4,9 +4,9 @@ This document tracks the current implementation state of bDS2 against the Allium
 
 ## Open Work Summary
 
-- Completed plan steps: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11.
-- Open plan steps: 12.
-- Next actionable step: 12. The remaining open parity backlog is now import execution/editor parity.
+- Completed plan steps: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12.
+- Open plan steps: none.
+- Next actionable step: rerun parity audits when scope expands; current implemented surfaces are at parity.
 - Scheduled after the current parity pass: none.
 
 ## Current State
@@ -83,7 +83,7 @@ Only these two audit tracks matter for the current pass. The follow-on missing-f
 11. Restore desktop-side CLI mutation watching parity. Completed 2026-04-29.
    A supervised CLI-sync watcher now polls the persisted notification store on the old-app timing budget, broadcasts `entity:changed` events through PubSub, and the LiveView shell refreshes sidebar/editor state while closing stale post/media tabs on external deletes.
 
-12. Restore import execution and editor parity. Completed 2026-04-29.
+12. Restore import execution and editor parity. Completed 2026-04-30.
    The stored import-definition flow now runs through the old analysis/execution pipeline again with progress callbacks, dedicated import-editor detail sections, inline taxonomy mapping pills plus AI-backed mapping, and focused import proof plus clean compile, dialyzer, and full-suite validation.
 
 ## Batch 3 Audit Matrix
