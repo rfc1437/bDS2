@@ -33,42 +33,43 @@ defmodule BDS.Media do
     destination = Path.join(Projects.project_data_dir(project), file_path)
     stat = File.stat!(source_path)
 
-    Repo.transaction(fn ->
-      media =
-        %Media{}
-        |> Media.changeset(%{
-          id: Ecto.UUID.generate(),
-          project_id: project.id,
-          filename: file_name,
-          original_name: original_name,
-          mime_type: mime_type,
-          size: stat.size,
-          width: attr(attrs, :width) || width,
-          height: attr(attrs, :height) || height,
-          title: attr(attrs, :title),
-          alt: attr(attrs, :alt),
-          caption: attr(attrs, :caption),
-          author: attr(attrs, :author),
-          language: attr(attrs, :language),
-          file_path: file_path,
-          sidecar_path: sidecar_path,
-          checksum: attr(attrs, :checksum),
-          tags: attr(attrs, :tags) || [],
-          created_at: now,
-          updated_at: now
-        })
-        |> Repo.insert!()
+    :ok = File.mkdir_p(Path.dirname(destination))
+    :ok = File.cp(source_path, destination)
 
-      :ok = File.mkdir_p(Path.dirname(destination))
-      :ok = File.cp(source_path, destination)
-      :ok = write_sidecar(project, media)
-      :ok = ensure_thumbnails(project, media)
-      :ok = Search.sync_media(media)
-      media
-    end)
-    |> case do
-      {:ok, media} -> {:ok, media}
-      {:error, reason} -> {:error, reason}
+    case Repo.transaction(fn ->
+           %Media{}
+           |> Media.changeset(%{
+             id: Ecto.UUID.generate(),
+             project_id: project.id,
+             filename: file_name,
+             original_name: original_name,
+             mime_type: mime_type,
+             size: stat.size,
+             width: attr(attrs, :width) || width,
+             height: attr(attrs, :height) || height,
+             title: attr(attrs, :title),
+             alt: attr(attrs, :alt),
+             caption: attr(attrs, :caption),
+             author: attr(attrs, :author),
+             language: attr(attrs, :language),
+             file_path: file_path,
+             sidecar_path: sidecar_path,
+             checksum: attr(attrs, :checksum),
+             tags: attr(attrs, :tags) || [],
+             created_at: now,
+             updated_at: now
+           })
+           |> Repo.insert!()
+         end) do
+      {:ok, media} ->
+        :ok = write_sidecar(project, media)
+        :ok = ensure_thumbnails(project, media)
+        :ok = Search.sync_media(media)
+        {:ok, media}
+
+      {:error, reason} ->
+        _ = File.rm(destination)
+        {:error, reason}
     end
   end
 
@@ -94,19 +95,18 @@ defmodule BDS.Media do
 
         project = Projects.get_project!(media.project_id)
 
-        Repo.transaction(fn ->
-          updated_media =
-            media
-            |> Media.changeset(updates)
-            |> Repo.update!()
+        case Repo.transaction(fn ->
+               media
+               |> Media.changeset(updates)
+               |> Repo.update!()
+             end) do
+          {:ok, updated_media} ->
+            :ok = write_sidecar(project, updated_media)
+            :ok = Search.sync_media(updated_media)
+            {:ok, updated_media}
 
-          :ok = write_sidecar(project, updated_media)
-          :ok = Search.sync_media(updated_media)
-          updated_media
-        end)
-        |> case do
-          {:ok, updated_media} -> {:ok, updated_media}
-          {:error, reason} -> {:error, reason}
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
@@ -292,25 +292,24 @@ defmodule BDS.Media do
           updated_at: now
         }
 
-        Repo.transaction(fn ->
-          updated_translation =
-            translation
-            |> Translation.changeset(translation_attrs)
-            |> Repo.insert_or_update!()
+        case Repo.transaction(fn ->
+               translation
+               |> Translation.changeset(translation_attrs)
+               |> Repo.insert_or_update!()
+             end) do
+          {:ok, updated_translation} ->
+            :ok = write_translation_sidecar(project, media, updated_translation)
+            :ok = Search.sync_media(media.id)
+            {:ok, updated_translation}
 
-          :ok = write_translation_sidecar(project, media, updated_translation)
-          :ok = Search.sync_media(media.id)
-          updated_translation
-        end)
-        |> case do
-          {:ok, updated_translation} -> {:ok, updated_translation}
-          {:error, reason} -> {:error, reason}
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
 
   @spec delete_media_translation(String.t(), String.t() | atom()) ::
-          {:ok, :deleted} | {:error, :not_found}
+          {:ok, boolean()} | {:error, :not_found | term()}
   def delete_media_translation(media_id, language) do
     normalized_language = language |> to_string() |> String.trim() |> String.downcase()
 
@@ -326,16 +325,15 @@ defmodule BDS.Media do
           translation ->
             project = Projects.get_project!(media.project_id)
 
-            Repo.transaction(fn ->
-              Repo.delete!(translation)
-              delete_file_if_present(media.project_id, translation_sidecar_path(media, normalized_language))
-              :ok = Search.sync_media(media)
-              :ok = write_sidecar(project, media)
-              true
-            end)
-            |> case do
-              {:ok, deleted?} -> {:ok, deleted?}
-              {:error, reason} -> {:error, reason}
+            case Repo.transaction(fn -> Repo.delete!(translation) end) do
+              {:ok, _deleted} ->
+                delete_file_if_present(media.project_id, translation_sidecar_path(media, normalized_language))
+                :ok = Search.sync_media(media)
+                :ok = write_sidecar(project, media)
+                {:ok, true}
+
+              {:error, reason} ->
+                {:error, reason}
             end
         end
     end
@@ -361,29 +359,31 @@ defmodule BDS.Media do
           else
             mime_type = media.mime_type || detect_mime(media.original_name || media.filename)
             {width, height} = image_dimensions(new_source_path, mime_type)
+            previous_destination_backup = destination <> ".bak"
+            _ = File.rename(destination, previous_destination_backup)
+            :ok = File.cp(new_source_path, destination)
 
-            Repo.transaction(fn ->
-              :ok = File.cp(new_source_path, destination)
+            case Repo.transaction(fn ->
+                   media
+                   |> Media.changeset(%{
+                     size: stat.size,
+                     width: width || media.width,
+                     height: height || media.height,
+                     checksum: checksum,
+                     updated_at: Persistence.now_ms()
+                   })
+                   |> Repo.update!()
+                 end) do
+              {:ok, updated_media} ->
+                _ = File.rm(previous_destination_backup)
+                :ok = write_sidecar(project, updated_media)
+                :ok = ensure_thumbnails(project, updated_media)
+                :ok = Search.sync_media(updated_media)
+                {:ok, updated_media}
 
-              updated_media =
-                media
-                |> Media.changeset(%{
-                  size: stat.size,
-                  width: width || media.width,
-                  height: height || media.height,
-                  checksum: checksum,
-                  updated_at: Persistence.now_ms()
-                })
-                |> Repo.update!()
-
-              :ok = write_sidecar(project, updated_media)
-              :ok = ensure_thumbnails(project, updated_media)
-              :ok = Search.sync_media(updated_media)
-              updated_media
-            end)
-            |> case do
-              {:ok, updated_media} -> {:ok, updated_media}
-              {:error, reason} -> {:error, reason}
+              {:error, reason} ->
+                _ = File.rename(previous_destination_backup, destination)
+                {:error, reason}
             end
           end
         end
@@ -428,29 +428,29 @@ defmodule BDS.Media do
       {%Media{} = media, %BDS.Posts.Post{} = post} ->
         project = Projects.get_project!(media.project_id)
 
-        Repo.transaction(fn ->
-          case Repo.query("SELECT 1 FROM post_media WHERE post_id = ? AND media_id = ? LIMIT 1", [post.id, media.id]) do
-            {:ok, %{rows: [[1]]}} ->
-              :already_linked
+        case Repo.transaction(fn ->
+               case Repo.query("SELECT 1 FROM post_media WHERE post_id = ? AND media_id = ? LIMIT 1", [post.id, media.id]) do
+                 {:ok, %{rows: [[1]]}} ->
+                   :already_linked
 
-            _other ->
-              sort_order = next_sort_order(media.id)
+                 _other ->
+                   sort_order = next_sort_order(media.id)
 
-              {:ok, _result} =
-                Repo.query(
-                  "INSERT INTO post_media (id, project_id, post_id, media_id, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                  [Ecto.UUID.generate(), media.project_id, post.id, media.id, sort_order, Persistence.now_ms()]
-                )
+                   {:ok, _result} =
+                     Repo.query(
+                       "INSERT INTO post_media (id, project_id, post_id, media_id, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                       [Ecto.UUID.generate(), media.project_id, post.id, media.id, sort_order, Persistence.now_ms()]
+                     )
 
-              :linked
-          end
+                   :linked
+               end
+             end) do
+          {:ok, _result} ->
+            :ok = write_sidecar(project, media)
+            {:ok, :linked}
 
-          :ok = write_sidecar(project, media)
-          :ok
-        end)
-        |> case do
-          {:ok, :ok} -> {:ok, :linked}
-          {:error, reason} -> {:error, reason}
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
@@ -465,14 +465,18 @@ defmodule BDS.Media do
       %Media{} = media ->
         project = Projects.get_project!(media.project_id)
 
-        Repo.transaction(fn ->
-          {:ok, _result} = Repo.query("DELETE FROM post_media WHERE media_id = ? AND post_id = ?", [media.id, post_id])
-          :ok = write_sidecar(project, media)
-          :ok
-        end)
-        |> case do
-          {:ok, :ok} -> {:ok, :unlinked}
-          {:error, reason} -> {:error, reason}
+        case Repo.transaction(fn ->
+               {:ok, _result} =
+                 Repo.query("DELETE FROM post_media WHERE media_id = ? AND post_id = ?", [media.id, post_id])
+
+               :ok
+             end) do
+          {:ok, :ok} ->
+            :ok = write_sidecar(project, media)
+            {:ok, :unlinked}
+
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end

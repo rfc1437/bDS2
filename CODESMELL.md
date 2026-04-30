@@ -259,7 +259,7 @@ This suggests data isn't normalized at boundaries. Prefer atoms for internal str
 ## Priority Order
 
 1. **Add `@spec` to public APIs of core contexts.** ✅ **DONE 2026-04-30.** See "Priority #1 Completion" section below.
-2. **Extract filesystem / Search side effects out of `Repo.transaction` in `BDS.Media`.** Real correctness bug under SQLite busy retries.
+2. **Extract filesystem / Search side effects out of `Repo.transaction` in `BDS.Media`.** ✅ **DONE 2026-04-30.** See "Priority #2 Completion" section below.
 3. **Fix `MCP.atomize_keys`** to use `String.to_existing_atom/1` with a string-fallback. Removes a real atom-table DoS vector.
 4. **Introduce `BDS.PostMedia` Ecto schema** and migrate the 6–8 raw `post_media` queries. Direct type-safety win.
 5. **Replace `Repo.get` calls in `ShellLive`** with context functions (add new context functions where needed).
@@ -319,6 +319,36 @@ Added `@spec` and `@type` declarations to the public APIs of all core contexts a
 - LiveView modules under `lib/bds/desktop/shell_live/`. These are Phoenix LiveView callbacks (`mount/3`, `handle_event/3`, `handle_info/2`) whose specs are inherited from the behaviour. Public helper functions in those modules can be specced as part of the eventual ShellLive module split (priority #9).
 - Internal helpers in `BDS.MCP` and `BDS.AI` that are private (`defp`) — Dialyzer infers these.
 - `BDS.Tags`, `BDS.Templates`, `BDS.Scripts`, `BDS.PostLinks` — smaller contexts; queue for a follow-up pass if Dialyzer surfaces issues.
+
+---
+
+## Priority #2 Completion (2026-04-30)
+
+Refactored every `Repo.transaction/1` block in [lib/bds/media.ex](lib/bds/media.ex) so that only DB writes run inside the transaction. Filesystem writes (`File.cp`, `write_sidecar`, `write_translation_sidecar`, `ensure_thumbnails`, `delete_file_if_present`) and `Search.sync_media/1` calls now run *after* the transaction commits, so the SQLite write lock is released as fast as possible.
+
+**Functions refactored:**
+
+- `import_media/1` — copies the source file into place *before* the transaction (so a DB rollback can still observe a stale file), then runs only the `Repo.insert!` inside the transaction, then writes sidecar / thumbnails / search index. On DB failure the copied file is removed.
+- `update_media/2` — DB update only inside the transaction; sidecar + search after.
+- `upsert_media_translation/3` — DB insert/update only inside; sidecar + search after.
+- `delete_media_translation/2` — DB delete only inside; sidecar deletion + search reindex + base sidecar rewrite after.
+- `replace_media_file/2` — moves the existing destination to a `.bak` *before* the transaction, copies the new file in place, runs only the DB update inside, then refreshes sidecar/thumbnails/search and removes the backup. On DB failure the original file is restored from the backup.
+- `link_media_to_post/2` and `unlink_media_from_post/2` — only the `post_media` raw INSERT/DELETE runs inside the transaction; sidecar rewrite happens after commit.
+
+**Why this matters:**
+
+SQLite has a single global write lock. Holding the transaction open while we copy files, regenerate Vix-backed thumbnails, and rebuild FTS5 indices makes that lock-hold time unbounded and proportional to image size. Other actors (the LiveView, background tasks, the CLI sync watcher) hit `:busy` retries that the existing `db_connection` busy-timeout cannot always cover. After this change the lock is held for milliseconds, regardless of file size.
+
+**Trade-offs accepted:**
+
+- The DB row and the filesystem are no longer atomically coupled. If the BEAM crashes between `Repo.insert!` and `write_sidecar/2`, the row exists without a sidecar. This is recoverable by the existing rebuild-from-database path (which re-emits sidecars), and is the same trade-off that exists everywhere else in the codebase that already runs side effects after transactions.
+- `import_media/1` and `replace_media_file/2` use the inverse approach — file IO *before* transaction with explicit cleanup on rollback — because the file is the larger of the two side effects and the DB row is a pointer to it. This keeps the destination consistent on rollback.
+
+**Spec correction surfaced by Dialyzer:**
+
+- `BDS.Media.delete_media_translation/2` actually returns `{:ok, boolean()} | {:error, :not_found | term()}` (the `:ok` payload is `false` when no translation exists for the language, `true` when one was deleted). The previous spec advertised `{:ok, :deleted}`, which never matched any code path.
+
+**Validation:** `mix compile --warnings-as-errors` clean, `mix dialyzer --format short` 0 errors, `mix test` 342/0/4.
 
 ---
 
