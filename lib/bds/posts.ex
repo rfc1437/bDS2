@@ -13,6 +13,7 @@ defmodule BDS.Posts do
   alias BDS.PostLinks
   alias BDS.Posts.Link
   alias BDS.Posts.Post
+  alias BDS.Posts.PostMedia
   alias BDS.Posts.Translation
   alias BDS.Projects
   alias BDS.Rebuild
@@ -1411,10 +1412,12 @@ defmodule BDS.Posts do
   end
 
   defp linked_media_ids(post_id) do
-    case Repo.query("SELECT media_id FROM post_media WHERE post_id = ? ORDER BY sort_order ASC, media_id ASC", [post_id]) do
-      {:ok, %{rows: rows}} -> Enum.map(rows, fn [media_id] -> media_id end)
-      {:error, _reason} -> []
-    end
+    Repo.all(
+      from pm in PostMedia,
+        where: pm.post_id == ^post_id,
+        order_by: [asc: pm.sort_order, asc: pm.media_id],
+        select: pm.media_id
+    )
   end
 
   defp sync_deleted_post_media_sidecar(media_id) do

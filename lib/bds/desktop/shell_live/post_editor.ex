@@ -8,7 +8,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   alias BDS.Desktop.ShellData
   alias BDS.{AI, I18n, Metadata, PostLinks, Posts, Preview, Repo, Tags, Templates}
   alias BDS.Media.Media
-  alias BDS.Posts.{Post, Translation}
+  alias BDS.Posts.{Post, PostMedia, Translation}
   alias BDS.UI.Workbench
 
   embed_templates "post_editor_html/*"
@@ -770,27 +770,29 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   end
 
   defp linked_media(post_id) do
-    case Repo.query("SELECT media_id, sort_order FROM post_media WHERE post_id = ? ORDER BY sort_order ASC, media_id ASC", [post_id]) do
-      {:ok, %{rows: rows}} ->
-        Enum.map(rows, fn [media_id, sort_order] ->
-          case Repo.get(Media, media_id) do
-            %Media{} = media ->
-              %{
-                media_id: media.id,
-                has_thumbnail: String.starts_with?(to_string(media.mime_type || ""), "image/"),
-                name: media.title || media.original_name || media.id,
-                sort_order: sort_order || 0
-              }
+    rows =
+      Repo.all(
+        from pm in PostMedia,
+          where: pm.post_id == ^post_id,
+          order_by: [asc: pm.sort_order, asc: pm.media_id],
+          select: {pm.media_id, pm.sort_order}
+      )
 
-            _other ->
-              nil
-          end
-        end)
-        |> Enum.reject(&is_nil/1)
+    Enum.map(rows, fn {media_id, sort_order} ->
+      case Repo.get(Media, media_id) do
+        %Media{} = media ->
+          %{
+            media_id: media.id,
+            has_thumbnail: String.starts_with?(to_string(media.mime_type || ""), "image/"),
+            name: media.title || media.original_name || media.id,
+            sort_order: sort_order || 0
+          }
 
-      _other ->
-        []
-    end
+        _other ->
+          nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
   rescue
     _error -> []
   end

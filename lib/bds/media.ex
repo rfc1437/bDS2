@@ -7,6 +7,7 @@ defmodule BDS.Media do
   alias BDS.Media.Media
   alias BDS.Media.Translation
   alias BDS.Persistence
+  alias BDS.Posts.PostMedia
   alias BDS.Projects
   alias BDS.Rebuild
   alias BDS.Repo
@@ -403,14 +404,14 @@ defmodule BDS.Media do
   def list_linked_posts(media_id) when is_binary(media_id) do
     Repo.all(
       from post in BDS.Posts.Post,
-        join: post_media in "post_media",
-        on: post_media.post_id == post.id,
-        where: post_media.media_id == ^media_id,
-        order_by: [asc: post_media.sort_order, asc: post.updated_at],
+        join: pm in PostMedia,
+        on: pm.post_id == post.id,
+        where: pm.media_id == ^media_id,
+        order_by: [asc: pm.sort_order, asc: post.updated_at],
         select: %{
           post_id: post.id,
           title: fragment("COALESCE(?, ?, ?)", post.title, post.slug, post.id),
-          sort_order: post_media.sort_order
+          sort_order: pm.sort_order
         }
     )
   end
@@ -429,20 +430,23 @@ defmodule BDS.Media do
         project = Projects.get_project!(media.project_id)
 
         case Repo.transaction(fn ->
-               case Repo.query("SELECT 1 FROM post_media WHERE post_id = ? AND media_id = ? LIMIT 1", [post.id, media.id]) do
-                 {:ok, %{rows: [[1]]}} ->
-                   :already_linked
+               if Repo.exists?(from pm in PostMedia, where: pm.post_id == ^post.id and pm.media_id == ^media.id) do
+                 :already_linked
+               else
+                 sort_order = next_sort_order(media.id)
 
-                 _other ->
-                   sort_order = next_sort_order(media.id)
+                 %PostMedia{}
+                 |> PostMedia.changeset(%{
+                   id: Ecto.UUID.generate(),
+                   project_id: media.project_id,
+                   post_id: post.id,
+                   media_id: media.id,
+                   sort_order: sort_order,
+                   created_at: Persistence.now_ms()
+                 })
+                 |> Repo.insert!()
 
-                   {:ok, _result} =
-                     Repo.query(
-                       "INSERT INTO post_media (id, project_id, post_id, media_id, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                       [Ecto.UUID.generate(), media.project_id, post.id, media.id, sort_order, Persistence.now_ms()]
-                     )
-
-                   :linked
+                 :linked
                end
              end) do
           {:ok, _result} ->
@@ -466,8 +470,10 @@ defmodule BDS.Media do
         project = Projects.get_project!(media.project_id)
 
         case Repo.transaction(fn ->
-               {:ok, _result} =
-                 Repo.query("DELETE FROM post_media WHERE media_id = ? AND post_id = ?", [media.id, post_id])
+               {_count, _} =
+                 Repo.delete_all(
+                   from pm in PostMedia, where: pm.media_id == ^media.id and pm.post_id == ^post_id
+                 )
 
                :ok
              end) do
@@ -908,15 +914,21 @@ defmodule BDS.Media do
   end
 
   defp linked_post_ids(media_id) do
-    case Repo.query("SELECT post_id FROM post_media WHERE media_id = ? ORDER BY sort_order ASC, post_id ASC", [media_id]) do
-      {:ok, %{rows: rows}} -> Enum.map(rows, fn [post_id] -> post_id end)
-      {:error, _reason} -> []
-    end
+    Repo.all(
+      from pm in PostMedia,
+        where: pm.media_id == ^media_id,
+        order_by: [asc: pm.sort_order, asc: pm.post_id],
+        select: pm.post_id
+    )
   end
 
   defp next_sort_order(media_id) do
-    case Repo.query("SELECT COALESCE(MAX(sort_order), -1) FROM post_media WHERE media_id = ?", [media_id]) do
-      {:ok, %{rows: [[value]]}} when is_integer(value) -> value + 1
+    case Repo.one(
+           from pm in PostMedia,
+             where: pm.media_id == ^media_id,
+             select: max(pm.sort_order)
+         ) do
+      value when is_integer(value) -> value + 1
       _other -> 0
     end
   end

@@ -261,7 +261,7 @@ This suggests data isn't normalized at boundaries. Prefer atoms for internal str
 1. **Add `@spec` to public APIs of core contexts.** ✅ **DONE 2026-04-30.** See "Priority #1 Completion" section below.
 2. **Extract filesystem / Search side effects out of `Repo.transaction` in `BDS.Media`.** ✅ **DONE 2026-04-30.** See "Priority #2 Completion" section below.
 3. **Fix `MCP.atomize_keys`** to use `String.to_existing_atom/1` with a string-fallback. ✅ **DONE 2026-04-30.** See "Priority #3 Completion" section below.
-4. **Introduce `BDS.PostMedia` Ecto schema** and migrate the 6–8 raw `post_media` queries. Direct type-safety win.
+4. **Introduce `BDS.PostMedia` Ecto schema** and migrate the 6–8 raw `post_media` queries. ✅ **DONE 2026-04-30.** See "Priority #4 Completion" section below.
 5. **Replace `Repo.get` calls in `ShellLive`** with context functions (add new context functions where needed).
 6. **Move locale from `Process.put` into assigns**, then ban `Process.put` via Credo.
 7. **Extract shared helpers** (`attr/2`, `maybe_put/3`, `blank_to_nil/1`, `progress_callback/1`, rebuild progress reporters) into `BDS.MapUtils` / `BDS.ProgressReporter`.
@@ -370,6 +370,38 @@ Removed `BDS.MCP.atomize_keys/1` entirely instead of just narrowing it to `Strin
 **Other `String.to_atom/1` call sites considered:**
 
 The codebase has nine other `String.to_atom/1` call sites; all of them operate on bounded inputs (`Workbench` type names, release platforms, route IDs from the router config, `:supports_attachment` / `:supports_tool_calls` capability keys we ourselves wrote, `parse_modality` from a fixed AI catalog). None of them are reachable from attacker-controlled JSON the way `MCP.accept_proposal` was. They are safe to leave as a follow-up if a stricter sweep is wanted later.
+
+**Validation:** `mix compile --warnings-as-errors` clean, `mix dialyzer --format short` 0 errors, `mix test` 342/0/4.
+
+---
+
+## Priority #4 Completion (2026-04-30)
+
+Introduced [lib/bds/posts/post_media.ex](lib/bds/posts/post_media.ex) — a proper `Ecto.Schema` for the `post_media` join table — and migrated every raw SQL / string-table query in the codebase to use it.
+
+**New schema:** `BDS.Posts.PostMedia` with fields `id`, `project_id`, `post_id`, `media_id`, `sort_order`, `created_at`, `belongs_to :post` and `belongs_to :media` associations, full `@type t`, and a `changeset/2` enforcing `validate_required` + `foreign_key_constraint` + `unique_constraint([:post_id, :media_id])`.
+
+**Call sites migrated:**
+
+- [lib/bds/media.ex](lib/bds/media.ex)
+  - `list_linked_posts/1` — replaced `join: post_media in "post_media"` string-table join with `join: pm in PostMedia`.
+  - `link_media_to_post/2` — replaced `Repo.query("SELECT 1 FROM post_media …")` with `Repo.exists?(from pm in PostMedia, …)` and `Repo.query("INSERT INTO post_media …")` with `%PostMedia{} |> changeset() |> Repo.insert!()` (uniqueness now enforced through the schema constraint).
+  - `unlink_media_from_post/2` — replaced `Repo.query("DELETE FROM post_media …")` with `Repo.delete_all(from pm in PostMedia, …)`.
+  - `linked_post_ids/1` — replaced raw `SELECT post_id` with `Repo.all(from pm in PostMedia, select: pm.post_id)`.
+  - `next_sort_order/1` — replaced raw `SELECT COALESCE(MAX(sort_order), -1)` with `Repo.one(from pm in PostMedia, select: max(pm.sort_order))` and a `value when is_integer(value)` guard for the empty-table case.
+- [lib/bds/posts.ex](lib/bds/posts.ex)
+  - `linked_media_ids/1` — replaced raw `SELECT media_id` with `Repo.all(from pm in PostMedia, select: pm.media_id)`.
+- [lib/bds/desktop/shell_live/post_editor.ex](lib/bds/desktop/shell_live/post_editor.ex)
+  - `linked_media/1` — replaced raw `SELECT media_id, sort_order` with a `Repo.all(from pm in PostMedia, select: {pm.media_id, pm.sort_order})` query.
+- [lib/bds/desktop/shell_live/overlay_components.ex](lib/bds/desktop/shell_live/overlay_components.ex)
+  - `post_media_ids/1` — replaced raw `SELECT media_id` with `Repo.all(from pm in PostMedia, select: pm.media_id)`.
+  - `delete_details/2` — replaced the raw `SELECT posts.title FROM posts JOIN post_media ON …` with a typed Ecto join query (`from post in Post, join: pm in PostMedia, on: pm.post_id == post.id, …`).
+
+**Why this matters:**
+
+- All `post_media` access now goes through a typed schema, so every column reference is checked at compile time by Ecto and any future migration that renames a column will produce a `Postgrex/Sqlite` error at compile or test time instead of silently breaking at runtime.
+- The unique `(post_id, media_id)` constraint is now enforceable via `Ecto.Changeset.unique_constraint/2`, which would let the next refactor turn `link_media_to_post/2` into an idempotent upsert without losing the protection.
+- `Repo.query/2` is reserved for the few remaining cases that genuinely need raw SQL (FTS5 virtual tables in `BDS.Search`, which are not Ecto-mappable).
 
 **Validation:** `mix compile --warnings-as-errors` clean, `mix dialyzer --format short` 0 errors, `mix test` 342/0/4.
 

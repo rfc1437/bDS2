@@ -9,7 +9,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   alias BDS.{I18n, Metadata, Repo}
   alias BDS.Media.Media
   alias BDS.Media.Translation, as: MediaTranslation
-  alias BDS.Posts.{Post, Translation}
+  alias BDS.Posts.{Post, PostMedia, Translation}
   alias BDS.Tags.Tag
 
   embed_templates "overlay_html/*"
@@ -112,10 +112,12 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   end
 
   defp post_media_ids(%{type: :post, id: post_id}) do
-    case Repo.query("SELECT media_id FROM post_media WHERE post_id = ? ORDER BY sort_order ASC, media_id ASC", [post_id]) do
-      {:ok, %{rows: rows}} -> Enum.map(rows, fn [media_id] -> media_id end)
-      _other -> []
-    end
+    Repo.all(
+      from pm in PostMedia,
+        where: pm.post_id == ^post_id,
+        order_by: [asc: pm.sort_order, asc: pm.media_id],
+        select: pm.media_id
+    )
   rescue
     _error -> []
   end
@@ -229,10 +231,15 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       end
 
     reference_list =
-      case Repo.query("SELECT posts.title FROM posts JOIN post_media ON posts.id = post_media.post_id WHERE post_media.media_id = ? ORDER BY post_media.sort_order ASC, posts.updated_at DESC", [media_id]) do
-        {:ok, %{rows: rows}} -> Enum.map(rows, fn [title] -> title || media_id end)
-        _other -> []
-      end
+      Repo.all(
+        from post in Post,
+          join: pm in PostMedia,
+          on: pm.post_id == post.id,
+          where: pm.media_id == ^media_id,
+          order_by: [asc: pm.sort_order, desc: post.updated_at],
+          select: post.title
+      )
+      |> Enum.map(&(&1 || media_id))
 
     %{
       title: ShellData.translate("Delete Media", %{}, page_language),
