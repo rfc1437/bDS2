@@ -1,13 +1,13 @@
 defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
   @moduledoc false
 
-  alias BDS.{AI, Repo}
+  alias BDS.AI
   alias BDS.AI.ChatConversation
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.ChatEditor.{ModelSelection, ToolSurfaces, ToolTracking}
 
   def build(%{current_tab: %{type: :chat, id: conversation_id}} = assigns) do
-    case Repo.get(ChatConversation, conversation_id) do
+    case AI.get_chat_conversation(conversation_id) do
       nil ->
         nil
 

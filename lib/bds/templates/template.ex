@@ -7,6 +7,22 @@ defmodule BDS.Templates.Template do
   @primary_key {:id, :string, autogenerate: false}
   @foreign_key_type :string
 
+  @type t :: %__MODULE__{
+          id: String.t(),
+          project_id: String.t(),
+          slug: String.t() | nil,
+          title: String.t() | nil,
+          kind: :post | :list | :not_found | :partial | nil,
+          enabled: boolean() | nil,
+          version: integer() | nil,
+          file_path: String.t() | nil,
+          status: :draft | :published | nil,
+          content: String.t() | nil,
+          created_at: integer() | nil,
+          updated_at: integer() | nil,
+          project: term()
+        }
+
   schema "templates" do
     field :slug, :string
     field :title, :string

@@ -6,10 +6,11 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   import Ecto.Query
 
   alias BDS.Desktop.{FilePicker, ShellData}
-  alias BDS.{AI, I18n, Media, Repo}
+  alias BDS.{AI, I18n, Media}
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Media.Translation
   alias BDS.Posts.Post
+  alias BDS.Repo
   alias BDS.UI.Workbench
 
   embed_templates "media_editor_html/*"
@@ -23,7 +24,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   def update(socket, params, reload) do
     case socket.assigns.current_tab do
       %{type: :media, id: media_id} ->
-        case Repo.get(MediaRecord, media_id) do
+        case Media.get_media(media_id) do
           nil ->
             socket
 
@@ -38,7 +39,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   end
 
   def persist_socket(socket, media_id, reload, append_output) do
-    case Repo.get(MediaRecord, media_id) do
+    case Media.get_media(media_id) do
       nil ->
         socket
 
@@ -111,7 +112,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
       |> append_output.(translated("Detect Language"), translated("Automatic AI actions stay gated by airplane mode."), nil, "info")
       |> reload.(socket.assigns.workbench)
     else
-      case Repo.get(MediaRecord, media_id) do
+      case Media.get_media(media_id) do
         nil ->
           socket
 
@@ -184,7 +185,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
   def apply_ai_suggestions(socket, media_id, fields, reload, append_output) do
     try do
-      case Repo.get(MediaRecord, media_id) do
+      case Media.get_media(media_id) do
         nil ->
           socket
 
@@ -375,7 +376,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   end
 
   def build(%{current_tab: %{type: :media, id: media_id}} = assigns) do
-    case Repo.get(MediaRecord, media_id) do
+    case Media.get_media(media_id) do
       nil ->
         nil
 
@@ -468,7 +469,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
       "title" => media.title || "",
       "alt" => media.alt || "",
       "caption" => media.caption || "",
-      "tags" => Enum.join(media.tags || [], ", "),
+      "tags" => Enum.join(media.tags, ", "),
       "author" => media.author || "",
       "language" => media.language || ""
     }

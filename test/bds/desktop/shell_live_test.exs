@@ -4,6 +4,29 @@ defmodule BDS.Desktop.ShellLiveTest do
   import Phoenix.ConnTest
   import Phoenix.LiveViewTest
 
+  @shell_live_source_root Path.expand("../../../lib/bds/desktop/shell_live", __DIR__)
+
+  test "shell live modules use contexts instead of direct Repo.get calls" do
+    source_files =
+      [Path.expand("../../../lib/bds/desktop/shell_live.ex", __DIR__) |
+       Path.wildcard(Path.join(@shell_live_source_root, "**/*.ex"))]
+
+    offenders =
+      source_files
+      |> Enum.flat_map(fn path ->
+        path
+        |> File.read!()
+        |> String.split("\n")
+        |> Enum.with_index(1)
+        |> Enum.filter(fn {line, _line_number} ->
+          String.contains?(line, "Repo.get(") or String.contains?(line, "Repo.get!(")
+        end)
+        |> Enum.map(fn {_line, line_number} -> "#{Path.relative_to_cwd(path)}:#{line_number}" end)
+      end)
+
+    assert offenders == []
+  end
+
   alias BDS.Persistence
   alias BDS.AI
   alias BDS.CliSync.Watcher

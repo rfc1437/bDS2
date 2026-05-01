@@ -3,9 +3,9 @@ defmodule BDS.Desktop.ShellLive.CliSync do
 
   import Phoenix.Component, only: [assign: 3]
 
-  alias BDS.Media.Media
+  alias BDS.{Media, Posts}
+  alias BDS.Media.Media, as: MediaRecord
   alias BDS.Posts.Post
-  alias BDS.Repo
   alias BDS.UI.Workbench
 
   @doc """
@@ -78,8 +78,8 @@ defmodule BDS.Desktop.ShellLive.CliSync do
 
   defp maybe_refresh_tab_meta(socket, "post", post_id, action) when action in [:created, :updated] do
     maybe_put_tab_meta(socket, :post, post_id, fn ->
-      case Repo.get(Post, post_id) do
-        %Post{} = post -> %{title: post.title || post.slug || post.id, subtitle: Atom.to_string(post.status || :draft)}
+      case Posts.get_post(post_id) do
+        %Post{} = post -> %{title: post.title || post.slug || post.id, subtitle: Atom.to_string(post.status)}
         _other -> nil
       end
     end)
@@ -87,8 +87,8 @@ defmodule BDS.Desktop.ShellLive.CliSync do
 
   defp maybe_refresh_tab_meta(socket, "media", media_id, action) when action in [:created, :updated] do
     maybe_put_tab_meta(socket, :media, media_id, fn ->
-      case Repo.get(Media, media_id) do
-        %Media{} = media -> %{title: media.title || media.filename || media.id, subtitle: media.filename || media.mime_type || "media"}
+      case Media.get_media(media_id) do
+        %MediaRecord{} = media -> %{title: media.title || media.filename || media.id, subtitle: media.filename || media.mime_type || "media"}
         _other -> nil
       end
     end)

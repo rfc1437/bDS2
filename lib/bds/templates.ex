@@ -38,6 +38,9 @@ defmodule BDS.Templates do
     |> Repo.insert()
   end
 
+  @spec get_template(String.t()) :: Template.t() | nil
+  def get_template(template_id), do: Repo.get(Template, template_id)
+
   def publish_template(template_id) do
     case Repo.get(Template, template_id) do
       nil ->

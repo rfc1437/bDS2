@@ -3,9 +3,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.EditorSettings do
 
   use Phoenix.Component
 
-  alias BDS.Persistence
-  alias BDS.Repo
-  alias BDS.Settings.Setting
+  alias BDS.Settings
   alias BDS.Desktop.ShellData
 
   def editor_form do
@@ -46,22 +44,11 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.EditorSettings do
   end
 
   def get_global_setting(key) do
-    case Repo.get(Setting, key) do
-      %Setting{value: value} -> value
-      _other -> nil
-    end
+    Settings.get_global_setting(key)
   end
 
   def put_global_setting(key, value) do
-    setting = Repo.get(Setting, key) || %Setting{}
-
-    setting
-    |> Setting.changeset(%{key: key, value: to_string(value || ""), updated_at: Persistence.now_ms()})
-    |> Repo.insert_or_update()
-    |> case do
-      {:ok, _setting} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
+    Settings.put_global_setting(key, value)
   end
 
   defp editor_attrs(assigns) do

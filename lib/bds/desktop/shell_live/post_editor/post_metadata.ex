@@ -3,9 +3,9 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
 
   import Ecto.Query
 
-  alias BDS.{I18n, Metadata, PostLinks, Posts, Preview, Repo, Templates}
+  alias BDS.{I18n, Media, Metadata, PostLinks, Posts, Preview, Repo, Templates}
   alias BDS.Desktop.ShellData
-  alias BDS.Media.Media
+  alias BDS.Media.Media, as: MediaRecord
   alias BDS.Posts.{Post, PostMedia}
 
   def project_metadata(nil), do: %{main_language: "en", blog_languages: []}
@@ -56,8 +56,8 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
       )
 
     Enum.map(rows, fn {media_id, sort_order} ->
-      case Repo.get(Media, media_id) do
-        %Media{} = media ->
+      case Media.get_media(media_id) do
+        %MediaRecord{} = media ->
           %{
             media_id: media.id,
             has_thumbnail: String.starts_with?(to_string(media.mime_type || ""), "image/"),
@@ -83,7 +83,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
 
   defp related_posts(links, key) do
     Enum.map(links, fn link ->
-      case Repo.get(Post, Map.fetch!(link, key)) do
+      case Posts.get_post(Map.fetch!(link, key)) do
         %Post{} = post -> %{id: post.id, title: post.title || post.slug || post.id, text: link.link_text || post.slug || post.id}
         _other -> nil
       end

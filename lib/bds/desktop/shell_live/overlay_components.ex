@@ -6,8 +6,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   import Ecto.Query
 
   alias BDS.Desktop.ShellData
-  alias BDS.{I18n, Metadata, Repo}
-  alias BDS.Media.Media
+  alias BDS.{I18n, Media, Metadata, Posts, Repo}
+  alias BDS.Media.Media, as: MediaRecord
   alias BDS.Media.Translation, as: MediaTranslation
   alias BDS.Posts.{Post, PostMedia, Translation}
   alias BDS.Tags.Tag
@@ -93,7 +93,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
 
   defp media(project_id) do
     Repo.all(
-      from media in Media,
+      from media in MediaRecord,
         where: media.project_id == ^project_id,
         order_by: [desc: media.updated_at, desc: media.created_at],
         select: %{id: media.id, title: media.title, original_name: media.original_name, mime_type: media.mime_type, alt: media.alt, caption: media.caption}
@@ -155,7 +155,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   end
 
   defp source_language(%{type: :post, id: post_id}, metadata) do
-    case Repo.get(Post, post_id) do
+    case Posts.get_post(post_id) do
       %Post{language: language} when is_binary(language) and language != "" -> language
       _other -> metadata.main_language || "en"
     end
@@ -164,8 +164,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   end
 
   defp source_language(%{type: :media, id: media_id}, metadata) do
-    case Repo.get(Media, media_id) do
-      %Media{language: language} when is_binary(language) and language != "" -> language
+    case Media.get_media(media_id) do
+      %MediaRecord{language: language} when is_binary(language) and language != "" -> language
       _other -> metadata.main_language || "en"
     end
   rescue
@@ -190,7 +190,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   end
 
   defp ai_fields(%{type: :post, id: post_id}, title, subtitle, page_language) do
-    case Repo.get(Post, post_id) do
+    case Posts.get_post(post_id) do
       %Post{} = post ->
         [
           %{key: "title", label: ShellData.translate("Title", %{}, page_language), current_value: post.title || title, suggested_value: refine_title(post.title || title), locked: false},
@@ -206,8 +206,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   end
 
   defp ai_fields(%{type: :media, id: media_id}, title, _subtitle, page_language) do
-    case Repo.get(Media, media_id) do
-      %Media{} = media ->
+    case Media.get_media(media_id) do
+      %MediaRecord{} = media ->
         [
           %{key: "title", label: ShellData.translate("Title", %{}, page_language), current_value: media.title || title, suggested_value: refine_title(media.title || title), locked: false},
           %{key: "alt", label: ShellData.translate("Alt Text", %{}, page_language), current_value: media.alt || "", suggested_value: media.alt || title, locked: false},
@@ -225,8 +225,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
 
   defp delete_details(%{type: :media, id: media_id}, page_language) do
     entity_name =
-      case Repo.get(Media, media_id) do
-        %Media{} = media -> media.title || media.original_name || media.id
+      case Media.get_media(media_id) do
+        %MediaRecord{} = media -> media.title || media.original_name || media.id
         _other -> media_id
       end
 

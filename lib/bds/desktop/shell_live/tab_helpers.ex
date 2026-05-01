@@ -2,9 +2,9 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   @moduledoc false
 
   alias BDS.Desktop.ShellData
-  alias BDS.Media.Media
+  alias BDS.{Media, Posts}
+  alias BDS.Media.Media, as: MediaRecord
   alias BDS.Posts.Post
-  alias BDS.Repo
   alias BDS.UI.Registry
 
   def tab_title(nil, _tab_meta), do: translated("Dashboard")
@@ -59,29 +59,29 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   end
 
   def post_title(post_id) do
-    case Repo.get(Post, post_id) do
+    case Posts.get_post(post_id) do
       %Post{} = post -> post.title || post.slug || post.id
       _other -> "Post"
     end
   end
 
   def post_subtitle(post_id) do
-    case Repo.get(Post, post_id) do
+    case Posts.get_post(post_id) do
       %Post{} = post -> post.slug || "draft"
       _other -> "draft"
     end
   end
 
   def media_title(media_id) do
-    case Repo.get(Media, media_id) do
-      %Media{} = media -> media.title || media.filename || media.id
+    case Media.get_media(media_id) do
+      %MediaRecord{} = media -> media.title || media.filename || media.id
       _other -> "Media"
     end
   end
 
   def media_subtitle(media_id) do
-    case Repo.get(Media, media_id) do
-      %Media{} = media -> media.filename || media.mime_type || "media"
+    case Media.get_media(media_id) do
+      %MediaRecord{} = media -> media.filename || media.mime_type || "media"
       _other -> "media"
     end
   end

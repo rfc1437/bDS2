@@ -38,6 +38,9 @@ defmodule BDS.Scripts do
     |> Repo.insert()
   end
 
+  @spec get_script(String.t()) :: Script.t() | nil
+  def get_script(script_id), do: Repo.get(Script, script_id)
+
   def publish_script(script_id) do
     case Repo.get(Script, script_id) do
       nil ->

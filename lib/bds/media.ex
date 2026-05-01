@@ -115,6 +115,9 @@ defmodule BDS.Media do
     end
   end
 
+  @spec get_media(String.t()) :: Media.t() | nil
+  def get_media(media_id), do: Repo.get(Media, media_id)
+
   @spec update_media(String.t(), attrs()) ::
           {:ok, Media.t()} | {:error, :not_found | Ecto.Changeset.t()}
   def update_media(media_id, attrs) do

@@ -83,9 +83,9 @@ _None._ All modules previously on the queue have been split; refresh the queue i
 
 ## 7. Direct `Repo.get` in `BDS.Desktop.ShellLive`
 
-**Status:** open. 10 call sites verified.
+**Status:** ✅ done (2026-05-01). `Repo.get/2` and `Repo.get!/2` no longer appear in `BDS.Desktop.ShellLive` or its submodules. ShellLive entity reads now go through context APIs (`Posts.get_post/1`, `Posts.get_post!/1`, `Media.get_media/1`, `Templates.get_template/1`, `Scripts.get_script/1`, `AI.get_chat_conversation/1`, and `Settings.get_global_setting/1` / `put_global_setting/2`). Added a regression test that scans ShellLive source for direct `Repo.get` calls.
 
-**Plan:** add the missing context functions (`Posts.get_post_with_translations/1`, etc.) and replace each `Repo.get(Schema, id)` with the context call.
+**Rule:** ShellLive modules may use `Repo` for query-shaped read models where no context abstraction exists yet, but direct primary-key entity fetches belong in context modules.
 
 ---
 
@@ -215,6 +215,8 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
   - `BDS.Media` 993 → 324 (67 %). Submodules under `lib/bds/media/`: `FileOps` (150, attr/maybe_put/blank_to_nil/atomic_write/delete_file_if_present/list_matching_files/media_file_path/detect_mime/image_dimensions/image_mime?/progress callbacks), `Thumbnails` (165, thumbnail_paths/regenerate_thumbnails/regenerate_missing_thumbnails/ensure_thumbnails/delete_thumbnail_files + private render/write helpers), `Sidecars` (329, write_sidecar/write_translation_sidecar/parse_canonical_sidecar/parse_translation_sidecar/upsert_media_from_sidecar/upsert_translation_from_sidecar + sync/import-orphan public API + translation_sidecar_path/canonical_sidecar?/translation_sidecar?/binary_path_for_translation_sidecar/binary_exists_for_sidecar?), `Linking` (125, list_linked_posts/link_media_to_post/unlink_media_from_post/linked_post_ids), `Rebuilder` (82, rebuild_media_from_files/2). Public API preserved via `defdelegate`; coordinator keeps import_media/update_media/delete_media/upsert_media_translation/delete_media_translation/replace_media_file/list_media_translations and uses `import only:` for shared helpers.
 
 ### 2026-05-01
+
+- **Direct `Repo.get` in `BDS.Desktop.ShellLive`**: added context helpers for primary-key reads (`Posts.get_post/1`, `Media.get_media/1`, `Templates.get_template/1`, `Scripts.get_script/1`, `AI.get_chat_conversation/1`) and introduced `BDS.Settings` for global editor settings. Replaced all ShellLive `Repo.get/2` and `Repo.get!/2` calls across the main shell, tab helpers, CLI sync, panel renderer, chat message build, code entity editor, post editor, media editor, overlay components, post metadata, and settings editor. Added a ShellLive regression test that scans source files to keep direct `Repo.get` calls out. Section 7 is closed.
 
 - **God modules**:
   - `BDS.Maintenance` 810 → 141 (83 %). Submodules under `lib/bds/maintenance/`: `Progress` (45), `FileScan` (158), `DiffComputation` (93), `DiffReports` (315), `Repair` (145). Coordinator keeps the 4 public entrypoints (`repair_metadata_diff/4`, `import_metadata_diff_orphans/3`, `rebuild_from_filesystem/3`, `metadata_diff/2`); submodules wired via `import only:`.

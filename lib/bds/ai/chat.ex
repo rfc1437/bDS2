@@ -53,6 +53,11 @@ defmodule BDS.AI.Chat do
     |> Enum.map(&format_conversation/1)
   end
 
+  @spec get_chat_conversation(String.t()) :: ChatConversation.t() | nil
+  def get_chat_conversation(conversation_id) when is_binary(conversation_id) do
+    Repo.get(ChatConversation, conversation_id)
+  end
+
   @spec available_chat_models(String.t() | nil) :: [map()]
   def available_chat_models(current_model \\ nil) do
     endpoint_models = configured_chat_models()

@@ -4,7 +4,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   use Phoenix.Component
 
   alias BDS.Desktop.ShellData
-  alias BDS.{MCP, Repo, Scripts, Scripting, Templates}
+  alias BDS.{MCP, Scripts, Scripting, Templates}
   alias BDS.Scripts.Script
   alias BDS.Templates.Template
 
@@ -27,7 +27,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   def save_script(socket, reload, append_output) do
     %{id: script_id} = socket.assigns.current_tab
 
-    case Repo.get(Script, script_id) do
+    case Scripts.get_script(script_id) do
       nil -> reload.(socket, socket.assigns.workbench)
       %Script{} = script ->
         draft = current_script_draft(socket.assigns, script)
@@ -57,7 +57,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   def check_script(socket, reload, append_output) do
     %{id: script_id} = socket.assigns.current_tab
 
-    case Repo.get(Script, script_id) do
+    case Scripts.get_script(script_id) do
       nil -> reload.(socket, socket.assigns.workbench)
       %Script{} = script ->
         case Scripting.validate(current_script_draft(socket.assigns, script)["content"] || "") do
@@ -70,7 +70,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   def run_script(socket, reload, append_output) do
     %{id: script_id} = socket.assigns.current_tab
 
-    case Repo.get(Script, script_id) do
+    case Scripts.get_script(script_id) do
       nil -> reload.(socket, socket.assigns.workbench)
       %Script{} = script ->
         draft = current_script_draft(socket.assigns, script)
@@ -109,7 +109,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   def save_template(socket, reload, append_output) do
     %{id: template_id} = socket.assigns.current_tab
 
-    case Repo.get(Template, template_id) do
+    case Templates.get_template(template_id) do
       nil -> reload.(socket, socket.assigns.workbench)
       %Template{} = template ->
         draft = current_template_draft(socket.assigns, template)
@@ -129,7 +129,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   def validate_template(socket, reload, append_output) do
     %{id: template_id} = socket.assigns.current_tab
 
-    case Repo.get(Template, template_id) do
+    case Templates.get_template(template_id) do
       nil -> reload.(socket, socket.assigns.workbench)
       %Template{} = template ->
         case MCP.validate_template(current_template_draft(socket.assigns, template)["content"] || "") do
@@ -149,7 +149,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   end
 
   def build_script(%{current_tab: %{type: :scripts, id: script_id}} = assigns) do
-    case Repo.get(Script, script_id) do
+    case Scripts.get_script(script_id) do
       nil -> nil
       %Script{} = script ->
         draft = current_script_draft(assigns, script)
@@ -171,7 +171,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   def build_script(_assigns), do: nil
 
   def build_template(%{current_tab: %{type: :templates, id: template_id}} = assigns) do
-    case Repo.get(Template, template_id) do
+    case Templates.get_template(template_id) do
       nil -> nil
       %Template{} = template ->
         draft = current_template_draft(assigns, template)

@@ -3,7 +3,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   use Phoenix.Component
 
-  alias BDS.{AI, Posts, Preview, Repo}
+  alias BDS.{AI, Posts, Preview}
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, ListValues, Persistence, PostMetadata}
   alias BDS.Posts.Post
@@ -84,7 +84,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   def update(socket, params, reload) do
     case socket.assigns.current_tab do
       %{type: :post, id: post_id} ->
-        case Repo.get(Post, post_id) do
+        case Posts.get_post(post_id) do
           nil ->
             socket
 
@@ -118,7 +118,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   end
 
   def persist_socket(socket, post_id, action, reload, append_output) do
-    case Repo.get(Post, post_id) do
+    case Posts.get_post(post_id) do
       nil ->
         socket
 
@@ -131,13 +131,13 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
         case persist(post, draft, active_language, metadata, action) do
           {:ok, record} ->
             workbench = Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
-            normalized_form = persisted_form(Repo.get!(Post, post_id), metadata, active_language)
+            normalized_form = persisted_form(Posts.get_post!(post_id), metadata, active_language)
 
             socket
             |> assign(:workbench, workbench)
             |> assign(:post_editor_drafts, put_nested_map(socket.assigns.post_editor_drafts, post_id, active_language, normalized_form))
             |> assign(:post_editor_save_states, Map.put(socket.assigns.post_editor_save_states, post_id, save_state_for_action(action)))
-            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: record_title(record, Repo.get!(Post, post_id)), subtitle: Atom.to_string(record_status(record))}))
+            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: record_title(record, Posts.get_post!(post_id)), subtitle: Atom.to_string(record_status(record))}))
             |> reload.(workbench)
 
           {:error, reason} ->
@@ -149,7 +149,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   end
 
   def discard_socket(socket, post_id, reload, append_output) do
-    case Repo.get(Post, post_id) do
+    case Posts.get_post(post_id) do
       nil ->
         socket
 
@@ -206,7 +206,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     normalized_mode = normalize_mode(mode)
 
     if normalized_mode == :preview do
-      case Repo.get(Post, post_id) do
+      case Posts.get_post(post_id) do
         %Post{} = post ->
           _ = Preview.ensure_preview(post.project_id)
 
@@ -250,7 +250,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       |> append_output.(translated("Detect Language"), translated("Automatic AI actions stay gated by airplane mode."), nil, "info")
       |> reload.(socket.assigns.workbench)
     else
-      case Repo.get(Post, post_id) do
+      case Posts.get_post(post_id) do
         nil ->
           socket
 
@@ -318,7 +318,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   end
 
   def apply_ai_suggestions(socket, post_id, fields, reload, append_output) do
-    case Repo.get(Post, post_id) do
+    case Posts.get_post(post_id) do
       nil ->
         socket
 
@@ -366,7 +366,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   end
 
   def add_list_value(socket, post_id, kind, value, reload) when kind in [:tags, :categories] do
-    case Repo.get(Post, post_id) do
+    case Posts.get_post(post_id) do
       nil ->
         socket
 
@@ -399,7 +399,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   end
 
   def remove_list_value(socket, post_id, kind, value, reload) when kind in [:tags, :categories] do
-    case Repo.get(Post, post_id) do
+    case Posts.get_post(post_id) do
       nil ->
         socket
 
@@ -417,7 +417,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   end
 
   def build(%{current_tab: %{type: :post, id: post_id}} = assigns) do
-    case Repo.get(Post, post_id) do
+    case Posts.get_post(post_id) do
       nil ->
         nil
 
@@ -446,7 +446,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
           display_title: display_title(form["title"], post.slug, post.id),
           subtitle: nil,
           slug: post.slug || post.id,
-          status: post.status || :draft,
+          status: post.status,
           dirty?: Workbench.dirty?(assigns.workbench, :post, post.id),
           save_state: Map.get(assigns.post_editor_save_states, post.id, :idle),
           quick_actions_open?: Map.get(assigns.post_editor_quick_actions_open, post.id, false),
@@ -454,8 +454,8 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
           excerpt_expanded: Map.get(expanded, :excerpt, false),
           mode: Map.get(assigns.post_editor_modes, post.id, :markdown),
           editing_canonical?: editing_canonical_language?(translations, active_language, canonical_language),
-          can_publish?: (post.status || :draft) == :draft,
-          can_delete?: (post.status || :draft) == :published,
+          can_publish?: post.status == :draft,
+          can_delete?: post.status == :published,
           has_published_version?: has_published_version?(post),
           discard_label: discard_label(post),
           discard_title: discard_title(post),

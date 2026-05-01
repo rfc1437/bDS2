@@ -149,6 +149,9 @@ defmodule BDS.AI do
   @spec list_chat_conversations() :: [map()]
   defdelegate list_chat_conversations(), to: Chat
 
+  @spec get_chat_conversation(String.t()) :: BDS.AI.ChatConversation.t() | nil
+  defdelegate get_chat_conversation(conversation_id), to: Chat
+
   @spec available_chat_models(String.t() | nil) :: [map()]
   defdelegate available_chat_models(current_model \\ nil), to: Chat
 

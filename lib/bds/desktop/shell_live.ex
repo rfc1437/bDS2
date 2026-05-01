@@ -29,7 +29,6 @@ defmodule BDS.Desktop.ShellLive do
       parse_integer: 1
     ]
   alias BDS.Projects
-  alias BDS.Repo
   alias BDS.Templates
   alias BDS.UI.{Commands, MenuBar, Session, Workbench}
 
@@ -346,7 +345,7 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("delete_sidebar_template", %{"id" => template_id}, socket) do
-    case Repo.get(Templates.Template, template_id) do
+    case Templates.get_template(template_id) do
       %Templates.Template{project_id: project_id} when project_id == socket.assigns.projects.active_project_id ->
         case Templates.delete_template(template_id) do
           {:ok, :deleted} ->

@@ -348,6 +348,9 @@ defmodule BDS.Posts do
   end
 
   @spec get_post!(String.t()) :: Post.t()
+  @spec get_post(String.t()) :: Post.t() | nil
+  def get_post(post_id), do: Repo.get(Post, post_id)
+
   def get_post!(post_id), do: Repo.get!(Post, post_id)
 
   @spec get_post_translation!(String.t()) :: Translation.t()

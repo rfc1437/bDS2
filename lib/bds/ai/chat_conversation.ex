@@ -6,6 +6,15 @@ defmodule BDS.AI.ChatConversation do
 
   @primary_key {:id, :string, autogenerate: false}
 
+  @type t :: %__MODULE__{
+          id: String.t(),
+          title: String.t() | nil,
+          model: String.t() | nil,
+          copilot_session_id: String.t() | nil,
+          created_at: integer() | nil,
+          updated_at: integer() | nil
+        }
+
   schema "chat_conversations" do
     field :title, :string
     field :model, :string
