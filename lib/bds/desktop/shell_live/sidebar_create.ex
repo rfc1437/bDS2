@@ -2,6 +2,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
   @moduledoc false
 
   alias BDS.Desktop.{FilePicker, ShellData}
+  alias BDS.AI
   alias BDS.ImportDefinitions
   alias BDS.Scripts
   alias BDS.Templates
@@ -132,6 +133,27 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
     end
   end
 
+  def create(socket, _project_id, "chat", callbacks) do
+    case AI.start_chat(%{}) do
+      {:ok, conversation} ->
+        callbacks.open_sidebar.(
+          socket,
+          %{
+            "route" => "chat",
+            "id" => conversation.id,
+            "title" => conversation.title,
+            "subtitle" => "AI conversations"
+          },
+          :pin
+        )
+
+      {:error, reason} ->
+        socket
+        |> callbacks.append_output.(translated("chat.newChat"), inspect(reason), nil, "error")
+        |> callbacks.reload.(socket.assigns.workbench)
+    end
+  end
+
   def create(socket, project_id, "import", callbacks) do
     case ImportDefinitions.create_definition(%{
            project_id: project_id,
@@ -168,6 +190,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
   def action(:media), do: %{kind: "media", label: "sidebar.importMedia"}
   def action(:scripts), do: %{kind: "script", label: "sidebar.scripts.newScript"}
   def action(:templates), do: %{kind: "template", label: "sidebar.templates.newTemplate"}
+  def action(:chat), do: %{kind: "chat", label: "chat.newChat"}
   def action(:import), do: %{kind: "import", label: "sidebar.import.newDefinition"}
   def action(_view), do: nil
 

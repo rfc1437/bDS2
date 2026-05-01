@@ -690,6 +690,35 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     },
 
+    SettingsSectionScroll: {
+      mounted() {
+        this.lastTargetId = null;
+        this.scrollToSelectedSection();
+      },
+
+      updated() {
+        this.scrollToSelectedSection();
+      },
+
+      scrollToSelectedSection() {
+        const targetId = this.el.dataset.settingsScrollTarget;
+
+        if (!targetId || targetId === this.lastTargetId) {
+          return;
+        }
+
+        this.lastTargetId = targetId;
+
+        window.requestAnimationFrame(() => {
+          const target = document.getElementById(targetId);
+
+          if (target && this.el.contains(target)) {
+            target.scrollIntoView({ block: "start", behavior: "smooth" });
+          }
+        });
+      }
+    },
+
     ChatSurface: {
       mounted() {
         this.stickToBottom = true;

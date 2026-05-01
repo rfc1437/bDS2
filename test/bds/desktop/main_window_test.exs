@@ -63,4 +63,19 @@ defmodule BDS.Desktop.MainWindowTest do
 
     assert opts[:size] == {1200, 700}
   end
+
+  test "terminate persists the last known bounds without querying wx during shutdown", %{
+    path: path
+  } do
+    bounds = %{x: 33, y: 44, width: 900, height: 700}
+
+    assert :ok = MainWindow.terminate(:shutdown, %{frame: :invalid_wx_frame, last_bounds: bounds})
+
+    assert Jason.decode!(File.read!(path)) == %{
+             "x" => 33,
+             "y" => 44,
+             "width" => 900,
+             "height" => 700
+           }
+  end
 end

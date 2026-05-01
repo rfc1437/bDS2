@@ -1,4 +1,11 @@
-<div class="settings-view-shell" data-testid="settings-editor" data-selected-settings-section={@settings_editor.selected_section}>
+<div
+  id="settings-editor-shell"
+  class="settings-view-shell"
+  data-testid="settings-editor"
+  phx-hook="SettingsSectionScroll"
+  data-selected-settings-section={@settings_editor.selected_section}
+  data-settings-scroll-target={"settings-section-#{@settings_editor.selected_section}"}
+>
   <div class="settings-view">
     <div class="settings-header">
       <h2 data-testid="editor-title"><%= translated("Settings") %></h2>

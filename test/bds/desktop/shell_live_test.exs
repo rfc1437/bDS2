@@ -136,7 +136,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "sidebar headers expose old-app create actions for posts, media, scripts, templates, and imports" do
+  test "sidebar headers expose old-app create actions for posts, media, scripts, templates, chat, and imports" do
     {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
     assert html =~ ~s(data-testid="sidebar-create-action")
@@ -164,19 +164,28 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     html =
       view
+      |> element("[data-testid='activity-button'][data-view='chat']")
+      |> render_click()
+
+    assert html =~ ~s(data-sidebar-action="chat")
+
+    html =
+      view
       |> element("[data-testid='activity-button'][data-view='import']")
       |> render_click()
 
     assert html =~ ~s(data-sidebar-action="import")
   end
 
-  test "sidebar create actions follow the old-app post, script, template, and import flows", %{
-    project: project
-  } do
+  test "sidebar create actions follow the old-app post, script, template, chat, and import flows",
+       %{
+         project: project
+       } do
     {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
     post_count_before = Repo.aggregate(Post, :count, :id)
     script_count_before = Repo.aggregate(BDS.Scripts.Script, :count, :id)
     template_count_before = Repo.aggregate(BDS.Templates.Template, :count, :id)
+    chat_count_before = Repo.aggregate(BDS.AI.ChatConversation, :count, :id)
     import_count_before = Repo.aggregate(ImportDefinitions.ImportDefinition, :count, :id)
 
     html =
@@ -225,6 +234,20 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-tab-type="templates")
     assert html =~ ~s(data-tab-id="#{created_template.id}")
 
+    _html = render_click(view, "select_view", %{"view" => "chat"})
+
+    html =
+      view
+      |> element("[data-testid='sidebar-create-action'][data-sidebar-action='chat']")
+      |> render_click()
+
+    assert Repo.aggregate(BDS.AI.ChatConversation, :count, :id) == chat_count_before + 1
+
+    created_chat = Repo.one!(BDS.AI.ChatConversation)
+    assert created_chat.title == "New Chat"
+    assert html =~ ~s(data-tab-type="chat")
+    assert html =~ ~s(data-tab-id="#{created_chat.id}")
+
     _html = render_click(view, "select_view", %{"view" => "import"})
 
     html =
@@ -240,6 +263,21 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert created_definition.name == "New Import Definition"
     assert html =~ ~s(data-tab-type="import")
     assert html =~ ~s(data-tab-id="#{created_definition.id}")
+  end
+
+  test "settings sidebar selections expose a scroll target for the preferences editor" do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html = render_click(view, "select_view", %{"view" => "settings"})
+
+    html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='settings-ai']")
+      |> render_click()
+
+    assert html =~ ~s(phx-hook="SettingsSectionScroll")
+    assert html =~ ~s(data-selected-settings-section="ai")
+    assert html =~ ~s(data-settings-scroll-target="settings-section-ai")
   end
 
   test "shell live refreshes the posts sidebar when the CLI watcher broadcasts an entity change",
@@ -2074,6 +2112,38 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute chat_html =~ "Desktop workbench content routed through the Elixir shell."
   end
 
+  test "chat editor uses the model name itself as the selector" do
+    assert {:ok, conversation} = AI.start_chat(%{title: "Selector Chat", model: "qwen3.5-122b"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert html =~ ~s(data-testid="chat-model-selector-button")
+    assert html =~ ~s(class="chat-panel-title-main")
+    assert html =~ ~s(class="chat-model-selector-wrap")
+    assert html =~ ~s(class="chat-model-selector-button chat-model-selector-inline")
+    refute html =~ ~s(class="chat-panel-header-actions")
+
+    css = File.read!(Path.expand("../../../priv/ui/app.css", __DIR__))
+    assert css =~ ".chat-model-selector-wrap"
+    assert css =~ "left: 0;"
+    assert css =~ "right: auto;"
+
+    refute css =~
+             ".chat-model-selector-menu {\n  position: absolute;\n  top: calc(100% + 4px);\n  right: 16px;"
+
+    assert css =~ ".chat-panel .chat-model-selector-button.chat-model-selector-inline"
+    assert css =~ ".chat-panel .chat-model-selector-caret"
+    assert css =~ "position: static;"
+  end
+
   test "chat editor renders legacy model controls, tool markers, and structured tool surfaces" do
     assert {:ok, conversation} = AI.start_chat(%{title: "Editor Chat", model: "gpt-4.1"})
 
@@ -2139,6 +2209,42 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Blog Stats"
     assert html =~ "Metric"
     assert html =~ "Posts"
+  end
+
+  test "chat editor marks user message text as compact" do
+    assert {:ok, conversation} = AI.start_chat(%{title: "Compact Chat", model: "gpt-4.1"})
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :user,
+        content: "wie viele Posts sind im Blog?",
+        created_at: Persistence.now_ms()
+      })
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert html =~ ~s(data-testid="chat-user-message-text")
+    assert html =~ ~s(class="chat-message-text chat-user-message-text")
+
+    assert html =~
+             ~s(<div class="chat-message-text chat-user-message-text" data-testid="chat-user-message-text">wie viele Posts sind im Blog?</div>)
+
+    css = File.read!(Path.expand("../../../priv/ui/app.css", __DIR__))
+    assert css =~ ".chat-panel .chat-message.user .chat-message-content"
+    assert css =~ "background: transparent;"
+    assert css =~ "border: 0;"
+    assert css =~ "padding: 6px 12px;"
+    assert css =~ "line-height: 1.35;"
   end
 
   test "chat editor groups selector models by provider and uses catalog labels" do

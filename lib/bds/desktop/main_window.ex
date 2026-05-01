@@ -90,8 +90,8 @@ defmodule BDS.Desktop.MainWindow do
   end
 
   @impl true
-  def terminate(_reason, %{frame: frame, last_bounds: last_bounds}) do
-    if bounds = current_bounds(frame) || last_bounds do
+  def terminate(_reason, %{last_bounds: last_bounds}) do
+    if bounds = last_bounds do
       _ = persist_bounds(bounds)
     end
 
