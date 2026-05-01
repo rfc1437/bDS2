@@ -3,8 +3,58 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   use Phoenix.Component
 
-  alias BDS.Desktop.{FilePicker, FolderPicker, ShellData}
-  alias BDS.{AI, ImportAnalysis, ImportDefinitions, ImportExecution, Metadata, Tags}
+  alias BDS.AI
+  alias BDS.Desktop.ShellData
+  alias BDS.Desktop.ShellLive.ImportEditor.{
+    AnalysisState,
+    ConflictResolution,
+    ProgressTracking,
+    TaxonomyEditing
+  }
+
+  alias BDS.ImportDefinitions
+
+  import AnalysisState,
+    only: [
+      default_analysis_state: 0,
+      default_sections: 0,
+      detail_items: 2,
+      importable_counts: 1
+    ]
+
+  import ProgressTracking,
+    only: [
+      default_execution_state: 0,
+      execution_progress_width: 1,
+      format_eta: 1
+    ]
+
+  import TaxonomyEditing,
+    only: [
+      existing_taxonomy_terms: 1,
+      taxonomy_item_editing?: 3,
+      taxonomy_mapping_tooltip: 1,
+      taxonomy_pill_class: 1
+    ]
+
+  defdelegate change_definition(socket, params, reload), to: AnalysisState
+  defdelegate select_uploads_folder(socket, reload, append_output), to: AnalysisState
+  defdelegate select_and_analyze(socket, reload, append_output), to: AnalysisState
+  defdelegate note_analysis_progress(socket, definition_id, step, detail, reload), to: AnalysisState
+  defdelegate finish_analysis(socket, ref, result, reload, append_output), to: AnalysisState
+
+  defdelegate execute_import(socket, reload, append_output), to: ProgressTracking
+  defdelegate note_execution_progress(socket, definition_id, phase, current, total, detail, reload), to: ProgressTracking
+  defdelegate finish_execution(socket, ref, result, reload, append_output), to: ProgressTracking
+  defdelegate handle_task_down(socket, kind, ref, reason, reload, append_output), to: ProgressTracking
+
+  defdelegate change_conflict_resolution(socket, params, reload), to: ConflictResolution
+
+  defdelegate start_taxonomy_edit(socket, params, reload), to: TaxonomyEditing
+  defdelegate cancel_taxonomy_edit(socket, reload), to: TaxonomyEditing
+  defdelegate save_taxonomy_edit(socket, params, reload), to: TaxonomyEditing
+  defdelegate clear_taxonomy_mapping(socket, params, reload), to: TaxonomyEditing
+  defdelegate analyze_taxonomy_ai(socket, reload, append_output), to: TaxonomyEditing
 
   def assign_socket(socket) do
     case socket.assigns[:current_tab] do
@@ -58,200 +108,6 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     end
   end
 
-  def change_definition(socket, params, reload) do
-    with %{id: definition_id} <- socket.assigns.current_tab,
-         {:ok, _definition} <- ImportDefinitions.update_definition(definition_id, %{name: Map.get(params, "name", "")}) do
-      reload.(socket, socket.assigns.workbench)
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  def select_uploads_folder(socket, reload, append_output) do
-    with %{id: definition_id} <- socket.assigns.current_tab do
-      case FolderPicker.choose_directory(translated("importAnalysis.uploadsFolder")) do
-        {:ok, uploads_folder_path} ->
-          {:ok, _definition} = ImportDefinitions.update_definition(definition_id, %{uploads_folder_path: uploads_folder_path})
-          reload.(socket, socket.assigns.workbench)
-
-        :cancel ->
-          reload.(socket, socket.assigns.workbench)
-
-        {:error, %{message: message}} ->
-          socket
-          |> append_output.(translated("activity.import"), message, nil, "error")
-          |> reload.(socket.assigns.workbench)
-      end
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  def select_and_analyze(socket, reload, append_output) do
-    with %{id: definition_id} <- socket.assigns.current_tab,
-         %{} = definition <- ImportDefinitions.get_definition(definition_id) do
-      case FilePicker.choose_file(translated("importAnalysis.wxrFile")) do
-        {:ok, wxr_file_path} ->
-          project_id = socket.assigns.projects.active_project_id
-
-          {:ok, _definition} =
-            ImportDefinitions.update_definition(definition_id, %{
-              wxr_file_path: wxr_file_path,
-              last_analysis_result: nil
-            })
-
-          live_view_pid = self()
-
-          task =
-            Task.Supervisor.async_nolink(BDS.Tasks.TaskSupervisor, fn ->
-              ImportAnalysis.analyze_wxr(project_id, wxr_file_path, definition.uploads_folder_path,
-                on_progress: fn step, detail ->
-                  send(live_view_pid, {:import_analysis_progress, definition_id, translate_phase(step), detail})
-                end
-              )
-            end)
-
-          :ok = allow_repo_sandbox(task.pid)
-
-          socket
-          |> assign(
-            :import_editor_analysis_states,
-            Map.put(socket.assigns.import_editor_analysis_states, definition_id, %{
-              loading: true,
-              step: translated("importAnalysis.analyzingWxr"),
-              detail: Path.basename(wxr_file_path),
-              file_path: wxr_file_path,
-              ref: task.ref
-            })
-          )
-          |> assign(:import_editor_analysis_task_refs, Map.put(socket.assigns.import_editor_analysis_task_refs, task.ref, definition_id))
-          |> assign(:import_editor_execution_states, Map.delete(socket.assigns.import_editor_execution_states, definition_id))
-          |> reload.(socket.assigns.workbench)
-
-        :cancel ->
-          reload.(socket, socket.assigns.workbench)
-
-        {:error, %{message: message}} ->
-          socket
-          |> append_output.(translated("activity.import"), message, nil, "error")
-          |> reload.(socket.assigns.workbench)
-      end
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  def execute_import(socket, reload, _append_output) do
-    with %{id: definition_id} <- socket.assigns.current_tab,
-         %{} = definition <- ImportDefinitions.get_definition(definition_id),
-         %{} = report <- ImportDefinitions.decode_analysis_result(definition) do
-      project_id = socket.assigns.projects.active_project_id
-      default_author = default_author(project_id)
-      counts = importable_counts(report)
-
-      if counts.total == 0 do
-        reload.(socket, socket.assigns.workbench)
-      else
-        live_view_pid = self()
-
-        task =
-          Task.Supervisor.async_nolink(BDS.Tasks.TaskSupervisor, fn ->
-            ImportExecution.execute_import(project_id, report,
-              uploads_folder_path: definition.uploads_folder_path,
-              default_author: default_author,
-              on_progress: fn phase, current, total, detail ->
-                send(live_view_pid, {:import_execution_progress, definition_id, phase, current, total, detail})
-              end
-            )
-          end)
-
-        progress_phase = translate_execution_phase("posts")
-
-        :ok = allow_repo_sandbox(task.pid)
-
-        socket
-        |> assign(
-          :import_editor_execution_states,
-          Map.put(socket.assigns.import_editor_execution_states, definition_id, %{
-            is_executing: true,
-            completed: false,
-            error: nil,
-            count: counts.total,
-            result: nil,
-            phase: progress_phase,
-            current: 0,
-            total: counts.total,
-            detail: nil,
-            eta: nil,
-            ref: task.ref
-          })
-        )
-        |> assign(:import_editor_execution_task_refs, Map.put(socket.assigns.import_editor_execution_task_refs, task.ref, definition_id))
-        |> reload.(socket.assigns.workbench)
-      end
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  def change_conflict_resolution(socket, %{"item_type" => item_type, "item_name" => item_name, "resolution" => resolution}, reload) do
-    with %{id: definition_id} <- socket.assigns.current_tab,
-         %{} = definition <- ImportDefinitions.get_definition(definition_id),
-         %{} = report <- ImportDefinitions.decode_analysis_result(definition),
-         updated_report <- update_conflict_resolution(report, item_type, item_name, resolution),
-         {:ok, _definition} <- ImportDefinitions.update_definition(definition_id, %{last_analysis_result: updated_report}) do
-      reload.(socket, socket.assigns.workbench)
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  def start_taxonomy_edit(socket, %{"type" => type, "name" => name, "mapped_to" => mapped_to}, reload) do
-    with %{id: definition_id} <- socket.assigns.current_tab do
-      socket
-      |> assign(
-        :import_editor_taxonomy_edits,
-        Map.put(socket.assigns.import_editor_taxonomy_edits, definition_id, %{
-          type: type,
-          name: name,
-          value: mapped_to |> to_string() |> blank_to_nil()
-        })
-      )
-      |> reload.(socket.assigns.workbench)
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  def cancel_taxonomy_edit(socket, reload) do
-    with %{id: definition_id} <- socket.assigns.current_tab do
-      socket
-      |> assign(:import_editor_taxonomy_edits, Map.delete(socket.assigns.import_editor_taxonomy_edits, definition_id))
-      |> reload.(socket.assigns.workbench)
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  def save_taxonomy_edit(socket, %{"type" => type, "name" => name, "mapped_to" => mapped_to}, reload) do
-    with %{id: definition_id} <- socket.assigns.current_tab,
-         %{} = definition <- ImportDefinitions.get_definition(definition_id),
-         %{} = report <- ImportDefinitions.decode_analysis_result(definition),
-         normalized_value <- normalize_taxonomy_mapping_value(socket.assigns.projects.active_project_id, type, mapped_to),
-         updated_report <- update_taxonomy_mapping(report, type, name, normalized_value),
-         {:ok, _definition} <- ImportDefinitions.update_definition(definition_id, %{last_analysis_result: updated_report}) do
-      socket
-      |> assign(:import_editor_taxonomy_edits, Map.delete(socket.assigns.import_editor_taxonomy_edits, definition_id))
-      |> reload.(socket.assigns.workbench)
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  def clear_taxonomy_mapping(socket, %{"type" => type, "name" => name}, reload) do
-    save_taxonomy_edit(socket, %{"type" => type, "name" => name, "mapped_to" => ""}, reload)
-  end
-
   def toggle_section(socket, section, reload) do
     with %{id: definition_id} <- socket.assigns.current_tab,
          section_key when section_key in ["post_conflicts", "page_conflicts", "posts", "other", "pages", "media", "taxonomy", "macros"] <- section do
@@ -290,234 +146,6 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       _other -> reload.(socket, socket.assigns.workbench)
     end
   end
-
-  def analyze_taxonomy_ai(socket, reload, append_output) do
-    with %{id: definition_id} <- socket.assigns.current_tab,
-         %{} = definition <- ImportDefinitions.get_definition(definition_id),
-         %{} = report <- ImportDefinitions.decode_analysis_result(definition) do
-      cond do
-        socket.assigns.offline_mode ->
-          socket
-          |> append_output.(translated("activity.import"), ShellData.translate("Automatic AI actions stay gated by airplane mode.", %{}, socket.assigns.page_language), nil, "info")
-          |> reload.(socket.assigns.workbench)
-
-        true ->
-          taxonomy_terms = existing_taxonomy_terms(socket.assigns.projects.active_project_id)
-
-          import_terms = %{
-            categories: Enum.map(Map.get(report.items, :categories, []), & &1.name),
-            tags: Enum.map(Map.get(report.items, :tags, []), & &1.name)
-          }
-
-          opts = maybe_put_option([], :model, Map.get(socket.assigns.import_editor_selected_models, definition_id))
-
-          case AI.analyze_import_taxonomy(import_terms, taxonomy_terms, opts) do
-            {:ok, analysis} ->
-              updated_report = apply_taxonomy_mappings(report, analysis)
-              {:ok, _definition} = ImportDefinitions.update_definition(definition_id, %{last_analysis_result: updated_report})
-              mapped_count = auto_mapped_count(report, updated_report)
-
-              socket
-              |> append_output.(translated("activity.import"), translated("importAnalysis.mappedCount", %{count: mapped_count}), Map.get(socket.assigns.import_editor_selected_models, definition_id), "info")
-              |> reload.(socket.assigns.workbench)
-
-            {:error, reason} ->
-              socket
-              |> append_output.(translated("activity.import"), inspect(reason), Map.get(socket.assigns.import_editor_selected_models, definition_id), "error")
-              |> reload.(socket.assigns.workbench)
-          end
-      end
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  def note_analysis_progress(socket, definition_id, step, detail, reload) do
-    socket
-    |> assign(
-      :import_editor_analysis_states,
-      Map.update(socket.assigns.import_editor_analysis_states, definition_id, default_analysis_state(), fn state ->
-        state
-        |> Map.put(:loading, true)
-        |> Map.put(:step, step)
-        |> Map.put(:detail, detail)
-      end)
-    )
-    |> reload.(socket.assigns.workbench)
-  end
-
-  def note_execution_progress(socket, definition_id, phase, current, total, detail, reload) do
-    {detail_text, eta} = decompose_progress_detail(detail)
-    translated_phase = translate_execution_phase(phase)
-
-    socket
-    |> assign(
-      :import_editor_execution_states,
-      Map.update(socket.assigns.import_editor_execution_states, definition_id, default_execution_state(), fn state ->
-        state
-        |> Map.put(:is_executing, true)
-        |> Map.put(:phase, translated_phase)
-        |> Map.put(:current, current)
-        |> Map.put(:total, total)
-        |> Map.put(:detail, detail_text)
-        |> Map.put(:eta, eta)
-      end)
-    )
-    |> reload.(socket.assigns.workbench)
-  end
-
-  def finish_analysis(socket, ref, result, reload, append_output) do
-    case Map.get(socket.assigns.import_editor_analysis_task_refs, ref) do
-      nil ->
-        socket
-
-      definition_id ->
-        analysis_state = Map.get(socket.assigns.import_editor_analysis_states, definition_id, default_analysis_state())
-
-        socket =
-          socket
-          |> assign(:import_editor_analysis_task_refs, Map.delete(socket.assigns.import_editor_analysis_task_refs, ref))
-          |> assign(:import_editor_analysis_states, Map.delete(socket.assigns.import_editor_analysis_states, definition_id))
-
-        case result do
-          {:ok, report} ->
-            attrs =
-              %{
-                wxr_file_path: analysis_state.file_path,
-                last_analysis_result: report
-              }
-              |> maybe_put(:name, suggested_definition_name(report))
-
-            case ImportDefinitions.update_definition(definition_id, attrs) do
-              {:ok, _definition} -> reload.(socket, socket.assigns.workbench)
-
-              {:error, reason} ->
-                socket
-                |> append_output.(translated("activity.import"), inspect(reason), nil, "error")
-                |> reload.(socket.assigns.workbench)
-            end
-
-          {:error, %{message: message}} ->
-            socket
-            |> append_output.(translated("activity.import"), message, nil, "error")
-            |> reload.(socket.assigns.workbench)
-
-          {:error, reason} ->
-            socket
-            |> append_output.(translated("activity.import"), inspect(reason), nil, "error")
-            |> reload.(socket.assigns.workbench)
-        end
-    end
-  end
-
-  def finish_execution(socket, ref, result, reload, append_output) do
-    case Map.get(socket.assigns.import_editor_execution_task_refs, ref) do
-      nil ->
-        socket
-
-      definition_id ->
-        previous_state = Map.get(socket.assigns.import_editor_execution_states, definition_id, default_execution_state())
-
-        socket =
-          socket
-          |> assign(:import_editor_execution_task_refs, Map.delete(socket.assigns.import_editor_execution_task_refs, ref))
-
-        case result do
-          {:ok, execution_result} ->
-            socket
-            |> assign(
-              :import_editor_execution_states,
-              Map.put(socket.assigns.import_editor_execution_states, definition_id, %{
-                previous_state
-                | is_executing: false,
-                  completed: true,
-                  error: nil,
-                  current: previous_state.total,
-                  detail: nil,
-                  result: execution_result,
-                  ref: nil
-              })
-            )
-            |> append_output.(translated("activity.import"), translated("importAnalysis.importComplete", %{count: previous_state.count}), nil, "info")
-            |> reload.(socket.assigns.workbench)
-
-          {:error, %{message: message}} ->
-            socket
-            |> assign(
-              :import_editor_execution_states,
-              Map.put(socket.assigns.import_editor_execution_states, definition_id, %{
-                previous_state
-                | is_executing: false,
-                  completed: false,
-                  error: message,
-                  ref: nil
-              })
-            )
-            |> append_output.(translated("activity.import"), message, nil, "error")
-            |> reload.(socket.assigns.workbench)
-
-          {:error, reason} ->
-            message = inspect(reason)
-
-            socket
-            |> assign(
-              :import_editor_execution_states,
-              Map.put(socket.assigns.import_editor_execution_states, definition_id, %{
-                previous_state
-                | is_executing: false,
-                  completed: false,
-                  error: message,
-                  ref: nil
-              })
-            )
-            |> append_output.(translated("activity.import"), message, nil, "error")
-            |> reload.(socket.assigns.workbench)
-        end
-    end
-  end
-
-  def handle_task_down(socket, kind, ref, reason, reload, append_output) when reason not in [:normal, :shutdown] do
-    message = inspect(reason)
-
-    case kind do
-      :analysis ->
-        case Map.get(socket.assigns.import_editor_analysis_task_refs, ref) do
-          nil -> socket
-
-          definition_id ->
-            socket
-            |> assign(:import_editor_analysis_task_refs, Map.delete(socket.assigns.import_editor_analysis_task_refs, ref))
-            |> assign(:import_editor_analysis_states, Map.delete(socket.assigns.import_editor_analysis_states, definition_id))
-            |> append_output.(translated("activity.import"), message, nil, "error")
-            |> reload.(socket.assigns.workbench)
-        end
-
-      :execution ->
-        case Map.get(socket.assigns.import_editor_execution_task_refs, ref) do
-          nil -> socket
-
-          definition_id ->
-            previous_state = Map.get(socket.assigns.import_editor_execution_states, definition_id, default_execution_state())
-
-            socket
-            |> assign(:import_editor_execution_task_refs, Map.delete(socket.assigns.import_editor_execution_task_refs, ref))
-            |> assign(
-              :import_editor_execution_states,
-              Map.put(socket.assigns.import_editor_execution_states, definition_id, %{
-                previous_state
-                | is_executing: false,
-                  completed: false,
-                  error: message,
-                  ref: nil
-              })
-            )
-            |> append_output.(translated("activity.import"), message, nil, "error")
-            |> reload.(socket.assigns.workbench)
-        end
-    end
-  end
-
-  def handle_task_down(socket, _kind, _ref, _reason, _reload, _append_output), do: socket
 
   attr :import_editor, :map, required: true
 
@@ -1106,104 +734,6 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     """
   end
 
-  defp update_conflict_resolution(report, item_type, item_name, resolution) do
-    report
-    |> update_in([:conflicts], fn conflicts ->
-      Enum.map(conflicts || [], fn conflict ->
-        if conflict.item_type == item_type and conflict.item_name == item_name do
-          %{conflict | resolution: resolution}
-        else
-          conflict
-        end
-      end)
-    end)
-    |> update_in([:items], &update_conflict_bucket(&1, item_type, item_name, resolution))
-    |> update_in([:details], &update_conflict_bucket(&1, item_type, item_name, resolution))
-  end
-
-  defp update_conflict_bucket(nil, _item_type, _item_name, _resolution), do: nil
-
-  defp update_conflict_bucket(buckets, item_type, item_name, resolution) do
-    bucket_key = if(item_type == "page", do: :pages, else: if(item_type == "media", do: :media, else: :posts))
-
-    update_in(buckets, [bucket_key], fn items ->
-      Enum.map(items || [], fn item ->
-        identity = Map.get(item, :slug) || Map.get(item, :filename)
-
-        if identity == item_name do
-          Map.put(item, :resolution, resolution)
-        else
-          item
-        end
-      end)
-    end)
-  end
-
-  defp update_taxonomy_mapping(report, type, name, mapped_to) do
-    bucket_key = if(type == "categories", do: :categories, else: :tags)
-    normalized_value = mapped_to |> to_string() |> String.trim() |> blank_to_nil()
-
-    updated_report =
-      update_in(report, [:items, bucket_key], fn items ->
-        Enum.map(items || [], fn item ->
-          if item.name == name do
-            %{item | mapped_to: normalized_value}
-          else
-            item
-          end
-        end)
-      end)
-
-    Map.put(updated_report, stat_key(bucket_key), rebuild_taxonomy_stats(get_in(updated_report, [:items, bucket_key]) || []))
-  end
-
-  defp rebuild_taxonomy_stats(items) do
-    %{
-      existing_count: Enum.count(items, & &1.exists_in_project),
-      mapped_count: Enum.count(items, &(not &1.exists_in_project and present?(&1.mapped_to))),
-      new_count: Enum.count(items, &(not &1.exists_in_project and not present?(&1.mapped_to)))
-    }
-  end
-
-  defp stat_key(:categories), do: :category_stats
-  defp stat_key(:tags), do: :tag_stats
-
-  defp importable_counts(nil), do: %{total: 0, tags: 0, posts: 0, media: 0, pages: 0}
-
-  defp importable_counts(report) do
-    tag_count =
-      (Map.get(report.items, :categories, []) ++ Map.get(report.items, :tags, []))
-      |> Enum.count(&(not &1.exists_in_project and not present?(&1.mapped_to)))
-
-    posts = importable_entity_count(Map.get(report.items, :posts, []))
-    pages = importable_entity_count(Map.get(report.items, :pages, []))
-    media = importable_entity_count(Map.get(report.items, :media, []))
-
-    %{total: tag_count + posts + pages + media, tags: tag_count, posts: posts, media: media, pages: pages}
-  end
-
-  defp importable_entity_count(items) do
-    Enum.count(items || [], fn item ->
-      item.status == "new" or (item.status == "conflict" and Map.get(item, :resolution, "ignore") not in ["ignore", "skip"])
-    end)
-  end
-
-  defp detail_items(nil, _bucket), do: []
-
-  defp detail_items(report, bucket) do
-    get_in(report, [:details, bucket]) || get_in(report, [:items, bucket]) || []
-  end
-
-  defp execution_progress_width(state) do
-    current = Map.get(state, :current, 0)
-    total = Map.get(state, :total, 0)
-
-    cond do
-      total <= 0 -> 0
-      true -> min(current / total * 100, 100)
-    end
-  end
-
   defp joined_or_none(values) when is_list(values) and values != [], do: Enum.join(values, ", ")
   defp joined_or_none(_values), do: translated("importAnalysis.none")
 
@@ -1216,117 +746,6 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   defp total_stats(stats), do: stats.new_count + stats.update_count + stats.conflict_count + stats.duplicate_count
   defp total_media_stats(stats), do: total_stats(stats) + stats.missing_count
-
-  defp taxonomy_pill_class(item) do
-    cond do
-      item.exists_in_project -> "import-taxonomy-pill exists"
-      present?(item.mapped_to) -> "import-taxonomy-pill mapped"
-      true -> "import-taxonomy-pill new-tax"
-    end
-  end
-
-  defp taxonomy_item_editing?(%{type: type, name: name}, type, name), do: true
-  defp taxonomy_item_editing?(_edit, _type, _name), do: false
-
-  defp taxonomy_mapping_tooltip(item) do
-    action =
-      if present?(item.mapped_to),
-        do: translated("importAnalysis.mappingActionEdit"),
-        else: translated("importAnalysis.mappingActionAdd")
-
-    translated("importAnalysis.mappingTooltip", %{action: action})
-  end
-
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
-
-  defp translate_phase(step) when is_binary(step) do
-    case step do
-      "parsing" -> translated("importAnalysis.analysisPhase.parsing")
-      "scanning" -> translated("importAnalysis.analysisPhase.scanning")
-      "taxonomies" -> translated("importAnalysis.analysisPhase.taxonomies")
-      "posts" -> translated("importAnalysis.analysisPhase.posts")
-      "media" -> translated("importAnalysis.analysisPhase.media")
-      "complete" -> translated("importAnalysis.analysisPhase.complete")
-      other -> other
-    end
-  end
-
-  defp translate_phase(other), do: other
-
-  defp translate_execution_phase(phase) when is_binary(phase) do
-    case phase do
-      "tags" -> translated("importAnalysis.phase.tags")
-      "posts" -> translated("importAnalysis.phase.posts")
-      "media" -> translated("importAnalysis.phase.media")
-      "pages" -> translated("importAnalysis.phase.pages")
-      "complete" -> translated("importAnalysis.phase.complete")
-      other -> other
-    end
-  end
-
-  defp translate_execution_phase(other), do: other
-
-  defp decompose_progress_detail(%{detail: detail, eta: eta}), do: {to_string_or_nil(detail), eta}
-  defp decompose_progress_detail(detail) when is_binary(detail) or is_nil(detail), do: {detail, nil}
-  defp decompose_progress_detail(detail), do: {to_string_or_nil(detail), nil}
-
-  defp to_string_or_nil(nil), do: nil
-  defp to_string_or_nil(value) when is_binary(value), do: value
-  defp to_string_or_nil(value), do: inspect(value)
-
-  def format_eta(nil), do: nil
-
-  def format_eta(ms) when is_integer(ms) and ms >= 0 do
-    seconds = div(ms, 1000)
-
-    if seconds < 60 do
-      translated("importAnalysis.eta", %{value: translated("importAnalysis.etaSeconds", %{count: seconds})})
-    else
-      m = div(seconds, 60)
-      s = rem(seconds, 60)
-      translated("importAnalysis.eta", %{value: translated("importAnalysis.etaMinutes", %{minutes: m, seconds: s})})
-    end
-  end
-
-  def format_eta(_other), do: nil
-
-  defp present?(value), do: value not in [nil, ""]
-  defp blank?(value), do: value in [nil, ""]
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(value), do: value
-
-  defp default_analysis_state do
-    %{loading: false, step: nil, detail: nil, file_path: nil, ref: nil}
-  end
-
-  defp default_sections do
-    %{
-      post_conflicts: true,
-      page_conflicts: true,
-      posts: false,
-      other: false,
-      pages: false,
-      media: false,
-      taxonomy: true,
-      macros: true
-    }
-  end
-
-  defp default_execution_state do
-    %{
-      is_executing: false,
-      completed: false,
-      error: nil,
-      count: 0,
-      result: nil,
-      phase: nil,
-      current: 0,
-      total: 0,
-      detail: nil,
-      eta: nil,
-      ref: nil
-    }
-  end
 
   defp selected_model(assigns, definition_id) do
     Map.get(assigns.import_editor_selected_models, definition_id) || preferred_model(assigns)
@@ -1351,86 +770,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     end
   end
 
-  defp auto_mapped_count(previous_report, next_report) do
-    previous_count =
-      (Map.get(previous_report.items, :categories, []) ++ Map.get(previous_report.items, :tags, []))
-      |> Enum.count(&present?(&1.mapped_to))
-
-    next_count =
-      (Map.get(next_report.items, :categories, []) ++ Map.get(next_report.items, :tags, []))
-      |> Enum.count(&present?(&1.mapped_to))
-
-    max(next_count - previous_count, 0)
-  end
-
-  defp apply_taxonomy_mappings(report, analysis) do
-    report
-    |> update_in([:items, :categories], &apply_taxonomy_mapping_bucket(&1, Map.get(analysis, :category_mappings, %{})))
-    |> update_in([:items, :tags], &apply_taxonomy_mapping_bucket(&1, Map.get(analysis, :tag_mappings, %{})))
-    |> then(fn updated_report ->
-      updated_report
-      |> Map.put(:category_stats, rebuild_taxonomy_stats(get_in(updated_report, [:items, :categories]) || []))
-      |> Map.put(:tag_stats, rebuild_taxonomy_stats(get_in(updated_report, [:items, :tags]) || []))
-    end)
-  end
-
-  defp apply_taxonomy_mapping_bucket(items, mappings) do
-    Enum.map(items || [], fn item ->
-      case Map.fetch(mappings, item.name) do
-        {:ok, mapped_to} -> %{item | mapped_to: mapped_to}
-        :error -> item
-      end
-    end)
-  end
-
-  defp existing_taxonomy_terms(project_id) do
-    {:ok, metadata} = Metadata.get_project_metadata(project_id)
-
-    %{
-      categories: Enum.uniq(Map.get(metadata, :categories, []) || []),
-      tags: project_id |> Tags.list_tags() |> Enum.map(& &1.name) |> Enum.uniq()
-    }
-  end
-
-  defp normalize_taxonomy_mapping_value(project_id, type, mapped_to) do
-    normalized_value = mapped_to |> to_string() |> String.trim() |> blank_to_nil()
-
-    case normalized_value do
-      nil -> nil
-      value ->
-        project_id
-        |> existing_taxonomy_terms()
-        |> Map.get(String.to_existing_atom(type), [])
-        |> Enum.find(fn term -> String.downcase(term) == String.downcase(value) end)
-    end
-  end
-
-  defp maybe_put_option(opts, _key, nil), do: opts
-  defp maybe_put_option(opts, key, value), do: Keyword.put(opts, key, value)
-
-  defp default_author(project_id) do
-    {:ok, metadata} = Metadata.get_project_metadata(project_id)
-    Map.get(metadata, :default_author)
-  end
-
-  defp suggested_definition_name(report) do
-    get_in(report, [:site_info, :url]) || get_in(report, [:site_info, :title])
-  end
-
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
-
-  defp allow_repo_sandbox(pid) when is_pid(pid) do
-    if Code.ensure_loaded?(Ecto.Adapters.SQL.Sandbox) do
-      try do
-        Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), pid)
-      rescue
-        _error -> :ok
-      end
-    else
-      :ok
-    end
-
-    :ok
-  end
+  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  defp present?(value), do: value not in [nil, ""]
+  defp blank?(value), do: value in [nil, ""]
 end

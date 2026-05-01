@@ -2,7 +2,7 @@
 
 Living document. Each section lists **status**, then **open work in priority order**, then a brief notes block. Completed work is listed compactly at the bottom (`## Changelog`).
 
-Last refreshed: 2026-05-02.
+Last refreshed: 2026-05-03.
 
 ---
 
@@ -14,7 +14,6 @@ Last refreshed: 2026-05-02.
 
 | # | Module | Current lines | Target | Strategy |
 |---|---|---|---|---|
-| 3 | `BDS.Desktop.ShellLive.ImportEditor` | 1436 | ≤ 600 | Extract `ConflictResolution` (~150), `TaxonomyEditing` (~120), `AnalysisState` (~150), `ProgressTracking` (~120). Components stay in main file. |
 | 4 | `BDS.Rendering` | 838 | ≤ 200 | Extract `TemplateSelection` (~120), `PostRendering` (~180), `ListArchive` (~150), `Metadata` (~140), `LinksAndLanguages` (~100). Main keeps the 3 public renders. |
 | 5 | `BDS.Desktop.ShellLive.MenuEditor` | 871 | ≤ 350 | Extract `TreeOps` (~280), `TreePredicates` (~60), `DraftManagement` (~140), `PageCategory` (~120), `State` (~80). |
 | 6 | `BDS.Desktop.ShellLive.PostEditor` | 963 | ≤ 400 | Extract `DraftManagement` (~180), `ListValues` (~160), `Persistence` (~140), `PostMetadata` (~150). |
@@ -33,6 +32,7 @@ Last refreshed: 2026-05-02.
 - `BDS.Desktop.ShellLive` 2607 → 1545 (41 %)
 - `BDS.Maintenance` 810 → 141 (83 %)
 - `BDS.Media` 993 → 324 (67 %)
+- `BDS.Desktop.ShellLive.ImportEditor` 1436 → 776 (46 %)
 
 ---
 
@@ -165,6 +165,11 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ---
 
 ## Changelog
+
+### 2026-05-03
+
+- **God modules**:
+  - `BDS.Desktop.ShellLive.ImportEditor` 1436 → 776 (46 %). Submodules under `lib/bds/desktop/shell_live/import_editor/`: `ConflictResolution` (50, change_conflict_resolution + update_conflict_resolution + update_conflict_bucket), `TaxonomyEditing` (206, start/cancel/save/clear_taxonomy_edit + analyze_taxonomy_ai + update_taxonomy_mapping + rebuild_taxonomy_stats + stat_key + apply_taxonomy_mappings + apply_taxonomy_mapping_bucket + existing_taxonomy_terms + normalize_taxonomy_mapping_value + auto_mapped_count + taxonomy_pill_class + taxonomy_item_editing? + taxonomy_mapping_tooltip + maybe_put_option), `AnalysisState` (248, change_definition + select_uploads_folder + select_and_analyze + note_analysis_progress + finish_analysis + handle_analysis_task_down + importable_counts + importable_entity_count + detail_items + default_analysis_state + default_sections + default_author + suggested_definition_name + maybe_put + allow_repo_sandbox + translate_phase), `ProgressTracking` (246, execute_import + note_execution_progress + finish_execution + handle_task_down + default_execution_state + execution_progress_width + decompose_progress_detail + to_string_or_nil + format_eta + translate_execution_phase). Components (`import_editor`, `conflict_section`, `post_detail_section`, `media_detail_section`, `stat_card`, `other_stat_card`, `media_stat_card`, `taxonomy_stat_card`, `taxonomy_group`) stay in main file (587 lines of HEEx); main also keeps `assign_socket/1`, `toggle_section/3`, `toggle_model_selector/2`, `select_ai_model/3`, and the small `selected_model`/`selected_model_label`/`preferred_model` helpers tied to `assign_socket`. Public API preserved via `defdelegate` for the 14 event handlers called from `BDS.Desktop.ShellLive`. ProgressTracking calls back into AnalysisState for `default_author/1`, `importable_counts/1`, `allow_repo_sandbox/1`, and the `:analysis` branch of `handle_task_down/6`. The 600-line target was not reachable while keeping all 9 components in the main file (components alone are 587 lines).
 
 ### 2026-05-02
 
