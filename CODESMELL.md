@@ -2,7 +2,7 @@
 
 Living document. Each section lists **status**, then **open work in priority order**, then a brief notes block. Completed work is listed compactly at the bottom (`## Changelog`).
 
-Last refreshed: 2026-05-05.
+Last refreshed: 2026-05-06.
 
 ---
 
@@ -14,7 +14,6 @@ Last refreshed: 2026-05-05.
 
 | # | Module | Current lines | Target | Strategy |
 |---|---|---|---|---|
-| 6 | `BDS.Desktop.ShellLive.PostEditor` | 963 | ≤ 400 | Extract `DraftManagement` (~180), `ListValues` (~160), `Persistence` (~140), `PostMetadata` (~150). |
 | 7 | `BDS.Desktop.ShellLive.SettingsEditor` | 872 | ≤ 350 | Extract `ProjectSettings` (~140), `AISettings` (~150), `PublishingSettings` (~80), `ManagedCategories` (~140), `StyleEditor` (~80), `MCPConfig` (~60). |
 | 8 | `BDS.Desktop.ShellLive.ChatEditor` | 972 | ≤ 400 | Extract `ToolSurfaces` (~280), `ToolTracking` (~140), `MessageBuild` (~160), `ModelSelection` (~100). Defer — highest internal coupling. |
 | 9 | `BDS.MCP` | 677 | ≤ 350 | Split tools / resources / proposals / serialization clusters. (Carried over from original priority list.) |
@@ -33,6 +32,7 @@ Last refreshed: 2026-05-05.
 - `BDS.Desktop.ShellLive.ImportEditor` 1436 → 776 (46 %)
 - `BDS.Rendering` 838 → 33 (96 %)
 - `BDS.Desktop.ShellLive.MenuEditor` 871 → 335 (62 %)
+- `BDS.Desktop.ShellLive.PostEditor` 963 → 506 (47 %)
 
 ---
 
@@ -165,6 +165,11 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ---
 
 ## Changelog
+
+### 2026-05-06
+
+- **God modules**:
+  - `BDS.Desktop.ShellLive.PostEditor` 963 → 506 (47 %). Submodules under `lib/bds/desktop/shell_live/post_editor/`: `PostMetadata` (190, project_metadata + canonical_language + translations + languages + template_options + linked_media + post_links + translation_flags + footer + format_timestamp + display_title + gallery_count + preview_url + canonical_preview_path + pad2 + maybe_put_query + truthy? + blank? + blank_to_nil), `ListValues` (125, field_key + tag_values/category_values + tag_suggestions/category_suggestions + filter_suggestions + tag_chips + query_addable? + normalize_query + normalize_list_entry + ensure_list_value + csv_to_list + tag_chip_style + normalize_color + contrast_color + ai_overlay_fields), `DraftManagement` (183, normalize_mode + normalize_language + normalize_params + current_draft + persisted_form/3,4 + maybe_update_draft + put_draft_field + put_query_state + query_value + query_key + maybe_drop_old_language_draft + toggled_sections + put_nested_map + delete_nested_map + reload_with_assigned_workbench + save_state_for_action + record_title + record_status + editing_canonical_language?), `Persistence` (105, persist + discard + has_published_version? + discard_label + discard_title + save_canonical_draft + save_translation_draft + maybe_publish_post + maybe_publish_translation). Coordinator keeps the 16 public event handlers (assign_socket, update, persist_socket, discard_socket, delete_socket, set_mode, toggle_section, select_language, toggle_quick_actions, detect_language, translate, apply_ai_suggestions, insert_content, add_list_value, remove_list_value), build/1,2, and the HEEx-callable helpers (`translated/1,2`, `post_status_label/1`, `post_editor_save_state_label/1`, `post_editor_mode_label/1`); `tag_chip_style/1` is exposed via `defdelegate` so HEEx call sites stay unchanged. Cross-submodule deps form a runtime cycle between PostMetadata.canonical_language → DraftManagement.normalize_language and DraftManagement.persisted_form → PostMetadata.translations/canonical_language (compile-safe, no compile cycle). Persistence → DraftManagement + PostMetadata; ListValues is a leaf. Each submodule that needs it duplicates the small `translated/2`, `blank_to_nil/1`, `csv_to_list/1` helpers locally per the established convention. Submodules use `Phoenix.Component.assign/3` directly (only DraftManagement needs it). The 400-line target was not reachable while keeping all 16 public event handlers + build + HEEx helpers in the coordinator. Validates clean: `mix compile --warnings-as-errors`, `mix dialyzer --format short` (0 errors), `mix test` (342 tests, 0 failures, 4 skipped).
 
 ### 2026-05-05
 
