@@ -107,6 +107,7 @@
   "chat.welcomeTipTabs": "Beitragsstatistiken pro Jahr in Tabs mit Diagrammen",
   "chat.role.you": "Du",
   "chat.role.assistant": "Assistent",
+  "chat.modelUnavailable": "Kein Modell",
   "chat.inputPlaceholder": "Nachricht eingeben...",
   "chat.stop": "Stopp",
   "chat.toolArguments": "Argumente",

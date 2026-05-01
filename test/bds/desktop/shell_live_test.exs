@@ -2160,6 +2160,49 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert css =~ "position: static;"
   end
 
+  test "chat editor model selector uses effective model for new chats and persists selection" do
+    assert :ok = AI.set_airplane_mode(true)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:airplane, %{
+               url: "http://localhost:11434/v1",
+               api_key: nil,
+               model: "llama-default"
+             })
+
+    assert :ok = AI.put_model_preference(:airplane_chat, "llama-current")
+    assert {:ok, conversation} = AI.start_chat(%{title: "New Chat"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => "chat"
+      })
+
+    assert html =~ ~s(data-testid="chat-model-selector-button")
+    assert html =~ "llama-current"
+    refute html =~ ~s(<span>New Chat</span><span class="chat-model-selector-caret">▾</span>)
+
+    selector_html = render_click(view, "toggle_chat_model_selector", %{})
+    assert selector_html =~ ~s(class="chat-model-selector-menu")
+    assert selector_html =~ ~s(data-testid="chat-model-selector-option")
+    assert selector_html =~ "llama-current"
+
+    css = File.read!(Path.expand("../../../priv/ui/app.css", __DIR__))
+    assert css =~ ".chat-panel-title {"
+    assert css =~ "overflow: visible;"
+    refute css =~ ".chat-panel-title {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  overflow: hidden;"
+
+    render_click(view, "select_chat_model", %{"model" => "llama-next"})
+
+    assert AI.get_chat_conversation(conversation.id).model == "llama-next"
+    assert render(view) =~ "llama-next"
+  end
+
   test "chat editor renders legacy model controls, collapsed tool pills, and dismissible A2UI surfaces" do
     assert {:ok, conversation} = AI.start_chat(%{title: "Editor Chat", model: "gpt-4.1"})
 

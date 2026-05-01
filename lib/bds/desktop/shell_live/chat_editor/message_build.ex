@@ -15,12 +15,14 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
       %ChatConversation{} = conversation ->
         messages = AI.list_chat_messages(conversation.id)
         request = Map.get(assigns.chat_editor_requests, conversation.id)
-        available_models = AI.available_chat_models(conversation.model)
+        effective_model = AI.effective_chat_model(conversation)
+        available_models = AI.available_chat_models(effective_model)
 
         %{
           id: conversation.id,
           title: conversation.title || translated("chat.newChat"),
           model: conversation.model,
+          effective_model: effective_model,
           available_models: available_models,
           available_model_groups: ModelSelection.group_available_models(available_models),
           model_selector_open?:

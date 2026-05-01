@@ -105,6 +105,15 @@ defmodule BDS.AI.Chat do
     end)
   end
 
+  @spec effective_chat_model(ChatConversation.t() | map() | nil) :: String.t() | nil
+  def effective_chat_model(%ChatConversation{} = conversation) do
+    resolve_effective_chat_model(conversation.model)
+  end
+
+  def effective_chat_model(%{model: model}), do: resolve_effective_chat_model(model)
+  def effective_chat_model(%{"model" => model}), do: resolve_effective_chat_model(model)
+  def effective_chat_model(_conversation), do: resolve_effective_chat_model(nil)
+
   @spec set_conversation_model(String.t(), String.t()) ::
           {:ok, map()} | {:error, :not_found | Ecto.Changeset.t()}
   def set_conversation_model(conversation_id, model_id)
@@ -279,6 +288,25 @@ defmodule BDS.AI.Chat do
           context_window: nil,
           max_output_tokens: nil
         }
+    end
+  end
+
+  defp resolve_effective_chat_model(model) when is_binary(model) and model != "", do: model
+
+  defp resolve_effective_chat_model(_model) do
+    mode = if AI.airplane_mode?(), do: :airplane, else: :online
+
+    preference_key = if mode == :airplane, do: :airplane_chat, else: :chat
+
+    case Runtime.model_preference_value(preference_key) do
+      model when is_binary(model) and model != "" ->
+        model
+
+      _other ->
+        case AI.get_endpoint(mode) do
+          {:ok, %{model: model}} when is_binary(model) and model != "" -> model
+          _other -> nil
+        end
     end
   end
 

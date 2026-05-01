@@ -107,6 +107,7 @@
   "chat.welcomeTipTabs": "Afficher les statistiques par année dans des onglets avec graphiques",
   "chat.role.you": "Vous",
   "chat.role.assistant": "Assistant IA",
+  "chat.modelUnavailable": "Aucun modèle",
   "chat.inputPlaceholder": "Saisissez un message...",
     "chat.stop": "Arrêter",
     "chat.toolArguments": "Arguments",

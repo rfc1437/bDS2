@@ -169,6 +169,9 @@ defmodule BDS.AI do
   @spec available_chat_models(String.t() | nil) :: [map()]
   defdelegate available_chat_models(current_model \\ nil), to: Chat
 
+  @spec effective_chat_model(BDS.AI.ChatConversation.t() | map() | nil) :: String.t() | nil
+  defdelegate effective_chat_model(conversation), to: Chat
+
   @spec set_conversation_model(String.t(), String.t()) ::
           {:ok, map()} | {:error, :not_found | Ecto.Changeset.t()}
   defdelegate set_conversation_model(conversation_id, model_id), to: Chat

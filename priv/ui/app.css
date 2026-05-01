@@ -3565,7 +3565,7 @@ button svg * {
   display: flex;
   align-items: center;
   gap: 10px;
-  overflow: hidden;
+  overflow: visible;
   font-size: 14px;
   font-weight: 500;
   color: var(--vscode-foreground, inherit);
@@ -5145,7 +5145,7 @@ button svg * {
   display: flex;
   align-items: center;
   gap: 10px;
-  overflow: hidden;
+  overflow: visible;
   font-size: 14px;
   font-weight: 500;
   color: var(--vscode-foreground, inherit);

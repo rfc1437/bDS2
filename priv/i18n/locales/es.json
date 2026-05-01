@@ -107,6 +107,7 @@
   "chat.welcomeTipTabs": "Muestre estadísticas por año en pestañas con gráficos",
   "chat.role.you": "Tú",
   "chat.role.assistant": "Asistente",
+  "chat.modelUnavailable": "Sin modelo",
   "chat.inputPlaceholder": "Escribe un mensaje...",
   "chat.stop": "Detener",
   "chat.toolArguments": "Argumentos",

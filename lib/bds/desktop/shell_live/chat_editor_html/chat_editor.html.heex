@@ -17,7 +17,7 @@
             phx-click="toggle_chat_model_selector"
             data-testid="chat-model-selector-button"
           >
-            <span><%= @chat_editor.model || translated("chat.newChat") %></span>
+            <span><%= @chat_editor.effective_model || translated("chat.modelUnavailable") %></span>
             <span class="chat-model-selector-caret">▾</span>
           </button>
 
@@ -33,7 +33,7 @@
                     <button
                       class={[
                         "chat-model-selector-option",
-                        if(model.id == @chat_editor.model, do: "active")
+                        if(model.id == @chat_editor.effective_model, do: "active")
                       ]}
                       type="button"
                       phx-click="select_chat_model"
