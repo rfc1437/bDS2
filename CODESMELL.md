@@ -452,7 +452,18 @@ Total: 2245 lines now live in focused submodules; the remaining 647 in `BDS.Gene
   | `SessionUtil` | 49 | Workbench-session restore, project-name picker, task-result tracking |
 
   Coordinator (`shell_live.ex`) now 1545 lines containing only `mount/3`, `render/1`, `handle_event/3`, `handle_info/2` clauses, plus thin dispatchers and small editor-assign helpers.
-- ⏳ `BDS.Posts` (1781).
+- ⏳ `BDS.Posts` (1781 → 569, 68% reduction). Submodules extracted under `lib/bds/posts/`:
+
+  | Module | Lines | Responsibility |
+  |---|---|---|
+  | `Slugs` | 86 | `slug_available/3`, `unique_slug_for_title/3`, `unique`, `unique_for_import`, `default_source` |
+  | `AutoTranslation` | 176 | `maybe_schedule/1`, missing-language detection, post + cascading media auto-translate task scheduling |
+  | `FileSync` | 146 | Post/translation relative-path computation, frontmatter serialization, body extraction, on-disk delete |
+  | `TranslationValidation` | 464 | `validate/2`, `fix_invalid/1`, invalid DB/FS issue classification, legacy report fields, canonical-language helpers, markdown-file recursion |
+  | `RebuildFromFiles` | 320 | `rebuild_posts_from_files/2`, `import_orphan_post_file/2`, `import_orphan_post_translation_file/2`, `parse_rebuild_file`, `upsert_post_from_file`, `upsert_post_from_rebuild_file`, `upsert_post_translation_from_rebuild_file`, `progress_callback/1`, `report_rebuild_started/3`, `report_rebuild_progress/4`, `parse_post_status`, `parse_translation_status` |
+  | `Translations` | 279 | `publish_post_translation/2`, `list_post_translations/1`, `upsert_post_translation/3`, `delete_post_translation/1`, `sync_post_translation_from_file/1`, `rewrite_published_post_translation/1`, `publish_translation/2`, `publish_post_translations/1`, `normalize_translation_updates`, `maybe_reopen_source_post_for_manual_translation` |
+
+  Public API on `BDS.Posts` preserved via `defdelegate` for: `slug_available/3`, `unique_slug_for_title/3`, `validate_translations/2`, `fix_invalid_translations/1`, `rebuild_posts_from_files/2`, `import_orphan_post_file/2`, `import_orphan_post_translation_file/2`, `publish_post_translation/2`, `list_post_translations/1`, `upsert_post_translation/3`, `delete_post_translation/1`, `sync_post_translation_from_file/1`, `rewrite_published_post_translation/1`. Remaining clusters in posts.ex are core CRUD (`create_post`, `update_post`, `publish_post`, `delete_post`, `archive_post`, `discard_post_changes`, `sync_post_from_file`, `rewrite_published_post`, `editor_body`), small stats (`dashboard_stats`, `post_counts_by_year_month`, ~40 lines extractable), and `rebuild_post_links` (~22 lines). Stats could be split next, but ~569 lines is a reasonable steady state.
 - ⏳ `BDS.AI` (1711).
 - ⏳ `BDS.MCP` (677).
 
