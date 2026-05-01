@@ -44,6 +44,11 @@ defmodule BDS.Desktop.MainWindowTest do
     assert MainWindow.restore_bounds() == %{x: 120, y: 80, width: 1260, height: 820}
   end
 
+  test "window id and watcher process name do not collide" do
+    assert MainWindow.window_id() == BDS.Desktop.MainWindow
+    assert MainWindow.server_name() == BDS.Desktop.MainWindow.Watcher
+  end
+
   test "window options clamp oversized startup bounds to the visible client area" do
     desktop = Application.get_env(:bds, :desktop, [])
 
@@ -77,5 +82,23 @@ defmodule BDS.Desktop.MainWindowTest do
              "width" => 900,
              "height" => 700
            }
+  end
+
+  test "persist timer keeps last bounds when the wx frame is already gone", %{path: path} do
+    bounds = %{x: 166, y: 57, width: 1280, height: 780}
+
+    assert {:noreply, state} =
+             MainWindow.handle_info(:persist_bounds, %{
+               frame: :invalid_wx_frame,
+               last_bounds: bounds
+             })
+
+    assert state.last_bounds == bounds
+
+    refute File.exists?(path)
+  end
+
+  test "persist now is harmless when the window watcher is not running" do
+    assert :ok = MainWindow.persist_now()
   end
 end

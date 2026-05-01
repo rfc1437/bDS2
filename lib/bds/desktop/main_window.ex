@@ -6,16 +6,24 @@ defmodule BDS.Desktop.MainWindow do
   alias Desktop.Window
 
   @window_id __MODULE__
+  @server_name BDS.Desktop.MainWindow.Watcher
   @persist_interval_ms 1_000
   @default_size {1280, 780}
   @default_min_size {800, 600}
   @state_file "window-state.json"
 
   def start_link(_opts) do
-    GenServer.start_link(__MODULE__, :ok)
+    GenServer.start_link(__MODULE__, :ok, name: @server_name)
   end
 
   def window_id, do: @window_id
+  def server_name, do: @server_name
+
+  def persist_now(timeout \\ 100) do
+    GenServer.call(@server_name, :persist_bounds_now, timeout)
+  catch
+    :exit, _reason -> :ok
+  end
 
   def window_options(extra_opts \\ []) do
     desktop_config = Application.get_env(:bds, :desktop, [])
@@ -91,6 +99,11 @@ defmodule BDS.Desktop.MainWindow do
   end
 
   @impl true
+  def handle_call(:persist_bounds_now, _from, state) do
+    {:reply, :ok, persist_current_bounds(state)}
+  end
+
+  @impl true
   def terminate(_reason, %{last_bounds: last_bounds}) do
     if bounds = last_bounds do
       _ = persist_bounds(bounds)
@@ -101,6 +114,16 @@ defmodule BDS.Desktop.MainWindow do
 
   defp schedule_persist do
     Process.send_after(self(), :persist_bounds, @persist_interval_ms)
+  end
+
+  defp persist_current_bounds(%{frame: frame} = state) do
+    next_bounds = current_bounds(frame) || state.last_bounds
+
+    if next_bounds do
+      _ = persist_bounds(next_bounds)
+    end
+
+    %{state | last_bounds: next_bounds}
   end
 
   defp apply_restored_bounds(frame) do
@@ -127,23 +150,30 @@ defmodule BDS.Desktop.MainWindow do
   defp current_bounds(nil), do: nil
 
   defp current_bounds(frame) do
-    with_wx_env(fn ->
-      cond do
-        not :wxWindow.isShown(frame) ->
-          nil
+    try do
+      with_wx_env(fn ->
+        cond do
+          not :wxWindow.isShown(frame) ->
+            nil
 
-        :wxTopLevelWindow.isFullScreen(frame) ->
-          nil
+          :wxTopLevelWindow.isFullScreen(frame) ->
+            nil
 
-        :wxTopLevelWindow.isMaximized(frame) ->
-          nil
+          :wxTopLevelWindow.isMaximized(frame) ->
+            nil
 
-        true ->
-          {x, y} = :wxWindow.getPosition(frame)
-          {width, height} = :wxWindow.getSize(frame)
-          %{x: x, y: y, width: width, height: height}
-      end
-    end)
+          true ->
+            {x, y} = :wxWindow.getPosition(frame)
+            {width, height} = :wxWindow.getSize(frame)
+            %{x: x, y: y, width: width, height: height}
+        end
+      end)
+    rescue
+      ErlangError -> nil
+      FunctionClauseError -> nil
+    catch
+      :exit, _reason -> nil
+    end
   end
 
   defp with_wx_env(fun) do

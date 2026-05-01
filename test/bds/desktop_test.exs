@@ -10,6 +10,13 @@ defmodule BDS.DesktopTest do
     end
   end
 
+  defmodule FakeWindowQuit do
+    def quit do
+      send(Application.fetch_env!(:bds, :desktop_shutdown_test_pid), :window_quit_requested)
+      :ok
+    end
+  end
+
   test "desktop configuration no longer uses a pending adapter" do
     assert Application.get_env(:bds, BDS.Application)[:desktop_adapter] == :desktop
   end
@@ -136,6 +143,29 @@ defmodule BDS.DesktopTest do
 
     assert {:noreply, %{}} = BDS.Desktop.Menu.handle_event("quit", %{})
     assert_receive :quit_requested
+  end
+
+  test "cmd-q remains handled by the desktop window quit handler" do
+    refute function_exported?(BDS.Desktop.Shutdown, :command_menu_selected, 2)
+  end
+
+  test "app-owned shutdown delegates final termination to the desktop hard quit path" do
+    previous_module = Application.get_env(:bds, :desktop_shutdown_module)
+    previous_quit_module = Application.get_env(:bds, :desktop_window_quit_module)
+    previous_pid = Application.get_env(:bds, :desktop_shutdown_test_pid)
+
+    Application.put_env(:bds, :desktop_shutdown_module, BDS.Desktop.Shutdown)
+    Application.put_env(:bds, :desktop_window_quit_module, FakeWindowQuit)
+    Application.put_env(:bds, :desktop_shutdown_test_pid, self())
+
+    on_exit(fn ->
+      restore_env(:desktop_shutdown_module, previous_module)
+      restore_env(:desktop_window_quit_module, previous_quit_module)
+      restore_env(:desktop_shutdown_test_pid, previous_pid)
+    end)
+
+    assert :ok = BDS.Desktop.Shutdown.request_quit()
+    assert_receive :window_quit_requested
   end
 
   test "desktop root html is a LiveView shell and references only the live bootstrap assets" do
