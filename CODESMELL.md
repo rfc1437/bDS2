@@ -436,7 +436,22 @@ Total: 2245 lines now live in focused submodules; the remaining 647 in `BDS.Gene
 **Remaining work in this priority:**
 
 - ✅ `BDS.Generation` — done (76% reduction, 647 lines remaining is acceptable for a coordinator).
-- ⏳ `BDS.Desktop.ShellLive` (2607) — next target.
+- 🔄 `BDS.Desktop.ShellLive` (2607 → 1545, 41% reduction). Submodules extracted under `lib/bds/desktop/shell_live/`:
+
+  | Module | Lines | Responsibility |
+  |---|---|---|
+  | `TitlebarMenu` | 181 | Menu group definition, dropdown items, open/close/hover/keydown |
+  | `CliSync` | 133 | CLI watcher entity-change application + tab refresh |
+  | `PanelRenderer` | 290 | Tasks/output/post-links/git-log panel rendering + editor toolbar |
+  | `TabHelpers` | 99 | Tab title/subtitle/icon, route atom mapping, post/media labels |
+  | `TaskLocalization` | 80 | Task status localization, editor-meta translation |
+  | `ChatSurface` | 233 | Chat-surface action dispatch, assistant message helpers |
+  | `SidebarCreate` | 131 | New post/media/script/template/import sidebar creation |
+  | `Layout` | 53 | Sync-layout, resize-panel, parse-width, ignore-shortcut |
+  | `ShellCommandRunner` | 95 | `apply_shell_command` + `apply_result` dispatch |
+  | `SessionUtil` | 49 | Workbench-session restore, project-name picker, task-result tracking |
+
+  Coordinator (`shell_live.ex`) now 1545 lines containing only `mount/3`, `render/1`, `handle_event/3`, `handle_info/2` clauses, plus thin dispatchers and small editor-assign helpers.
 - ⏳ `BDS.Posts` (1781).
 - ⏳ `BDS.AI` (1711).
 - ⏳ `BDS.MCP` (677).

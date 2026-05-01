@@ -121,12 +121,14 @@ defmodule BDS.UI.ShellTest do
   test "desktop shell assets persist workbench layout per project" do
     live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
+    session_util_ex =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/session_util.ex")
 
     assert live_js =~ "bds-workbench-"
     assert live_js =~ "restore_workbench_session"
     assert live_js =~ "dataset.workbenchSession"
     assert live_ex =~ ~s(def handle_event("restore_workbench_session")
-    assert live_ex =~ "Session.restore"
+    assert session_util_ex =~ "Session.restore"
     assert live_ex =~ "encoded_workbench_session"
   end
 

@@ -41,14 +41,14 @@
                 data-testid="window-titlebar-menu-dropdown"
                 phx-click-away="close_titlebar_menu"
               >
-                <%= for item <- titlebar_menu_dropdown_items(group) do %>
+                <%= for item <- BDS.Desktop.ShellLive.TitlebarMenu.dropdown_items(group) do %>
                   <%= if item.separator do %>
                     <div class="window-titlebar-menu-separator" role="separator"></div>
                   <% else %>
                     <button
                       class={[
                         "window-titlebar-menu-item",
-                        if(titlebar_menu_item_active?(group, item, @titlebar_menu_item_index), do: "is-keyboard-active")
+                        if(BDS.Desktop.ShellLive.TitlebarMenu.item_active?(group, item, @titlebar_menu_item_index), do: "is-keyboard-active")
                       ]}
                       data-testid="window-titlebar-menu-item"
                       data-menu-action={item.id}
@@ -237,8 +237,8 @@
                   phx-value-type={tab.type}
                   phx-value-id={tab.id}
                 >
-                  <span class="tab-icon"><%= raw(ShellData.activity_icon(tab_icon_id(tab))) %></span>
-                  <span class="tab-title"><%= tab_title(tab, @tab_meta) %></span>
+                  <span class="tab-icon"><%= raw(ShellData.activity_icon(BDS.Desktop.ShellLive.TabHelpers.tab_icon_id(tab))) %></span>
+                  <span class="tab-title"><%= BDS.Desktop.ShellLive.TabHelpers.tab_title(tab, @tab_meta) %></span>
                 </button>
                 <div class="tab-actions">
                   <%= if Workbench.dirty?(@workbench, tab.type, tab.id) do %>
@@ -383,7 +383,7 @@
         <% else %>
           <%= cond do %>
             <% @current_tab.type == :post and @post_editor -> %>
-              <PostEditor.post_editor post_editor={@post_editor} toolbar_buttons={editor_toolbar_buttons(@current_tab)} />
+              <PostEditor.post_editor post_editor={@post_editor} toolbar_buttons={BDS.Desktop.ShellLive.PanelRenderer.editor_toolbar_buttons(@current_tab)} />
 
             <% @current_tab.type == :media and @media_editor -> %>
               <MediaEditor.media_editor media_editor={@media_editor} />
@@ -418,14 +418,14 @@
             <% true -> %>
               <div class="editor-frame">
                 <section class="editor-main">
-                  <div class="editor-kicker"><%= tab_route_label(@current_tab) %></div>
-                  <h1 class="editor-title" data-testid="editor-title"><%= tab_title(@current_tab, @tab_meta) %></h1>
-                  <p class="editor-subtitle"><%= tab_subtitle(@current_tab, @tab_meta) %></p>
+                  <div class="editor-kicker"><%= BDS.Desktop.ShellLive.TabHelpers.tab_route_label(@current_tab) %></div>
+                  <h1 class="editor-title" data-testid="editor-title"><%= BDS.Desktop.ShellLive.TabHelpers.tab_title(@current_tab, @tab_meta) %></h1>
+                  <p class="editor-subtitle"><%= BDS.Desktop.ShellLive.TabHelpers.tab_subtitle(@current_tab, @tab_meta) %></p>
 
-                  <%= render_editor_toolbar(assigns) %>
+                  <%= BDS.Desktop.ShellLive.PanelRenderer.render_editor_toolbar(assigns) %>
 
                   <div class="editor-section">
-                    <h2><%= tab_title(@current_tab, @tab_meta) %></h2>
+                    <h2><%= BDS.Desktop.ShellLive.TabHelpers.tab_title(@current_tab, @tab_meta) %></h2>
                     <p>Desktop workbench content routed through the Elixir shell.</p>
                   </div>
                 </section>
@@ -469,7 +469,7 @@
           </button>
         </div>
         <div class="panel-content">
-          <%= render_panel_body(assigns) %>
+          <%= BDS.Desktop.ShellLive.PanelRenderer.render_panel_body(assigns) %>
         </div>
       </section>
     </main>
@@ -498,13 +498,13 @@
           <section class="assistant-sidebar-context" data-testid="assistant-context">
             <div class="assistant-sidebar-context-row">
               <span class="assistant-sidebar-context-label"><%= translated("Project") %></span>
-              <span class="assistant-sidebar-context-value"><%= assistant_project_name(@current_project) %></span>
+              <span class="assistant-sidebar-context-value"><%= BDS.Desktop.ShellLive.ChatSurface.assistant_project_name(@current_project) %></span>
             </div>
             <div class="assistant-sidebar-context-row">
               <span class="assistant-sidebar-context-label"><%= translated("Editor") %></span>
-              <span class="assistant-sidebar-context-value"><%= tab_title(@current_tab, @tab_meta) %></span>
+              <span class="assistant-sidebar-context-value"><%= BDS.Desktop.ShellLive.TabHelpers.tab_title(@current_tab, @tab_meta) %></span>
             </div>
-            <p class="assistant-sidebar-context-text"><%= tab_subtitle(@current_tab, @tab_meta) %></p>
+            <p class="assistant-sidebar-context-text"><%= BDS.Desktop.ShellLive.TabHelpers.tab_subtitle(@current_tab, @tab_meta) %></p>
           </section>
 
           <form
@@ -545,9 +545,9 @@
               <%= for message <- @assistant_messages do %>
                 <article
                   class={["assistant-sidebar-message", message.role]}
-                  data-testid={assistant_message_testid(message.role)}
+                  data-testid={BDS.Desktop.ShellLive.ChatSurface.assistant_message_testid(message.role)}
                 >
-                  <span class="assistant-sidebar-message-role"><%= assistant_message_label(message.role) %></span>
+                  <span class="assistant-sidebar-message-role"><%= BDS.Desktop.ShellLive.ChatSurface.assistant_message_label(message.role) %></span>
                   <p class="assistant-sidebar-message-content"><%= message.content %></p>
                 </article>
               <% end %>

@@ -7,27 +7,34 @@ defmodule BDS.Desktop.ShellLive do
 
   alias BDS.AI
   alias BDS.CliSync.Watcher
-  alias BDS.Desktop.{FilePicker, FolderPicker, Overlay, ShellCommands, ShellData}
+  alias BDS.Desktop.{FolderPicker, Overlay, ShellData}
   alias BDS.Desktop.ShellLive.{ChatEditor, CodeEntityEditor, ImportEditor, MediaEditor, MenuEditor, MiscEditor, SettingsEditor, TagsEditor}
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
   alias BDS.Desktop.ShellLive.PostEditor
   alias BDS.Desktop.ShellLive.SidebarComponents, as: ShellSidebarComponents
   alias BDS.Desktop.ShellLive.SidebarState, as: ShellSidebarState
-  alias BDS.Desktop.MenuBar, as: DesktopMenuBar
-  alias BDS.Git
-  alias BDS.ImportDefinitions
-  alias BDS.Media.Media
-  alias BDS.PostLinks
-  alias BDS.Posts.Post
+  alias BDS.Desktop.ShellLive.{ChatSurface, CliSync, Layout, SessionUtil, ShellCommandRunner, SidebarCreate, TabHelpers, TaskLocalization, TitlebarMenu}
+  import TaskLocalization,
+    only: [
+      localize_task_status: 2,
+      translate_for_socket: 2
+    ]
+  import TabHelpers,
+    only: [
+      tab_title: 2,
+      tab_subtitle: 2,
+      tab_id_for_route: 2,
+      tab_intent: 2,
+      sidebar_route_atom: 1,
+      parse_integer: 1
+    ]
   alias BDS.Projects
   alias BDS.Repo
-  alias BDS.Scripts
   alias BDS.Templates
-  alias BDS.UI.{Commands, MenuBar, Registry, Session, Workbench}
+  alias BDS.UI.{Commands, MenuBar, Session, Workbench}
 
   @refresh_interval 1_500
   @output_entry_limit 20
-  @default_new_project_name "New Blog"
   @local_menu_actions MapSet.new([
                        :toggle_sidebar,
                        :toggle_panel,
@@ -60,11 +67,11 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:page_language, ShellData.ui_language())
       |> assign(:client_shortcuts, Commands.client_shortcuts())
     |> assign(:offline_mode, if(connected, do: AI.airplane_mode?(true), else: true))
-      |> assign(:handled_task_results, initial_handled_task_results())
+      |> assign(:handled_task_results, SessionUtil.initial_handled_task_results())
       |> assign(:assistant_prompt, "")
       |> assign(:assistant_messages, [])
     |> assign(:is_mac_ui, mac_ui?())
-    |> assign(:menu_groups, titlebar_menu_groups())
+    |> assign(:menu_groups, TitlebarMenu.groups())
     |> assign(:titlebar_menu_group, nil)
       |> assign(:titlebar_menu_item_index, nil)
      |> assign(:tab_meta, %{})
@@ -158,11 +165,11 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("sync_layout", params, socket) do
-    {:noreply, reload_shell(socket, sync_layout(socket.assigns.workbench, params))}
+    {:noreply, reload_shell(socket, Layout.sync(socket.assigns.workbench, params))}
   end
 
   def handle_event("resize_panel", %{"target" => target, "width" => width}, socket) do
-    {:noreply, reload_shell(socket, resize_panel(socket.assigns.workbench, target, width))}
+    {:noreply, reload_shell(socket, Layout.resize(socket.assigns.workbench, target, width))}
   end
 
   def handle_event("toggle_sidebar_filters", _params, socket) do
@@ -313,7 +320,7 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("shortcut", params, socket) do
-    if ignore_shortcut?(params) do
+    if Layout.ignore_shortcut?(params) do
       {:noreply, socket}
     else
       {:noreply, reload_shell(socket, Commands.handle_shortcut(socket.assigns.workbench, params))}
@@ -388,7 +395,7 @@ defmodule BDS.Desktop.ShellLive do
       else
         socket
         |> assign(:assistant_prompt, "")
-        |> assign(:assistant_messages, socket.assigns.assistant_messages ++ assistant_turn(prompt, socket))
+        |> assign(:assistant_messages, socket.assigns.assistant_messages ++ ChatSurface.assistant_turn(prompt, socket))
       end
 
     {:noreply, socket}
@@ -759,7 +766,7 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("open_chat_settings", _params, socket) do
     {:noreply,
      socket
-     |> clear_chat_action_error()
+     |> ChatSurface.clear_action_error()
      |> open_sidebar_item(%{"route" => "settings", "id" => "settings-ai", "title" => "Settings", "subtitle" => "AI"}, :pin)}
   end
 
@@ -772,7 +779,11 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("chat_surface_action", params, socket) do
-    {:noreply, handle_chat_surface_action(socket, params)}
+    {:noreply,
+     ChatSurface.handle_action(socket, params, %{
+       reload: &reload_shell/2,
+       open_sidebar: &open_sidebar_item/3
+     })}
   end
 
   def handle_event("change_import_editor_definition", %{"import_definition" => params}, socket) do
@@ -1115,7 +1126,7 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("create_project", _params, socket) do
-    attrs = %{name: next_project_name(socket.assigns.projects.projects)}
+    attrs = %{name: SessionUtil.next_project_name(socket.assigns.projects.projects)}
 
     socket =
       case Projects.create_project(attrs) do
@@ -1156,7 +1167,7 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("restore_workbench_session", %{"session" => session_payload}, socket) when is_map(session_payload) do
-    {:noreply, reload_shell(socket, restore_workbench_session(session_payload))}
+    {:noreply, reload_shell(socket, SessionUtil.restore_workbench_session(session_payload))}
   end
 
   def handle_event("native_menu_action", %{"action" => action}, socket) do
@@ -1164,36 +1175,25 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("titlebar_menu_keydown", %{"key" => key}, socket) do
-    {:noreply, handle_titlebar_menu_keydown(socket, key)}
+    {:noreply, TitlebarMenu.handle_keydown(socket, key, &handle_native_menu_action/2)}
   end
 
   def handle_event("toggle_titlebar_menu", %{"group" => group}, socket) do
-    {:noreply,
-     if(socket.assigns.titlebar_menu_group == group,
-       do: close_titlebar_menu(socket),
-       else: open_titlebar_menu(socket, group)
-     )}
+    {:noreply, TitlebarMenu.toggle(socket, group)}
   end
 
   def handle_event("hover_titlebar_menu", %{"group" => group}, socket) do
-    socket =
-      if socket.assigns.titlebar_menu_group do
-        open_titlebar_menu(socket, group)
-      else
-        socket
-      end
-
-    {:noreply, socket}
+    {:noreply, TitlebarMenu.hover(socket, group)}
   end
 
   def handle_event("close_titlebar_menu", _params, socket) do
-    {:noreply, close_titlebar_menu(socket)}
+    {:noreply, TitlebarMenu.close(socket)}
   end
 
   def handle_event("titlebar_menu_action", %{"action" => action}, socket) do
     {:noreply,
      socket
-     |> close_titlebar_menu()
+     |> TitlebarMenu.close()
      |> handle_native_menu_action(action)}
   end
 
@@ -1253,13 +1253,13 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_info({:entity_changed, payload}, socket) when is_map(payload) do
-    {:noreply, apply_cli_entity_change(socket, payload)}
+    {:noreply, CliSync.apply_entity_change(socket, payload, &reload_shell/2)}
   end
 
   def handle_info(:refresh_task_status, socket) do
     raw_task_status = BDS.Tasks.status_snapshot()
 
-    case next_completed_task_result(socket, raw_task_status) do
+    case SessionUtil.next_completed_task_result(socket, raw_task_status) do
       nil ->
         task_status = localize_task_status(raw_task_status, socket.assigns.page_language)
 
@@ -1278,7 +1278,7 @@ defmodule BDS.Desktop.ShellLive do
       task ->
         {:noreply,
          socket
-         |> mark_task_result_handled(task.id)
+         |> SessionUtil.mark_task_result_handled(task.id)
          |> apply_shell_command_result(task.result)}
     end
   end
@@ -1332,7 +1332,7 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:activity_buttons, activity_buttons)
     |> assign(:panel_tabs, ShellData.panel_tabs(workbench))
     |> assign(:supported_ui_languages, ShellData.supported_ui_languages())
-    |> assign(:menu_groups, socket.assigns[:menu_groups] || titlebar_menu_groups())
+    |> assign(:menu_groups, socket.assigns[:menu_groups] || TitlebarMenu.groups())
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
     |> assign(:current_tab, current_tab(workbench))
     |> assign_post_editor()
@@ -1344,298 +1344,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign_chat_editor()
     |> assign_import_editor()
     |> assign_misc_editor()
-  end
-
-  defp apply_cli_entity_change(socket, payload) do
-    entity = Map.get(payload, :entity) || Map.get(payload, "entity") || Map.get(payload, :entity_type) || Map.get(payload, "entity_type")
-    entity_id = Map.get(payload, :entity_id) || Map.get(payload, "entity_id") || Map.get(payload, :entityId) || Map.get(payload, "entityId")
-    action = normalize_cli_entity_action(Map.get(payload, :action) || Map.get(payload, "action"))
-
-    if is_binary(entity) and entity != "" and is_binary(entity_id) and entity_id != "" and action in [:created, :updated, :deleted] do
-      {socket, workbench} = maybe_close_deleted_cli_tab(socket, entity, entity_id, action)
-
-      socket
-      |> maybe_refresh_cli_tab_meta(entity, entity_id, action)
-      |> reload_shell(workbench)
-    else
-      socket
-    end
-  end
-
-  defp maybe_close_deleted_cli_tab(socket, "post", post_id, :deleted) do
-    workbench = Workbench.close_tab(socket.assigns.workbench, :post, post_id)
-
-    socket =
-      socket
-      |> assign(:workbench, workbench)
-      |> assign(:shell_overlay, nil)
-      |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:post, post_id}))
-      |> assign(:post_editor_drafts, Map.delete(socket.assigns.post_editor_drafts, post_id))
-      |> assign(:post_editor_active_languages, Map.delete(socket.assigns.post_editor_active_languages, post_id))
-      |> assign(:post_editor_tag_queries, Map.delete(socket.assigns.post_editor_tag_queries, post_id))
-      |> assign(:post_editor_category_queries, Map.delete(socket.assigns.post_editor_category_queries, post_id))
-      |> assign(:post_editor_quick_actions_open, Map.delete(socket.assigns.post_editor_quick_actions_open, post_id))
-      |> assign(:post_editor_modes, Map.delete(socket.assigns.post_editor_modes, post_id))
-      |> assign(:post_editor_expanded, Map.delete(socket.assigns.post_editor_expanded, post_id))
-      |> assign(:post_editor_save_states, Map.delete(socket.assigns.post_editor_save_states, post_id))
-
-    {socket, workbench}
-  end
-
-  defp maybe_close_deleted_cli_tab(socket, "media", media_id, :deleted) do
-    workbench = Workbench.close_tab(socket.assigns.workbench, :media, media_id)
-
-    socket =
-      socket
-      |> assign(:workbench, workbench)
-      |> assign(:shell_overlay, nil)
-      |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:media, media_id}))
-      |> assign(:media_editor_drafts, Map.delete(socket.assigns.media_editor_drafts, media_id))
-      |> assign(:media_editor_quick_actions_open, Map.delete(socket.assigns.media_editor_quick_actions_open, media_id))
-      |> assign(:media_editor_post_pickers_open, Map.delete(socket.assigns.media_editor_post_pickers_open, media_id))
-      |> assign(:media_editor_post_picker_queries, Map.delete(socket.assigns.media_editor_post_picker_queries, media_id))
-      |> assign(:media_editor_save_states, Map.delete(socket.assigns.media_editor_save_states, media_id))
-      |> assign(:media_editor_translation_forms, Map.delete(socket.assigns.media_editor_translation_forms, media_id))
-
-    {socket, workbench}
-  end
-
-  defp maybe_close_deleted_cli_tab(socket, _entity, _entity_id, _action), do: {socket, socket.assigns.workbench}
-
-  defp maybe_refresh_cli_tab_meta(socket, "post", post_id, action) when action in [:created, :updated] do
-    maybe_put_cli_tab_meta(socket, :post, post_id, fn ->
-      case Repo.get(Post, post_id) do
-        %Post{} = post -> %{title: post.title || post.slug || post.id, subtitle: Atom.to_string(post.status || :draft)}
-        _other -> nil
-      end
-    end)
-  end
-
-  defp maybe_refresh_cli_tab_meta(socket, "media", media_id, action) when action in [:created, :updated] do
-    maybe_put_cli_tab_meta(socket, :media, media_id, fn ->
-      case Repo.get(Media, media_id) do
-        %Media{} = media -> %{title: media.title || media.filename || media.id, subtitle: media.filename || media.mime_type || "media"}
-        _other -> nil
-      end
-    end)
-  end
-
-  defp maybe_refresh_cli_tab_meta(socket, _entity, _entity_id, _action), do: socket
-
-  defp maybe_put_cli_tab_meta(socket, route, entity_id, meta_fun) do
-    key = {route, entity_id}
-
-    if cli_tab_present?(socket.assigns.workbench, key) or Map.has_key?(socket.assigns.tab_meta, key) do
-      case meta_fun.() do
-        %{} = fresh_meta ->
-          updated_meta = Map.update(socket.assigns.tab_meta, key, fresh_meta, &Map.merge(&1, fresh_meta))
-          assign(socket, :tab_meta, updated_meta)
-
-        _other ->
-          socket
-      end
-    else
-      socket
-    end
-  end
-
-  defp cli_tab_present?(%{tabs: tabs}, {route, entity_id}) do
-    Enum.any?(tabs, &(&1.type == route and &1.id == entity_id))
-  end
-
-  defp normalize_cli_entity_action(action) when action in [:created, :updated, :deleted], do: action
-
-  defp normalize_cli_entity_action(action) do
-    action
-    |> to_string()
-    |> String.downcase()
-    |> case do
-      "created" -> :created
-      "updated" -> :updated
-      "deleted" -> :deleted
-      _other -> :unknown
-    end
-  end
-
-  defp render_panel_body(assigns) do
-    case assigns.workbench.panel.active_tab do
-      :tasks -> render_task_entries(assigns)
-      :output -> render_output_entries(assigns)
-      :post_links -> render_post_links(assigns)
-      :git_log -> render_git_log(assigns)
-      other -> render_generic_panel(assigns, other)
-    end
-  end
-
-  defp render_editor_toolbar(assigns) do
-    buttons = editor_toolbar_buttons(assigns.current_tab)
-    assigns = assign(assigns, :editor_toolbar_buttons, buttons)
-
-    ~H"""
-    <%= if Enum.any?(@editor_toolbar_buttons) do %>
-      <div class="editor-toolbar">
-        <%= for button <- @editor_toolbar_buttons do %>
-          <button
-            class={["editor-toolbar-button", if(button.destructive, do: "is-destructive")]}
-            data-testid="editor-toolbar-overlay-button"
-            type="button"
-            phx-click="open_overlay"
-            phx-value-kind={button.kind}
-          >
-            <%= translated(button.label) %>
-          </button>
-        <% end %>
-      </div>
-    <% end %>
-    """
-  end
-
-  defp render_task_entries(assigns) do
-    ~H"""
-    <%= if Enum.empty?(Map.get(@task_status, :tasks, [])) do %>
-      <div class="panel-entry panel-empty-state">
-        <strong><%= translated("Tasks") %></strong>
-        <span><%= translated("No background tasks running") %></span>
-      </div>
-    <% else %>
-      <div class="task-list">
-        <%= for task <- Map.get(@task_status, :tasks, []) do %>
-          <div class="panel-entry task-entry">
-            <div class="task-entry-header">
-              <strong><%= task.name %></strong>
-              <span class={"task-status task-status-#{task.status}"}><%= Map.get(task, :status_label, task.status |> to_string() |> String.capitalize()) %></span>
-            </div>
-            <span><%= task.message || task.group_name || "" %></span>
-            <%= if is_number(task.progress) do %>
-              <div class="task-progress-row">
-                <progress max="1" value={task.progress}></progress>
-                <span><%= Map.get(task, :progress_label, progress_percent(task.progress)) %></span>
-              </div>
-            <% end %>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
-    """
-  end
-
-  defp render_output_entries(assigns) do
-    ~H"""
-    <%= if Enum.empty?(@output_entries) do %>
-      <div class="panel-entry panel-empty-state output-list">
-        <strong><%= translated("Output") %></strong>
-        <span><%= translated("No shell output yet") %></span>
-      </div>
-    <% else %>
-      <div class="output-list">
-        <%= for entry <- @output_entries do %>
-          <div class={[
-            "panel-entry",
-            "output-entry",
-            if(Map.get(entry, :level) == "error", do: "output-entry-error")
-          ]}>
-            <strong><%= entry.title %></strong>
-            <span><%= entry.message %></span>
-            <%= if present?(entry.details) do %>
-              <span><%= entry.details %></span>
-            <% end %>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
-    """
-  end
-
-  defp render_post_links(assigns) do
-    links = post_link_entries(assigns)
-
-    assigns =
-      assigns
-      |> assign(:backlinks, Map.get(links, :backlinks, []))
-      |> assign(:outlinks, Map.get(links, :outlinks, []))
-
-    ~H"""
-    <%= if Enum.empty?(@backlinks) and Enum.empty?(@outlinks) do %>
-      <div class="panel-entry panel-empty-state">
-        <strong><%= translated("Post Links") %></strong>
-        <span><%= translated("No post links yet") %></span>
-      </div>
-    <% else %>
-      <div class="git-log-list">
-        <%= if Enum.any?(@backlinks) do %>
-          <div class="panel-entry"><strong><%= translated("Backlinks") %></strong></div>
-          <%= for entry <- @backlinks do %>
-            <button
-              class="panel-entry task-entry"
-              type="button"
-              phx-click="pin_sidebar_item"
-              phx-value-route="post"
-              phx-value-id={entry.id}
-              phx-value-title={entry.title}
-              phx-value-subtitle="linked post"
-            >
-              <strong><%= entry.title %></strong>
-              <span><%= entry.text %></span>
-            </button>
-          <% end %>
-        <% end %>
-
-        <%= if Enum.any?(@outlinks) do %>
-          <div class="panel-entry"><strong><%= translated("Links To") %></strong></div>
-          <%= for entry <- @outlinks do %>
-            <button
-              class="panel-entry task-entry"
-              type="button"
-              phx-click="pin_sidebar_item"
-              phx-value-route="post"
-              phx-value-id={entry.id}
-              phx-value-title={entry.title}
-              phx-value-subtitle="linked post"
-            >
-              <strong><%= entry.title %></strong>
-              <span><%= entry.text %></span>
-            </button>
-          <% end %>
-        <% end %>
-      </div>
-    <% end %>
-    """
-  end
-
-  defp render_git_log(assigns) do
-    entries = git_log_entries(assigns)
-    assigns = assign(assigns, :git_entries, entries)
-
-    ~H"""
-    <%= if Enum.empty?(@git_entries) do %>
-      <div class="git-log-list">
-        <div class="panel-entry panel-empty-state">
-          <strong><%= translated("Git Log") %></strong>
-          <span><%= translated("No git history yet") %></span>
-        </div>
-      </div>
-    <% else %>
-      <div class="git-log-list">
-        <%= for entry <- @git_entries do %>
-          <div class="panel-entry task-entry">
-            <strong><%= short_commit_hash(entry.hash) %> <%= entry.subject || translated("No commit subject") %></strong>
-            <span><%= entry.hash %></span>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
-    """
-  end
-
-  defp render_generic_panel(assigns, tab) do
-    assigns = assign(assigns, :panel_label, ShellData.route_label(tab))
-
-    ~H"""
-    <div class="panel-entry">
-      <strong><%= @panel_label %></strong>
-      <span><%= translated("The shared lower panel is available for tasks, output, git details, and editor-specific diagnostics.") %></span>
-    </div>
-    """
   end
 
   defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
@@ -1660,8 +1368,6 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp sidebar_header_label(label), do: translated(label)
-
-  defp present?(value), do: value not in [nil, ""]
 
   defp timeline_height(entry, entries) do
     max_count =
@@ -1715,142 +1421,16 @@ defmodule BDS.Desktop.ShellLive do
   end
 
 
-  defp sync_layout(workbench, params) do
-    workbench
-    |> maybe_set_sidebar_width(Map.get(params, "sidebar_width"))
-    |> maybe_set_assistant_width(Map.get(params, "assistant_sidebar_width"))
+  defp create_sidebar_item(socket, kind),
+    do: SidebarCreate.create(socket, kind, sidebar_create_callbacks())
+
+  defp sidebar_create_callbacks do
+    %{
+      reload: &reload_shell/2,
+      open_sidebar: &open_sidebar_item/3,
+      append_output: &append_output_entry/5
+    }
   end
-
-  defp resize_panel(workbench, "sidebar", width) do
-    workbench
-    |> Workbench.set_sidebar_width(parse_width(width))
-    |> Map.put(:sidebar_visible, true)
-  end
-
-  defp resize_panel(workbench, "assistant", width) do
-    workbench
-    |> Workbench.set_assistant_sidebar_width(parse_width(width))
-    |> Map.put(:assistant_sidebar_visible, true)
-  end
-
-  defp resize_panel(workbench, _target, _width), do: workbench
-
-  defp maybe_set_sidebar_width(workbench, nil), do: workbench
-  defp maybe_set_sidebar_width(workbench, width), do: Workbench.set_sidebar_width(workbench, parse_width(width))
-
-  defp maybe_set_assistant_width(workbench, nil), do: workbench
-
-  defp maybe_set_assistant_width(workbench, width) do
-    Workbench.set_assistant_sidebar_width(workbench, parse_width(width))
-  end
-
-  defp parse_width(width) when is_integer(width), do: width
-
-  defp parse_width(width) when is_binary(width) do
-    case Integer.parse(width) do
-      {parsed, _rest} -> parsed
-      :error -> 0
-    end
-  end
-
-  defp ignore_shortcut?(params) do
-    Map.get(params, "alt", false) or
-      Map.get(params, "contentEditable", false) or
-      Map.get(params, "content_editable", false) or
-      Map.get(params, "tag") in ["INPUT", "TEXTAREA", "SELECT"] or
-      Map.get(params, :tag) in ["INPUT", "TEXTAREA", "SELECT"]
-  end
-
-  defp create_sidebar_item(socket, kind) do
-    case socket.assigns.projects.active_project_id do
-      project_id when is_binary(project_id) -> create_sidebar_item(socket, project_id, kind)
-      _other -> reload_shell(socket, socket.assigns.workbench)
-    end
-  end
-
-  defp create_sidebar_item(socket, project_id, "post") do
-    case BDS.Posts.create_post(%{project_id: project_id, title: "", content: "", tags: [], categories: []}) do
-      {:ok, _post} -> reload_shell(socket, socket.assigns.workbench)
-
-      {:error, reason} ->
-        socket
-        |> append_output_entry(translated("sidebar.newPost"), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp create_sidebar_item(socket, project_id, "media") do
-    case FilePicker.choose_file(translated("sidebar.importMedia")) do
-      {:ok, source_path} ->
-        case BDS.Media.import_media(%{project_id: project_id, source_path: source_path}) do
-          {:ok, _media} -> reload_shell(socket, socket.assigns.workbench)
-
-          {:error, reason} ->
-            socket
-            |> append_output_entry(translated("sidebar.importMedia"), inspect(reason), nil, "error")
-            |> reload_shell(socket.assigns.workbench)
-        end
-
-      :cancel ->
-        reload_shell(socket, socket.assigns.workbench)
-
-      {:error, %{message: message}} ->
-        socket
-        |> append_output_entry(translated("sidebar.importMedia"), message, nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp create_sidebar_item(socket, project_id, "script") do
-    case Scripts.create_script(%{
-           project_id: project_id,
-           title: translated("sidebar.scripts.newScript"),
-           kind: :utility,
-           content: "print(\"new script\")",
-           entrypoint: "main",
-           enabled: true
-         }) do
-      {:ok, script} ->
-        open_sidebar_item(socket, %{"route" => "scripts", "id" => script.id, "title" => script.title, "subtitle" => "Automation helpers"}, :pin)
-
-      {:error, reason} ->
-        socket
-        |> append_output_entry(translated("sidebar.scripts.newScript"), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp create_sidebar_item(socket, project_id, "template") do
-    case Templates.create_template(%{
-           project_id: project_id,
-           title: translated("sidebar.templates.newTemplate"),
-           kind: :post,
-           content: "",
-           enabled: true
-         }) do
-      {:ok, template} ->
-        open_sidebar_item(socket, %{"route" => "templates", "id" => template.id, "title" => template.title, "subtitle" => "Site rendering"}, :pin)
-
-      {:error, reason} ->
-        socket
-        |> append_output_entry(translated("sidebar.templates.newTemplate"), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp create_sidebar_item(socket, project_id, "import") do
-    case ImportDefinitions.create_definition(%{project_id: project_id, name: translated("sidebar.import.newDefinition")}) do
-      {:ok, definition} ->
-        open_sidebar_item(socket, %{"route" => "import", "id" => definition.id, "title" => definition.name, "subtitle" => "Import definitions"}, :pin)
-
-      {:error, reason} ->
-        socket
-        |> append_output_entry(translated("sidebar.import.newDefinition"), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp create_sidebar_item(socket, _project_id, _kind), do: reload_shell(socket, socket.assigns.workbench)
 
   defp open_sidebar_item(socket, params, intent) do
     route_atom = sidebar_route_atom(Map.fetch!(params, "route"))
@@ -1871,12 +1451,7 @@ defmodule BDS.Desktop.ShellLive do
     |> reload_shell(workbench)
   end
 
-  defp sidebar_create_action(:posts), do: %{kind: "post", label: "sidebar.newPost"}
-  defp sidebar_create_action(:media), do: %{kind: "media", label: "sidebar.importMedia"}
-  defp sidebar_create_action(:scripts), do: %{kind: "script", label: "sidebar.scripts.newScript"}
-  defp sidebar_create_action(:templates), do: %{kind: "template", label: "sidebar.templates.newTemplate"}
-  defp sidebar_create_action(:import), do: %{kind: "import", label: "sidebar.import.newDefinition"}
-  defp sidebar_create_action(_view), do: nil
+  defp sidebar_create_action(view), do: SidebarCreate.action(view)
 
   defp set_page_language(socket, language) do
     codes = Enum.map(socket.assigns[:supported_ui_languages] || ShellData.supported_ui_languages(), & &1.code)
@@ -1924,16 +1499,6 @@ defmodule BDS.Desktop.ShellLive do
     assign(socket, :output_entries, entries)
   end
 
-  defp next_project_name(projects) do
-    existing_names = MapSet.new(Enum.map(projects, & &1.name))
-
-    Stream.iterate(1, &(&1 + 1))
-    |> Enum.find_value(fn index ->
-      candidate = if index == 1, do: @default_new_project_name, else: "#{@default_new_project_name} #{index}"
-      if MapSet.member?(existing_names, candidate), do: nil, else: candidate
-    end)
-  end
-
   defp handle_native_menu_action(socket, action) do
     with action_atom when not is_nil(action_atom) <- safe_existing_atom(action) do
       if MapSet.member?(@local_menu_actions, action_atom) do
@@ -1946,322 +1511,20 @@ defmodule BDS.Desktop.ShellLive do
     end
   end
 
-  defp restore_workbench_session(session_payload) do
-    Session.restore(session_payload)
-  rescue
-    _error -> Workbench.new()
+  defp apply_shell_command(socket, action, params \\ %{}),
+    do: ShellCommandRunner.execute(socket, action, params, shell_command_callbacks())
+
+  defp apply_shell_command_result(socket, result),
+    do: ShellCommandRunner.apply_result(socket, result, shell_command_callbacks())
+
+  defp shell_command_callbacks do
+    %{
+      reload: &reload_shell/2,
+      append_output: &append_output_entry/5
+    }
   end
 
-  defp safe_existing_atom(action) when is_binary(action) do
-    String.to_existing_atom(action)
-  rescue
-    ArgumentError -> nil
-  end
-
-  defp apply_shell_command(socket, action, params \\ %{}) do
-    case ShellCommands.execute(action, params) do
-      {:ok, result} -> apply_shell_command_result(socket, result)
-      {:error, %{message: message}} -> append_output_entry(socket, command_title(action), message, nil, "error")
-      {:error, reason} -> append_output_entry(socket, command_title(action), inspect(reason), nil, "error")
-    end
-  end
-
-  defp apply_shell_command_result(socket, %{kind: "task_queued", title: title, message: message, panel_tab: panel_tab}) do
-    workbench =
-      socket.assigns.workbench
-      |> Workbench.set_panel_visible(true)
-      |> Workbench.set_panel_tab(String.to_existing_atom(panel_tab))
-
-    socket
-    |> append_output_entry(translate_for_socket(socket, title), translate_for_socket(socket, message))
-    |> reload_shell(workbench)
-  end
-
-  defp apply_shell_command_result(socket, %{kind: "output", title: title, message: message} = result) do
-    socket
-    |> append_output_entry(translate_for_socket(socket, title), translate_for_socket(socket, message), Map.get(result, :details), Map.get(result, :level, "info"))
-  end
-
-  defp apply_shell_command_result(socket, %{kind: "open_url", title: title, message: message, url: url}) do
-    append_output_entry(socket, translate_for_socket(socket, title), translate_for_socket(socket, message), url)
-  end
-
-  defp apply_shell_command_result(socket, %{kind: "open_editor", route: route, title: title, subtitle: subtitle} = result) do
-    route_atom = String.to_existing_atom(route)
-    tab_id = tab_id_for_route(route_atom, route)
-    workbench = Workbench.open_tab(socket.assigns.workbench, route_atom, tab_id, :pin)
-
-    tab_meta =
-      Map.put(socket.assigns.tab_meta, {route_atom, tab_id}, %{
-        title: translate_for_socket(socket, title),
-        subtitle: translate_for_socket(socket, subtitle),
-        action: Map.get(result, :action),
-        payload: Map.get(result, :payload),
-        project_id: Map.get(result, :project_id),
-        editor_meta: translate_editor_meta(Map.get(result, :editorMeta, []), socket.assigns.page_language)
-      })
-
-    socket
-    |> assign(:tab_meta, tab_meta)
-    |> reload_shell(workbench)
-  end
-
-  defp apply_shell_command_result(socket, _result), do: socket
-
-  defp initial_handled_task_results do
-    BDS.Tasks.status_snapshot()
-    |> Map.get(:tasks, [])
-    |> Enum.filter(fn task -> task.status == :completed and is_map(task.result) end)
-    |> Enum.map(& &1.id)
-    |> MapSet.new()
-  end
-
-  defp next_completed_task_result(socket, task_status) do
-    handled = Map.get(socket.assigns, :handled_task_results, MapSet.new())
-
-    Enum.find(Map.get(task_status, :tasks, []), fn task ->
-      task.status == :completed and is_map(task.result) and not MapSet.member?(handled, task.id)
-    end)
-  end
-
-  defp mark_task_result_handled(socket, task_id) do
-    handled = Map.get(socket.assigns, :handled_task_results, MapSet.new())
-    assign(socket, :handled_task_results, MapSet.put(handled, task_id))
-  end
-
-  defp localize_task_status(task_status, locale) do
-    tasks = Enum.map(Map.get(task_status, :tasks, []), &localize_task(&1, locale))
-    active = Enum.filter(tasks, &(&1.status in [:running, :pending]))
-
-    task_status
-    |> Map.put(:tasks, tasks)
-    |> Map.put(:running_task_message, localized_running_task_message(active, locale))
-  end
-
-  defp localize_task(task, locale) do
-    progress = Map.get(task, :progress)
-
-    task
-    |> Map.put(:name, ShellData.translate(task.name, %{}, locale))
-    |> Map.put(:message, localize_task_message(Map.get(task, :message), locale))
-    |> Map.put(:group_name, localize_task_group(Map.get(task, :group_name), locale))
-    |> Map.put(:status_label, localize_task_status_label(task.status, locale))
-    |> Map.put(:progress_label, if(is_number(progress), do: progress_percent(progress), else: nil))
-  end
-
-  defp localize_task_message(nil, _locale), do: nil
-  defp localize_task_message("", _locale), do: ""
-  defp localize_task_message(message, locale), do: ShellData.translate(message, %{}, locale)
-
-  defp localize_task_group(nil, _locale), do: nil
-  defp localize_task_group(group, locale), do: ShellData.translate(group, %{}, locale)
-
-  defp localize_task_status_label(status, locale) do
-    status
-    |> to_string()
-    |> String.capitalize()
-    |> ShellData.translate(%{}, locale)
-  end
-
-  defp localized_running_task_message([], _locale), do: nil
-
-  defp localized_running_task_message([task | _rest], locale) do
-    cond do
-      task.status == :pending -> ShellData.translate("Queued", %{}, locale) <> ": " <> task.name
-      is_binary(task.message) and task.message != "" -> task.name <> ": " <> task.message
-      true -> task.name
-    end
-  end
-
-  defp translate_editor_meta(items, locale) do
-    Enum.map(items, fn item ->
-      item
-      |> Map.update(:label, nil, &ShellData.translate(&1, %{}, locale))
-      |> Map.update(:value, nil, &translate_editor_meta_value(&1, locale))
-    end)
-  end
-
-  defp translate_editor_meta_value(value, locale) when is_binary(value), do: ShellData.translate(value, %{}, locale)
-  defp translate_editor_meta_value(value, _locale), do: value
-
-  defp translate_for_socket(socket, text) when is_binary(text), do: ShellData.translate(text, %{}, socket.assigns.page_language)
-  defp translate_for_socket(_socket, text), do: text
-
-  defp progress_percent(progress) when is_number(progress) do
-    percentage = progress |> Kernel.*(100) |> round()
-    Integer.to_string(percentage) <> "%"
-  end
-
-  defp command_title(action) do
-    action
-    |> to_string()
-    |> String.replace("_", " ")
-    |> String.split()
-    |> Enum.map_join(" ", &String.capitalize/1)
-  end
-
-  defp titlebar_menu_groups do
-    DesktopMenuBar.groups(dev_mode?: Application.get_env(:bds, :dev_routes, false))
-  end
-
-  defp titlebar_menu_dropdown_items(group) do
-    group.items
-    |> Enum.map_reduce(0, fn item, keyboard_index ->
-      if Map.get(item, :separator, false) do
-        {%{separator: true}, keyboard_index}
-      else
-        {Map.put(item, :keyboard_index, keyboard_index), keyboard_index + 1}
-      end
-    end)
-    |> elem(0)
-  end
-
-  defp titlebar_menu_item_active?(group, item, current_index) do
-    cond do
-      is_nil(current_index) ->
-        false
-
-      Map.get(item, :separator, false) ->
-        false
-
-      true ->
-        group.items
-        |> Enum.reject(&Map.get(&1, :separator, false))
-        |> Enum.find_index(&(&1.id == item.id))
-        |> Kernel.==(current_index)
-    end
-  end
-
-  defp active_titlebar_menu_group(assigns) do
-    Enum.find(assigns.menu_groups || [], fn group -> Atom.to_string(group.id) == assigns.titlebar_menu_group end)
-  end
-
-  defp active_titlebar_menu_items(assigns) do
-    assigns
-    |> active_titlebar_menu_group()
-    |> case do
-      nil -> []
-      group -> Enum.reject(group.items, &Map.get(&1, :separator, false))
-    end
-  end
-
-  defp open_titlebar_menu(socket, group) do
-    socket
-    |> assign(:titlebar_menu_group, group)
-    |> assign(:titlebar_menu_item_index, nil)
-  end
-
-  defp close_titlebar_menu(socket) do
-    socket
-    |> assign(:titlebar_menu_group, nil)
-    |> assign(:titlebar_menu_item_index, nil)
-  end
-
-  defp handle_titlebar_menu_keydown(socket, key) do
-    if socket.assigns.titlebar_menu_group do
-      case key do
-        "Escape" ->
-          close_titlebar_menu(socket)
-
-        "ArrowRight" ->
-          rotate_titlebar_menu_group(socket, 1)
-
-        "ArrowLeft" ->
-          rotate_titlebar_menu_group(socket, -1)
-
-        "ArrowDown" ->
-          advance_titlebar_menu_item_index(socket, 1)
-
-        "ArrowUp" ->
-          advance_titlebar_menu_item_index(socket, -1)
-
-        "Home" ->
-          set_first_titlebar_menu_item_index(socket)
-
-        "End" ->
-          set_last_titlebar_menu_item_index(socket)
-
-        "Enter" ->
-          invoke_active_titlebar_menu_item(socket)
-
-        " " ->
-          invoke_active_titlebar_menu_item(socket)
-
-        _other ->
-          socket
-      end
-    else
-      socket
-    end
-  end
-
-  defp rotate_titlebar_menu_group(socket, offset) do
-    groups = socket.assigns.menu_groups || []
-    current_group = socket.assigns.titlebar_menu_group
-    current_index = Enum.find_index(groups, fn group -> Atom.to_string(group.id) == current_group end)
-
-    if is_nil(current_index) or groups == [] do
-      socket
-    else
-      next_index = rem(current_index + offset + length(groups), length(groups))
-      next_group = Enum.at(groups, next_index)
-      open_titlebar_menu(socket, Atom.to_string(next_group.id))
-    end
-  end
-
-  defp advance_titlebar_menu_item_index(socket, offset) do
-    items = active_titlebar_menu_items(socket.assigns)
-    current_index = socket.assigns[:titlebar_menu_item_index]
-
-    cond do
-      items == [] ->
-        socket
-
-      current_index == nil and offset > 0 ->
-        assign(socket, :titlebar_menu_item_index, 0)
-
-      current_index == nil and offset < 0 ->
-        assign(socket, :titlebar_menu_item_index, length(items) - 1)
-
-      true ->
-        next_index = rem(current_index + offset + length(items), length(items))
-        assign(socket, :titlebar_menu_item_index, next_index)
-    end
-  end
-
-  defp set_last_titlebar_menu_item_index(socket) do
-    items = active_titlebar_menu_items(socket.assigns)
-
-    if items == [] do
-      socket
-    else
-      assign(socket, :titlebar_menu_item_index, length(items) - 1)
-    end
-  end
-
-  defp set_first_titlebar_menu_item_index(socket) do
-    items = active_titlebar_menu_items(socket.assigns)
-
-    if items == [] do
-      socket
-    else
-      assign(socket, :titlebar_menu_item_index, 0)
-    end
-  end
-
-  defp invoke_active_titlebar_menu_item(socket) do
-    items = active_titlebar_menu_items(socket.assigns)
-
-    case Enum.at(items, socket.assigns[:titlebar_menu_item_index]) do
-      %{id: id} ->
-        socket
-        |> close_titlebar_menu()
-        |> handle_native_menu_action(Atom.to_string(id))
-
-      _other ->
-        socket
-    end
-  end
+  defp safe_existing_atom(action), do: ShellCommandRunner.safe_existing_atom(action)
 
   defp mac_ui? do
     case Application.get_env(:bds, :shell_platform) do
@@ -2270,333 +1533,8 @@ defmodule BDS.Desktop.ShellLive do
     end
   end
 
-  defp post_link_entries(assigns) do
-    case assigns.current_tab do
-      %{type: :post, id: post_id} ->
-        %{
-          backlinks: related_posts(PostLinks.list_incoming_links(post_id), :source_post_id),
-          outlinks: related_posts(PostLinks.list_outgoing_links(post_id), :target_post_id)
-        }
-
-      _other ->
-        %{backlinks: [], outlinks: []}
-    end
-  end
-
-  defp related_posts(links, key) do
-    Enum.map(links, fn link ->
-      case Repo.get(Post, Map.fetch!(link, key)) do
-        %Post{} = post -> %{id: post.id, title: post.title || post.slug || post.id, text: link.link_text || post.slug || post.id}
-        _other -> nil
-      end
-    end)
-    |> Enum.reject(&is_nil/1)
-  end
-
-  defp git_log_entries(assigns) do
-    case git_history_target(assigns.current_tab) do
-      nil -> []
-      {project_id, file_path} ->
-        case Git.file_history(project_id, file_path) do
-          {:ok, %{commits: commits}} -> commits
-          _other -> []
-        end
-    end
-  end
-
-  defp git_history_target(%{type: :post, id: post_id}) do
-    case Repo.get(Post, post_id) do
-      %Post{project_id: project_id, file_path: file_path} when file_path not in [nil, ""] -> {project_id, file_path}
-      _other -> nil
-    end
-  end
-
-  defp git_history_target(%{type: :media, id: media_id}) do
-    case Repo.get(Media, media_id) do
-      %Media{project_id: project_id, file_path: file_path} when file_path not in [nil, ""] -> {project_id, file_path}
-      _other -> nil
-    end
-  end
-
-  defp git_history_target(_tab), do: nil
-
-  defp handle_chat_surface_action(socket, params) do
-    surface_id = Map.get(params, "surface-id", "")
-
-    payload =
-      params
-      |> Map.get("payload")
-      |> decode_chat_surface_payload()
-      |> maybe_put_chat_surface_form_data(socket, surface_id)
-
-    case normalize_chat_action(Map.get(params, "action", "")) do
-      :open_post ->
-        case Map.get(payload, "postId") || Map.get(payload, "post_id") do
-          post_id when is_binary(post_id) and post_id != "" ->
-            socket
-            |> clear_chat_action_error()
-            |> open_sidebar_item(%{"route" => "post", "id" => post_id, "title" => post_title(post_id), "subtitle" => post_subtitle(post_id)}, :pin)
-
-          _other ->
-            ChatEditor.set_action_error(socket, socket.assigns.current_tab.id, "Invalid payload for openPost action", &reload_shell/2)
-        end
-
-      :open_media ->
-        case Map.get(payload, "mediaId") || Map.get(payload, "media_id") do
-          media_id when is_binary(media_id) and media_id != "" ->
-            socket
-            |> clear_chat_action_error()
-            |> open_sidebar_item(%{"route" => "media", "id" => media_id, "title" => media_title(media_id), "subtitle" => media_subtitle(media_id)}, :pin)
-
-          _other ->
-            ChatEditor.set_action_error(socket, socket.assigns.current_tab.id, "Invalid payload for openMedia action", &reload_shell/2)
-        end
-
-      :open_settings ->
-        socket
-        |> clear_chat_action_error()
-        |> open_sidebar_item(%{"route" => "settings", "id" => "settings-ai", "title" => "Settings", "subtitle" => "AI"}, :pin)
-
-      :open_chat ->
-        chat_id = Map.get(payload, "conversationId") || Map.get(payload, "conversation_id") || socket.assigns.current_tab.id
-
-        socket
-        |> clear_chat_action_error()
-        |> open_sidebar_item(%{"route" => "chat", "id" => chat_id, "title" => Map.get(payload, "title", "Chat"), "subtitle" => Map.get(payload, "subtitle", "")}, :pin)
-
-      :switch_view ->
-        case safe_existing_atom(Map.get(payload, "view")) do
-          nil -> ChatEditor.set_action_error(socket, socket.assigns.current_tab.id, "Invalid payload for switchView action", &reload_shell/2)
-          view ->
-            socket
-            |> clear_chat_action_error()
-            |> reload_shell(Workbench.click_activity(socket.assigns.workbench, view))
-        end
-
-      :toggle_sidebar ->
-        socket
-        |> clear_chat_action_error()
-        |> reload_shell(Workbench.toggle_sidebar(socket.assigns.workbench))
-
-      :toggle_panel ->
-        socket
-        |> clear_chat_action_error()
-        |> reload_shell(Workbench.toggle_panel(socket.assigns.workbench))
-
-      :toggle_assistant_sidebar ->
-        socket
-        |> clear_chat_action_error()
-        |> reload_shell(Workbench.toggle_assistant_sidebar(socket.assigns.workbench))
-
-      :unknown ->
-        ChatEditor.set_action_error(socket, socket.assigns.current_tab.id, "Unsupported assistant action", &reload_shell/2)
-    end
-  end
-
-  defp clear_chat_action_error(%{assigns: %{current_tab: %{type: :chat, id: conversation_id}}} = socket) do
-    assign(socket, :chat_editor_action_errors, Map.delete(socket.assigns.chat_editor_action_errors, conversation_id))
-  end
-
-  defp clear_chat_action_error(socket), do: socket
-
-  defp decode_chat_surface_payload(nil), do: %{}
-  defp decode_chat_surface_payload(""), do: %{}
-
-  defp decode_chat_surface_payload(payload) when is_binary(payload) do
-    case Jason.decode(payload) do
-      {:ok, decoded} when is_map(decoded) -> decoded
-      _other -> %{}
-    end
-  end
-
-  defp decode_chat_surface_payload(_payload), do: %{}
-
-  defp maybe_put_chat_surface_form_data(payload, socket, surface_id) when is_binary(surface_id) and surface_id != "" do
-    form_data = ChatEditor.current_surface_data(socket, surface_id)
-
-    if form_data == %{} do
-      payload
-    else
-      Map.put(payload, "formData", form_data)
-    end
-  end
-
-  defp maybe_put_chat_surface_form_data(payload, _socket, _surface_id), do: payload
-
-  defp normalize_chat_action(action) do
-    action
-    |> to_string()
-    |> String.replace("_", "")
-    |> String.downcase()
-    |> case do
-      "openpost" -> :open_post
-      "openmedia" -> :open_media
-      "opensettings" -> :open_settings
-      "openchat" -> :open_chat
-      "switchview" -> :switch_view
-      "setactiveview" -> :switch_view
-      "togglesidebar" -> :toggle_sidebar
-      "togglepanel" -> :toggle_panel
-      "openpanel" -> :toggle_panel
-      "toggleassistantsidebar" -> :toggle_assistant_sidebar
-      _other -> :unknown
-    end
-  end
-
-  defp post_title(post_id) do
-    case Repo.get(Post, post_id) do
-      %Post{} = post -> post.title || post.slug || post.id
-      _other -> "Post"
-    end
-  end
-
-  defp post_subtitle(post_id) do
-    case Repo.get(Post, post_id) do
-      %Post{} = post -> post.slug || "draft"
-      _other -> "draft"
-    end
-  end
-
-  defp media_title(media_id) do
-    case Repo.get(Media, media_id) do
-      %Media{} = media -> media.title || media.filename || media.id
-      _other -> "Media"
-    end
-  end
-
-  defp media_subtitle(media_id) do
-    case Repo.get(Media, media_id) do
-      %Media{} = media -> media.filename || media.mime_type || "media"
-      _other -> "media"
-    end
-  end
-
-  defp parse_integer(value) when is_integer(value), do: value
-
-  defp parse_integer(value) do
-    case Integer.parse(to_string(value || "0")) do
-      {parsed, _rest} -> parsed
-      :error -> 0
-    end
-  end
-
-  defp short_commit_hash(hash) when is_binary(hash), do: String.slice(hash, 0, 7)
-  defp short_commit_hash(_hash), do: "-------"
-
-  defp sidebar_route_atom(route) when is_atom(route), do: route
-  defp sidebar_route_atom(route) when is_binary(route), do: String.to_existing_atom(route)
-
-  defp tab_id_for_route(route, id) do
-    case Registry.editor_route(route) do
-      %{singleton: true} -> Atom.to_string(route)
-      _other -> id
-    end
-  end
-
-  defp tab_intent(route, requested_intent) do
-    case Registry.editor_route(route) do
-      %{singleton: true} -> :pin
-      _other -> requested_intent
-    end
-  end
-
-  defp tab_title(nil, _tab_meta), do: translated("Dashboard")
-
-  defp tab_title(tab, tab_meta) do
-    case Map.get(tab_meta, {tab.type, tab.id}) do
-      %{title: title} when is_binary(title) and title != "" -> title
-      _other -> default_tab_title(tab)
-    end
-  end
-
-  defp tab_subtitle(nil, _tab_meta), do: translated("dashboard.subtitle")
-
-  defp tab_subtitle(tab, tab_meta) do
-    case Map.get(tab_meta, {tab.type, tab.id}) do
-      %{subtitle: subtitle} when is_binary(subtitle) and subtitle != "" -> subtitle
-      _other -> "Desktop workbench content routed through the Elixir shell."
-    end
-  end
-
-  defp default_tab_title(%{type: type, id: id}) do
-    case Registry.editor_route(type) do
-      %{singleton: true} -> ShellData.route_label(type)
-      _other -> id
-    end
-  end
-
-  defp tab_route_label(nil), do: translated("Dashboard")
-  defp tab_route_label(%{type: type}), do: ShellData.route_label(type)
-
-  defp editor_toolbar_buttons(nil), do: []
-
-  defp editor_toolbar_buttons(%{type: :post}) do
-    [
-      %{kind: "ai_suggestions", label: "AI Suggestions", destructive: false},
-      %{kind: "insert_link", label: "Insert Link", destructive: false},
-      %{kind: "insert_media", label: "Insert Media", destructive: false},
-      %{kind: "language_picker", label: "Translate", destructive: false},
-      %{kind: "gallery", label: "Gallery", destructive: false}
-    ]
-  end
-
-  defp editor_toolbar_buttons(%{type: :media}) do
-    [
-      %{kind: "ai_suggestions", label: "AI Suggestions", destructive: false},
-      %{kind: "language_picker", label: "Translate", destructive: false},
-      %{kind: "confirm_delete", label: "Delete Media", destructive: true}
-    ]
-  end
-
-  defp editor_toolbar_buttons(%{type: :tags}) do
-    [
-      %{kind: "confirm_merge", label: "Merge Tags", destructive: false},
-      %{kind: "confirm_delete", label: "Delete Tag", destructive: true}
-    ]
-  end
-
-  defp editor_toolbar_buttons(_tab), do: []
-
-  defp tab_icon_id(nil), do: "posts"
-  defp tab_icon_id(%{type: :post}), do: "posts"
-  defp tab_icon_id(%{type: :git_diff}), do: "git"
-  defp tab_icon_id(%{type: :style}), do: "settings"
-  defp tab_icon_id(%{type: type}), do: Atom.to_string(type)
-
-  defp assistant_turn(prompt, socket) do
-    [
-      %{role: "user", content: prompt},
-      %{role: "assistant", content: assistant_reply(socket)}
-    ]
-  end
-
-  defp assistant_reply(socket) do
-    if socket.assigns.offline_mode do
-      ShellData.translate("Automatic AI actions stay gated by airplane mode.", %{}, socket.assigns.page_language)
-    else
-      ShellData.translate(
-        "The assistant sidebar chat surface is ready, but model execution is not connected yet.",
-        %{},
-        socket.assigns.page_language
-      )
-    end
-  end
-
-  defp assistant_project_name(nil), do: translated("Projects")
-  defp assistant_project_name(project), do: project.name
-
-  defp assistant_message_label("assistant"), do: translated("Assistant")
-  defp assistant_message_label("user"), do: translated("You")
-  defp assistant_message_label(_role), do: translated("Assistant")
-
-  defp assistant_message_testid(role), do: "assistant-message-#{role}"
-
-  defp update_shell_overlay(socket, updater) do
-    case socket.assigns[:shell_overlay] do
-      nil -> socket
-      overlay -> assign(socket, :shell_overlay, updater.(overlay))
-    end
-  end
+  defp update_shell_overlay(socket, updater),
+    do: ChatSurface.update_shell_overlay(socket, updater)
 
   defp close_overlay_with_output(socket, title, details) do
     socket
