@@ -3,6 +3,12 @@ defmodule BDS.DesktopTest do
 
   import Plug.Test
 
+  alias Desktop.Wx
+
+  require Record
+
+  Record.defrecordp(:wx, Record.extract(:wx, from_lib: "wx/include/wx.hrl"))
+
   defmodule FakeShutdown do
     def request_quit do
       send(Application.fetch_env!(:bds, :desktop_shutdown_test_pid), :quit_requested)
@@ -145,8 +151,25 @@ defmodule BDS.DesktopTest do
     assert_receive :quit_requested
   end
 
-  test "cmd-q remains handled by the desktop window quit handler" do
-    refute function_exported?(BDS.Desktop.Shutdown, :command_menu_selected, 2)
+  test "cmd-q is handled by the app-owned shutdown handler" do
+    assert {:module, BDS.Desktop.Shutdown} = Code.ensure_loaded(BDS.Desktop.Shutdown)
+    assert function_exported?(BDS.Desktop.Shutdown, :command_menu_selected, 2)
+  end
+
+  test "cmd-q callback requests app-owned shutdown" do
+    previous_module = Application.get_env(:bds, :desktop_shutdown_module)
+    previous_pid = Application.get_env(:bds, :desktop_shutdown_test_pid)
+
+    Application.put_env(:bds, :desktop_shutdown_module, FakeShutdown)
+    Application.put_env(:bds, :desktop_shutdown_test_pid, self())
+
+    on_exit(fn ->
+      restore_env(:desktop_shutdown_module, previous_module)
+      restore_env(:desktop_shutdown_test_pid, previous_pid)
+    end)
+
+    assert :ok = BDS.Desktop.Shutdown.command_menu_selected(wx(id: Wx.wxID_EXIT()), nil)
+    assert_receive :quit_requested
   end
 
   test "app-owned shutdown delegates final termination to the desktop hard quit path" do

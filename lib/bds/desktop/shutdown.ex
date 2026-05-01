@@ -2,17 +2,27 @@ defmodule BDS.Desktop.Shutdown do
   @moduledoc false
 
   alias BDS.Desktop.MainWindow
+  alias Desktop.Wx
   alias Desktop.Window
+
+  require Record
+
+  Record.defrecordp(:wx, Record.extract(:wx, from_lib: "wx/include/wx.hrl"))
 
   @spec install_handlers(term()) :: :ok
   def install_handlers(frame) do
     :wx.set_env(Desktop.Env.wx_env())
 
     _ = :wxFrame.disconnect(frame, :close_window)
+    _ = :wxFrame.disconnect(frame, :command_menu_selected)
 
     :wxFrame.connect(frame, :close_window,
       callback: &__MODULE__.close_window/2,
       userData: self()
+    )
+
+    :wxFrame.connect(frame, :command_menu_selected,
+      callback: &__MODULE__.command_menu_selected/2
     )
 
     :ok
@@ -41,6 +51,17 @@ defmodule BDS.Desktop.Shutdown do
 
     request_quit()
   end
+
+  @spec command_menu_selected(tuple(), term()) :: :ok
+  def command_menu_selected(wx(id: id), _command_event) do
+    if id == Wx.wxID_EXIT() do
+      request_quit()
+    end
+
+    :ok
+  end
+
+  def command_menu_selected(_event, _command_event), do: :ok
 
   defp start_shutdown_task do
     Task.start(fn ->
