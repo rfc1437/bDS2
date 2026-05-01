@@ -14,6 +14,9 @@ defmodule BDS.MCP.Resources do
   @typedoc "Resource descriptor returned by `list/0`."
   @type descriptor :: %{name: String.t(), uri: String.t()}
 
+  @typedoc "Resource template descriptor returned by `templates/0`."
+  @type template_descriptor :: %{name: String.t(), uriTemplate: String.t()}
+
   @spec list() :: [descriptor()]
   def list do
     [
@@ -24,13 +27,21 @@ defmodule BDS.MCP.Resources do
     ]
   end
 
+  @spec templates() :: [template_descriptor()]
+  def templates do
+    [
+      %{name: "posts", uriTemplate: "bds://posts{?cursor}"},
+      %{name: "media", uriTemplate: "bds://media{?cursor}"}
+    ]
+  end
+
   @spec read(String.t()) :: {:ok, term()} | {:error, term()}
   def read(uri) when is_binary(uri) do
     ProposalStore.ensure_started()
 
     case URI.parse(uri) do
-      %URI{scheme: "bds", host: "posts", path: nil} -> {:ok, posts_resource(0)}
-      %URI{scheme: "bds", host: "media", path: nil} -> {:ok, media_resource(0)}
+      %URI{scheme: "bds", host: "posts", path: nil, query: query} -> posts_resource(query)
+      %URI{scheme: "bds", host: "media", path: nil, query: query} -> media_resource(query)
       %URI{scheme: "bds", host: "tags", path: nil} -> {:ok, tags_resource()}
       %URI{scheme: "bds", host: "categories", path: nil} -> {:ok, categories_resource()}
       %URI{scheme: "bds", host: "posts", path: "/" <> id} -> read_post_resource(id)
@@ -39,7 +50,13 @@ defmodule BDS.MCP.Resources do
     end
   end
 
-  defp posts_resource(offset) do
+  defp posts_resource(query) do
+    with {:ok, offset} <- cursor_offset(query) do
+      {:ok, posts_page(offset)}
+    end
+  end
+
+  defp posts_page(offset) do
     project = Queries.active_project!()
     page_size = Queries.page_size()
     {:ok, result} = Search.search_posts(project.id, "", %{offset: offset, limit: page_size})
@@ -48,12 +65,18 @@ defmodule BDS.MCP.Resources do
       "items" => Enum.map(result.posts, &Queries.post_summary/1),
       "total" => result.total,
       "offset" => result.offset,
-      "limit" => result.limit,
-      "has_more" => result.offset + result.limit < result.total
+      "limit" => result.limit
     }
+    |> maybe_put_next_cursor(result)
   end
 
-  defp media_resource(offset) do
+  defp media_resource(query) do
+    with {:ok, offset} <- cursor_offset(query) do
+      {:ok, media_page(offset)}
+    end
+  end
+
+  defp media_page(offset) do
     project = Queries.active_project!()
     page_size = Queries.page_size()
     {:ok, result} = Search.search_media(project.id, "", %{offset: offset, limit: page_size})
@@ -62,9 +85,45 @@ defmodule BDS.MCP.Resources do
       "items" => Enum.map(result.media, &Util.sanitize/1),
       "total" => result.total,
       "offset" => result.offset,
-      "limit" => result.limit,
-      "has_more" => result.offset + result.limit < result.total
+      "limit" => result.limit
     }
+    |> maybe_put_next_cursor(result)
+  end
+
+  defp cursor_offset(nil), do: {:ok, 0}
+
+  defp cursor_offset(query) do
+    case URI.decode_query(query) do
+      %{"cursor" => cursor} when cursor != "" -> decode_cursor(cursor)
+      %{"cursor" => ""} -> {:error, :invalid_cursor}
+      _params -> {:ok, 0}
+    end
+  end
+
+  defp decode_cursor(cursor) do
+    with {:ok, decoded} <- Base.url_decode64(cursor, padding: false),
+         {:ok, %{"offset" => offset}} when is_integer(offset) and offset >= 0 <-
+           Jason.decode(decoded) do
+      {:ok, offset}
+    else
+      _other -> {:error, :invalid_cursor}
+    end
+  end
+
+  defp maybe_put_next_cursor(resource, result) do
+    next_offset = result.offset + result.limit
+
+    if next_offset < result.total do
+      Map.put(resource, "nextCursor", encode_cursor(next_offset))
+    else
+      resource
+    end
+  end
+
+  defp encode_cursor(offset) do
+    %{"offset" => offset}
+    |> Jason.encode!()
+    |> Base.url_encode64(padding: false)
   end
 
   defp tags_resource do

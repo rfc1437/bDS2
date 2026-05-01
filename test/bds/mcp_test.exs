@@ -236,4 +236,65 @@ defmodule BDS.MCPTest do
     assert {:ok, post_resource} = BDS.MCP.read_resource("bds://posts/#{post.id}")
     assert post_resource["slug"] == "resource-post"
   end
+
+  test "post resources use base64url cursors with 50 item pages", %{project: project} do
+    for index <- 1..51 do
+      assert {:ok, _post} =
+               BDS.Posts.create_post(%{
+                 project_id: project.id,
+                 title: "Cursor Post #{String.pad_leading(to_string(index), 2, "0")}",
+                 content: "Cursor body #{index}",
+                 language: "en"
+               })
+    end
+
+    assert {:ok, first_page} = BDS.MCP.read_resource("bds://posts")
+    assert length(first_page["items"]) == 50
+    assert first_page["nextCursor"] =~ ~r/^[A-Za-z0-9_-]+$/
+    refute Map.has_key?(first_page, "has_more")
+
+    assert {:ok, final_page} =
+             BDS.MCP.read_resource("bds://posts?cursor=#{first_page["nextCursor"]}")
+
+    assert length(final_page["items"]) == 1
+    refute Map.has_key?(final_page, "nextCursor")
+  end
+
+  test "media resources use base64url cursors with 50 item pages", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    for index <- 1..51 do
+      source_path = Path.join(temp_dir, "cursor-media-#{index}.txt")
+      File.write!(source_path, "media body #{index}")
+
+      assert {:ok, _media} =
+               BDS.Media.import_media(%{
+                 project_id: project.id,
+                 source_path: source_path,
+                 title: "Cursor Media #{String.pad_leading(to_string(index), 2, "0")}"
+               })
+    end
+
+    assert {:ok, first_page} = BDS.MCP.read_resource("bds://media")
+    assert length(first_page["items"]) == 50
+    assert first_page["nextCursor"] =~ ~r/^[A-Za-z0-9_-]+$/
+
+    assert {:ok, final_page} =
+             BDS.MCP.read_resource("bds://media?cursor=#{first_page["nextCursor"]}")
+
+    assert length(final_page["items"]) == 1
+    refute Map.has_key?(final_page, "nextCursor")
+  end
+
+  test "cursor resources reject invalid cursors and list URI templates" do
+    assert {:error, :invalid_cursor} = BDS.MCP.read_resource("bds://posts?cursor=not-valid")
+    assert {:error, :invalid_cursor} = BDS.MCP.read_resource("bds://media?cursor=not-valid")
+
+    templates = BDS.MCP.list_resource_templates()
+    template_uris = Enum.map(templates, & &1.uriTemplate)
+
+    assert "bds://posts{?cursor}" in template_uris
+    assert "bds://media{?cursor}" in template_uris
+  end
 end

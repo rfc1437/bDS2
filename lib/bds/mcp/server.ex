@@ -188,6 +188,10 @@ defmodule BDS.MCP.Server do
       "resources/list" ->
         {:ok, success_response(id, %{"resources" => BDS.MCP.list_resources()})}
 
+      "resources/templates/list" ->
+        {:ok,
+         success_response(id, %{"resourceTemplates" => BDS.MCP.list_resource_templates()})}
+
       "resources/read" ->
         read_resource(id, params)
 
@@ -230,6 +234,9 @@ defmodule BDS.MCP.Server do
 
       {:error, :not_found} ->
         {:error, error_response(id, -32004, "Not found")}
+
+      {:error, :invalid_cursor} ->
+        {:error, error_response(id, -32602, "Invalid cursor")}
     end
   end
 

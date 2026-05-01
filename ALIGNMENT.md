@@ -12,7 +12,7 @@ Goal: align bDS2 with old bDS behavior. Use the Allium specs as the contract onl
 - Action: change bDS2 to remove accepted/discarded proposals, update tests, and remove/adjust terminal-status expectations.
 - Status: done.
 
-## P0: MCP Cursor Resources
+## P0: MCP Cursor Resources (done)
 
 - Old bDS: `bds://posts{?cursor}` and `bds://media{?cursor}` use base64url cursors, page size 50, and `nextCursor`.
 - bDS2 now: first-page resources exist, but cursor URI/resource-template behavior is missing.

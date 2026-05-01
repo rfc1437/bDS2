@@ -79,6 +79,18 @@ defmodule BDS.MCP.Stdio do
   defp handle_payload(%{
          "jsonrpc" => "2.0",
          "id" => id,
+         "method" => "resources/templates/list"
+       }) do
+    %{
+      "jsonrpc" => "2.0",
+      "id" => id,
+      "result" => %{"resourceTemplates" => BDS.MCP.list_resource_templates()}
+    }
+  end
+
+  defp handle_payload(%{
+         "jsonrpc" => "2.0",
+         "id" => id,
          "method" => "resources/read",
          "params" => %{"uri" => uri}
        }) do
