@@ -163,6 +163,9 @@ defmodule BDS.AI do
   @spec get_chat_conversation(String.t()) :: BDS.AI.ChatConversation.t() | nil
   defdelegate get_chat_conversation(conversation_id), to: Chat
 
+  @spec delete_chat_conversation(String.t()) :: {:ok, :deleted} | {:error, :not_found | term()}
+  defdelegate delete_chat_conversation(conversation_id), to: Chat
+
   @spec available_chat_models(String.t() | nil) :: [map()]
   defdelegate available_chat_models(current_model \\ nil), to: Chat
 

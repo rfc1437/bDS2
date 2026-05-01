@@ -248,6 +248,17 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-tab-type="chat")
     assert html =~ ~s(data-tab-id="#{created_chat.id}")
 
+    html = render_click(view, "select_view", %{"view" => "chat"})
+    assert html =~ ~s(data-testid="sidebar-delete-chat")
+
+    html =
+      view
+      |> element("[data-testid='sidebar-delete-chat'][data-item-id='#{created_chat.id}']")
+      |> render_click()
+
+    refute Repo.get(BDS.AI.ChatConversation, created_chat.id)
+    refute html =~ ~s(data-tab-id="#{created_chat.id}")
+
     _html = render_click(view, "select_view", %{"view" => "import"})
 
     html =

@@ -353,7 +353,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
     <%= if Enum.any?(Map.get(@sidebar_data, :items, [])) do %>
       <div class={if(template_sidebar?(@sidebar_data), do: "chat-list-items", else: "settings-nav-list")}>
         <%= for item <- Map.get(@sidebar_data, :items, []) do %>
-          <%= if item.route == "templates" do %>
+          <%= if item.route in ["templates", "chat"] do %>
             <div
               class={["chat-list-item", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "active")]}
               data-item-id={item.id}
@@ -379,11 +379,11 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
               </button>
               <button
                 class="chat-item-delete"
-                data-testid="sidebar-delete-template"
+                data-testid={if(item.route == "chat", do: "sidebar-delete-chat", else: "sidebar-delete-template")}
                 data-item-id={item.id}
                 type="button"
-                title={translated("Delete") <> " " <> translated("Template")}
-                phx-click="delete_sidebar_template"
+                title={if(item.route == "chat", do: translated("sidebar.chat.deleteConversation"), else: translated("Delete") <> " " <> translated("Template"))}
+                phx-click={if(item.route == "chat", do: "delete_sidebar_chat", else: "delete_sidebar_template")}
                 phx-value-id={item.id}
               >
                 ×

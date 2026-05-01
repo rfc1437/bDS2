@@ -168,6 +168,9 @@ defmodule BDS.AITest do
                usage: usage(31, 8, 0, 0)
              }}
           end
+
+        :chat_title ->
+          {:ok, %{content: "Blog Stats", usage: usage(12, 3, 0, 0)}}
       end
     end
 
@@ -613,6 +616,46 @@ defmodule BDS.AITest do
                  }
                ]
            end)
+  end
+
+  test "chat generates a short title after the first user turn using the title model" do
+    {:ok, project} = create_project_fixture("Title Chat")
+    _fixtures = seed_project_content(project.id)
+
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(false)
+    assert :ok = BDS.AI.put_model_preference(:title, "title-model")
+    assert {:ok, conversation} = BDS.AI.start_chat(%{model: "gpt-4o-mini"})
+
+    assert {:ok, reply} =
+             BDS.AI.send_chat_message(conversation.id, "How many items are in the blog?",
+               runtime: FakeRuntime,
+               test_pid: self(),
+               project_id: project.id,
+               secret_backend: FakeSecretBackend
+             )
+
+    assert reply.conversation.title == "Blog Stats"
+    assert BDS.AI.get_chat_conversation(conversation.id).title == "Blog Stats"
+
+    assert_received {:runtime_request, _endpoint, %{operation: :chat}}
+    assert_received {:runtime_request, _endpoint, %{operation: :chat}}
+
+    assert_received {:runtime_request, _endpoint, title_request}
+    assert title_request.operation == :chat_title
+    assert title_request.model == "title-model"
+    assert Enum.any?(title_request.messages, &(&1["content"] =~ "2-3 words"))
+    assert Enum.any?(title_request.messages, &(&1["content"] =~ "How many items"))
   end
 
   test "chat does not prompt models to emit textual tool calls when tools are unavailable" do

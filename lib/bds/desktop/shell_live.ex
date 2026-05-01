@@ -458,6 +458,30 @@ defmodule BDS.Desktop.ShellLive do
     end
   end
 
+  def handle_event("delete_sidebar_chat", %{"id" => conversation_id}, socket) do
+    case AI.delete_chat_conversation(conversation_id) do
+      {:ok, :deleted} ->
+        workbench = Workbench.close_tab(socket.assigns.workbench, :chat, conversation_id)
+        tab_meta = Map.delete(socket.assigns.tab_meta, {:chat, conversation_id})
+
+        {:noreply,
+         socket
+         |> assign(:tab_meta, tab_meta)
+         |> reload_shell(workbench)}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> append_output_entry(
+           translated("sidebar.chat.deleteConversation"),
+           inspect(reason),
+           nil,
+           "error"
+         )
+         |> reload_shell(socket.assigns.workbench)}
+    end
+  end
+
   def handle_event("toggle_offline_mode", _params, socket) do
     next_mode = not socket.assigns.offline_mode
 
