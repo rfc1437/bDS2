@@ -2,7 +2,7 @@
 
 Living document. Each section lists **status**, then **open work in priority order**, then a brief notes block. Completed work is listed compactly at the bottom (`## Changelog`).
 
-Last refreshed: 2026-05-07.
+Last refreshed: 2026-05-08.
 
 ---
 
@@ -14,7 +14,6 @@ Last refreshed: 2026-05-07.
 
 | # | Module | Current lines | Target | Strategy |
 |---|---|---|---|---|
-| 8 | `BDS.Desktop.ShellLive.ChatEditor` | 972 | ≤ 400 | Extract `ToolSurfaces` (~280), `ToolTracking` (~140), `MessageBuild` (~160), `ModelSelection` (~100). Defer — highest internal coupling. |
 | 9 | `BDS.MCP` | 677 | ≤ 350 | Split tools / resources / proposals / serialization clusters. (Carried over from original priority list.) |
 
 **Established pattern:** extract cohesive helper clusters into submodules under `lib/<context>/<sub>.ex`; `import BDS.X.Y, only: [...]` from the main module so internal call sites are unchanged; `defdelegate` for any helper still needed through the public namespace; verify with `mix compile --warnings-as-errors`, `mix dialyzer --format short`, and full `mix test` after each extraction.
@@ -33,6 +32,7 @@ Last refreshed: 2026-05-07.
 - `BDS.Desktop.ShellLive.MenuEditor` 871 → 335 (62 %)
 - `BDS.Desktop.ShellLive.PostEditor` 963 → 506 (47 %)
 - `BDS.Desktop.ShellLive.SettingsEditor` 872 → 226 (74 %)
+- `BDS.Desktop.ShellLive.ChatEditor` 972 → 576 (41 %)
 
 ---
 
@@ -165,6 +165,11 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ---
 
 ## Changelog
+
+### 2026-05-08
+
+- **God modules**:
+  - `BDS.Desktop.ShellLive.ChatEditor` 972 → 576 (41 %). Submodules under `lib/bds/desktop/shell_live/chat_editor/`: `ToolSurfaces` (274, build_render_surfaces + build_render_surface + do_build_render_surface (8 clauses) + build_tab_surface + decode_surface_actions/options + normalize_tool_surface + map_value + numeric_value + stringify_list + render_tool? + @render_tool_names), `ToolTracking` (101, tool_call_name + tool_call_arguments + normalize_tool_calls + tool_arguments_preview + mark_tool_call_completed + tool_markers_from_events + mark_last_matching_complete + preview_value + @tool_args_max_length), `MessageBuild` (118, build/1,2 + build_entries + finalize_entry + start_entry + append_tool_surface + pending_user_message + streaming_content), `ModelSelection` (80, toggle_model_selector + set_model + group_available_models + needs_api_key? + provider_group_label + blank?). Coordinator keeps the 3 HEEx components (chat_editor, chat_tool_markers, chat_surface), the 13 public event handlers (assign_socket, update_input, update_surface_form, select_surface_tab, current_surface_data, set_action_error, clear_action_error, send_message, abort_message, note_tool_call, note_tool_result, note_streaming_content, finish_request), the HEEx-callable helpers (markdown_html, message_role_label, payload_json, chart_width, truthy?, tool_surface_type, translated/1,2), private helpers (update_request, allow_repo_sandbox, rewrite_external_images, external_image_link, surface_input_type, present?, format_error), and `defdelegate` entries for `build/1`, `toggle_model_selector/2`, `set_model/4`, `tool_call_name/1`, `tool_call_arguments/1`. Cross-submodule deps are linear: MessageBuild → ModelSelection + ToolSurfaces + ToolTracking; ToolSurfaces, ToolTracking, ModelSelection are leaves. Each submodule that needs it duplicates the small `translated/2` and `blank?/1` helpers locally per the established convention; ToolSurfaces also duplicates `truthy?/1` privately. ModelSelection uses `Phoenix.Component.assign/3` via `import only:`. The 400-line target was not reachable while keeping all 3 HEEx components in the coordinator (the chat_surface component alone is ~200 lines). Validates clean: `mix compile --warnings-as-errors`, `mix dialyzer --format short` (Total errors: 0), `mix test` (342 tests, 0 failures, 4 skipped).
 
 ### 2026-05-07
 

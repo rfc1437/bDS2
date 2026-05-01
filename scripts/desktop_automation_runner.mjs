@@ -74,9 +74,20 @@ for await (const line of rl) {
 
     if (message.command === "native_menu_action") {
       await page.evaluate((action) => {
-        window.dispatchEvent(new CustomEvent("bds:native-menu-action", { detail: { action } }));
+        return new Promise((resolve) => {
+          const ackId = `ack-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          const handler = (event) => {
+            if (event.detail?.ackId === ackId) {
+              window.removeEventListener("bds:native-menu-action-ack", handler);
+              resolve();
+            }
+          };
+          window.addEventListener("bds:native-menu-action-ack", handler);
+          window.dispatchEvent(
+            new CustomEvent("bds:native-menu-action", { detail: { action, ackId } })
+          );
+        });
       }, message.action);
-      await page.waitForTimeout(50);
       console.log(JSON.stringify({ ref, status: "ok", result: "ok" }));
       continue;
     }

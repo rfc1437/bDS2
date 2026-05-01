@@ -555,9 +555,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         this.handleNativeMenuAction = (event) => {
           const action = event.detail?.action;
+          const ackId = event.detail?.ackId;
 
           if (action) {
-            this.pushEvent("native_menu_action", { action });
+            this.pushEvent("native_menu_action", { action }, () => {
+              if (ackId) {
+                window.dispatchEvent(
+                  new CustomEvent("bds:native-menu-action-ack", { detail: { ackId } })
+                );
+              }
+            });
           }
         };
 
