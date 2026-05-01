@@ -109,40 +109,6 @@
           <.chat_surface surface={surface} />
         <% end %>
 
-        <%= for surface <- message.tool_surfaces do %>
-          <article class="chat-tool-surface" data-testid="chat-tool-surface">
-            <%= if surface.title do %>
-              <h3><%= surface.title %></h3>
-            <% end %>
-
-            <%= case tool_surface_type(surface) do %>
-              <% "table" -> %>
-                <div class="chat-tool-surface-table-wrap">
-                  <table class="chat-tool-surface-table">
-                    <thead>
-                      <tr>
-                        <%= for column <- surface.columns do %>
-                          <th><%= column %></th>
-                        <% end %>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <%= for row <- surface.rows do %>
-                        <tr>
-                          <%= for value <- row do %>
-                            <td><%= value %></td>
-                          <% end %>
-                        </tr>
-                      <% end %>
-                    </tbody>
-                  </table>
-                </div>
-
-              <% _other -> %>
-                <pre class="chat-tool-surface-json"><%= Jason.encode!(surface.data, pretty: true) %></pre>
-            <% end %>
-          </article>
-        <% end %>
       <% end %>
 
       <%= if @chat_editor.is_streaming and (@chat_editor.streaming_content != "" or @chat_editor.streaming_tool_markers != []) do %>
@@ -160,6 +126,10 @@
             <% end %>
           </div>
         </div>
+
+        <%= for surface <- @chat_editor.streaming_inline_surfaces do %>
+          <.chat_surface surface={surface} />
+        <% end %>
       <% end %>
 
       <%= if @chat_editor.is_streaming and @chat_editor.streaming_content == "" and @chat_editor.streaming_tool_markers == [] do %>

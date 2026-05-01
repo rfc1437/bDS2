@@ -22,6 +22,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
         name: tool_call_name(tool_call),
         arguments: arguments,
         args_preview: tool_arguments_preview(arguments),
+        result: nil,
         complete?: false
       }
     end)
@@ -39,11 +40,19 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
   @spec tool_arguments_preview(term()) :: term()
   def tool_arguments_preview(_arguments), do: ""
 
+  @spec mark_tool_call_completed(term(), term()) :: term()
   def mark_tool_call_completed(entry, tool_call_id) when is_binary(tool_call_id) do
+    mark_tool_call_completed(entry, tool_call_id, nil)
+  end
+
+  def mark_tool_call_completed(entry, _tool_call_id), do: entry
+
+  @spec mark_tool_call_completed(term(), term(), term()) :: term()
+  def mark_tool_call_completed(entry, tool_call_id, result) when is_binary(tool_call_id) do
     update_in(entry.tool_markers, fn markers ->
       Enum.map(markers, fn marker ->
         if marker.id == tool_call_id do
-          %{marker | complete?: true}
+          %{marker | complete?: true, result: result}
         else
           marker
         end
@@ -51,8 +60,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
     end)
   end
 
-  @spec mark_tool_call_completed(term(), term()) :: term()
-  def mark_tool_call_completed(entry, _tool_call_id), do: entry
+  def mark_tool_call_completed(entry, _tool_call_id, _result), do: entry
 
   @spec tool_markers_from_events(term()) :: term()
   def tool_markers_from_events(nil), do: []
@@ -68,6 +76,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
                 name: event.name,
                 arguments: event.arguments,
                 args_preview: tool_arguments_preview(event.arguments || %{}),
+                result: nil,
                 complete?: false
               }
             ]

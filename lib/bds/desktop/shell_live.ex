@@ -135,6 +135,7 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:chat_editor_request_refs, %{})
      |> assign(:chat_editor_surface_data, %{})
      |> assign(:chat_editor_surface_tabs, %{})
+    |> assign(:chat_editor_dismissed_surfaces, MapSet.new())
      |> assign(:chat_editor_action_errors, %{})
      |> assign(:import_editor_analysis_states, %{})
      |> assign(:import_editor_analysis_task_refs, %{})
@@ -946,6 +947,10 @@ defmodule BDS.Desktop.ShellLive do
       ) do
     {:noreply,
      ChatEditor.select_surface_tab(socket, surface_id, parse_integer(index), &reload_shell/2)}
+  end
+
+  def handle_event("dismiss_chat_surface", %{"surface-id" => surface_id}, socket) do
+    {:noreply, ChatEditor.dismiss_surface(socket, surface_id, &reload_shell/2)}
   end
 
   def handle_event("chat_surface_action", params, socket) do

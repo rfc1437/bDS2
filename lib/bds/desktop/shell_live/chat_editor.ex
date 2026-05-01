@@ -59,6 +59,16 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec dismiss_surface(term(), term(), term()) :: term()
+  def dismiss_surface(socket, surface_id, reload) when is_binary(surface_id) do
+    socket
+    |> assign(
+      :chat_editor_dismissed_surfaces,
+      MapSet.put(socket.assigns.chat_editor_dismissed_surfaces, surface_id)
+    )
+    |> reload.(socket.assigns.workbench)
+  end
+
   @spec current_surface_data(term(), term()) :: term()
   def current_surface_data(socket, surface_id) when is_binary(surface_id) do
     Map.get(socket.assigns.chat_editor_surface_data, surface_id, %{})
@@ -314,13 +324,23 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     <%= if @markers != [] do %>
       <div class="chat-tool-markers">
         <%= for marker <- @markers do %>
-          <div class={["chat-tool-marker", if(marker.complete?, do: "completed", else: "pending")]} data-testid="chat-tool-marker">
-            <span class="chat-tool-marker-icon"><%= if marker.complete?, do: "✓", else: "●" %></span>
-            <span class="chat-tool-marker-name"><%= marker.name %></span>
-            <%= if marker.args_preview not in [nil, ""] do %>
-              <span class="chat-tool-marker-args">(<%= marker.args_preview %>)</span>
-            <% end %>
-          </div>
+          <details class={["chat-tool-marker", if(marker.complete?, do: "completed", else: "pending")]} data-testid="chat-tool-marker">
+            <summary>
+              <span class="chat-tool-marker-icon"><%= if marker.complete?, do: "✓", else: "●" %></span>
+              <span class="chat-tool-marker-name"><%= marker.name %></span>
+              <%= if marker.args_preview not in [nil, ""] do %>
+                <span class="chat-tool-marker-args">(<%= marker.args_preview %>)</span>
+              <% end %>
+            </summary>
+            <div class="chat-tool-marker-details" data-testid="chat-tool-marker-details">
+              <div class="chat-tool-marker-detail-label"><%= translated("chat.toolArguments") %></div>
+              <pre><%= Jason.encode!(marker.arguments || %{}, pretty: true) %></pre>
+              <%= if marker.result not in [nil, ""] do %>
+                <div class="chat-tool-marker-detail-label"><%= translated("chat.toolResult") %></div>
+                <pre><%= marker.result %></pre>
+              <% end %>
+            </div>
+          </details>
         <% end %>
       </div>
     <% end %>
@@ -332,7 +352,13 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   @spec chat_surface(term()) :: term()
   def chat_surface(assigns) do
     ~H"""
-    <article class={["chat-inline-surface", "chat-inline-surface-#{@surface.type}"]} data-testid="chat-inline-surface">
+    <details id={@surface.id} class={["chat-inline-surface", "chat-inline-surface-#{@surface.type}"]} data-testid="chat-inline-surface" open={Map.get(@surface, :expanded?, false)}>
+      <summary class="chat-inline-surface-header">
+        <span class="chat-inline-surface-icon"><%= surface_icon(@surface.type) %></span>
+        <span class="chat-inline-surface-title"><%= surface_title(@surface) %></span>
+        <button class="chat-inline-surface-dismiss" type="button" phx-click="dismiss_chat_surface" phx-value-surface-id={@surface.id} aria-label={translated("chat.dismissSurface")} data-testid="chat-inline-surface-dismiss">×</button>
+      </summary>
+      <div class="chat-inline-surface-body">
       <%= case @surface.type do %>
         <% "card" -> %>
           <div class="chat-surface-card">
@@ -526,8 +552,26 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         <% _other -> %>
           <pre class="chat-tool-surface-json"><%= Jason.encode!(@surface.raw || %{}, pretty: true) %></pre>
       <% end %>
-    </article>
+      </div>
+    </details>
     """
+  end
+
+  defp surface_icon("chart"), do: "▥"
+  defp surface_icon("table"), do: "▦"
+  defp surface_icon("form"), do: "▤"
+  defp surface_icon("card"), do: "▣"
+  defp surface_icon("metric"), do: "#"
+  defp surface_icon("list"), do: "☰"
+  defp surface_icon("tabs"), do: "▧"
+  defp surface_icon(_type), do: "■"
+
+  defp surface_title(surface) do
+    cond do
+      present?(Map.get(surface, :title)) -> Map.get(surface, :title)
+      present?(Map.get(surface, :label)) -> Map.get(surface, :label)
+      true -> surface.type |> to_string() |> String.capitalize()
+    end
   end
 
   # ── Private helpers ───────────────────────────────────────────────────────

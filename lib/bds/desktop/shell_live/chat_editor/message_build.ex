@@ -31,6 +31,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
           is_streaming: not is_nil(request),
           streaming_content: streaming_content(request),
           streaming_tool_markers: ToolTracking.tool_markers_from_events(request),
+          streaming_inline_surfaces: streaming_inline_surfaces(conversation.id, request, assigns),
           offline?: Map.get(assigns, :offline_mode, true),
           needs_api_key?: ModelSelection.needs_api_key?(Map.get(assigns, :offline_mode, true)),
           action_error: Map.get(assigns.chat_editor_action_errors, conversation.id),
@@ -49,7 +50,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
         case message.role do
           :tool ->
             if current_entry && current_entry.role == :assistant do
-              {entries, append_tool_surface(current_entry, message), turn_index}
+              {entries, append_tool_result(current_entry, message), turn_index}
             else
               {entries, current_entry, turn_index}
             end
@@ -95,18 +96,15 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
       content: message.content || "",
       turn_index: turn_index,
       tool_markers: tool_markers,
-      inline_surfaces: ToolSurfaces.build_render_surfaces(tool_markers, message.id, assigns),
+      inline_surfaces:
+        ToolSurfaces.build_render_surfaces(tool_markers, message.id, assigns)
+        |> mark_latest_surface_expanded(assigns),
       tool_surfaces: []
     }
   end
 
-  defp append_tool_surface(entry, message) do
-    entry = ToolTracking.mark_tool_call_completed(entry, message.tool_call_id)
-
-    case ToolSurfaces.normalize_tool_surface(message.content) do
-      nil -> entry
-      surface -> update_in(entry.tool_surfaces, &(&1 ++ [surface]))
-    end
+  defp append_tool_result(entry, message) do
+    ToolTracking.mark_tool_call_completed(entry, message.tool_call_id, message.content)
   end
 
   defp tool_only_assistant_entry?(%{role: :assistant, content: content} = entry) do
@@ -125,6 +123,17 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
     }
   end
 
+  defp mark_latest_surface_expanded([], _assigns), do: []
+
+  defp mark_latest_surface_expanded(surfaces, assigns) do
+    dismissed = Map.get(assigns, :chat_editor_dismissed_surfaces, MapSet.new())
+
+    surfaces
+    |> Enum.reject(&MapSet.member?(dismissed, &1.id))
+    |> Enum.with_index()
+    |> Enum.map(fn {surface, index} -> Map.put(surface, :expanded?, index == length(surfaces) - 1) end)
+  end
+
   defp pending_user_message(_messages, nil), do: nil
 
   defp pending_user_message(messages, %{message: message}) when is_binary(message) do
@@ -139,6 +148,15 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
   defp streaming_content(nil), do: ""
   defp streaming_content(%{content: content}) when is_binary(content), do: content
   defp streaming_content(_request), do: ""
+
+  defp streaming_inline_surfaces(_conversation_id, nil, _assigns), do: []
+
+  defp streaming_inline_surfaces(conversation_id, request, assigns) do
+    request
+    |> ToolTracking.tool_markers_from_events()
+    |> ToolSurfaces.build_render_surfaces("streaming-#{conversation_id}", assigns)
+    |> mark_latest_surface_expanded(assigns)
+  end
 
   defp translated(text, bindings \\ %{}),
     do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())

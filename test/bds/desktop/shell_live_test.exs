@@ -2149,7 +2149,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert css =~ "position: static;"
   end
 
-  test "chat editor renders legacy model controls, tool markers, and structured tool surfaces" do
+  test "chat editor renders legacy model controls, collapsed tool pills, and dismissible A2UI surfaces" do
     assert {:ok, conversation} = AI.start_chat(%{title: "Editor Chat", model: "gpt-4.1"})
 
     now = Persistence.now_ms()
@@ -2209,11 +2209,21 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-testid="chat-model-selector-button")
     assert html =~ "gpt-4.1"
     assert html =~ ~s(data-testid="chat-tool-marker")
+    assert html =~ ~s(data-testid="chat-tool-marker-details")
     assert html =~ "render_table"
-    assert html =~ ~s(data-testid="chat-tool-surface")
+    refute html =~ ~s(data-testid="chat-tool-surface")
+    assert html =~ ~s(data-testid="chat-inline-surface")
+    assert html =~ ~s(data-testid="chat-inline-surface-dismiss")
     assert html =~ "Blog Stats"
     assert html =~ "Metric"
     assert html =~ "Posts"
+
+    dismissed_html =
+      render_click(view, "dismiss_chat_surface", %{
+        "surface-id" => Regex.run(~r/id="([^"]+-surface-0)"/, html) |> Enum.at(1)
+      })
+
+    refute dismissed_html =~ ~s(data-testid="chat-inline-surface")
   end
 
   test "chat editor folds tool-only assistant steps into the final assistant answer" do
@@ -2646,6 +2656,25 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert assistant_index < user_index
     assert html =~ ~r/<textarea[^>]*class="chat-input chat-surface-input"[^>]*disabled/
+
+    send(view.pid, {
+      :chat_tool_call,
+      conversation.id,
+      %{
+        id: "call-streaming-chart",
+        name: "render_chart",
+        arguments: %{
+          "title" => "Streaming Chart",
+          "chartType" => "bar",
+          "series" => [%{"label" => "Posts", "value" => 3}]
+        }
+      }
+    })
+
+    html = render(view)
+    assert html =~ ~s(data-testid="chat-streaming-message")
+    assert html =~ ~s(data-testid="chat-inline-surface")
+    assert html =~ "Streaming Chart"
 
     html =
       view
