@@ -14,8 +14,7 @@ Last refreshed: 2026-05-01.
 
 | # | Module | Current lines | Target | Strategy |
 |---|---|---|---|---|
-| 1 | `BDS.Maintenance` | 810 | ≤ 250 | Extract `DiffReports` (~240), `DiffComputation` (~160), `Repair` (~160), `FileScan` (~140), `Progress` (~60). Coordinator keeps the 4 public entrypoints. |
-| 2 | `BDS.Media` | 993 | ≤ 250 | Extract `Thumbnails` (~140), `Sidecars` (~150), `FileOps` (~180), `Rebuild` (~130), `Linking` (~80). Main keeps CRUD + translation API. |
+| 1 | `BDS.Media` | 993 | ≤ 250 | Extract `Thumbnails` (~140), `Sidecars` (~150), `FileOps` (~180), `Rebuild` (~130), `Linking` (~80). Main keeps CRUD + translation API. |
 | 3 | `BDS.Desktop.ShellLive.ImportEditor` | 1436 | ≤ 600 | Extract `ConflictResolution` (~150), `TaxonomyEditing` (~120), `AnalysisState` (~150), `ProgressTracking` (~120). Components stay in main file. |
 | 4 | `BDS.Rendering` | 838 | ≤ 200 | Extract `TemplateSelection` (~120), `PostRendering` (~180), `ListArchive` (~150), `Metadata` (~140), `LinksAndLanguages` (~100). Main keeps the 3 public renders. |
 | 5 | `BDS.Desktop.ShellLive.MenuEditor` | 871 | ≤ 350 | Extract `TreeOps` (~280), `TreePredicates` (~60), `DraftManagement` (~140), `PageCategory` (~120), `State` (~80). |
@@ -33,6 +32,7 @@ Last refreshed: 2026-05-01.
 - `BDS.Scripting.Capabilities` 1715 → 194 (89 %)
 - `BDS.Posts` 1781 → 569 (68 %)
 - `BDS.Desktop.ShellLive` 2607 → 1545 (41 %)
+- `BDS.Maintenance` 810 → 141 (83 %)
 
 ---
 
@@ -169,6 +169,7 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ### 2026-05-01
 
 - **God modules**:
+  - `BDS.Maintenance` 810 → 141 (83 %). Submodules under `lib/bds/maintenance/`: `Progress` (45), `FileScan` (158), `DiffComputation` (93), `DiffReports` (315), `Repair` (145). Coordinator keeps the 4 public entrypoints (`repair_metadata_diff/4`, `import_metadata_diff_orphans/3`, `rebuild_from_filesystem/3`, `metadata_diff/2`); submodules wired via `import only:`.
   - `BDS.Scripting.Capabilities` 1715 → 194 (89 %). Submodules: `Util` (301), `Posts` (270), `Media` (254), `Crud` (284), `Projects` (204), `AppShell` (134), `Bridges` (176). Public `for_project/2` preserved.
   - Fixed real race in `test/bds/desktop/shell_live_test.exs:1149` (metadata-diff editor open) — was diagnosed as flake but was a missing `completed_task!(task.id)` synchronization between the worker `:DOWN` and the next `:refresh_task_status` tick.
 
