@@ -7,11 +7,18 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   alias BDS.{Embeddings, Generation, Git, Posts, Repo}
   alias BDS.Desktop.ShellData
+  alias BDS.MapUtils
   alias BDS.Settings.Setting
 
-  embed_templates "misc_editor_html/*"
+  embed_templates("misc_editor_html/*")
 
-  @misc_routes [:site_validation, :metadata_diff, :translation_validation, :find_duplicates, :git_diff]
+  @misc_routes [
+    :site_validation,
+    :metadata_diff,
+    :translation_validation,
+    :find_duplicates,
+    :git_diff
+  ]
 
   def assign_socket(socket) do
     assign(socket, :misc_editor, build(socket.assigns))
@@ -19,7 +26,9 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   def rerun(socket) do
     case meta(socket.assigns) do
-      %{action: action} when is_binary(action) -> {:command, action}
+      %{action: action} when is_binary(action) ->
+        {:command, action}
+
       _other ->
         case misc_route_action(socket.assigns.current_tab.type) do
           nil -> {:noop, socket}
@@ -47,10 +56,16 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
       {:ok, result} ->
         {:rerun,
          socket
-         |> append_output.(translated("Site Validation"), translated("Validation changes applied"), inspect(result))}
+         |> append_output.(
+           translated("Site Validation"),
+           translated("Validation changes applied"),
+           inspect(result)
+         )}
     end
   rescue
-    error -> {:socket, append_output.(socket, translated("Site Validation"), inspect(error), nil, "error")}
+    error ->
+      {:socket,
+       append_output.(socket, translated("Site Validation"), inspect(error), nil, "error")}
   end
 
   def toggle_duplicate(socket, pair_id, reload) do
@@ -65,7 +80,10 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
       end
 
     socket
-    |> assign(:misc_editor_selected_pairs, Map.put(selected_by_tab, socket.assigns.current_tab.id, next))
+    |> assign(
+      :misc_editor_selected_pairs,
+      Map.put(selected_by_tab, socket.assigns.current_tab.id, next)
+    )
     |> reload.(socket.assigns.workbench)
   end
 
@@ -75,7 +93,9 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
         socket
         |> update_payload(fn payload ->
           update_in(payload[:pairs], fn pairs ->
-            Enum.reject(pairs || [], fn pair -> pair_identity(pair) == pair_id(post_id_a, post_id_b) end)
+            Enum.reject(pairs || [], fn pair ->
+              pair_identity(pair) == pair_id(post_id_a, post_id_b)
+            end)
           end)
         end)
         |> clear_selected_pair(pair_id(post_id_a, post_id_b))
@@ -91,6 +111,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   def dismiss_selected(socket, reload, append_output) do
     tab_id = socket.assigns.current_tab.id
+
     selected =
       socket.assigns.misc_editor_selected_pairs
       |> Map.get(tab_id, MapSet.new())
@@ -106,7 +127,10 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
             Enum.reject(pairs || [], fn pair -> pair_identity(pair) in selected end)
           end)
         end)
-        |> assign(:misc_editor_selected_pairs, Map.put(socket.assigns.misc_editor_selected_pairs, tab_id, MapSet.new()))
+        |> assign(
+          :misc_editor_selected_pairs,
+          Map.put(socket.assigns.misc_editor_selected_pairs, tab_id, MapSet.new())
+        )
         |> append_output.(translated("Find Duplicates"), translated("Selected pairs dismissed"))
         |> reload.(socket.assigns.workbench)
 
@@ -137,14 +161,20 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
        })
      )}
   rescue
-    error -> {:socket, append_output.(socket, translated("Translation Validation"), inspect(error), nil, "error")}
+    error ->
+      {:socket,
+       append_output.(socket, translated("Translation Validation"), inspect(error), nil, "error")}
   end
 
   def select_git_diff_file(socket, file_path) do
     assign(
       socket,
       :misc_editor_git_selected_files,
-      Map.put(socket.assigns.misc_editor_git_selected_files, socket.assigns.current_tab.id, file_path)
+      Map.put(
+        socket.assigns.misc_editor_git_selected_files,
+        socket.assigns.current_tab.id,
+        file_path
+      )
     )
   end
 
@@ -183,7 +213,10 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     meta = meta(socket.assigns)
     payload = Map.get(meta, :payload, %{})
     items = Enum.map(Map.get(payload, :diff_reports, []), &normalize_metadata_diff_item/1)
-    orphan_files = Enum.map(Map.get(payload, :orphan_reports, []), &normalize_metadata_diff_orphan/1)
+
+    orphan_files =
+      Enum.map(Map.get(payload, :orphan_reports, []), &normalize_metadata_diff_orphan/1)
+
     tabs = metadata_diff_tabs(items, orphan_files)
     active_tab = metadata_diff_active_tab(socket.assigns, tabs)
 
@@ -214,7 +247,8 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   def build(_assigns), do: nil
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  def translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   def misc_class(:site_validation), do: "site-validation-view"
   def misc_class(:metadata_diff), do: "metadata-diff-view"
@@ -255,11 +289,17 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   defp build_metadata_diff(assigns, meta, payload) do
     items = Enum.map(Map.get(payload, :diff_reports, []), &normalize_metadata_diff_item/1)
-    orphan_files = Enum.map(Map.get(payload, :orphan_reports, []), &normalize_metadata_diff_orphan/1)
+
+    orphan_files =
+      Enum.map(Map.get(payload, :orphan_reports, []), &normalize_metadata_diff_orphan/1)
+
     tabs = metadata_diff_tabs(items, orphan_files)
     active_tab = metadata_diff_active_tab(assigns, tabs)
     active_field = metadata_diff_active_field(assigns)
-    current_tab = Enum.find(tabs, &(&1.id == active_tab)) || List.first(tabs) || empty_metadata_diff_tab()
+
+    current_tab =
+      Enum.find(tabs, &(&1.id == active_tab)) || List.first(tabs) || empty_metadata_diff_tab()
+
     filtered_items = metadata_diff_filtered_items(current_tab.items, active_field)
 
     %{
@@ -267,7 +307,8 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
       title: Map.get(meta, :title, translated("Metadata Diff")),
       subtitle: Map.get(meta, :subtitle, ""),
       summary: Map.get(payload, :summary, %{}),
-      tabs: Enum.map(tabs, &Map.take(&1, [:id, :label, :badge_count, :diff_count, :orphan_count])),
+      tabs:
+        Enum.map(tabs, &Map.take(&1, [:id, :label, :badge_count, :diff_count, :orphan_count])),
       active_tab: current_tab.id,
       active_field: active_field,
       repair_enabled: metadata_diff_repairable_tab?(current_tab.id),
@@ -300,7 +341,8 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   end
 
   defp build_duplicates(assigns, meta, payload) do
-    selected_pairs = Map.get(assigns.misc_editor_selected_pairs, assigns.current_tab.id, MapSet.new())
+    selected_pairs =
+      Map.get(assigns.misc_editor_selected_pairs, assigns.current_tab.id, MapSet.new())
 
     %{
       kind: :find_duplicates,
@@ -319,8 +361,15 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     {files, diff, error_message} =
       case Git.status(project_id) do
         {:ok, %{files: files}} ->
-          file_paths = files |> Enum.map(&Map.get(&1, :path)) |> Enum.reject(&is_nil/1) |> Enum.uniq() |> Enum.sort()
-          selected_file_path = select_git_diff_path(assigns.current_tab.id, file_paths, selected_files)
+          file_paths =
+            files
+            |> Enum.map(&Map.get(&1, :path))
+            |> Enum.reject(&is_nil/1)
+            |> Enum.uniq()
+            |> Enum.sort()
+
+          selected_file_path =
+            select_git_diff_path(assigns.current_tab.id, file_paths, selected_files)
 
           diff =
             case selected_file_path do
@@ -329,8 +378,14 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
               file_path ->
                 case Git.get_diff_content(project_id, file_path) do
-                  {:ok, diff} -> diff
-                  {:error, reason} -> Map.merge(empty_git_diff(project_id), %{file_path: file_path, error: inspect(reason)})
+                  {:ok, diff} ->
+                    diff
+
+                  {:error, reason} ->
+                    Map.merge(empty_git_diff(project_id), %{
+                      file_path: file_path,
+                      error: inspect(reason)
+                    })
                 end
             end
 
@@ -357,10 +412,17 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   def translation_issue_label(issue) do
     case issue_value(issue, :issue) do
-      "same-language-as-canonical" -> translated("translationValidation.issue.sameLanguage")
-      "do-not-translate-has-translations" -> translated("translationValidation.issue.doNotTranslate")
-      "content-in-database" -> translated("translationValidation.issue.contentInDatabase")
-      _other -> translated("translationValidation.issue.missingSource")
+      "same-language-as-canonical" ->
+        translated("translationValidation.issue.sameLanguage")
+
+      "do-not-translate-has-translations" ->
+        translated("translationValidation.issue.doNotTranslate")
+
+      "content-in-database" ->
+        translated("translationValidation.issue.contentInDatabase")
+
+      _other ->
+        translated("translationValidation.issue.missingSource")
     end
   end
 
@@ -414,12 +476,17 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   defp clear_selected_pair(socket, pair_id) do
     tab_id = socket.assigns.current_tab.id
     current = Map.get(socket.assigns.misc_editor_selected_pairs, tab_id, MapSet.new())
-    next_pairs = Map.put(socket.assigns.misc_editor_selected_pairs, tab_id, MapSet.delete(current, pair_id))
+
+    next_pairs =
+      Map.put(socket.assigns.misc_editor_selected_pairs, tab_id, MapSet.delete(current, pair_id))
+
     assign(socket, :misc_editor_selected_pairs, next_pairs)
   end
 
   defp pair_id(post_id_a, post_id_b), do: Enum.sort([post_id_a, post_id_b]) |> Enum.join("::")
-  defp pair_identity(pair), do: pair_id(Map.get(pair, :post_id_a) || Map.get(pair, "post_id_a"), Map.get(pair, :post_id_b) || Map.get(pair, "post_id_b"))
+
+  defp pair_identity(pair),
+    do: pair_id(MapUtils.attr(pair, :post_id_a), MapUtils.attr(pair, :post_id_b))
 
   defp decode_pair_id(encoded) when is_binary(encoded) do
     case String.split(encoded, "::", parts: 2) do
@@ -432,7 +499,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   defp field_summaries(items) do
     items
-    |> Enum.flat_map(fn item -> Map.get(item, :differences) || Map.get(item, "differences") || [] end)
+    |> Enum.flat_map(fn item -> MapUtils.attr(item, :differences) || [] end)
     |> Enum.group_by(&diff_name/1)
     |> Enum.map(fn {field, diffs} -> %{field_name: field, diff_count: length(diffs)} end)
     |> Enum.sort_by(&{&1.diff_count * -1, &1.field_name})
@@ -465,7 +532,15 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   end
 
   defp empty_metadata_diff_tab do
-    %{id: "posts", label: translated("Posts"), items: [], orphan_files: [], diff_count: 0, orphan_count: 0, badge_count: 0}
+    %{
+      id: "posts",
+      label: translated("Posts"),
+      items: [],
+      orphan_files: [],
+      diff_count: 0,
+      orphan_count: 0,
+      badge_count: 0
+    }
   end
 
   defp metadata_diff_active_tab(assigns, tabs) do
@@ -489,11 +564,12 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   end
 
   defp normalize_metadata_diff_item(item) do
-    entity_type = Map.get(item, :entity_type) || Map.get(item, "entity_type") || "post"
-    entity_id = Map.get(item, :entity_id) || Map.get(item, "entity_id") || ""
+    entity_type = MapUtils.attr(item, :entity_type) || "post"
+    entity_id = MapUtils.attr(item, :entity_id) || ""
+
     differences =
       item
-      |> Map.get(:differences, Map.get(item, "differences", []))
+      |> MapUtils.attr(:differences, [])
       |> Enum.map(&normalize_metadata_diff_difference/1)
 
     %{
@@ -510,30 +586,31 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   defp normalize_metadata_diff_difference(diff) do
     %{
       field: diff_name(diff),
-      db_value: format_metadata_diff_value(Map.get(diff, :db_value) || Map.get(diff, "db_value")),
-      file_value: format_metadata_diff_value(Map.get(diff, :file_value) || Map.get(diff, "file_value"))
+      db_value: format_metadata_diff_value(MapUtils.attr(diff, :db_value)),
+      file_value: format_metadata_diff_value(MapUtils.attr(diff, :file_value))
     }
   end
 
   defp normalize_metadata_diff_orphan(orphan) do
-    path = Map.get(orphan, :file_path) || Map.get(orphan, "file_path") || Map.get(orphan, :path) || Map.get(orphan, "path") || ""
-    entity_type = Map.get(orphan, :entity_type) || Map.get(orphan, "entity_type") || metadata_diff_orphan_entity_type(path)
+    path = MapUtils.attr(orphan, :file_path) || MapUtils.attr(orphan, :path) || ""
+    entity_type = MapUtils.attr(orphan, :entity_type) || metadata_diff_orphan_entity_type(path)
 
     %{
       tab_id: metadata_diff_tab_id(entity_type),
       entity_type: entity_type,
       file_path: path,
       slug: Path.basename(path) |> String.trim(),
-      id: Map.get(orphan, :id) || Map.get(orphan, "id")
+      id: MapUtils.attr(orphan, :id)
     }
   end
 
   defp metadata_diff_item_label(item, entity_id) do
-    Map.get(item, :label) || Map.get(item, "label") || Map.get(item, :title) || Map.get(item, "title") || Map.get(item, :slug) || Map.get(item, "slug") || entity_id
+    MapUtils.attr(item, :label) || MapUtils.attr(item, :title) || MapUtils.attr(item, :slug) ||
+      entity_id
   end
 
   defp metadata_diff_item_meta_label(item, entity_id) do
-    Map.get(item, :meta_label) || Map.get(item, "meta_label") || entity_id
+    MapUtils.attr(item, :meta_label) || entity_id
   end
 
   defp metadata_diff_item_type_label("post"), do: translated("Post")
@@ -547,7 +624,9 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   defp metadata_diff_item_type_label("categories"), do: translated("Categories")
   defp metadata_diff_item_type_label("category_meta"), do: translated("Categories")
   defp metadata_diff_item_type_label("embedding"), do: translated("Embeddings")
-  defp metadata_diff_item_type_label(entity_type), do: entity_type |> String.replace("_", " ") |> String.capitalize()
+
+  defp metadata_diff_item_type_label(entity_type),
+    do: entity_type |> String.replace("_", " ") |> String.capitalize()
 
   defp metadata_diff_tab_id("post"), do: "posts"
   defp metadata_diff_tab_id("post_translation"), do: "posts"
@@ -568,7 +647,9 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   defp metadata_diff_tab_label("templates"), do: translated("Templates")
   defp metadata_diff_tab_label("project"), do: translated("Project")
   defp metadata_diff_tab_label("embeddings"), do: translated("Embeddings")
-  defp metadata_diff_tab_label(tab_id), do: tab_id |> String.replace("_", " ") |> String.capitalize()
+
+  defp metadata_diff_tab_label(tab_id),
+    do: tab_id |> String.replace("_", " ") |> String.capitalize()
 
   defp metadata_diff_tab_sort_key("posts"), do: 0
   defp metadata_diff_tab_sort_key("media"), do: 1
@@ -588,7 +669,8 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
-  defp metadata_diff_repairable_tab?(tab_id), do: tab_id in ["posts", "media", "scripts", "templates", "project", "embeddings"]
+  defp metadata_diff_repairable_tab?(tab_id),
+    do: tab_id in ["posts", "media", "scripts", "templates", "project", "embeddings"]
 
   defp misc_route_action(:site_validation), do: "validate_site"
   defp misc_route_action(:metadata_diff), do: "metadata_diff"
@@ -601,7 +683,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   defp format_metadata_diff_value(value), do: to_string(value)
 
   defp diff_name(diff) do
-    Map.get(diff, :field) || Map.get(diff, "field") || Map.get(diff, :name) || Map.get(diff, "name") || "value"
+    MapUtils.attr(diff, :field) || MapUtils.attr(diff, :name) || "value"
   end
 
   defp normalize_translation_validation_report(payload) when is_map(payload) do

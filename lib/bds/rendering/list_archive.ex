@@ -2,6 +2,7 @@ defmodule BDS.Rendering.ListArchive do
   @moduledoc false
 
   alias BDS.I18n
+  alias BDS.MapUtils
   alias BDS.Persistence
   alias BDS.Rendering.LinksAndLanguages
   alias BDS.Rendering.Metadata, as: RenderMetadata
@@ -12,18 +13,19 @@ defmodule BDS.Rendering.ListArchive do
     metadata = RenderMetadata.project_metadata(project_id)
     template_context = TemplateSelection.template_render_context(project_id)
 
-    language =
-      Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
+    language = MapUtils.attr(assigns, :language, metadata.main_language || "en")
 
     main_language = metadata.main_language || language
-    archive_context = Map.get(assigns, :archive_context, Map.get(assigns, "archive_context", %{}))
+    archive_context = MapUtils.attr(assigns, :archive_context, %{})
 
-    canonical_post_paths = LinksAndLanguages.canonical_post_path_by_slug(project_id, main_language)
+    canonical_post_paths =
+      LinksAndLanguages.canonical_post_path_by_slug(project_id, main_language)
+
     canonical_media_paths = LinksAndLanguages.canonical_media_path_by_source_path(project_id)
 
     posts =
       normalize_list_posts(
-        Map.get(assigns, :posts, Map.get(assigns, "posts", [])),
+        MapUtils.attr(assigns, :posts, []),
         canonical_post_paths,
         canonical_media_paths,
         language,
@@ -31,7 +33,7 @@ defmodule BDS.Rendering.ListArchive do
       )
 
     pagination =
-      normalize_pagination(Map.get(assigns, :pagination, Map.get(assigns, "pagination")), posts)
+      normalize_pagination(MapUtils.attr(assigns, :pagination), posts)
 
     day_blocks = build_day_blocks(posts)
     min_date = min_date(posts)
@@ -44,15 +46,23 @@ defmodule BDS.Rendering.ListArchive do
         Map.get(
           assigns,
           :language_prefix,
-          Map.get(assigns, "language_prefix", LinksAndLanguages.language_prefix(language, main_language))
+          Map.get(
+            assigns,
+            "language_prefix",
+            LinksAndLanguages.language_prefix(language, main_language)
+          )
         ),
-      page_title: Map.get(assigns, :page_title, Map.get(assigns, "page_title")),
+      page_title: MapUtils.attr(assigns, :page_title),
       posts: posts,
       pico_stylesheet_href:
         Map.get(
           assigns,
           :pico_stylesheet_href,
-          Map.get(assigns, "pico_stylesheet_href", RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme))
+          Map.get(
+            assigns,
+            "pico_stylesheet_href",
+            RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
+          )
         ),
       html_theme_attribute:
         Map.get(
@@ -66,7 +76,8 @@ defmodule BDS.Rendering.ListArchive do
       calendar_initial_year: calendar_initial_year_from_posts(posts),
       calendar_initial_month: calendar_initial_month_from_posts(posts),
       archive_context: normalized_archive_context,
-      show_archive_range_heading: show_archive_range_heading?(normalized_archive_context, day_blocks),
+      show_archive_range_heading:
+        show_archive_range_heading?(normalized_archive_context, day_blocks),
       min_date: min_date,
       max_date: max_date,
       is_list_page: true,
@@ -91,25 +102,32 @@ defmodule BDS.Rendering.ListArchive do
   def not_found_assigns(project_id, assigns) do
     metadata = RenderMetadata.project_metadata(project_id)
 
-    language =
-      Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
+    language = MapUtils.attr(assigns, :language, metadata.main_language || "en")
 
     main_language = metadata.main_language || language
 
     %{
-      page_title: Map.get(assigns, :page_title, Map.get(assigns, "page_title", "404")),
+      page_title: MapUtils.attr(assigns, :page_title, "404"),
       language: language,
       language_prefix:
         Map.get(
           assigns,
           :language_prefix,
-          Map.get(assigns, "language_prefix", LinksAndLanguages.language_prefix(language, main_language))
+          Map.get(
+            assigns,
+            "language_prefix",
+            LinksAndLanguages.language_prefix(language, main_language)
+          )
         ),
       pico_stylesheet_href:
         Map.get(
           assigns,
           :pico_stylesheet_href,
-          Map.get(assigns, "pico_stylesheet_href", RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme))
+          Map.get(
+            assigns,
+            "pico_stylesheet_href",
+            RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
+          )
         ),
       html_theme_attribute:
         Map.get(
@@ -143,20 +161,27 @@ defmodule BDS.Rendering.ListArchive do
     }
   end
 
-  defp normalize_list_posts(posts, canonical_post_paths, canonical_media_paths, language, template_context) do
+  defp normalize_list_posts(
+         posts,
+         canonical_post_paths,
+         canonical_media_paths,
+         language,
+         template_context
+       ) do
     Enum.map(posts, fn post ->
       post_record = PostRendering.load_post_record(post)
+
       raw_content =
         Map.get(
           post,
           :content,
-          Map.get(post, "content", Map.get(post, :excerpt, Map.get(post, "excerpt", "")))
+          MapUtils.attr(post, :excerpt, "")
         )
 
       %{
-        id: Map.get(post, :id, Map.get(post, "id")),
-        slug: Map.get(post, :slug, Map.get(post, "slug")),
-        title: Map.get(post, :title, Map.get(post, "title")),
+        id: MapUtils.attr(post, :id),
+        slug: MapUtils.attr(post, :slug),
+        title: MapUtils.attr(post, :title),
         content:
           PostRendering.render_post_content(
             raw_content,
@@ -166,29 +191,30 @@ defmodule BDS.Rendering.ListArchive do
             template_context
           ),
         raw_content: raw_content,
-        excerpt:
-          Map.get(post, :excerpt, Map.get(post, "excerpt", Map.get(post_record || %{}, :excerpt))),
-        author: Map.get(post, :author, Map.get(post, "author", Map.get(post_record || %{}, :author))),
+        excerpt: MapUtils.attr(post, :excerpt, Map.get(post_record || %{}, :excerpt)),
+        author: MapUtils.attr(post, :author, Map.get(post_record || %{}, :author)),
         language:
           Map.get(
             post,
             :language,
-            Map.get(post, "language", Map.get(post_record || %{}, :language))
+            Map.get(post_record || %{}, :language)
           ),
         published_at:
-          Map.get(post, :published_at, Map.get(post, "published_at", Map.get(post_record || %{}, :published_at))),
-        created_at:
-          Map.get(post, :created_at, Map.get(post, "created_at", Map.get(post_record || %{}, :created_at))),
-        updated_at:
-          Map.get(post, :updated_at, Map.get(post, "updated_at", Map.get(post_record || %{}, :updated_at))),
-        tags: Map.get(post, :tags, Map.get(post, "tags", Map.get(post_record || %{}, :tags, []))) || [],
+          MapUtils.attr(post, :published_at, Map.get(post_record || %{}, :published_at)),
+        created_at: MapUtils.attr(post, :created_at, Map.get(post_record || %{}, :created_at)),
+        updated_at: MapUtils.attr(post, :updated_at, Map.get(post_record || %{}, :updated_at)),
+        tags: MapUtils.attr(post, :tags, Map.get(post_record || %{}, :tags, [])) || [],
         categories:
-          Map.get(post, :categories, Map.get(post, "categories", Map.get(post_record || %{}, :categories, []))) || [],
+          MapUtils.attr(post, :categories, Map.get(post_record || %{}, :categories, [])) || [],
         template_slug:
-          Map.get(post, :template_slug, Map.get(post, "template_slug", Map.get(post_record || %{}, :template_slug))),
+          MapUtils.attr(post, :template_slug, Map.get(post_record || %{}, :template_slug)),
         do_not_translate:
-          Map.get(post, :do_not_translate, Map.get(post, "do_not_translate", Map.get(post_record || %{}, :do_not_translate, false))),
-        href: Map.get(post, :href, Map.get(post, "href")),
+          MapUtils.attr(
+            post,
+            :do_not_translate,
+            Map.get(post_record || %{}, :do_not_translate, false)
+          ),
+        href: MapUtils.attr(post, :href),
         show_title: true,
         linked_media: [],
         outgoing_links: [],
@@ -214,24 +240,20 @@ defmodule BDS.Rendering.ListArchive do
 
   defp normalize_pagination(%{} = pagination, posts) do
     total_items =
-      Map.get(pagination, :total_items, Map.get(pagination, "total_items", length(posts)))
+      MapUtils.attr(pagination, :total_items, length(posts))
 
     items_per_page =
-      Map.get(pagination, :items_per_page, Map.get(pagination, "items_per_page", total_items))
+      MapUtils.attr(pagination, :items_per_page, total_items)
 
     %{
-      current_page: Map.get(pagination, :current_page, Map.get(pagination, "current_page", 1)),
-      total_pages: Map.get(pagination, :total_pages, Map.get(pagination, "total_pages", 1)),
+      current_page: MapUtils.attr(pagination, :current_page, 1),
+      total_pages: MapUtils.attr(pagination, :total_pages, 1),
       total_items: total_items,
       items_per_page: items_per_page,
-      has_prev_page:
-        Map.get(pagination, :has_prev_page, Map.get(pagination, "has_prev_page", false)),
-      prev_page_href:
-        Map.get(pagination, :prev_page_href, Map.get(pagination, "prev_page_href", "")),
-      has_next_page:
-        Map.get(pagination, :has_next_page, Map.get(pagination, "has_next_page", false)),
-      next_page_href:
-        Map.get(pagination, :next_page_href, Map.get(pagination, "next_page_href", ""))
+      has_prev_page: MapUtils.attr(pagination, :has_prev_page, false),
+      prev_page_href: MapUtils.attr(pagination, :prev_page_href, ""),
+      has_next_page: MapUtils.attr(pagination, :has_next_page, false),
+      next_page_href: MapUtils.attr(pagination, :next_page_href, "")
     }
   end
 
@@ -239,11 +261,11 @@ defmodule BDS.Rendering.ListArchive do
 
   defp normalize_archive_context(%{} = archive_context) do
     %{
-      kind: Map.get(archive_context, :kind, Map.get(archive_context, "kind")),
-      name: Map.get(archive_context, :name, Map.get(archive_context, "name")),
-      month: Map.get(archive_context, :month, Map.get(archive_context, "month")),
-      year: Map.get(archive_context, :year, Map.get(archive_context, "year")),
-      day: Map.get(archive_context, :day, Map.get(archive_context, "day"))
+      kind: MapUtils.attr(archive_context, :kind),
+      name: MapUtils.attr(archive_context, :name),
+      month: MapUtils.attr(archive_context, :month),
+      year: MapUtils.attr(archive_context, :year),
+      day: MapUtils.attr(archive_context, :day)
     }
   end
 
@@ -251,7 +273,12 @@ defmodule BDS.Rendering.ListArchive do
     grouped_blocks =
       posts
       |> Enum.filter(&is_integer(Map.get(&1, :created_at)))
-      |> Enum.group_by(&(Map.get(&1, :created_at) |> Persistence.from_unix_ms!() |> DateTime.to_date() |> Date.to_iso8601()))
+      |> Enum.group_by(
+        &(Map.get(&1, :created_at)
+          |> Persistence.from_unix_ms!()
+          |> DateTime.to_date()
+          |> Date.to_iso8601())
+      )
       |> Enum.sort_by(fn {label, _posts} -> label end)
 
     grouped_blocks
@@ -287,9 +314,13 @@ defmodule BDS.Rendering.ListArchive do
   defp show_archive_range_heading?(%{kind: "date"}, _day_blocks), do: true
   defp show_archive_range_heading?(_archive_context, _day_blocks), do: false
 
-  defp calendar_initial_year_from_posts([post | _rest]), do: RenderMetadata.calendar_initial_year(post)
+  defp calendar_initial_year_from_posts([post | _rest]),
+    do: RenderMetadata.calendar_initial_year(post)
+
   defp calendar_initial_year_from_posts([]), do: nil
 
-  defp calendar_initial_month_from_posts([post | _rest]), do: RenderMetadata.calendar_initial_month(post)
+  defp calendar_initial_month_from_posts([post | _rest]),
+    do: RenderMetadata.calendar_initial_month(post)
+
   defp calendar_initial_month_from_posts([]), do: nil
 end

@@ -80,18 +80,26 @@ defmodule BDS.Desktop.ShellCommands do
     attrs = %{group_id: group_id, group_name: "Search"}
 
     {:ok, posts_task} =
-      Tasks.submit_task("Reindex Search Text", fn report ->
-        :ok = Search.reindex_posts(project.id, on_progress: report)
-        report.(1.0, "Post search text reindexed")
-        %{project_id: project.id, entity: "posts"}
-      end, attrs)
+      Tasks.submit_task(
+        "Reindex Search Text",
+        fn report ->
+          :ok = Search.reindex_posts(project.id, on_progress: report)
+          report.(1.0, "Post search text reindexed")
+          %{project_id: project.id, entity: "posts"}
+        end,
+        attrs
+      )
 
     {:ok, _media_task} =
-      Tasks.submit_task("Reindex Media Search Text", fn report ->
-        :ok = Search.reindex_media(project.id, on_progress: report)
-        report.(1.0, "Media search text reindexed")
-        %{project_id: project.id, entity: "media"}
-      end, attrs)
+      Tasks.submit_task(
+        "Reindex Media Search Text",
+        fn report ->
+          :ok = Search.reindex_media(project.id, on_progress: report)
+          report.(1.0, "Media search text reindexed")
+          %{project_id: project.id, entity: "media"}
+        end,
+        attrs
+      )
 
     {:ok,
      %{
@@ -107,43 +115,86 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp dispatch("rebuild_embedding_index", project, _params) do
-    queue_task(project, "rebuild_embedding_index", "Rebuild Embedding Index", "Embeddings", fn report ->
-      {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id, on_progress: report)
-      report.(1.0, "Embedding index rebuilt")
-      %{project_id: project.id, rebuilt_post_ids: rebuilt_post_ids, rebuilt_count: length(rebuilt_post_ids)}
-    end)
+    queue_task(
+      project,
+      "rebuild_embedding_index",
+      "Rebuild Embedding Index",
+      "Embeddings",
+      fn report ->
+        {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id, on_progress: report)
+        report.(1.0, "Embedding index rebuilt")
+
+        %{
+          project_id: project.id,
+          rebuilt_post_ids: rebuilt_post_ids,
+          rebuilt_count: length(rebuilt_post_ids)
+        }
+      end
+    )
   end
 
   defp dispatch("rebuild_posts_from_files", project, _params) do
-    queue_task(project, "rebuild_posts_from_files", "Rebuild Posts From Files", "Maintenance", fn report ->
-      {:ok, posts} = Maintenance.rebuild_from_filesystem(project.id, "post", on_progress: report)
-      report.(1.0, "Post rebuild complete")
-      %{project_id: project.id, counts: %{posts: length(posts)}}
-    end)
+    queue_task(
+      project,
+      "rebuild_posts_from_files",
+      "Rebuild Posts From Files",
+      "Maintenance",
+      fn report ->
+        {:ok, posts} =
+          Maintenance.rebuild_from_filesystem(project.id, "post", on_progress: report)
+
+        report.(1.0, "Post rebuild complete")
+        %{project_id: project.id, counts: %{posts: length(posts)}}
+      end
+    )
   end
 
   defp dispatch("rebuild_media_from_files", project, _params) do
-    queue_task(project, "rebuild_media_from_files", "Rebuild Media From Files", "Maintenance", fn report ->
-      {:ok, media} = Maintenance.rebuild_from_filesystem(project.id, "media", on_progress: report)
-      report.(1.0, "Media rebuild complete")
-      %{project_id: project.id, counts: %{media: length(media)}}
-    end)
+    queue_task(
+      project,
+      "rebuild_media_from_files",
+      "Rebuild Media From Files",
+      "Maintenance",
+      fn report ->
+        {:ok, media} =
+          Maintenance.rebuild_from_filesystem(project.id, "media", on_progress: report)
+
+        report.(1.0, "Media rebuild complete")
+        %{project_id: project.id, counts: %{media: length(media)}}
+      end
+    )
   end
 
   defp dispatch("rebuild_scripts_from_files", project, _params) do
-    queue_task(project, "rebuild_scripts_from_files", "Rebuild Scripts From Files", "Maintenance", fn report ->
-      {:ok, scripts} = Maintenance.rebuild_from_filesystem(project.id, "script", on_progress: report)
-      report.(1.0, "Script rebuild complete")
-      %{project_id: project.id, counts: %{scripts: length(scripts)}}
-    end)
+    queue_task(
+      project,
+      "rebuild_scripts_from_files",
+      "Rebuild Scripts From Files",
+      "Maintenance",
+      fn report ->
+        {:ok, scripts} =
+          Maintenance.rebuild_from_filesystem(project.id, "script", on_progress: report)
+
+        report.(1.0, "Script rebuild complete")
+        %{project_id: project.id, counts: %{scripts: length(scripts)}}
+      end
+    )
   end
 
   defp dispatch("rebuild_templates_from_files", project, _params) do
-    queue_task(project, "rebuild_templates_from_files", "Rebuild Templates From Files", "Maintenance", fn report ->
-      {:ok, templates} = Maintenance.rebuild_from_filesystem(project.id, "template", on_progress: report)
-      report.(1.0, "Template rebuild complete")
-      %{project_id: project.id, counts: %{templates: length(templates)}}
-    end)
+    queue_task(
+      project,
+      "rebuild_templates_from_files",
+      "Rebuild Templates From Files",
+      "Maintenance",
+      fn report ->
+        {:ok, templates} =
+          Maintenance.rebuild_from_filesystem(project.id, "template", on_progress: report)
+
+        report.(1.0, "Template rebuild complete")
+        %{project_id: project.id, counts: %{templates: length(templates)}}
+      end
+    )
   end
 
   defp dispatch("rebuild_post_links", project, _params) do
@@ -155,11 +206,17 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp dispatch("regenerate_missing_thumbnails", project, _params) do
-    queue_task(project, "regenerate_missing_thumbnails", "Regenerate Missing Thumbnails", "Maintenance", fn report ->
-      result = BDS.Media.regenerate_missing_thumbnails(project.id, on_progress: report)
-      report.(1.0, "Missing thumbnails regenerated")
-      Map.put(result, :project_id, project.id)
-    end)
+    queue_task(
+      project,
+      "regenerate_missing_thumbnails",
+      "Regenerate Missing Thumbnails",
+      "Maintenance",
+      fn report ->
+        result = BDS.Media.regenerate_missing_thumbnails(project.id, on_progress: report)
+        report.(1.0, "Missing thumbnails regenerated")
+        Map.put(result, :project_id, project.id)
+      end
+    )
   end
 
   defp dispatch("rebuild_database", project, _params) do
@@ -192,15 +249,24 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp dispatch("generate_sitemap", project, _params) do
     queue_task(project, "generate_sitemap", "Generate Site", "Generation", fn report ->
-      {:ok, generation} = Generation.generate_site(project.id, @site_sections, on_progress: report)
+      {:ok, generation} =
+        Generation.generate_site(project.id, @site_sections, on_progress: report)
+
       report.(1.0, "Generated site output")
-      %{project_id: project.id, sections: generation.sections, generated_count: length(generation.generated_files)}
+
+      %{
+        project_id: project.id,
+        sections: generation.sections,
+        generated_count: length(generation.generated_files)
+      }
     end)
   end
 
   defp dispatch("validate_site", project, _params) do
     queue_task(project, "validate_site", "Validate Site", "Validation", fn report ->
-      {:ok, validation} = Generation.validate_site(project.id, @site_sections, on_progress: report)
+      {:ok, validation} =
+        Generation.validate_site(project.id, @site_sections, on_progress: report)
+
       site_validation_result(project.id, validation)
     end)
   end
@@ -214,58 +280,76 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp dispatch("repair_metadata_diff", project, params) do
-    items = normalize_metadata_diff_items(Map.get(params, "items", Map.get(params, :items, [])))
-    direction = Map.get(params, "direction", Map.get(params, :direction))
+    items = normalize_metadata_diff_items(BDS.MapUtils.attr(params, :items, []))
+    direction = BDS.MapUtils.attr(params, :direction)
 
     if items == [] do
       {:error, %{action: "repair_metadata_diff", message: "No metadata diff items selected"}}
     else
-      queue_task(project, "repair_metadata_diff", "Repair Metadata Diff", "Maintenance", fn report ->
-        {:ok, _repair} =
-          Maintenance.repair_metadata_diff(project.id, direction, items,
-            on_progress: scaled_progress_reporter(report, 0.0, 0.8)
-          )
+      queue_task(
+        project,
+        "repair_metadata_diff",
+        "Repair Metadata Diff",
+        "Maintenance",
+        fn report ->
+          {:ok, _repair} =
+            Maintenance.repair_metadata_diff(project.id, direction, items,
+              on_progress: scaled_progress_reporter(report, 0.0, 0.8)
+            )
 
-        {:ok, metadata_diff} =
-          Maintenance.metadata_diff(project.id,
-            on_progress: scaled_progress_reporter(report, 0.8, 0.98)
-          )
+          {:ok, metadata_diff} =
+            Maintenance.metadata_diff(project.id,
+              on_progress: scaled_progress_reporter(report, 0.8, 0.98)
+            )
 
-        report.(1.0, "Metadata diff repair complete")
-        metadata_diff_result(project.id, metadata_diff)
-      end)
+          report.(1.0, "Metadata diff repair complete")
+          metadata_diff_result(project.id, metadata_diff)
+        end
+      )
     end
   end
 
   defp dispatch("import_metadata_diff_orphans", project, params) do
-    orphans = normalize_metadata_diff_orphans(Map.get(params, "orphans", Map.get(params, :orphans, [])))
+    orphans = normalize_metadata_diff_orphans(BDS.MapUtils.attr(params, :orphans, []))
 
     if orphans == [] do
       {:error, %{action: "import_metadata_diff_orphans", message: "No orphan files selected"}}
     else
-      queue_task(project, "import_metadata_diff_orphans", "Import Metadata Diff Orphans", "Maintenance", fn report ->
-        {:ok, _import} =
-          Maintenance.import_metadata_diff_orphans(project.id, orphans,
-            on_progress: scaled_progress_reporter(report, 0.0, 0.8)
-          )
+      queue_task(
+        project,
+        "import_metadata_diff_orphans",
+        "Import Metadata Diff Orphans",
+        "Maintenance",
+        fn report ->
+          {:ok, _import} =
+            Maintenance.import_metadata_diff_orphans(project.id, orphans,
+              on_progress: scaled_progress_reporter(report, 0.0, 0.8)
+            )
 
-        {:ok, metadata_diff} =
-          Maintenance.metadata_diff(project.id,
-            on_progress: scaled_progress_reporter(report, 0.8, 0.98)
-          )
+          {:ok, metadata_diff} =
+            Maintenance.metadata_diff(project.id,
+              on_progress: scaled_progress_reporter(report, 0.8, 0.98)
+            )
 
-        report.(1.0, "Metadata diff import complete")
-        metadata_diff_result(project.id, metadata_diff)
-      end)
+          report.(1.0, "Metadata diff import complete")
+          metadata_diff_result(project.id, metadata_diff)
+        end
+      )
     end
   end
 
   defp dispatch("validate_translations", project, _params) do
-    queue_task(project, "validate_translations", "Validate Translations", "Validation", fn report ->
-      {:ok, translation_report} = Posts.validate_translations(project.id, on_progress: report)
-      report.(1.0, "Translation validation complete")
-      translation_validation_result(project.id, translation_report)
-    end)
+    queue_task(
+      project,
+      "validate_translations",
+      "Validate Translations",
+      "Validation",
+      fn report ->
+        {:ok, translation_report} = Posts.validate_translations(project.id, on_progress: report)
+        report.(1.0, "Translation validation complete")
+        translation_validation_result(project.id, translation_report)
+      end
+    )
   end
 
   defp dispatch("find_duplicates", project, _params) do
@@ -342,7 +426,9 @@ defmodule BDS.Desktop.ShellCommands do
       %{
         name: "Rebuild Media From Files",
         work: fn report ->
-          {:ok, media} = Maintenance.rebuild_from_filesystem(project.id, "media", on_progress: report)
+          {:ok, media} =
+            Maintenance.rebuild_from_filesystem(project.id, "media", on_progress: report)
+
           report.(1.0, "Media rebuild complete")
           %{project_id: project.id, counts: %{media: length(media)}}
         end
@@ -350,7 +436,9 @@ defmodule BDS.Desktop.ShellCommands do
       %{
         name: "Rebuild Scripts From Files",
         work: fn report ->
-          {:ok, scripts} = Maintenance.rebuild_from_filesystem(project.id, "script", on_progress: report)
+          {:ok, scripts} =
+            Maintenance.rebuild_from_filesystem(project.id, "script", on_progress: report)
+
           report.(1.0, "Script rebuild complete")
           %{project_id: project.id, counts: %{scripts: length(scripts)}}
         end
@@ -358,7 +446,9 @@ defmodule BDS.Desktop.ShellCommands do
       %{
         name: "Rebuild Templates From Files",
         work: fn report ->
-          {:ok, templates} = Maintenance.rebuild_from_filesystem(project.id, "template", on_progress: report)
+          {:ok, templates} =
+            Maintenance.rebuild_from_filesystem(project.id, "template", on_progress: report)
+
           report.(1.0, "Template rebuild complete")
           %{project_id: project.id, counts: %{templates: length(templates)}}
         end
@@ -384,7 +474,12 @@ defmodule BDS.Desktop.ShellCommands do
         work: fn report ->
           {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id, on_progress: report)
           report.(1.0, "Embedding index rebuilt")
-          %{project_id: project.id, rebuilt_post_ids: rebuilt_post_ids, rebuilt_count: length(rebuilt_post_ids)}
+
+          %{
+            project_id: project.id,
+            rebuilt_post_ids: rebuilt_post_ids,
+            rebuilt_count: length(rebuilt_post_ids)
+          }
         end
       }
     ]
@@ -531,7 +626,10 @@ defmodule BDS.Desktop.ShellCommands do
       subtitle: "Database rows and translation files checked for invalid state",
       editorMeta: [
         %{label: "Invalid DB", value: Integer.to_string(length(report.invalid_database_rows))},
-        %{label: "Invalid Files", value: Integer.to_string(length(report.invalid_filesystem_files))}
+        %{
+          label: "Invalid Files",
+          value: Integer.to_string(length(report.invalid_filesystem_files))
+        }
       ],
       payload: normalize_translation_validation(report)
     }
@@ -564,8 +662,8 @@ defmodule BDS.Desktop.ShellCommands do
   defp normalize_metadata_diff_items(items) when is_list(items) do
     Enum.map(items, fn item ->
       %{
-        entity_type: Map.get(item, :entity_type) || Map.get(item, "entity_type"),
-        entity_id: Map.get(item, :entity_id) || Map.get(item, "entity_id")
+        entity_type: BDS.MapUtils.attr(item, :entity_type),
+        entity_id: BDS.MapUtils.attr(item, :entity_id)
       }
     end)
   end
@@ -574,7 +672,7 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp normalize_metadata_diff_orphans(orphans) when is_list(orphans) do
     Enum.map(orphans, fn orphan ->
-      %{file_path: Map.get(orphan, :file_path) || Map.get(orphan, "file_path")}
+      %{file_path: BDS.MapUtils.attr(orphan, :file_path)}
     end)
   end
 
@@ -593,7 +691,10 @@ defmodule BDS.Desktop.ShellCommands do
       ssh_mode: Map.get(prefs, "ssh_mode")
     }
 
-    if Enum.all?([credentials.ssh_host, credentials.ssh_user, credentials.ssh_remote_path], &is_binary/1) do
+    if Enum.all?(
+         [credentials.ssh_host, credentials.ssh_user, credentials.ssh_remote_path],
+         &is_binary/1
+       ) do
       {:ok, credentials}
     else
       {:error, %{action: "upload_site", message: "Publishing preferences are incomplete"}}

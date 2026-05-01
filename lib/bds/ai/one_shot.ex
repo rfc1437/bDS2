@@ -5,6 +5,7 @@ defmodule BDS.AI.OneShot do
   alias BDS.AI.OpenAICompatibleRuntime
   alias BDS.AI.Runtime
   alias BDS.Media.Media
+  alias BDS.MapUtils
   alias BDS.Posts.Post
   alias BDS.Repo
 
@@ -45,10 +46,10 @@ defmodule BDS.AI.OneShot do
   def analyze_import_taxonomy(import_terms, existing_terms, opts \\ [])
       when is_map(import_terms) and is_map(existing_terms) and is_list(opts) do
     payload = %{
-      import_categories: normalize_string_list(Map.get(import_terms, :categories) || Map.get(import_terms, "categories")),
-      import_tags: normalize_string_list(Map.get(import_terms, :tags) || Map.get(import_terms, "tags")),
-      existing_categories: normalize_string_list(Map.get(existing_terms, :categories) || Map.get(existing_terms, "categories")),
-      existing_tags: normalize_string_list(Map.get(existing_terms, :tags) || Map.get(existing_terms, "tags"))
+      import_categories: normalize_string_list(MapUtils.attr(import_terms, :categories)),
+      import_tags: normalize_string_list(MapUtils.attr(import_terms, :tags)),
+      existing_categories: normalize_string_list(MapUtils.attr(existing_terms, :categories)),
+      existing_tags: normalize_string_list(MapUtils.attr(existing_terms, :tags))
     }
 
     run_one_shot(
@@ -96,7 +97,8 @@ defmodule BDS.AI.OneShot do
     end
   end
 
-  @spec translate_post(map() | String.t(), String.t(), keyword()) :: {:ok, map()} | {:error, term()}
+  @spec translate_post(map() | String.t(), String.t(), keyword()) ::
+          {:ok, map()} | {:error, term()}
   def translate_post(post_input, target_language, opts \\ [])
       when is_binary(target_language) and is_list(opts) do
     with {:ok, post} <- normalize_post_input(post_input) do
@@ -138,7 +140,8 @@ defmodule BDS.AI.OneShot do
     end
   end
 
-  @spec translate_media(map() | String.t(), String.t(), keyword()) :: {:ok, map()} | {:error, term()}
+  @spec translate_media(map() | String.t(), String.t(), keyword()) ::
+          {:ok, map()} | {:error, term()}
   def translate_media(media_input, target_language, opts \\ [])
       when is_binary(target_language) and is_list(opts) do
     with {:ok, media} <- normalize_media_input(media_input) do
@@ -165,7 +168,8 @@ defmodule BDS.AI.OneShot do
     with {:ok, endpoint, model, mode} <- Runtime.resolve_target(operation, opts),
          :ok <- Runtime.validate_target(operation, model, mode),
          request <- build_one_shot_request(operation, payload, model),
-         {:ok, response} <- runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts),
+         {:ok, response} <-
+           runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts),
          {:ok, json} <- extract_json_response(response),
          usage <- Chat.normalize_usage(response.usage),
          {:ok, result} <- formatter.(json, usage) do
@@ -252,7 +256,10 @@ defmodule BDS.AI.OneShot do
 
   defp one_shot_user_content(:analyze_image, media) do
     [
-      %{"type" => "text", "text" => "Analyze this image and return title, alt text, and caption."},
+      %{
+        "type" => "text",
+        "text" => "Analyze this image and return title, alt text, and caption."
+      },
       %{"type" => "image_url", "image_url" => %{"url" => media.image_url}}
     ]
   end
@@ -286,9 +293,9 @@ defmodule BDS.AI.OneShot do
   defp normalize_post_input(attrs) when is_map(attrs) do
     {:ok,
      %{
-       title: Map.get(attrs, :title) || Map.get(attrs, "title") || "",
-       excerpt: Map.get(attrs, :excerpt) || Map.get(attrs, "excerpt") || "",
-       content: Map.get(attrs, :content) || Map.get(attrs, "content") || ""
+       title: MapUtils.attr(attrs, :title) || "",
+       excerpt: MapUtils.attr(attrs, :excerpt) || "",
+       content: MapUtils.attr(attrs, :content) || ""
      }}
   end
 
@@ -313,11 +320,11 @@ defmodule BDS.AI.OneShot do
   defp normalize_media_input(attrs) when is_map(attrs) do
     {:ok,
      %{
-       mime_type: Map.get(attrs, :mime_type) || Map.get(attrs, "mime_type"),
-       title: Map.get(attrs, :title) || Map.get(attrs, "title") || "",
-       alt: Map.get(attrs, :alt) || Map.get(attrs, "alt") || "",
-       caption: Map.get(attrs, :caption) || Map.get(attrs, "caption") || "",
-       image_url: Map.get(attrs, :image_url) || Map.get(attrs, "image_url")
+       mime_type: MapUtils.attr(attrs, :mime_type),
+       title: MapUtils.attr(attrs, :title) || "",
+       alt: MapUtils.attr(attrs, :alt) || "",
+       caption: MapUtils.attr(attrs, :caption) || "",
+       image_url: MapUtils.attr(attrs, :image_url)
      }}
   end
 
@@ -336,7 +343,8 @@ defmodule BDS.AI.OneShot do
     |> Enum.uniq()
   end
 
-  defp filter_taxonomy_mapping_response(mappings, import_terms, existing_terms) when is_map(mappings) do
+  defp filter_taxonomy_mapping_response(mappings, import_terms, existing_terms)
+       when is_map(mappings) do
     import_lookup = canonical_term_lookup(import_terms)
     existing_lookup = canonical_term_lookup(existing_terms)
 

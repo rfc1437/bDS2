@@ -13,6 +13,15 @@ defmodule BDS.MapUtils do
     end
   end
 
+  @spec attr(attrs(), atom(), term()) :: term()
+  def attr(attrs, key, default) do
+    cond do
+      Map.has_key?(attrs, key) -> Map.get(attrs, key)
+      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
+      true -> default
+    end
+  end
+
   @spec maybe_put(map(), term(), term()) :: map()
   def maybe_put(map, _key, nil), do: map
   def maybe_put(map, key, value), do: Map.put(map, key, value)

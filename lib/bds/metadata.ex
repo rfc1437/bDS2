@@ -173,7 +173,14 @@ defmodule BDS.Metadata do
         |> Repo.update!()
 
       persist_setting(project_id, "project", stringify_project_metadata(filesystem_state), now)
-      persist_setting(project_id, "categories", %{"categories" => filesystem_state.categories}, now)
+
+      persist_setting(
+        project_id,
+        "categories",
+        %{"categories" => filesystem_state.categories},
+        now
+      )
+
       persist_setting(
         project_id,
         "category_meta",
@@ -247,10 +254,15 @@ defmodule BDS.Metadata do
       read_json(project, "project.json") ||
         stringify_project_metadata(default_project_metadata(project))
 
-    categories = normalized_categories(read_json(project, "categories.json") || %{"categories" => @default_categories})
+    categories =
+      normalized_categories(
+        read_json(project, "categories.json") || %{"categories" => @default_categories}
+      )
 
     category_settings =
-      normalized_category_settings(read_json(project, "category-meta.json") || %{"categories" => %{}})
+      normalized_category_settings(
+        read_json(project, "category-meta.json") || %{"categories" => %{}}
+      )
 
     publishing_preferences = read_json(project, "publishing.json") || %{"ssh_mode" => "scp"}
 
@@ -305,14 +317,11 @@ defmodule BDS.Metadata do
 
   defp normalize_category_settings(settings) do
     %{
-      "render_in_lists" =>
-        Map.get(settings, :render_in_lists, Map.get(settings, "render_in_lists", true)),
-      "show_title" => Map.get(settings, :show_title, Map.get(settings, "show_title", true)),
-      "post_template_slug" =>
-        Map.get(settings, :post_template_slug, Map.get(settings, "post_template_slug")),
-      "list_template_slug" =>
-        Map.get(settings, :list_template_slug, Map.get(settings, "list_template_slug")),
-      "title" => Map.get(settings, :title, Map.get(settings, "title"))
+      "render_in_lists" => attr(settings, :render_in_lists, true),
+      "show_title" => attr(settings, :show_title, true),
+      "post_template_slug" => attr(settings, :post_template_slug),
+      "list_template_slug" => attr(settings, :list_template_slug),
+      "title" => attr(settings, :title)
     }
   end
 
@@ -447,7 +456,9 @@ defmodule BDS.Metadata do
     |> Map.new()
   end
 
-  defp normalized_categories(%{"categories" => categories}) when is_list(categories), do: categories
+  defp normalized_categories(%{"categories" => categories}) when is_list(categories),
+    do: categories
+
   defp normalized_categories(categories) when is_list(categories), do: categories
   defp normalized_categories(_payload), do: @default_categories
 
@@ -459,13 +470,25 @@ defmodule BDS.Metadata do
       {category,
        %{
          "render_in_lists" =>
-           Map.get(category_settings, "render_in_lists", Map.get(category_settings, "renderInLists", true)),
+           Map.get(
+             category_settings,
+             "render_in_lists",
+             Map.get(category_settings, "renderInLists", true)
+           ),
          "show_title" =>
            Map.get(category_settings, "show_title", Map.get(category_settings, "showTitle", true)),
          "post_template_slug" =>
-           Map.get(category_settings, "post_template_slug", Map.get(category_settings, "postTemplateSlug")),
+           Map.get(
+             category_settings,
+             "post_template_slug",
+             Map.get(category_settings, "postTemplateSlug")
+           ),
          "list_template_slug" =>
-           Map.get(category_settings, "list_template_slug", Map.get(category_settings, "listTemplateSlug")),
+           Map.get(
+             category_settings,
+             "list_template_slug",
+             Map.get(category_settings, "listTemplateSlug")
+           ),
          "title" => Map.get(category_settings, "title")
        }
        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
@@ -480,10 +503,12 @@ defmodule BDS.Metadata do
       "publicUrl" => Map.get(project_metadata, "public_url"),
       "mainLanguage" => Map.get(project_metadata, "main_language"),
       "defaultAuthor" => Map.get(project_metadata, "default_author"),
-      "maxPostsPerPage" => Map.get(project_metadata, "max_posts_per_page", @default_max_posts_per_page),
+      "maxPostsPerPage" =>
+        Map.get(project_metadata, "max_posts_per_page", @default_max_posts_per_page),
       "blogmarkCategory" => Map.get(project_metadata, "blogmark_category"),
       "picoTheme" => Map.get(project_metadata, "pico_theme"),
-      "semanticSimilarityEnabled" => Map.get(project_metadata, "semantic_similarity_enabled", false),
+      "semanticSimilarityEnabled" =>
+        Map.get(project_metadata, "semantic_similarity_enabled", false),
       "blogLanguages" => Map.get(project_metadata, "blog_languages", [])
     }
     |> Enum.reject(fn {_key, value} -> is_nil(value) end)
@@ -587,7 +612,12 @@ defmodule BDS.Metadata do
   defp unwrap_transaction({:ok, result}), do: {:ok, result}
   defp unwrap_transaction({:error, reason}), do: {:error, reason}
 
-  defp maybe_backfill_embeddings({:ok, _metadata} = result, project_id, previous_state, project_metadata) do
+  defp maybe_backfill_embeddings(
+         {:ok, _metadata} = result,
+         project_id,
+         previous_state,
+         project_metadata
+       ) do
     if previous_state.semantic_similarity_enabled != true and
          project_metadata.semantic_similarity_enabled == true do
       {:ok, _indexed_post_ids} = Embeddings.index_unindexed(project_id)
@@ -596,13 +626,22 @@ defmodule BDS.Metadata do
     result
   end
 
-  defp maybe_backfill_embeddings(result, _project_id, _previous_state, _project_metadata), do: result
+  defp maybe_backfill_embeddings(result, _project_id, _previous_state, _project_metadata),
+    do: result
 
   defp attr(attrs, key) do
     cond do
       Map.has_key?(attrs, key) -> Map.get(attrs, key)
       Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
       true -> nil
+    end
+  end
+
+  defp attr(attrs, key, default) do
+    cond do
+      Map.has_key?(attrs, key) -> Map.get(attrs, key)
+      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
+      true -> default
     end
   end
 end

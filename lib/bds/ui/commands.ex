@@ -32,13 +32,14 @@ defmodule BDS.UI.Commands do
   ]
 
   def handle_shortcut(state, shortcut) when is_map(shortcut) do
-    key = shortcut |> Map.get(:key, Map.get(shortcut, "key", "")) |> String.downcase()
-    primary =
-      Map.get(shortcut, :meta, Map.get(shortcut, "meta", false)) or
-        Map.get(shortcut, :ctrl, Map.get(shortcut, "ctrl", false))
+    key = shortcut |> BDS.MapUtils.attr(:key, "") |> String.downcase()
 
-    shift = Map.get(shortcut, :shift, Map.get(shortcut, "shift", false))
-    alt = Map.get(shortcut, :alt, Map.get(shortcut, "alt", false))
+    primary =
+      BDS.MapUtils.attr(shortcut, :meta, false) or
+        BDS.MapUtils.attr(shortcut, :ctrl, false)
+
+    shift = BDS.MapUtils.attr(shortcut, :shift, false)
+    alt = BDS.MapUtils.attr(shortcut, :alt, false)
 
     case Enum.find(@menu_shortcuts, &shortcut_match?(&1, key, primary, shift, alt)) do
       %{id: command_id} -> MenuBar.execute(state, command_id)

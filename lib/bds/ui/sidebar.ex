@@ -27,7 +27,13 @@ defmodule BDS.UI.Sidebar do
       "templates" => view(project_id, "templates"),
       "tags" => view(project_id, "tags"),
       "chat" => view(project_id, "chat"),
-      "import" => entity_list_view("Import", "Import definitions", "import", list_import_definitions(project_id)),
+      "import" =>
+        entity_list_view(
+          "Import",
+          "Import definitions",
+          "import",
+          list_import_definitions(project_id)
+        ),
       "git" => git_view(),
       "settings" => settings_nav_view()
     }
@@ -41,17 +47,43 @@ defmodule BDS.UI.Sidebar do
     normalized_view = normalize_view_id(view_id)
 
     case normalized_view do
-      "posts" -> posts_view(project_id, params, false)
-      "pages" -> posts_view(project_id, params, true)
-      "media" -> media_view(project_id, params)
-      "scripts" -> entity_list_view("Scripts", "Automation helpers", "scripts", list_scripts(project_id))
-      "templates" -> entity_list_view("Templates", "Site rendering", "templates", list_templates(project_id))
-      "tags" -> tags_nav_view(list_tags(project_id))
-      "chat" -> entity_list_view("Chat", "AI conversations", "chat", list_conversations())
-      "import" -> entity_list_view("Import", "Import definitions", "import", list_import_definitions(project_id))
-      "git" -> git_view()
-      "settings" -> settings_nav_view()
-      _other -> empty_view(normalized_view)
+      "posts" ->
+        posts_view(project_id, params, false)
+
+      "pages" ->
+        posts_view(project_id, params, true)
+
+      "media" ->
+        media_view(project_id, params)
+
+      "scripts" ->
+        entity_list_view("Scripts", "Automation helpers", "scripts", list_scripts(project_id))
+
+      "templates" ->
+        entity_list_view("Templates", "Site rendering", "templates", list_templates(project_id))
+
+      "tags" ->
+        tags_nav_view(list_tags(project_id))
+
+      "chat" ->
+        entity_list_view("Chat", "AI conversations", "chat", list_conversations())
+
+      "import" ->
+        entity_list_view(
+          "Import",
+          "Import definitions",
+          "import",
+          list_import_definitions(project_id)
+        )
+
+      "git" ->
+        git_view()
+
+      "settings" ->
+        settings_nav_view()
+
+      _other ->
+        empty_view(normalized_view)
     end
   end
 
@@ -74,13 +106,18 @@ defmodule BDS.UI.Sidebar do
   defp empty_view("pages"), do: posts_view_data([], [], %{}, true, empty_filter_params(), %{})
   defp empty_view("media"), do: media_view_data([], [], empty_filter_params(), %{})
   defp empty_view("scripts"), do: entity_list_view("Scripts", "Automation helpers", "scripts", [])
-  defp empty_view("templates"), do: entity_list_view("Templates", "Site rendering", "templates", [])
+
+  defp empty_view("templates"),
+    do: entity_list_view("Templates", "Site rendering", "templates", [])
+
   defp empty_view("tags"), do: tags_nav_view([])
   defp empty_view("chat"), do: entity_list_view("Chat", "AI conversations", "chat", [])
   defp empty_view("import"), do: entity_list_view("Import", "Import definitions", "import", [])
   defp empty_view("git"), do: git_view()
   defp empty_view("settings"), do: settings_nav_view()
-  defp empty_view(_other), do: %{title: "", subtitle: "", layout: "entity_list", items: [], empty_message: "No items"}
+
+  defp empty_view(_other),
+    do: %{title: "", subtitle: "", layout: "entity_list", items: [], empty_message: "No items"}
 
   defp posts_view(project_id, params, pages?) do
     posts = list_posts(project_id)
@@ -93,7 +130,14 @@ defmodule BDS.UI.Sidebar do
     posts_view_data(base_posts, filtered_posts, translation_counts, pages?, filters, tag_colors)
   end
 
-  defp posts_view_data(base_posts, filtered_posts, translation_counts, pages?, filters, tag_colors) do
+  defp posts_view_data(
+         base_posts,
+         filtered_posts,
+         translation_counts,
+         pages?,
+         filters,
+         tag_colors
+       ) do
     limited_posts = Enum.take(filtered_posts, filters.display_limit)
     grouped_posts = group_posts(limited_posts)
     available_tags = available_tags(base_posts, & &1.tags)
@@ -101,12 +145,14 @@ defmodule BDS.UI.Sidebar do
 
     %{
       title: if(pages?, do: "Pages", else: "Posts"),
-      subtitle: if(pages?, do: "Standalone pages", else: "Drafts, published entries, and archive history"),
+      subtitle:
+        if(pages?, do: "Standalone pages", else: "Drafts, published entries, and archive history"),
       layout: "post_list",
       empty_message: if(pages?, do: "sidebar.noPagesYet", else: "sidebar.noPostsYet"),
       filters: %{
         enabled: true,
-        search_placeholder: if(pages?, do: "sidebar.searchPagesPlaceholder", else: "sidebar.searchPostsPlaceholder"),
+        search_placeholder:
+          if(pages?, do: "sidebar.searchPagesPlaceholder", else: "sidebar.searchPostsPlaceholder"),
         toggle_filters_label: "sidebar.toggleFilters",
         archive_label: "render.archive",
         tags_label: "sidebar.tags",
@@ -137,8 +183,20 @@ defmodule BDS.UI.Sidebar do
       },
       sections: [
         build_post_section("Drafts", :draft, grouped_posts.draft, translation_counts, false),
-        build_post_section("Published", :published, grouped_posts.published, translation_counts, true),
-        build_post_section("Archived", :archived, grouped_posts.archived, translation_counts, false)
+        build_post_section(
+          "Published",
+          :published,
+          grouped_posts.published,
+          translation_counts,
+          true
+        ),
+        build_post_section(
+          "Archived",
+          :archived,
+          grouped_posts.archived,
+          translation_counts,
+          false
+        )
       ]
     }
   end
@@ -246,7 +304,13 @@ defmodule BDS.UI.Sidebar do
       layout: "entity_list",
       empty_message: "No items",
       items: [
-        %{id: "git-working-tree", title: "Working tree", meta: "Working tree and history", route: "git_diff", updated_at: nil}
+        %{
+          id: "git-working-tree",
+          title: "Working tree",
+          meta: "Working tree and history",
+          route: "git_diff",
+          updated_at: nil
+        }
       ]
     }
   end
@@ -285,7 +349,8 @@ defmodule BDS.UI.Sidebar do
             tags: post.tags || [],
             status: Atom.to_string(post.status),
             language_count: 1 + Map.get(translation_counts, post.id, 0),
-            meta_timestamp: if(published_meta?, do: post.published_at || post.updated_at, else: post.updated_at),
+            meta_timestamp:
+              if(published_meta?, do: post.published_at || post.updated_at, else: post.updated_at),
             route: "post",
             search_blob: post_search_blob(post)
           }
@@ -377,7 +442,11 @@ defmodule BDS.UI.Sidebar do
     Repo.all(
       from conversation in ChatConversation,
         order_by: [desc: conversation.updated_at, desc: conversation.created_at],
-        select: %{id: conversation.id, title: conversation.title, updated_at: conversation.updated_at}
+        select: %{
+          id: conversation.id,
+          title: conversation.title,
+          updated_at: conversation.updated_at
+        }
     )
   end
 
@@ -402,15 +471,15 @@ defmodule BDS.UI.Sidebar do
 
   defp normalize_filter_params(params) when is_map(params) do
     %{
-      search: normalize_string(Map.get(params, "search") || Map.get(params, :search)),
-      year: normalize_integer(Map.get(params, "year") || Map.get(params, :year)),
-      month: normalize_integer(Map.get(params, "month") || Map.get(params, :month)),
-      tags: normalize_string_list(Map.get(params, "tags") || Map.get(params, :tags)),
-      categories: normalize_string_list(Map.get(params, "categories") || Map.get(params, :categories)),
+      search: normalize_string(BDS.MapUtils.attr(params, :search)),
+      year: normalize_integer(BDS.MapUtils.attr(params, :year)),
+      month: normalize_integer(BDS.MapUtils.attr(params, :month)),
+      tags: normalize_string_list(BDS.MapUtils.attr(params, :tags)),
+      categories: normalize_string_list(BDS.MapUtils.attr(params, :categories)),
       display_limit:
         max(
           @default_page_size,
-          normalize_integer(Map.get(params, "display_limit") || Map.get(params, :display_limit)) || @default_page_size
+          normalize_integer(BDS.MapUtils.attr(params, :display_limit)) || @default_page_size
         )
     }
   end
@@ -418,11 +487,19 @@ defmodule BDS.UI.Sidebar do
   defp normalize_filter_params(_params), do: empty_filter_params()
 
   defp empty_filter_params do
-    %{search: nil, year: nil, month: nil, tags: [], categories: [], display_limit: @default_page_size}
+    %{
+      search: nil,
+      year: nil,
+      month: nil,
+      tags: [],
+      categories: [],
+      display_limit: @default_page_size
+    }
   end
 
   defp filter_active?(filters) do
-    present?(filters.search) or not is_nil(filters.year) or filters.tags != [] or filters.categories != []
+    present?(filters.search) or not is_nil(filters.year) or filters.tags != [] or
+      filters.categories != []
   end
 
   defp apply_post_filters(posts, filters) do
@@ -497,7 +574,9 @@ defmodule BDS.UI.Sidebar do
     posts
     |> Enum.flat_map(&filtered_categories(&1.categories || []))
     |> then(fn categories ->
-      if pages?, do: Enum.reject(categories, &(normalize_term(&1) == @page_category)), else: categories
+      if pages?,
+        do: Enum.reject(categories, &(normalize_term(&1) == @page_category)),
+        else: categories
     end)
     |> Enum.map(&to_string/1)
     |> Enum.reject(&(&1 == ""))
@@ -522,7 +601,13 @@ defmodule BDS.UI.Sidebar do
   defp post_filter_timestamp(post), do: post.published_at || post.updated_at
 
   defp post_search_blob(post) do
-    [post.title, post.slug, post.excerpt, Enum.join(post.tags || [], " "), Enum.join(post.categories || [], " ")]
+    [
+      post.title,
+      post.slug,
+      post.excerpt,
+      Enum.join(post.tags || [], " "),
+      Enum.join(post.categories || [], " ")
+    ]
     |> Enum.reject(&is_nil/1)
     |> Enum.join(" ")
   end

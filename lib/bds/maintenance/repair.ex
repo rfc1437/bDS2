@@ -11,6 +11,7 @@ defmodule BDS.Maintenance.Repair do
   import BDS.Maintenance.Progress, only: [report_progress: 4]
 
   alias BDS.Embeddings
+  alias BDS.MapUtils
   alias BDS.Metadata
 
   def normalize_entity_type(:post), do: :post
@@ -33,31 +34,62 @@ defmodule BDS.Maintenance.Repair do
   def normalize_repair_direction(_direction), do: :unsupported
 
   def repair_metadata_diff_item(project_id, direction, item) do
-    entity_type = Map.get(item, :entity_type) || Map.get(item, "entity_type")
-    entity_id = Map.get(item, :entity_id) || Map.get(item, "entity_id")
+    entity_type = MapUtils.attr(item, :entity_type)
+    entity_id = MapUtils.attr(item, :entity_id)
 
     case {normalize_repair_direction(direction), entity_type} do
-      {:file_to_db, entity_type} when entity_type in ["project", "categories", "category_meta", "publishing"] ->
+      {:file_to_db, entity_type}
+      when entity_type in ["project", "categories", "category_meta", "publishing"] ->
         Metadata.sync_project_metadata_from_filesystem(project_id)
 
-      {:db_to_file, entity_type} when entity_type in ["project", "categories", "category_meta", "publishing"] ->
+      {:db_to_file, entity_type}
+      when entity_type in ["project", "categories", "category_meta", "publishing"] ->
         Metadata.flush_project_metadata_to_filesystem(project_id)
 
-      {:file_to_db, "post"} -> BDS.Posts.sync_post_from_file(entity_id)
-      {:db_to_file, "post"} -> BDS.Posts.rewrite_published_post(entity_id)
-      {:file_to_db, "post_translation"} -> BDS.Posts.sync_post_translation_from_file(entity_id)
-      {:db_to_file, "post_translation"} -> BDS.Posts.rewrite_published_post_translation(entity_id)
-      {:file_to_db, "media"} -> BDS.Media.sync_media_from_sidecar(entity_id)
-      {:db_to_file, "media"} -> BDS.Media.sync_media_sidecar(entity_id)
-      {:file_to_db, "media_translation"} -> BDS.Media.sync_media_translation_from_sidecar(entity_id)
-      {:db_to_file, "media_translation"} -> BDS.Media.sync_media_translation_sidecar(entity_id)
-      {:file_to_db, "script"} -> BDS.Scripts.sync_script_from_file(entity_id)
-      {:db_to_file, "script"} -> BDS.Scripts.sync_published_script_file(entity_id)
-      {:file_to_db, "template"} -> BDS.Templates.sync_template_from_file(entity_id)
-      {:db_to_file, "template"} -> BDS.Templates.sync_published_template_file(entity_id)
-      {:file_to_db, "embedding"} -> BDS.Embeddings.sync_post(entity_id)
-      {:db_to_file, "embedding"} -> BDS.Embeddings.refresh_snapshot(project_id)
-      _other -> {:error, :unsupported}
+      {:file_to_db, "post"} ->
+        BDS.Posts.sync_post_from_file(entity_id)
+
+      {:db_to_file, "post"} ->
+        BDS.Posts.rewrite_published_post(entity_id)
+
+      {:file_to_db, "post_translation"} ->
+        BDS.Posts.sync_post_translation_from_file(entity_id)
+
+      {:db_to_file, "post_translation"} ->
+        BDS.Posts.rewrite_published_post_translation(entity_id)
+
+      {:file_to_db, "media"} ->
+        BDS.Media.sync_media_from_sidecar(entity_id)
+
+      {:db_to_file, "media"} ->
+        BDS.Media.sync_media_sidecar(entity_id)
+
+      {:file_to_db, "media_translation"} ->
+        BDS.Media.sync_media_translation_from_sidecar(entity_id)
+
+      {:db_to_file, "media_translation"} ->
+        BDS.Media.sync_media_translation_sidecar(entity_id)
+
+      {:file_to_db, "script"} ->
+        BDS.Scripts.sync_script_from_file(entity_id)
+
+      {:db_to_file, "script"} ->
+        BDS.Scripts.sync_published_script_file(entity_id)
+
+      {:file_to_db, "template"} ->
+        BDS.Templates.sync_template_from_file(entity_id)
+
+      {:db_to_file, "template"} ->
+        BDS.Templates.sync_published_template_file(entity_id)
+
+      {:file_to_db, "embedding"} ->
+        BDS.Embeddings.sync_post(entity_id)
+
+      {:db_to_file, "embedding"} ->
+        BDS.Embeddings.refresh_snapshot(project_id)
+
+      _other ->
+        {:error, :unsupported}
     end
   end
 
@@ -87,7 +119,8 @@ defmodule BDS.Maintenance.Repair do
     end
   end
 
-  def repair_embedding_batch(_project_id, _direction, _items, _on_progress, _total), do: :unsupported
+  def repair_embedding_batch(_project_id, _direction, _items, _on_progress, _total),
+    do: :unsupported
 
   defp build_batch_repair_result(items, total, on_progress, repaired?) do
     items
@@ -106,15 +139,15 @@ defmodule BDS.Maintenance.Repair do
   end
 
   defp metadata_diff_item_entity_type(item) do
-    Map.get(item, :entity_type) || Map.get(item, "entity_type")
+    MapUtils.attr(item, :entity_type)
   end
 
   defp metadata_diff_item_entity_id(item) do
-    Map.get(item, :entity_id) || Map.get(item, "entity_id")
+    MapUtils.attr(item, :entity_id)
   end
 
   def import_metadata_diff_orphan(project_id, orphan) do
-    file_path = Map.get(orphan, :file_path) || Map.get(orphan, "file_path")
+    file_path = MapUtils.attr(orphan, :file_path)
 
     cond do
       is_nil(file_path) ->

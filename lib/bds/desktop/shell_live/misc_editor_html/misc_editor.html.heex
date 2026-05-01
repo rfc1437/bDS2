@@ -261,11 +261,11 @@
           <%= for pair <- @misc_editor.pairs do %>
             <article class="misc-list-item duplicate-pair-row">
               <label><input type="checkbox" checked={duplicate_checked?(@misc_editor, pair_id_from_pair(pair))} phx-click="toggle_duplicate_pair" phx-value-pair-id={pair_id_from_pair(pair)} /> <span></span></label>
-              <button class="linkish" type="button" phx-click="open_duplicate_post" phx-value-id={Map.get(pair, :post_id_a) || Map.get(pair, "post_id_a")} phx-value-title={Map.get(pair, :title_a) || Map.get(pair, "title_a") }><%= Map.get(pair, :title_a) || Map.get(pair, "title_a") %></button>
+              <button class="linkish" type="button" phx-click="open_duplicate_post" phx-value-id={BDS.MapUtils.attr(pair, :post_id_a)} phx-value-title={BDS.MapUtils.attr(pair, :title_a)}><%= BDS.MapUtils.attr(pair, :title_a) %></button>
               <span>→</span>
-              <button class="linkish" type="button" phx-click="open_duplicate_post" phx-value-id={Map.get(pair, :post_id_b) || Map.get(pair, "post_id_b")} phx-value-title={Map.get(pair, :title_b) || Map.get(pair, "title_b") }><%= Map.get(pair, :title_b) || Map.get(pair, "title_b") %></button>
-              <span class="misc-summary-pill"><%= if(Map.get(pair, :exact_match) || Map.get(pair, "exact_match"), do: translated("Exact Match"), else: "#{Float.round((Map.get(pair, :similarity) || Map.get(pair, "similarity") || 0.0) * 100, 1)}%") %></span>
-              <button class="secondary" type="button" phx-click="dismiss_duplicate_pair" phx-value-post-id-a={Map.get(pair, :post_id_a) || Map.get(pair, "post_id_a")} phx-value-post-id-b={Map.get(pair, :post_id_b) || Map.get(pair, "post_id_b")}><%= translated("Dismiss") %></button>
+              <button class="linkish" type="button" phx-click="open_duplicate_post" phx-value-id={BDS.MapUtils.attr(pair, :post_id_b)} phx-value-title={BDS.MapUtils.attr(pair, :title_b)}><%= BDS.MapUtils.attr(pair, :title_b) %></button>
+              <span class="misc-summary-pill"><%= if(BDS.MapUtils.attr(pair, :exact_match), do: translated("Exact Match"), else: "#{Float.round((BDS.MapUtils.attr(pair, :similarity) || 0.0) * 100, 1)}%") %></span>
+              <button class="secondary" type="button" phx-click="dismiss_duplicate_pair" phx-value-post-id-a={BDS.MapUtils.attr(pair, :post_id_a)} phx-value-post-id-b={BDS.MapUtils.attr(pair, :post_id_b)}><%= translated("Dismiss") %></button>
             </article>
           <% end %>
         </div>

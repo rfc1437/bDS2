@@ -121,11 +121,9 @@ _None._ All modules previously on the queue have been split; refresh the queue i
 
 ## 12. Atom/String Key Duality
 
-**Status:** open, low priority.
+**Status:** ✅ done (2026-05-01). Same-name atom/string boundary reads now use `BDS.MapUtils.attr/2` or `attr/3` instead of nested `Map.get/3` or `Map.get/2 || Map.get/2` fallbacks. The cleanup covers AI endpoint/chat/one-shot attrs, model capabilities, rendering assigns and list pagination/archive contexts, UI shortcut/filter params, metadata category settings, metadata-diff repair payloads, CLI sync payloads, chat tool calls, and duplicate/metadata-diff editor payloads.
 
-**Pattern:** `Map.get(assigns, :language, Map.get(assigns, "language", default))` in many editors and capability bridges.
-
-**Plan:** normalize at boundaries. Adopt the rule "atoms internally, strings only at JSON/HTTP boundaries", and use `attr/2` (post-#6 consolidation) at every boundary point.
+**Rule:** atoms internally, strings only at JSON/HTTP/form/render boundaries. If a boundary must accept both atom and string keys for the same snake_case field, use `BDS.MapUtils.attr/2` or `attr/3`; do not open-code same-name dual-key reads.
 
 ---
 
@@ -160,6 +158,8 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ## Changelog
 
 ### 2026-05-01
+
+- **Atom/string key duality**: added `BDS.MapUtils.attr/3` and a regression test that scans `lib/**/*.ex` and `lib/**/*.heex` for same-name atom/string `Map.get` fallback reads. Replaced same-name atom/string boundary reads across AI attrs, rendering assigns, pagination/archive contexts, UI command/filter params, metadata category settings, metadata-diff repair payloads, CLI sync payloads, chat tool call normalization, and misc editor duplicate/metadata-diff payload rendering. Remaining mixed-key scan hits are intentionally different-key fallbacks (for example camelCase/snake_case JSON compatibility) or atom-only/string-only boundaries. Section 12 is closed.
 
 - **`Jason.decode!/1` on external HTTP responses**: replaced the 2 scoped OpenAI-compatible runtime response decodes with `Jason.decode/1` and tagged `{:error, %{kind: :invalid_json_response, reason: reason}}` propagation for malformed `/models` and `/chat/completions` bodies. Added regressions covering endpoint model listing through a fake HTTP client and generation through a local Bandit server. Section 9 is closed.
 

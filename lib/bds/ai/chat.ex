@@ -13,6 +13,7 @@ defmodule BDS.AI.Chat do
   alias BDS.AI.OpenAICompatibleRuntime
   alias BDS.AI.Runtime
   alias BDS.AI.SecretBackend
+  alias BDS.MapUtils
   import BDS.AI.SettingsStore, only: [get_setting: 1]
   alias BDS.Media.Media
   alias BDS.Persistence
@@ -28,15 +29,15 @@ defmodule BDS.AI.Chat do
   @spec start_chat(map()) :: {:ok, map()} | {:error, Ecto.Changeset.t()}
   def start_chat(attrs \\ %{}) when is_map(attrs) do
     now = Persistence.now_ms()
-    model = Map.get(attrs, :model) || Map.get(attrs, "model")
-    title = Map.get(attrs, :title) || Map.get(attrs, "title") || generated_chat_title(model)
+    model = MapUtils.attr(attrs, :model)
+    title = MapUtils.attr(attrs, :title) || generated_chat_title(model)
 
     %ChatConversation{}
     |> ChatConversation.changeset(%{
       id: Ecto.UUID.generate(),
       title: title,
       model: model,
-      copilot_session_id: Map.get(attrs, :copilot_session_id) || Map.get(attrs, "copilot_session_id"),
+      copilot_session_id: MapUtils.attr(attrs, :copilot_session_id),
       created_at: now,
       updated_at: now
     })
@@ -120,12 +121,13 @@ defmodule BDS.AI.Chat do
   def send_chat_message(conversation_id, content, opts \\ [])
       when is_binary(conversation_id) and is_binary(content) and is_list(opts) do
     with %ChatConversation{} = conversation <- Repo.get(ChatConversation, conversation_id),
-         {:ok, user_message} <- persist_chat_message(%{
-           conversation_id: conversation.id,
-           role: :user,
-           content: content,
-           created_at: Persistence.now_ms()
-         }) do
+         {:ok, user_message} <-
+           persist_chat_message(%{
+             conversation_id: conversation.id,
+             role: :user,
+             content: content,
+             created_at: Persistence.now_ms()
+           }) do
       task =
         Task.Supervisor.async_nolink(BDS.Tasks.TaskSupervisor, fn ->
           receive do
@@ -153,7 +155,9 @@ defmodule BDS.AI.Chat do
   @spec cancel_chat(String.t()) :: :ok
   def cancel_chat(conversation_id) when is_binary(conversation_id) do
     case InFlight.lookup(conversation_id) do
-      nil -> :ok
+      nil ->
+        :ok
+
       pid ->
         _ = Task.Supervisor.terminate_child(BDS.Tasks.TaskSupervisor, pid)
         :ok
@@ -162,7 +166,11 @@ defmodule BDS.AI.Chat do
 
   @doc false
   def count_distinct_string_list(schema, field, project_id) do
-    Repo.all(from record in schema, where: field(record, :project_id) == ^project_id, select: field(record, ^field))
+    Repo.all(
+      from record in schema,
+        where: field(record, :project_id) == ^project_id,
+        select: field(record, ^field)
+    )
     |> List.flatten()
     |> Enum.reject(&blank?/1)
     |> MapSet.new()
@@ -267,9 +275,14 @@ defmodule BDS.AI.Chat do
     normalized_url = String.downcase(url)
 
     cond do
-      String.contains?(normalized_url, "11434") or String.contains?(normalized_url, "ollama") -> "ollama"
-      String.contains?(normalized_url, "1234") or String.contains?(normalized_url, "lmstudio") -> "lmstudio"
-      true -> "generic-openai"
+      String.contains?(normalized_url, "11434") or String.contains?(normalized_url, "ollama") ->
+        "ollama"
+
+      String.contains?(normalized_url, "1234") or String.contains?(normalized_url, "lmstudio") ->
+        "lmstudio"
+
+      true ->
+        "generic-openai"
     end
   end
 
@@ -303,23 +316,58 @@ defmodule BDS.AI.Chat do
          :ok <- Runtime.validate_target(:chat, model, mode),
          messages <- load_chat_messages(conversation.id),
          tools <- available_chat_tools(project_id, model),
-         {:ok, reply} <- chat_round(conversation, messages, endpoint, model, project_id, tools, runtime, opts, @chat_max_tool_rounds) do
+         {:ok, reply} <-
+           chat_round(
+             conversation,
+             messages,
+             endpoint,
+             model,
+             project_id,
+             tools,
+             runtime,
+             opts,
+             @chat_max_tool_rounds
+           ) do
       {:ok, reply}
     end
   end
 
-  defp chat_round(_conversation, _messages, _endpoint, _model, _project_id, _tools, _runtime, _opts, 0) do
+  defp chat_round(
+         _conversation,
+         _messages,
+         _endpoint,
+         _model,
+         _project_id,
+         _tools,
+         _runtime,
+         _opts,
+         0
+       ) do
     {:error, %{kind: :tool_loop_exhausted}}
   end
 
-  defp chat_round(conversation, messages, endpoint, model, project_id, tools, runtime, opts, rounds_left) do
+  defp chat_round(
+         conversation,
+         messages,
+         endpoint,
+         model,
+         project_id,
+         tools,
+         runtime,
+         opts,
+         rounds_left
+       ) do
     request = build_chat_request(conversation, messages, model, project_id, tools)
 
-    with {:ok, response} <- runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts),
+    with {:ok, response} <-
+           runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts),
          {:ok, assistant_message} <- persist_assistant_response(conversation.id, response),
          :ok <- touch_conversation(conversation.id) do
       if is_binary(Map.get(response, :content)) and String.trim(Map.get(response, :content)) != "" do
-        notify_chat_event(opts, {:chat_streaming_content, conversation.id, Map.get(response, :content)})
+        notify_chat_event(
+          opts,
+          {:chat_streaming_content, conversation.id, Map.get(response, :content)}
+        )
       end
 
       tool_calls = decode_tool_calls(Map.get(response, :tool_calls))
@@ -330,7 +378,8 @@ defmodule BDS.AI.Chat do
 
       cond do
         tool_calls != [] and tools != [] ->
-          with {:ok, tool_messages} <- execute_tool_calls(conversation.id, tool_calls, project_id, opts),
+          with {:ok, tool_messages} <-
+                 execute_tool_calls(conversation.id, tool_calls, project_id, opts),
                updated_messages <- load_chat_messages(conversation.id),
                {:ok, reply} <-
                  chat_round(
@@ -420,8 +469,13 @@ defmodule BDS.AI.Chat do
   defp message_for_runtime(%ChatMessage{} = message) do
     base = %{"role" => Atom.to_string(message.role)}
 
-    base = if is_binary(message.content), do: Map.put(base, "content", message.content), else: base
-    base = if is_binary(message.tool_call_id), do: Map.put(base, "tool_call_id", message.tool_call_id), else: base
+    base =
+      if is_binary(message.content), do: Map.put(base, "content", message.content), else: base
+
+    base =
+      if is_binary(message.tool_call_id),
+        do: Map.put(base, "tool_call_id", message.tool_call_id),
+        else: base
 
     case Catalog.decode_nullable_json(message.tool_calls) do
       nil -> base
@@ -438,7 +492,9 @@ defmodule BDS.AI.Chat do
     [system | remainder] = messages
 
     {kept, _tokens} =
-      Enum.reduce(Enum.reverse(remainder), {[], approximate_message_tokens(system)}, fn message, {acc, used} ->
+      Enum.reduce(Enum.reverse(remainder), {[], approximate_message_tokens(system)}, fn message,
+                                                                                        {acc,
+                                                                                         used} ->
         message_tokens = approximate_message_tokens(message)
 
         if used + message_tokens <= max_budget do
@@ -467,8 +523,12 @@ defmodule BDS.AI.Chat do
   defp project_stats_summary(nil), do: nil
 
   defp project_stats_summary(project_id) do
-    post_count = Repo.aggregate(from(post in Post, where: post.project_id == ^project_id), :count, :id)
-    media_count = Repo.aggregate(from(media in Media, where: media.project_id == ^project_id), :count, :id)
+    post_count =
+      Repo.aggregate(from(post in Post, where: post.project_id == ^project_id), :count, :id)
+
+    media_count =
+      Repo.aggregate(from(media in Media, where: media.project_id == ^project_id), :count, :id)
+
     tag_count = count_distinct_string_list(Post, :tags, project_id)
     category_count = count_distinct_string_list(Post, :categories, project_id)
 
@@ -528,9 +588,14 @@ defmodule BDS.AI.Chat do
               10 -> {:error, :cancelled}
             end
 
-          :shutdown -> {:error, :cancelled}
-          {:shutdown, _detail} -> {:error, :cancelled}
-          _other -> {:error, :cancelled}
+          :shutdown ->
+            {:error, :cancelled}
+
+          {:shutdown, _detail} ->
+            {:error, :cancelled}
+
+          _other ->
+            {:error, :cancelled}
         end
     end
   end
@@ -556,14 +621,22 @@ defmodule BDS.AI.Chat do
   end
 
   defp approximate_value_tokens(value) when is_binary(value), do: div(String.length(value), 4) + 1
-  defp approximate_value_tokens(value) when is_list(value), do: Enum.map(value, &approximate_value_tokens/1) |> Enum.sum()
-  defp approximate_value_tokens(value) when is_map(value), do: Jason.encode!(value) |> approximate_value_tokens()
+
+  defp approximate_value_tokens(value) when is_list(value),
+    do: Enum.map(value, &approximate_value_tokens/1) |> Enum.sum()
+
+  defp approximate_value_tokens(value) when is_map(value),
+    do: Jason.encode!(value) |> approximate_value_tokens()
+
   defp approximate_value_tokens(_value), do: 1
 
   defp model_context_window(model_id) do
     case Catalog.get_catalog_model(model_id) do
-      {:ok, model} when is_integer(model.context_window) and model.context_window > 0 -> model.context_window
-      _other -> @default_context_window
+      {:ok, model} when is_integer(model.context_window) and model.context_window > 0 ->
+        model.context_window
+
+      _other ->
+        @default_context_window
     end
   end
 

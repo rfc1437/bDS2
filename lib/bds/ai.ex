@@ -6,6 +6,7 @@ defmodule BDS.AI do
   alias BDS.AI.OneShot
   alias BDS.AI.Runtime
   alias BDS.AI.SecretBackend
+  alias BDS.MapUtils
 
   import BDS.AI.SettingsStore,
     only: [
@@ -21,20 +22,26 @@ defmodule BDS.AI do
   @type endpoint_kind :: atom()
 
   @typedoc "Endpoint configuration map."
-  @type endpoint :: %{kind: endpoint_kind(), url: String.t() | nil, api_key: String.t() | nil, model: String.t() | nil}
+  @type endpoint :: %{
+          kind: endpoint_kind(),
+          url: String.t() | nil,
+          api_key: String.t() | nil,
+          model: String.t() | nil
+        }
 
   @typedoc "Attribute map for endpoint operations."
   @type endpoint_attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
 
   @spec put_endpoint(endpoint_kind(), endpoint_attrs(), keyword()) ::
           {:ok, endpoint()} | {:error, term()}
-  def put_endpoint(kind, attrs, opts \\ []) when is_atom(kind) and is_map(attrs) and is_list(opts) do
+  def put_endpoint(kind, attrs, opts \\ [])
+      when is_atom(kind) and is_map(attrs) and is_list(opts) do
     backend = Keyword.get(opts, :secret_backend, SecretBackend)
     kind_key = Atom.to_string(kind)
 
-    url = Map.get(attrs, :url) || Map.get(attrs, "url")
-    model = Map.get(attrs, :model) || Map.get(attrs, "model")
-    api_key = Map.get(attrs, :api_key) || Map.get(attrs, "api_key")
+    url = MapUtils.attr(attrs, :url)
+    model = MapUtils.attr(attrs, :model)
+    api_key = MapUtils.attr(attrs, :api_key)
 
     with :ok <- put_setting("ai.#{kind_key}.url", url),
          :ok <- put_setting("ai.#{kind_key}.model", model),
@@ -103,7 +110,8 @@ defmodule BDS.AI do
     end
   end
 
-  @spec put_model_preference(atom(), String.t()) :: :ok | {:error, :unknown_model_preference | term()}
+  @spec put_model_preference(atom(), String.t()) ::
+          :ok | {:error, :unknown_model_preference | term()}
   def put_model_preference(key, model) when is_atom(key) and is_binary(model) do
     case Map.fetch(Runtime.model_preference_keys(), key) do
       {:ok, setting_key} -> put_setting(setting_key, model)
@@ -111,7 +119,8 @@ defmodule BDS.AI do
     end
   end
 
-  @spec get_model_preference(atom()) :: {:ok, String.t() | nil} | {:error, :unknown_model_preference}
+  @spec get_model_preference(atom()) ::
+          {:ok, String.t() | nil} | {:error, :unknown_model_preference}
   def get_model_preference(key) when is_atom(key) do
     case Map.fetch(Runtime.model_preference_keys(), key) do
       {:ok, setting_key} -> {:ok, get_setting(setting_key)}
@@ -134,13 +143,15 @@ defmodule BDS.AI do
   @spec analyze_post(map() | String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   defdelegate analyze_post(post_input, opts \\ []), to: OneShot
 
-  @spec translate_post(map() | String.t(), String.t(), keyword()) :: {:ok, map()} | {:error, term()}
+  @spec translate_post(map() | String.t(), String.t(), keyword()) ::
+          {:ok, map()} | {:error, term()}
   defdelegate translate_post(post_input, target_language, opts \\ []), to: OneShot
 
   @spec analyze_image(map() | String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   defdelegate analyze_image(media_input, opts \\ []), to: OneShot
 
-  @spec translate_media(map() | String.t(), String.t(), keyword()) :: {:ok, map()} | {:error, term()}
+  @spec translate_media(map() | String.t(), String.t(), keyword()) ::
+          {:ok, map()} | {:error, term()}
   defdelegate translate_media(media_input, target_language, opts \\ []), to: OneShot
 
   @spec start_chat(map()) :: {:ok, map()} | {:error, Ecto.Changeset.t()}

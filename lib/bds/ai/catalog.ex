@@ -2,6 +2,7 @@ defmodule BDS.AI.Catalog do
   @moduledoc false
 
   import Ecto.Query
+
   import BDS.AI.SettingsStore,
     only: [
       get_setting: 1,
@@ -21,7 +22,13 @@ defmodule BDS.AI.Catalog do
 
   @spec list_endpoint_models(map(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def list_endpoint_models(endpoint, opts \\ []) when is_map(endpoint) and is_list(opts) do
-    http_client = Keyword.get(opts, :http_client, Application.get_env(:bds, :ai_http_client, BDS.AI.HttpClient))
+    http_client =
+      Keyword.get(
+        opts,
+        :http_client,
+        Application.get_env(:bds, :ai_http_client, BDS.AI.HttpClient)
+      )
+
     OpenAICompatibleRuntime.list_models(endpoint, http_client: http_client)
   end
 
@@ -103,8 +110,8 @@ defmodule BDS.AI.Catalog do
   @spec put_model_capabilities(String.t(), map()) :: :ok | {:error, term()}
   def put_model_capabilities(model_id, attrs) when is_binary(model_id) and is_map(attrs) do
     capabilities = %{
-      supports_attachment: truthy?(Map.get(attrs, :supports_attachment) || Map.get(attrs, "supports_attachment")),
-      supports_tool_calls: truthy?(Map.get(attrs, :supports_tool_calls) || Map.get(attrs, "supports_tool_calls"))
+      supports_attachment: truthy?(BDS.MapUtils.attr(attrs, :supports_attachment)),
+      supports_tool_calls: truthy?(BDS.MapUtils.attr(attrs, :supports_tool_calls))
     }
 
     put_setting("ai.model_capabilities.#{model_id}", Jason.encode!(capabilities))
@@ -154,7 +161,10 @@ defmodule BDS.AI.Catalog do
     }
   end
 
-  @spec model_capabilities(String.t()) :: %{supports_attachment: boolean(), supports_tool_calls: boolean()}
+  @spec model_capabilities(String.t()) :: %{
+          supports_attachment: boolean(),
+          supports_tool_calls: boolean()
+        }
   def model_capabilities(model_id) do
     overrides = decode_model_capabilities_override(model_id)
 
@@ -162,7 +172,7 @@ defmodule BDS.AI.Catalog do
       case get_catalog_model(model_id) do
         {:ok, model} ->
           %{
-            supports_attachment: model.supports_attachment or ("image" in model.input_modalities),
+            supports_attachment: model.supports_attachment or "image" in model.input_modalities,
             supports_tool_calls: model.supports_tool_calls
           }
 
@@ -257,8 +267,19 @@ defmodule BDS.AI.Catalog do
           |> Model.changeset(model_attrs)
           |> Repo.insert!()
 
-          insert_modalities(provider_id, model_id, Map.get(model_data, "input_modalities", []), :input)
-          insert_modalities(provider_id, model_id, Map.get(model_data, "output_modalities", []), :output)
+          insert_modalities(
+            provider_id,
+            model_id,
+            Map.get(model_data, "input_modalities", []),
+            :input
+          )
+
+          insert_modalities(
+            provider_id,
+            model_id,
+            Map.get(model_data, "output_modalities", []),
+            :output
+          )
 
           inner_count + 1
         end)

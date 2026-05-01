@@ -4,12 +4,11 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
   @tool_args_max_length 30
 
   def tool_call_name(tool_call) when is_map(tool_call) do
-    Map.get(tool_call, "name") || Map.get(tool_call, :name) || "tool"
+    BDS.MapUtils.attr(tool_call, :name) || "tool"
   end
 
   def tool_call_arguments(tool_call) when is_map(tool_call) do
-    Map.get(tool_call, "arguments") || Map.get(tool_call, :arguments) ||
-      Map.get(tool_call, "args") || Map.get(tool_call, :args) || %{}
+    BDS.MapUtils.attr(tool_call, :arguments) || BDS.MapUtils.attr(tool_call, :args) || %{}
   end
 
   def normalize_tool_calls(tool_calls) when is_list(tool_calls) do
@@ -17,7 +16,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
       arguments = tool_call_arguments(tool_call)
 
       %{
-        id: Map.get(tool_call, "id") || Map.get(tool_call, :id),
+        id: BDS.MapUtils.attr(tool_call, :id),
         name: tool_call_name(tool_call),
         arguments: arguments,
         args_preview: tool_arguments_preview(arguments),

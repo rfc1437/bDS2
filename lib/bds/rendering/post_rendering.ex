@@ -5,6 +5,7 @@ defmodule BDS.Rendering.PostRendering do
   alias BDS.Rendering.LinksAndLanguages
   alias BDS.Rendering.Metadata, as: RenderMetadata
   alias BDS.Rendering.TemplateSelection
+  alias BDS.MapUtils
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
   alias BDS.Repo
@@ -13,8 +14,7 @@ defmodule BDS.Rendering.PostRendering do
     metadata = RenderMetadata.project_metadata(project_id)
     template_context = TemplateSelection.template_render_context(project_id)
 
-    language =
-      Map.get(assigns, :language, Map.get(assigns, "language", metadata.main_language || "en"))
+    language = MapUtils.attr(assigns, :language, metadata.main_language || "en")
 
     main_language = metadata.main_language || language
     post_record = load_post_record(assigns)
@@ -22,12 +22,27 @@ defmodule BDS.Rendering.PostRendering do
     post_id = canonical_post_id(post_record, assigns)
     post_categories = Map.get(post_record || %{}, :categories, []) || []
     post_tags = Map.get(post_record || %{}, :tags, []) || []
-    canonical_post_paths = LinksAndLanguages.canonical_post_path_by_slug(project_id, main_language)
+
+    canonical_post_paths =
+      LinksAndLanguages.canonical_post_path_by_slug(project_id, main_language)
+
     canonical_media_paths = LinksAndLanguages.canonical_media_path_by_source_path(project_id)
-    raw_content = Map.get(assigns, :content, Map.get(assigns, "content"))
-    rendered_content = render_post_content(raw_content, canonical_post_paths, canonical_media_paths, language, template_context)
-    incoming_links = LinksAndLanguages.link_contexts(project_id, post_id, :incoming, main_language)
-    outgoing_links = LinksAndLanguages.link_contexts(project_id, post_id, :outgoing, main_language)
+    raw_content = MapUtils.attr(assigns, :content)
+
+    rendered_content =
+      render_post_content(
+        raw_content,
+        canonical_post_paths,
+        canonical_media_paths,
+        language,
+        template_context
+      )
+
+    incoming_links =
+      LinksAndLanguages.link_contexts(project_id, post_id, :incoming, main_language)
+
+    outgoing_links =
+      LinksAndLanguages.link_contexts(project_id, post_id, :outgoing, main_language)
 
     post_assigns =
       assigns
@@ -40,19 +55,27 @@ defmodule BDS.Rendering.PostRendering do
         Map.get(
           assigns,
           :language_prefix,
-          Map.get(assigns, "language_prefix", LinksAndLanguages.language_prefix(language, main_language))
+          Map.get(
+            assigns,
+            "language_prefix",
+            LinksAndLanguages.language_prefix(language, main_language)
+          )
         ),
       page_title:
         Map.get(
           assigns,
           :page_title,
-          Map.get(assigns, "page_title", Map.get(assigns, :title, Map.get(assigns, "title")))
+          MapUtils.attr(assigns, :title)
         ),
       pico_stylesheet_href:
         Map.get(
           assigns,
           :pico_stylesheet_href,
-          Map.get(assigns, "pico_stylesheet_href", RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme))
+          Map.get(
+            assigns,
+            "pico_stylesheet_href",
+            RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
+          )
         ),
       html_theme_attribute:
         Map.get(
@@ -77,7 +100,7 @@ defmodule BDS.Rendering.PostRendering do
   end
 
   def load_post_record(assigns) do
-    case Map.get(assigns, :id, Map.get(assigns, "id")) do
+    case MapUtils.attr(assigns, :id) do
       nil -> nil
       post_id -> Repo.get(Post, post_id) || Repo.get(Translation, post_id)
     end
@@ -89,17 +112,33 @@ defmodule BDS.Rendering.PostRendering do
 
   defp canonical_post_id(%Translation{translation_for: post_id}, _assigns), do: post_id
   defp canonical_post_id(%Post{id: post_id}, _assigns), do: post_id
-  defp canonical_post_id(_post_record, assigns), do: Map.get(assigns, :id, Map.get(assigns, "id"))
+  defp canonical_post_id(_post_record, assigns), do: MapUtils.attr(assigns, :id)
 
   defp post_data_json(assigns, post_record) do
-    id = Map.get(assigns, :id, Map.get(assigns, "id"))
+    id = MapUtils.attr(assigns, :id)
 
     if is_binary(id) do
-      incoming_links = LinksAndLanguages.link_contexts(Map.get(post_record || %{}, :project_id), canonical_post_id(post_record, assigns), :incoming, Map.get(post_record || %{}, :language))
-      outgoing_links = LinksAndLanguages.link_contexts(Map.get(post_record || %{}, :project_id), canonical_post_id(post_record, assigns), :outgoing, Map.get(post_record || %{}, :language))
+      incoming_links =
+        LinksAndLanguages.link_contexts(
+          Map.get(post_record || %{}, :project_id),
+          canonical_post_id(post_record, assigns),
+          :incoming,
+          Map.get(post_record || %{}, :language)
+        )
+
+      outgoing_links =
+        LinksAndLanguages.link_contexts(
+          Map.get(post_record || %{}, :project_id),
+          canonical_post_id(post_record, assigns),
+          :outgoing,
+          Map.get(post_record || %{}, :language)
+        )
 
       %{
-        id => post_data_json_value(build_post_context(assigns, post_record, incoming_links, outgoing_links))
+        id =>
+          post_data_json_value(
+            build_post_context(assigns, post_record, incoming_links, outgoing_links)
+          )
       }
     else
       %{}
@@ -124,23 +163,23 @@ defmodule BDS.Rendering.PostRendering do
 
   defp build_post_context(assigns, post_record, incoming_links, outgoing_links) do
     %{
-      id: Map.get(assigns, :id, Map.get(assigns, "id")),
-      slug: Map.get(assigns, :slug, Map.get(assigns, "slug")),
-      title: Map.get(assigns, :title, Map.get(assigns, "title")),
-      content: Map.get(assigns, :content, Map.get(assigns, "content")),
-      raw_content: Map.get(assigns, :raw_content, Map.get(assigns, "raw_content")),
+      id: MapUtils.attr(assigns, :id),
+      slug: MapUtils.attr(assigns, :slug),
+      title: MapUtils.attr(assigns, :title),
+      content: MapUtils.attr(assigns, :content),
+      raw_content: MapUtils.attr(assigns, :raw_content),
       excerpt:
         Map.get(
           assigns,
           :excerpt,
-          Map.get(assigns, "excerpt", Map.get(post_record || %{}, :excerpt))
+          Map.get(post_record || %{}, :excerpt)
         ),
       author: Map.get(post_record || %{}, :author),
       language:
         Map.get(
           assigns,
           :language,
-          Map.get(assigns, "language", Map.get(post_record || %{}, :language))
+          Map.get(post_record || %{}, :language)
         ),
       show_title: true,
       published_at: Map.get(post_record || %{}, :published_at),
@@ -152,7 +191,7 @@ defmodule BDS.Rendering.PostRendering do
         Map.get(
           post_record || %{},
           :template_slug,
-          Map.get(assigns, :template_slug, Map.get(assigns, "template_slug"))
+          MapUtils.attr(assigns, :template_slug)
         ),
       do_not_translate: Map.get(post_record || %{}, :do_not_translate, false),
       linked_media: [],
@@ -161,7 +200,19 @@ defmodule BDS.Rendering.PostRendering do
     }
   end
 
-  def render_post_content(content, canonical_post_paths, canonical_media_paths, language, template_context) do
-    Filters.render_markdown(content, canonical_post_paths, canonical_media_paths, language, template_context)
+  def render_post_content(
+        content,
+        canonical_post_paths,
+        canonical_media_paths,
+        language,
+        template_context
+      ) do
+    Filters.render_markdown(
+      content,
+      canonical_post_paths,
+      canonical_media_paths,
+      language,
+      template_context
+    )
   end
 end
