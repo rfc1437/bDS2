@@ -482,7 +482,7 @@ defmodule BDS.AITest do
 
   test "chat persists user, tool, and assistant messages with usage and blog stats prompt augmentation" do
     {:ok, project} = create_project_fixture("AI Chat")
-    :ok = seed_project_content(project.id)
+    _fixtures = seed_project_content(project.id)
 
     assert {:ok, _endpoint} =
              BDS.AI.put_endpoint(
@@ -530,8 +530,15 @@ defmodule BDS.AITest do
              message["role"] == "system" and String.contains?(message["content"], "Posts: 1") and
                String.contains?(message["content"], "Media: 1") and
                String.contains?(message["content"], "Available blog data tools") and
+               String.contains?(message["content"], "get_blog_stats") and
                String.contains?(message["content"], "list_posts") and
-               String.contains?(message["content"], "list_media")
+               String.contains?(message["content"], "get_media") and
+               String.contains?(message["content"], "view_image") and
+               String.contains?(message["content"], "update_post_metadata") and
+               String.contains?(message["content"], "Available UI Render Tools") and
+               String.contains?(message["content"], "render_chart") and
+               String.contains?(message["content"], "heatmap") and
+               String.contains?(message["content"], "render_tabs")
            end)
 
     tool_descriptions =
@@ -540,24 +547,66 @@ defmodule BDS.AITest do
         {get_in(tool, ["function", "name"]), get_in(tool, ["function", "description"])}
       end)
 
-    assert tool_descriptions["blog_stats"] =~ "aggregate"
+    expected_old_app_tools = [
+      "get_blog_stats",
+      "search_posts",
+      "read_post",
+      "read_post_by_slug",
+      "list_posts",
+      "get_media",
+      "list_media",
+      "view_image",
+      "update_post_metadata",
+      "update_media_metadata",
+      "list_tags",
+      "list_categories",
+      "get_post_backlinks",
+      "get_post_outlinks",
+      "get_post_media",
+      "get_media_posts",
+      "render_chart",
+      "render_table",
+      "render_form",
+      "render_card",
+      "render_metric",
+      "render_list",
+      "render_tabs",
+      "render_mindmap"
+    ]
+
+    assert Enum.all?(expected_old_app_tools, &Map.has_key?(tool_descriptions, &1))
+    assert tool_descriptions["get_blog_stats"] =~ "comprehensive blog statistics"
     assert tool_descriptions["list_posts"] =~ "titles"
     assert tool_descriptions["list_posts"] =~ "URLs"
     assert tool_descriptions["list_media"] =~ "filenames"
+    assert tool_descriptions["render_chart"] =~ "interactive chart"
+    assert tool_descriptions["render_chart"] =~ "heatmap"
+    assert tool_descriptions["render_table"] =~ "tabular data"
+    assert tool_descriptions["render_tabs"] =~ "multiple tabs"
+
+    render_chart_schema =
+      first_request.tools
+      |> Enum.find(&(get_in(&1, ["function", "name"]) == "render_chart"))
+      |> get_in(["function", "parameters", "properties"])
+
+    assert get_in(render_chart_schema, ["chartType", "enum"]) == [
+             "bar",
+             "stacked-bar",
+             "line",
+             "area",
+             "pie",
+             "donut",
+             "heatmap"
+           ]
+
+    assert get_in(render_chart_schema, ["series", "items", "properties", "segments"]) != nil
 
     assert Enum.any?(second_request.messages, fn message -> message["role"] == "tool" end)
   end
 
   test "non-stat chat tools expose concrete project data" do
     {:ok, project} = create_project_fixture("Concrete Tools")
-    :ok = seed_project_content(project.id)
-
-    [post] =
-      Repo.all(
-        from post in Post,
-          where: post.project_id == ^project.id,
-          select: post
-      )
+    %{post: post, media: media} = seed_project_content(project.id)
 
     assert %{posts: [listed_post], total: 1} =
              BDS.AI.ChatTools.execute("list_posts", %{"limit" => 5}, project.id)
@@ -567,10 +616,68 @@ defmodule BDS.AITest do
     assert listed_post["url"] == "/posts/#{post.slug}"
     assert listed_post["updated_at"] == post.updated_at
 
+    assert %{post: read_post} =
+             BDS.AI.ChatTools.execute("read_post", %{"postId" => post.id}, project.id)
+
+    assert read_post["title"] == post.title
+    assert read_post["content"] == post.content
+
     assert [listed_media] = BDS.AI.ChatTools.execute("list_media", %{"limit" => 5}, project.id)
     assert listed_media.filename == "image.png"
     assert listed_media.mime_type == "image/png"
     assert listed_media.updated_at
+
+    assert %{media: loaded_media} =
+             BDS.AI.ChatTools.execute("get_media", %{"mediaId" => media.id}, project.id)
+
+    assert loaded_media.id == media.id
+    assert loaded_media.title == "Hero"
+
+    assert %{linked_by: []} =
+             BDS.AI.ChatTools.execute("get_post_backlinks", %{"postId" => post.id}, project.id)
+
+    assert %{links_to: []} =
+             BDS.AI.ChatTools.execute("get_post_outlinks", %{"postId" => post.id}, project.id)
+
+    assert %{media: []} =
+             BDS.AI.ChatTools.execute("get_post_media", %{"postId" => post.id}, project.id)
+
+    assert %{posts: []} =
+             BDS.AI.ChatTools.execute("get_media_posts", %{"mediaId" => media.id}, project.id)
+
+    assert %{success: true, post: updated_post} =
+             BDS.AI.ChatTools.execute(
+               "update_post_metadata",
+               %{"postId" => post.id, "title" => "Updated AI Post"},
+               project.id
+             )
+
+    assert updated_post["title"] == "Updated AI Post"
+
+    assert %{success: true, media: updated_media} =
+             BDS.AI.ChatTools.execute(
+               "update_media_metadata",
+               %{"mediaId" => media.id, "alt" => "Updated alt"},
+               project.id
+             )
+
+    assert updated_media.alt == "Updated alt"
+
+    assert %{
+             type: "chart",
+             chart_type: "heatmap",
+             series: [%{"label" => "2026", "segments" => [%{"label" => "Jan", "value" => 2}]}]
+           } =
+             BDS.AI.ChatTools.execute(
+               "render_chart",
+               %{
+                 "chartType" => "heatmap",
+                 "series" => [
+                   %{"label" => "2026", "segments" => [%{"label" => "Jan", "value" => 2}]}
+                 ]
+               },
+               project.id
+             )
   end
 
   test "cancel_chat aborts an in-flight chat turn" do
@@ -621,36 +728,39 @@ defmodule BDS.AITest do
   defp seed_project_content(project_id) do
     now = Persistence.now_ms()
 
-    Repo.insert!(
-      Post.changeset(%Post{}, %{
-        id: Ecto.UUID.generate(),
-        project_id: project_id,
-        title: "AI Post",
-        slug: "ai-post",
-        excerpt: "Summary",
-        content: "Body",
-        status: :draft,
-        created_at: now,
-        updated_at: now,
-        do_not_translate: false
-      })
-    )
+    post =
+      Repo.insert!(
+        Post.changeset(%Post{}, %{
+          id: Ecto.UUID.generate(),
+          project_id: project_id,
+          title: "AI Post",
+          slug: "ai-post",
+          excerpt: "Summary",
+          content: "Body",
+          status: :draft,
+          created_at: now,
+          updated_at: now,
+          do_not_translate: false
+        })
+      )
 
-    Repo.insert!(
-      Media.changeset(%Media{}, %{
-        id: Ecto.UUID.generate(),
-        project_id: project_id,
-        filename: "image.png",
-        original_name: "image.png",
-        mime_type: "image/png",
-        size: 128,
-        file_path: "media/image.png",
-        sidecar_path: "media/image.png.meta",
-        created_at: now,
-        updated_at: now
-      })
-    )
+    media =
+      Repo.insert!(
+        Media.changeset(%Media{}, %{
+          id: Ecto.UUID.generate(),
+          project_id: project_id,
+          filename: "image.png",
+          original_name: "image.png",
+          mime_type: "image/png",
+          size: 128,
+          title: "Hero",
+          file_path: "media/image.png",
+          sidecar_path: "media/image.png.meta",
+          created_at: now,
+          updated_at: now
+        })
+      )
 
-    :ok
+    %{post: post, media: media}
   end
 end

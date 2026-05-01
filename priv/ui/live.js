@@ -731,8 +731,25 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
           }
 
-          textarea.style.height = "auto";
-          textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+          const styles = getComputedStyle(textarea);
+          const minHeight = parseFloat(styles.getPropertyValue("--chat-input-min-height")) || 20;
+          const maxHeight = parseFloat(styles.getPropertyValue("--chat-input-max-height")) || 160;
+
+          textarea.rows = 1;
+          textarea.style.minHeight = `${minHeight}px`;
+
+          if (textarea.value.trim() === "") {
+            textarea.style.height = `${minHeight}px`;
+            textarea.style.maxHeight = `${minHeight}px`;
+            textarea.style.overflowY = "hidden";
+            return;
+          }
+
+          textarea.style.maxHeight = `${maxHeight}px`;
+          textarea.style.height = "0px";
+          const nextHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
+          textarea.style.height = `${nextHeight}px`;
+          textarea.style.overflowY = nextHeight >= maxHeight ? "auto" : "hidden";
         };
 
         this.syncScrollContainer = () => {

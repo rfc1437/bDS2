@@ -2,6 +2,7 @@ defmodule BDS.Desktop.MenuBar do
   @moduledoc false
 
   use BDS.Desktop.MenuCompat
+  alias BDS.Desktop.Shutdown
   alias BDS.UI.Commands
   alias BDS.UI.MenuBar, as: ShellMenuBar
   alias Desktop.OS
@@ -50,7 +51,7 @@ defmodule BDS.Desktop.MenuBar do
 
   @impl true
   def handle_event("quit", menu) do
-    Window.quit()
+    Shutdown.request_quit()
     {:noreply, menu}
   end
 

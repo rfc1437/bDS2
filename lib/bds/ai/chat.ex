@@ -527,13 +527,26 @@ defmodule BDS.AI.Chat do
     Enum.join(
       [
         "Available blog data tools:",
-        "- Use blog_stats for aggregate counts of posts, media, tags, and categories.",
+        "- Use get_blog_stats for aggregate counts of posts, media, tags, and categories.",
         "- Use search_posts for full-text blog search and filtered post lookup by category, tag, language, year, month, or status.",
+        "- Use read_post to read a post by ID, or read_post_by_slug to read a post by slug.",
         "- Use read_post_by_slug to read full post content and metadata when a slug is known.",
         "- Use list_posts when asked for post titles, slugs, URLs, statuses, backlinks, or recent/top/latest post lists. This is allowed project data access.",
-        "- Use list_media when asked for media titles, filenames, MIME types, or recent media lists. This is allowed project data access.",
+        "- Use get_media for one media item by ID, list_media for media titles, filenames, MIME types, or recent media lists, and view_image for visual image inspection.",
+        "- Use update_post_metadata and update_media_metadata when asked to change titles, excerpts, tags, categories, alt text, or captions.",
+        "- Use get_post_backlinks, get_post_outlinks, get_post_media, and get_media_posts for relationship questions.",
         "- Use list_tags, list_categories, and count_posts for taxonomy and grouped analytics questions.",
-        "If a requested blog fact is available through these tools, call the tool instead of saying you cannot access the data."
+        "If a requested blog fact is available through these tools, call the tool instead of saying you cannot access the data.",
+        "",
+        "Available UI Render Tools:",
+        "- Use render_chart to show data as a bar, stacked-bar, line, area, pie, donut, or heatmap chart. Use it when presenting statistics or comparisons. Prefer heatmap over tables with emoji or color indicators for intensity grids or calendar-style activity.",
+        "- Use render_table for tabular data, comparisons, and structured listings.",
+        "- Use render_form to collect structured user input.",
+        "- Use render_card for summaries, highlights, or actionable items.",
+        "- Use render_metric for a single KPI or important statistic.",
+        "- Use render_list for bullet lists, checklists, or simple enumerations.",
+        "- Use render_tabs to organize multiple views into switchable tabs; tab content can contain text, metrics, lists, charts, and tables.",
+        "When presenting data, statistics, or comparisons, prefer render tools over plain text. When building any visualization, render it as soon as you have enough data."
       ],
       "\n"
     )

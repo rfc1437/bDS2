@@ -2,6 +2,7 @@ defmodule BDS.Desktop.Menu do
   @moduledoc false
 
   use BDS.Desktop.MenuCompat
+  alias BDS.Desktop.Shutdown
   alias Desktop.Window
 
   @impl true
@@ -27,7 +28,7 @@ defmodule BDS.Desktop.Menu do
   end
 
   def handle_event("quit", menu) do
-    Window.quit()
+    Shutdown.request_quit()
     {:noreply, menu}
   end
 

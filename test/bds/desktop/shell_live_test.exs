@@ -2247,6 +2247,58 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert css =~ "line-height: 1.35;"
   end
 
+  test "chat editor keeps empty input single-line until content grows" do
+    assert {:ok, conversation} = AI.start_chat(%{title: "Input Sizing", model: "gpt-4.1"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert html =~ ~s(rows="1")
+    assert html =~ ~s(class="chat-input chat-surface-input")
+
+    css = File.read!(Path.expand("../../../priv/ui/app.css", __DIR__))
+    assert css =~ "--chat-input-line-height: 20px;"
+    assert css =~ "--chat-input-min-height: 20px;"
+    assert css =~ ".chat-panel .chat-input-container"
+    assert css =~ "padding: 8px 16px;"
+    assert css =~ "padding: 6px 8px;"
+    assert css =~ ".chat-panel .chat-input-wrapper"
+    assert css =~ "min-height: 30px;"
+    assert css =~ "padding: 4px 6px;"
+    assert css =~ ".chat-panel .chat-input"
+    assert css =~ "box-sizing: border-box;"
+    assert css =~ "margin: 0;"
+    assert css =~ "height: var(--chat-input-min-height);"
+    assert css =~ "min-height: var(--chat-input-min-height);"
+    assert css =~ "overflow-y: hidden;"
+    assert css =~ ".chat-panel .chat-send-button"
+    assert css =~ "width: 22px;"
+    assert css =~ "height: 22px;"
+    assert css =~ "max-width: 22px;"
+    assert css =~ "max-height: 22px;"
+    assert css =~ "padding: 0;"
+
+    live_js = File.read!(Path.expand("../../../priv/ui/live.js", __DIR__))
+
+    assert live_js =~
+             "minHeight = parseFloat(styles.getPropertyValue(\"--chat-input-min-height\"))"
+
+    assert live_js =~ "textarea.value.trim() === \"\""
+    assert live_js =~ "textarea.rows = 1;"
+    assert live_js =~ "textarea.style.minHeight = `${minHeight}px`;"
+    assert live_js =~ "textarea.style.height = `${minHeight}px`;"
+    assert live_js =~ "textarea.style.maxHeight = `${minHeight}px`;"
+    assert live_js =~ "textarea.style.height = \"0px\";"
+    assert live_js =~ "textarea.style.overflowY = nextHeight >= maxHeight ? \"auto\" : \"hidden\""
+  end
+
   test "chat editor groups selector models by provider and uses catalog labels" do
     updated_at = Persistence.now_ms()
 

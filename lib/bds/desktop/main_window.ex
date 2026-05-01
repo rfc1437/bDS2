@@ -71,6 +71,7 @@ defmodule BDS.Desktop.MainWindow do
 
       frame ->
         apply_restored_bounds(frame)
+        BDS.Desktop.Shutdown.install_handlers(frame)
         schedule_persist()
 
         {:noreply,

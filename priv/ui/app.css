@@ -5796,9 +5796,13 @@ button svg * {
 }
 
 .chat-input-container {
-  padding: 16px;
+  padding: 8px 16px;
   border-top: 1px solid var(--vscode-editorGroup-border, var(--line, #3c3c3c));
   background-color: var(--vscode-sideBar-background, var(--panel-1, #1e1e1e));
+}
+
+.chat-panel .chat-input-container {
+  padding: 8px 16px;
 }
 
 .chat-abort-button {
@@ -5818,36 +5822,46 @@ button svg * {
   background-color: var(--vscode-inputValidation-errorBackground, rgba(244, 135, 113, 0.12));
 }
 
-.chat-input-wrapper {
+.chat-panel .chat-input-wrapper {
+  --chat-input-line-height: 20px;
+  --chat-input-min-height: 20px;
+  --chat-input-max-height: 160px;
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 8px;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 6px;
   border: 1px solid var(--vscode-input-border, var(--line, #3c3c3c));
   border-radius: 8px;
   background-color: var(--vscode-input-background, var(--panel-2, #252526));
 }
 
-.chat-input-wrapper:focus-within {
+.chat-panel .chat-input-wrapper:focus-within {
   border-color: var(--vscode-focusBorder, var(--accent-color));
 }
 
-.chat-input {
+.chat-panel .chat-input {
   flex: 1;
-  min-height: 24px;
-  max-height: 200px;
+  display: block;
+  box-sizing: border-box;
+  height: var(--chat-input-min-height);
+  min-height: var(--chat-input-min-height);
+  max-height: var(--chat-input-max-height);
+  margin: 0;
   padding: 0;
   border: none;
   outline: none;
+  appearance: none;
   background: transparent;
   color: var(--vscode-input-foreground, inherit);
   font: inherit;
-  line-height: 1.5;
+  line-height: var(--chat-input-line-height);
   resize: none;
-  overflow-y: auto;
+  overflow-y: hidden;
+  vertical-align: top;
 }
 
-.chat-input::placeholder {
+.chat-panel .chat-input::placeholder {
   color: var(--vscode-input-placeholderForeground, rgba(255, 255, 255, 0.45));
 }
 
@@ -5861,10 +5875,16 @@ button svg * {
   font-size: 12px;
 }
 
-.chat-send-button {
+.chat-panel .chat-send-button {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  max-width: 22px;
+  max-height: 22px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5872,16 +5892,17 @@ button svg * {
   border-radius: 50%;
   background-color: var(--vscode-button-background, var(--accent-color));
   color: var(--vscode-button-foreground, #ffffff);
-  font-size: 18px;
+  font-size: 15px;
+  line-height: 1;
   cursor: pointer;
   transition: background-color 0.15s;
 }
 
-.chat-send-button:hover:not(:disabled) {
+.chat-panel .chat-send-button:hover:not(:disabled) {
   background-color: var(--vscode-button-hoverBackground, var(--accent-color));
 }
 
-.chat-send-button:disabled,
+.chat-panel .chat-send-button:disabled,
 .api-key-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -6058,6 +6079,10 @@ button svg * {
   .chat-messages,
   .chat-input-container {
     padding: 12px;
+  }
+
+  .chat-panel .chat-input-container {
+    padding: 6px 8px;
   }
 }
 

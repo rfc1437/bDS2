@@ -4,15 +4,22 @@ defmodule BDS.AI.ChatTools do
   import Ecto.Query
 
   alias BDS.AI.Chat
+  alias BDS.Media, as: MediaContext
   alias BDS.Media.Media
   alias BDS.MCP.Queries
+  alias BDS.Posts, as: PostsContext
   alias BDS.Posts.Post
+  alias BDS.Posts.PostMedia
   alias BDS.Projects.Project
   alias BDS.Repo
   alias BDS.Search
 
   @spec execute(String.t(), map(), String.t() | nil) :: map()
   def execute("blog_stats", _arguments, project_id) do
+    execute("get_blog_stats", %{}, project_id)
+  end
+
+  def execute("get_blog_stats", _arguments, project_id) do
     project_id = project_id || active_project_id()
 
     %{
@@ -73,6 +80,18 @@ defmodule BDS.AI.ChatTools do
     end
   end
 
+  def execute("read_post", arguments, project_id) do
+    project_id = project_id || active_project_id()
+
+    case Repo.get_by(Post,
+           id: arguments["postId"] || arguments["post_id"],
+           project_id: project_id
+         ) do
+      %Post{} = post -> %{post: Queries.post_detail(post)}
+      nil -> %{success: false, error: "not_found"}
+    end
+  end
+
   def execute("list_posts", arguments, project_id) do
     project_id = project_id || active_project_id()
     limit = normalize_limit(arguments["limit"])
@@ -116,6 +135,70 @@ defmodule BDS.AI.ChatTools do
     )
   end
 
+  def execute("get_media", arguments, project_id) do
+    project_id = project_id || active_project_id()
+
+    case Repo.get_by(Media,
+           id: arguments["mediaId"] || arguments["media_id"],
+           project_id: project_id
+         ) do
+      %Media{} = media -> %{media: media_summary(media)}
+      nil -> %{success: false, error: "not_found"}
+    end
+  end
+
+  def execute("view_image", arguments, project_id) do
+    project_id = project_id || active_project_id()
+    media_id = arguments["mediaId"] || arguments["media_id"]
+    size = arguments["size"] || "medium"
+
+    case Repo.get_by(Media, id: media_id, project_id: project_id) do
+      %Media{mime_type: "image/" <> _rest} = media ->
+        case thumbnail_data_url(project_id, media, size) do
+          nil -> %{success: false, error: "thumbnail_not_available"}
+          data_url -> %{success: true, media: media_summary(media), data_url: data_url}
+        end
+
+      %Media{} = media ->
+        %{success: false, error: "not_image", mime_type: media.mime_type}
+
+      nil ->
+        %{success: false, error: "not_found"}
+    end
+  end
+
+  def execute("update_post_metadata", arguments, project_id) do
+    project_id = project_id || active_project_id()
+    post_id = arguments["postId"] || arguments["post_id"]
+
+    with %Post{} <- Repo.get_by(Post, id: post_id, project_id: project_id),
+         attrs <- metadata_attrs(arguments, ["title", "excerpt", "tags", "categories"]),
+         false <- attrs == %{},
+         {:ok, post} <- PostsContext.update_post(post_id, attrs) do
+      %{success: true, post: Queries.post_detail(post)}
+    else
+      nil -> %{success: false, error: "not_found"}
+      true -> %{success: false, error: "no_updates_provided"}
+      {:error, reason} -> %{success: false, error: inspect(reason)}
+    end
+  end
+
+  def execute("update_media_metadata", arguments, project_id) do
+    project_id = project_id || active_project_id()
+    media_id = arguments["mediaId"] || arguments["media_id"]
+
+    with %Media{} <- Repo.get_by(Media, id: media_id, project_id: project_id),
+         attrs <- metadata_attrs(arguments, ["title", "alt", "caption", "tags"]),
+         false <- attrs == %{},
+         {:ok, media} <- MediaContext.update_media(media_id, attrs) do
+      %{success: true, media: media_summary(media)}
+    else
+      nil -> %{success: false, error: "not_found"}
+      true -> %{success: false, error: "no_updates_provided"}
+      {:error, reason} -> %{success: false, error: inspect(reason)}
+    end
+  end
+
   def execute("list_tags", _arguments, project_id) do
     project_id = project_id || active_project_id()
 
@@ -149,6 +232,56 @@ defmodule BDS.AI.ChatTools do
     %{groups: groups, total_posts: result.total}
   end
 
+  def execute("get_post_backlinks", arguments, project_id) do
+    project_id = project_id || active_project_id()
+
+    case Repo.get_by(Post,
+           id: arguments["postId"] || arguments["post_id"],
+           project_id: project_id
+         ) do
+      %Post{} = post ->
+        %{success: true, post_id: post.id, linked_by: Queries.linked_posts(post.id, :incoming)}
+
+      nil ->
+        %{success: false, error: "not_found"}
+    end
+  end
+
+  def execute("get_post_outlinks", arguments, project_id) do
+    project_id = project_id || active_project_id()
+
+    case Repo.get_by(Post,
+           id: arguments["postId"] || arguments["post_id"],
+           project_id: project_id
+         ) do
+      %Post{} = post ->
+        %{success: true, post_id: post.id, links_to: Queries.linked_posts(post.id, :outgoing)}
+
+      nil ->
+        %{success: false, error: "not_found"}
+    end
+  end
+
+  def execute("get_post_media", arguments, project_id) do
+    project_id = project_id || active_project_id()
+    post_id = arguments["postId"] || arguments["post_id"]
+
+    case Repo.get_by(Post, id: post_id, project_id: project_id) do
+      %Post{} = post -> %{success: true, post_id: post.id, media: post_media(project_id, post.id)}
+      nil -> %{success: false, error: "not_found"}
+    end
+  end
+
+  def execute("get_media_posts", arguments, project_id) do
+    project_id = project_id || active_project_id()
+    media_id = arguments["mediaId"] || arguments["media_id"]
+
+    case Repo.get_by(Media, id: media_id, project_id: project_id) do
+      %Media{} = media -> %{success: true, media_id: media.id, posts: media_posts(media.id)}
+      nil -> %{success: false, error: "not_found"}
+    end
+  end
+
   def execute("render_table", arguments, _project_id) do
     %{
       type: "table",
@@ -162,7 +295,7 @@ defmodule BDS.AI.ChatTools do
     %{
       type: "chart",
       title: arguments["title"],
-      chart_type: arguments["chart_type"] || "bar",
+      chart_type: arguments["chartType"] || arguments["chart_type"] || "bar",
       series: arguments["series"] || []
     }
   end
@@ -238,6 +371,15 @@ defmodule BDS.AI.ChatTools do
                 })
             },
             %{
+              name: "get_blog_stats",
+              spec:
+                tool_spec(
+                  "get_blog_stats",
+                  "Get comprehensive blog statistics: total posts, media count, unique tag count, and unique category count. Use this first when you need to understand the scope of the data.",
+                  %{"type" => "object", "properties" => %{}}
+                )
+            },
+            %{
               name: "check_term",
               spec:
                 tool_spec(
@@ -257,6 +399,19 @@ defmodule BDS.AI.ChatTools do
                   "search_posts",
                   "Search blog posts using full-text search. Can filter by category, tags, language, missing translation language, year, month, or status. Returns paginated concrete post data with titles, slugs, tags, categories, backlinks, and links_to.",
                   post_search_schema(true)
+                )
+            },
+            %{
+              name: "read_post",
+              spec:
+                tool_spec(
+                  "read_post",
+                  "Read full content and metadata of a specific blog post by ID. Includes backlinks, links_to, tags, categories, excerpt, status, language, and available languages.",
+                  %{
+                    "type" => "object",
+                    "properties" => %{"postId" => %{"type" => "string"}},
+                    "required" => ["postId"]
+                  }
                 )
             },
             %{
@@ -282,12 +437,50 @@ defmodule BDS.AI.ChatTools do
                 )
             },
             %{
+              name: "get_media",
+              spec:
+                tool_spec(
+                  "get_media",
+                  "Get information about a specific media file by ID, including title, alt text, caption, tags, filename, MIME type, dimensions, and update time.",
+                  media_id_schema()
+                )
+            },
+            %{
               name: "list_media",
               spec:
                 tool_spec(
                   "list_media",
                   "List concrete media data in the active project, including titles, filenames, MIME types, and update times.",
                   limit_schema()
+                )
+            },
+            %{
+              name: "view_image",
+              spec:
+                tool_spec(
+                  "view_image",
+                  "View an image thumbnail as a local data URL for visual inspection. Only works with image media files.",
+                  media_id_schema(%{
+                    "size" => %{"type" => "string", "enum" => ["small", "medium", "large"]}
+                  })
+                )
+            },
+            %{
+              name: "update_post_metadata",
+              spec:
+                tool_spec(
+                  "update_post_metadata",
+                  "Update metadata for a blog post: title, excerpt, tags, or categories. Does not update post body content.",
+                  update_post_metadata_schema()
+                )
+            },
+            %{
+              name: "update_media_metadata",
+              spec:
+                tool_spec(
+                  "update_media_metadata",
+                  "Update metadata for a media file: title, alt text, caption, or tags.",
+                  update_media_metadata_schema()
                 )
             },
             %{
@@ -319,6 +512,42 @@ defmodule BDS.AI.ChatTools do
                   "Count posts grouped by dimensions such as year, month, tag, category, or status. Use for analytics, distributions, and heat maps without transferring full post content.",
                   count_posts_schema()
                 )
+            },
+            %{
+              name: "get_post_backlinks",
+              spec:
+                tool_spec(
+                  "get_post_backlinks",
+                  "Get all posts that link to a specific post.",
+                  post_id_schema()
+                )
+            },
+            %{
+              name: "get_post_outlinks",
+              spec:
+                tool_spec(
+                  "get_post_outlinks",
+                  "Get all posts that a specific post links to.",
+                  post_id_schema()
+                )
+            },
+            %{
+              name: "get_post_media",
+              spec:
+                tool_spec(
+                  "get_post_media",
+                  "Get media files linked to a specific post.",
+                  post_id_schema()
+                )
+            },
+            %{
+              name: "get_media_posts",
+              spec:
+                tool_spec(
+                  "get_media_posts",
+                  "Get posts that use a specific media file.",
+                  media_id_schema()
+                )
             }
           ]
         else
@@ -330,14 +559,18 @@ defmodule BDS.AI.ChatTools do
           %{
             name: "render_card",
             spec:
-              tool_spec("render_card", "Return a structured card payload", render_card_schema())
+              tool_spec(
+                "render_card",
+                "Render an information card in the chat UI. Use this for displaying a summary, highlight, or actionable item.",
+                render_card_schema()
+              )
           },
           %{
             name: "render_table",
             spec:
               tool_spec(
                 "render_table",
-                "Return a structured table payload",
+                "Render a data table in the chat UI. Use this when the user asks for tabular data, comparisons, or structured information.",
                 render_table_schema()
               )
           },
@@ -346,40 +579,52 @@ defmodule BDS.AI.ChatTools do
             spec:
               tool_spec(
                 "render_chart",
-                "Return a structured chart payload",
+                "Render an interactive chart in the chat UI. Use this when the user asks for a chart, graph, or data visualization. Supports bar, stacked-bar, line, area, pie, donut, and heatmap charts. Use stacked-bar for multi-segment bars and heatmap for grid/matrix visualizations.",
                 render_chart_schema()
               )
           },
           %{
             name: "render_form",
             spec:
-              tool_spec("render_form", "Return a structured form payload", render_form_schema())
+              tool_spec(
+                "render_form",
+                "Render an interactive form in the chat UI. Use this when you need to collect structured input from the user.",
+                render_form_schema()
+              )
           },
           %{
             name: "render_metric",
             spec:
               tool_spec(
                 "render_metric",
-                "Return a structured metric payload",
+                "Render a single metric/KPI display in the chat UI. Use this for showing a single important value with a label.",
                 render_metric_schema()
               )
           },
           %{
             name: "render_list",
             spec:
-              tool_spec("render_list", "Return a structured list payload", render_list_schema())
+              tool_spec(
+                "render_list",
+                "Render a list of items in the chat UI. Use this for displaying bullet-point style lists, checklists, or simple enumerations.",
+                render_list_schema()
+              )
           },
           %{
             name: "render_tabs",
             spec:
-              tool_spec("render_tabs", "Return a structured tabs payload", render_tabs_schema())
+              tool_spec(
+                "render_tabs",
+                "Render a tabbed interface in the chat UI. Use this to organize information into multiple tabs that the user can switch between.",
+                render_tabs_schema()
+              )
           },
           %{
             name: "render_mindmap",
             spec:
               tool_spec(
                 "render_mindmap",
-                "Return a structured mindmap payload",
+                "Render a mind map diagram in the chat UI. Use this when the user asks for a mind map, concept map, topic tree, brainstorming diagram, or hierarchical overview of ideas.",
                 render_mindmap_schema()
               )
           }
@@ -450,13 +695,65 @@ defmodule BDS.AI.ChatTools do
     }
   end
 
+  defp post_id_schema do
+    %{
+      "type" => "object",
+      "properties" => %{"postId" => %{"type" => "string"}},
+      "required" => ["postId"]
+    }
+  end
+
+  defp media_id_schema(extra_properties \\ %{}) do
+    %{
+      "type" => "object",
+      "properties" => Map.merge(%{"mediaId" => %{"type" => "string"}}, extra_properties),
+      "required" => ["mediaId"]
+    }
+  end
+
+  defp update_post_metadata_schema do
+    %{
+      "type" => "object",
+      "properties" => %{
+        "postId" => %{"type" => "string"},
+        "title" => %{"type" => "string"},
+        "excerpt" => %{"type" => "string"},
+        "tags" => %{"type" => "array", "items" => %{"type" => "string"}},
+        "categories" => %{"type" => "array", "items" => %{"type" => "string"}}
+      },
+      "required" => ["postId"]
+    }
+  end
+
+  defp update_media_metadata_schema do
+    %{
+      "type" => "object",
+      "properties" => %{
+        "mediaId" => %{"type" => "string"},
+        "title" => %{"type" => "string"},
+        "alt" => %{"type" => "string"},
+        "caption" => %{"type" => "string"},
+        "tags" => %{"type" => "array", "items" => %{"type" => "string"}}
+      },
+      "required" => ["mediaId"]
+    }
+  end
+
   defp render_table_schema do
     %{
       "type" => "object",
       "properties" => %{
-        "title" => %{"type" => "string"},
-        "columns" => %{"type" => "array"},
-        "rows" => %{"type" => "array"}
+        "title" => %{"type" => "string", "description" => "Optional table title"},
+        "columns" => %{
+          "type" => "array",
+          "items" => %{"type" => "string"},
+          "description" => "Column header names"
+        },
+        "rows" => %{
+          "type" => "array",
+          "items" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "description" => "Table rows, each row is an array of cell values"
+        }
       }
     }
   end
@@ -465,10 +762,40 @@ defmodule BDS.AI.ChatTools do
     %{
       "type" => "object",
       "properties" => %{
-        "title" => %{"type" => "string"},
-        "chart_type" => %{"type" => "string"},
-        "series" => %{"type" => "array"}
-      }
+        "chartType" => %{
+          "type" => "string",
+          "enum" => ["bar", "stacked-bar", "line", "area", "pie", "donut", "heatmap"],
+          "description" =>
+            "The type of chart to render. Use stacked-bar for multi-segment bars. Use heatmap for grid/matrix visualizations."
+        },
+        "title" => %{"type" => "string", "description" => "Optional chart title"},
+        "series" => %{
+          "type" => "array",
+          "description" => "Array of data points.",
+          "items" => %{
+            "type" => "object",
+            "properties" => %{
+              "label" => %{"type" => "string", "description" => "Data point label"},
+              "value" => %{"type" => "number", "description" => "Data point value"},
+              "segments" => %{
+                "type" => "array",
+                "description" =>
+                  "Segments within this data point. Required for stacked-bar and heatmap charts.",
+                "items" => %{
+                  "type" => "object",
+                  "properties" => %{
+                    "label" => %{"type" => "string"},
+                    "value" => %{"type" => "number"}
+                  },
+                  "required" => ["label", "value"]
+                }
+              }
+            },
+            "required" => ["label"]
+          }
+        }
+      },
+      "required" => ["chartType", "series"]
     }
   end
 
@@ -568,6 +895,79 @@ defmodule BDS.AI.ChatTools do
     |> Enum.frequencies()
     |> Enum.map(fn {term, count} -> %{name: term, count: count} end)
     |> Enum.sort_by(&String.downcase(to_string(&1.name)))
+  end
+
+  defp metadata_attrs(arguments, keys) do
+    Enum.reduce(keys, %{}, fn key, acc ->
+      maybe_put(acc, String.to_atom(key), arguments[key])
+    end)
+  end
+
+  defp media_summary(%Media{} = media) do
+    %{
+      id: media.id,
+      filename: media.filename,
+      original_name: media.original_name,
+      mime_type: media.mime_type,
+      size: media.size,
+      width: media.width,
+      height: media.height,
+      title: media.title,
+      alt: media.alt,
+      caption: media.caption,
+      author: media.author,
+      language: media.language,
+      tags: media.tags || [],
+      created_at: media.created_at,
+      updated_at: media.updated_at
+    }
+  end
+
+  defp post_media(project_id, post_id) do
+    Repo.all(
+      from media in Media,
+        join: post_media in PostMedia,
+        on: post_media.media_id == media.id,
+        where: post_media.project_id == ^project_id and post_media.post_id == ^post_id,
+        order_by: [asc: post_media.sort_order, asc: media.updated_at]
+    )
+    |> Enum.map(&media_summary/1)
+  end
+
+  defp media_posts(media_id) do
+    MediaContext.list_linked_posts(media_id)
+    |> Enum.map(fn post ->
+      %{"id" => post.post_id, "title" => post.title, "sort_order" => post.sort_order}
+    end)
+  end
+
+  defp thumbnail_data_url(project_id, media, size) do
+    project = Repo.get!(Project, project_id)
+    size_key = thumbnail_size(size)
+    relative_path = MediaContext.thumbnail_paths(media)[size_key]
+    absolute_path = Path.join(project.data_path, relative_path || "")
+
+    with true <- is_binary(relative_path),
+         true <- File.exists?(absolute_path),
+         {:ok, binary} <- File.read(absolute_path) do
+      "data:#{thumbnail_mime(absolute_path)};base64," <> Base.encode64(binary)
+    else
+      _other -> nil
+    end
+  end
+
+  defp thumbnail_size("small"), do: :small
+  defp thumbnail_size("large"), do: :large
+  defp thumbnail_size(_size), do: :medium
+
+  defp thumbnail_mime(path) do
+    case Path.extname(path) |> String.downcase() do
+      ".jpg" -> "image/jpeg"
+      ".jpeg" -> "image/jpeg"
+      ".png" -> "image/png"
+      ".webp" -> "image/webp"
+      _other -> "application/octet-stream"
+    end
   end
 
   defp blank?(value), do: is_nil(value) or String.trim(to_string(value)) == ""
