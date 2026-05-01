@@ -220,7 +220,7 @@ defmodule BDS.AI.ChatTools do
   def execute("count_posts", arguments, project_id) do
     project_id = project_id || active_project_id()
     group_by = List.wrap(arguments["groupBy"] || arguments["group_by"]) |> Enum.map(&to_string/1)
-    {:ok, result} = Search.search_posts(project_id, "", search_filters(arguments))
+    result = search_all_counted_posts(project_id, arguments)
 
     groups =
       result.posts
@@ -880,6 +880,16 @@ defmodule BDS.AI.ChatTools do
     |> maybe_put(:status, BDS.BoundedAtoms.post_status(arguments["status"]))
     |> Map.put(:offset, normalize_offset(arguments["offset"]))
     |> Map.put(:limit, normalize_limit(arguments["limit"]))
+  end
+
+  defp search_all_counted_posts(project_id, arguments) do
+    filters = search_filters(arguments) |> Map.put(:offset, 0) |> Map.put(:limit, 1)
+    {:ok, %{total: total}} = Search.search_posts(project_id, "", filters)
+
+    filters = Map.put(filters, :limit, max(total, 1))
+    {:ok, result} = Search.search_posts(project_id, "", filters)
+
+    result
   end
 
   defp maybe_put(map, _key, nil), do: map

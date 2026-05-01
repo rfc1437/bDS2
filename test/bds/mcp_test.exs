@@ -3,6 +3,7 @@ defmodule BDS.MCPTest do
 
   alias BDS.Media.Media
   alias BDS.MCP.ProposalStore
+  alias BDS.Posts.Post
   alias BDS.Repo
   alias BDS.Scripts.Script
   alias BDS.Templates.Template
@@ -86,6 +87,39 @@ defmodule BDS.MCPTest do
     assert {:ok, read_result} = BDS.MCP.call_tool("read_post_by_slug", %{slug: "travel-notes"})
     assert read_result["post"]["title"] == "Travel Notes"
     assert read_result["post"]["slug"] == "travel-notes"
+  end
+
+  test "count_posts groups every matching post before returning groups", %{project: project} do
+    month_counts = [{2, 24}, {3, 26}, {4, 23}]
+
+    for {month, count} <- month_counts,
+        index <- 1..count do
+      day = rem(index - 1, 28) + 1
+      created_at = unix_ms!(NaiveDateTime.new!(Date.new!(2026, month, day), ~T[12:00:00]))
+
+      Repo.insert!(
+        Post.changeset(%Post{}, %{
+          id: Ecto.UUID.generate(),
+          project_id: project.id,
+          title: "MCP Count #{month}-#{index}",
+          slug: "mcp-count-#{month}-#{index}",
+          content: "Body",
+          status: :draft,
+          created_at: created_at,
+          updated_at: created_at,
+          do_not_translate: false
+        })
+      )
+    end
+
+    assert {:ok, %{"groups" => groups, "total_posts" => 73}} =
+             BDS.MCP.call_tool("count_posts", %{groupBy: ["month"], year: 2026})
+
+    assert Enum.sort_by(groups, & &1["month"]) == [
+             %{"count" => 24, "month" => 2},
+             %{"count" => 26, "month" => 3},
+             %{"count" => 23, "month" => 4}
+           ]
   end
 
   test "translation tools expose post and media translations and upsert media metadata", %{
@@ -436,5 +470,11 @@ defmodule BDS.MCPTest do
 
     assert "bds://posts{?cursor}" in template_uris
     assert "bds://media{?cursor}" in template_uris
+  end
+
+  defp unix_ms!(%NaiveDateTime{} = naive_datetime) do
+    naive_datetime
+    |> DateTime.from_naive!("Etc/UTC")
+    |> DateTime.to_unix(:millisecond)
   end
 end

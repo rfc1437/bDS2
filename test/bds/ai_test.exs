@@ -770,6 +770,44 @@ defmodule BDS.AITest do
              )
   end
 
+  test "chat count_posts groups every matching post before returning groups" do
+    {:ok, project} = create_project_fixture("Count Posts")
+
+    month_counts = [{2, 4}, {3, 6}, {4, 3}]
+
+    for {month, count} <- month_counts,
+        index <- 1..count do
+      created_at = unix_ms!(NaiveDateTime.new!(Date.new!(2026, month, index), ~T[12:00:00]))
+
+      Repo.insert!(
+        Post.changeset(%Post{}, %{
+          id: Ecto.UUID.generate(),
+          project_id: project.id,
+          title: "AI Count #{month}-#{index}",
+          slug: "ai-count-#{month}-#{index}",
+          content: "Body",
+          status: :draft,
+          created_at: created_at,
+          updated_at: created_at,
+          do_not_translate: false
+        })
+      )
+    end
+
+    assert %{groups: groups, total_posts: 13} =
+             BDS.AI.ChatTools.execute(
+               "count_posts",
+               %{"groupBy" => ["month"], "year" => 2026},
+               project.id
+             )
+
+    assert Enum.sort_by(groups, & &1["month"]) == [
+             %{"count" => 4, "month" => 2},
+             %{"count" => 6, "month" => 3},
+             %{"count" => 3, "month" => 4}
+           ]
+  end
+
   test "cancel_chat aborts an in-flight chat turn" do
     assert {:ok, _endpoint} =
              BDS.AI.put_endpoint(
@@ -852,5 +890,11 @@ defmodule BDS.AITest do
       )
 
     %{post: post, media: media}
+  end
+
+  defp unix_ms!(%NaiveDateTime{} = naive_datetime) do
+    naive_datetime
+    |> DateTime.from_naive!("Etc/UTC")
+    |> DateTime.to_unix(:millisecond)
   end
 end

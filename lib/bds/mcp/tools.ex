@@ -390,8 +390,7 @@ defmodule BDS.MCP.Tools do
   defp count_posts(params) do
     project = Queries.active_project!()
     group_by = map_get(params, :groupBy, []) |> Enum.map(&to_string/1)
-    filters = Queries.search_filters(params)
-    {:ok, result} = Search.search_posts(project.id, "", filters)
+    result = search_all_counted_posts(project.id, params)
 
     groups =
       result.posts
@@ -401,6 +400,16 @@ defmodule BDS.MCP.Tools do
       |> Enum.sort_by(&Map.to_list/1)
 
     %{"groups" => groups, "total_posts" => result.total}
+  end
+
+  defp search_all_counted_posts(project_id, params) do
+    filters = Queries.search_filters(params) |> Map.put(:offset, 0) |> Map.put(:limit, 1)
+    {:ok, %{total: total}} = Search.search_posts(project_id, "", filters)
+
+    filters = Map.put(filters, :limit, max(total, 1))
+    {:ok, result} = Search.search_posts(project_id, "", filters)
+
+    result
   end
 
   defp read_post_by_slug(%{"slug" => slug} = params),
