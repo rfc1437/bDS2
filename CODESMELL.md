@@ -2,19 +2,17 @@
 
 Living document. Each section lists **status**, then **open work in priority order**, then a brief notes block. Completed work is listed compactly at the bottom (`## Changelog`).
 
-Last refreshed: 2026-05-08.
+Last refreshed: 2026-05-09.
 
 ---
 
 ## 1. God Modules
 
-**Status:** in progress. Five originally-flagged god modules are reduced to coordinator size; eight new files (mostly LiveView editors) crossed the 800-line threshold and are now the active queue.
+**Status:** in progress. The originally-flagged god modules (now including `BDS.MCP`) are all reduced to coordinator size; the open queue is empty.
 
 ### Open queue (priority order)
 
-| # | Module | Current lines | Target | Strategy |
-|---|---|---|---|---|
-| 9 | `BDS.MCP` | 677 | ≤ 350 | Split tools / resources / proposals / serialization clusters. (Carried over from original priority list.) |
+_None._ All modules previously on the queue have been split; refresh the queue if a new module crosses the 800-line threshold.
 
 **Established pattern:** extract cohesive helper clusters into submodules under `lib/<context>/<sub>.ex`; `import BDS.X.Y, only: [...]` from the main module so internal call sites are unchanged; `defdelegate` for any helper still needed through the public namespace; verify with `mix compile --warnings-as-errors`, `mix dialyzer --format short`, and full `mix test` after each extraction.
 
@@ -33,6 +31,7 @@ Last refreshed: 2026-05-08.
 - `BDS.Desktop.ShellLive.PostEditor` 963 → 506 (47 %)
 - `BDS.Desktop.ShellLive.SettingsEditor` 872 → 226 (74 %)
 - `BDS.Desktop.ShellLive.ChatEditor` 972 → 576 (41 %)
+- `BDS.MCP` 677 → 27 (96 %)
 
 ---
 
@@ -165,6 +164,11 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ---
 
 ## Changelog
+
+### 2026-05-09
+
+- **God modules**:
+  - `BDS.MCP` 677 → 27 (96 %). Submodules under `lib/bds/mcp/`: `Util` (36, sanitize/1 + normalize_term/1 + maybe_put/3 + map_get/3), `Queries` (201, page_size/0 + active_project!/0 + post_summary/1 + post_detail/1 + translated_post_detail/2 + search_filters/1 + parse_status/1 + group_rows/2 + private group_values/2 (5 clauses) + available_languages/2 + linked_posts/2 + private load_linked_post/1 + post_body/1 + translation_body/1 + tag_post_count/2 + category_post_count/2), `Tools` (394, list/0 + call/2 + validate_template/1 + private check_term/1 + search_posts/1 + count_posts/1 + read_post_by_slug/1 + draft_post/1 + propose_script/1 + propose_template/1 + propose_media_metadata/1 + propose_post_metadata/1 + accept_proposal/1 + discard_proposal/1 + script_validation/1 + parse_script_kind/1 + parse_template_kind/1 + tool/2), `Resources` (112, list/0 + read/1 + private posts_resource/1 + media_resource/1 + tags_resource/0 + categories_resource/0 + read_post_resource/1 + read_media_resource/1). Coordinator `BDS.MCP` keeps the 5 public entrypoints (`list_tools/0`, `list_resources/0`, `call_tool/2`, `read_resource/1`, `validate_template/1`) as `defdelegate` to `Tools`/`Resources` and re-exports the `tool_descriptor`/`resource_descriptor` types as aliases of `Tools.descriptor`/`Resources.descriptor`. Cross-submodule deps are linear and acyclic: `Tools` → `Queries` + `Util` + `ProposalStore`; `Resources` → `Queries` + `Util` + `ProposalStore`; `Queries` → `Util`; `Util` is a leaf. Existing siblings (`ProposalStore`, `Proposal`, `AgentConfig`, `Server`, `Stdio`) untouched. The pre-existing `BDS.MCP.Server`/`Stdio` callers (`call_tool` / `list_tools` / `list_resources` / `read_resource`) keep using the coordinator unchanged. Validates clean: `mix compile --warnings-as-errors`, `mix dialyzer --format short` (Total errors: 0), `mix test` (342 tests, 0 failures, 4 skipped).
 
 ### 2026-05-08
 
