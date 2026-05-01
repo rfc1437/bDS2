@@ -47,11 +47,11 @@ Goal: align bDS2 with old bDS behavior. Use the Allium specs as the contract onl
 - Spec: adds `proposal_ttl_cli = 8.hours`.
 - Action: remove the CLI-specific TTL from `specs/mcp.allium` or mark it explicitly future/non-current.
 
-## P1: Media Thumbnail Encoding
+## P1: Media Thumbnail Encoding (done)
 
 - Old bDS: small/medium/large WebP quality 80; AI JPEG quality 85.
 - bDS2 now: matches old bDS.
-- Spec: says encoder default quality.
+- Spec: now specifies WebP quality 80 and AI JPEG quality 85.
 - Action: tend `specs/media_processing.allium` to specify WebP quality 80 and AI JPEG quality 85.
 
 ## P2: Media Import Event Shape

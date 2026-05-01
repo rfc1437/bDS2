@@ -91,8 +91,10 @@ config {
     thumbnail_medium_width: Integer = 400
     thumbnail_large_width: Integer = 800
     thumbnail_ai_size: Integer = 448       -- 448x448 square crop, JPEG
-    thumbnail_format: String = "webp"      -- All sizes except AI (encoder default quality)
+    thumbnail_format: String = "webp"      -- All sizes except AI
+    thumbnail_quality: Integer = 80         -- WebP quality for small/medium/large
     thumbnail_ai_format: String = "jpeg"   -- AI thumbnail only
+    thumbnail_ai_quality: Integer = 85      -- JPEG quality for AI thumbnail
 }
 
 rule GenerateThumbnails {
@@ -103,25 +105,29 @@ rule GenerateThumbnails {
         source: media.file_path,
         destination: media.thumbnails.small,
         width: config.thumbnail_small_width,
-        format: config.thumbnail_format
+        format: config.thumbnail_format,
+        quality: config.thumbnail_quality
     )
     ensures: ThumbnailGenerated(
         source: media.file_path,
         destination: media.thumbnails.medium,
         width: config.thumbnail_medium_width,
-        format: config.thumbnail_format
+        format: config.thumbnail_format,
+        quality: config.thumbnail_quality
     )
     ensures: ThumbnailGenerated(
         source: media.file_path,
         destination: media.thumbnails.large,
         width: config.thumbnail_large_width,
-        format: config.thumbnail_format
+        format: config.thumbnail_format,
+        quality: config.thumbnail_quality
     )
     ensures: ThumbnailGenerated(
         source: media.file_path,
         destination: media.thumbnails.ai,
         size: config.thumbnail_ai_size,
-        format: config.thumbnail_ai_format
+        format: config.thumbnail_ai_format,
+        quality: config.thumbnail_ai_quality
     )
 }
 
@@ -131,8 +137,8 @@ value ThumbnailGeneration {
     -- 2. Apply EXIF orientation correction (rotation, flip) so thumbnails display correctly
     -- 3. Resize: small/medium/large preserve aspect ratio (width-constrained)
     --    AI thumbnail is a 448x448 center crop (letterboxed on black background)
-    -- 4. Encode as WebP (encoder default quality) for small/medium/large
-    --    Encode as JPEG for AI thumbnail
+    -- 4. Encode as WebP quality 80 for small/medium/large
+    --    Encode as JPEG quality 85 for AI thumbnail
     -- 5. Write to bucketed thumbnail path: thumbnails/{id[0:2]}/{id}-{size}.{ext}
     --
     -- No _source copy is made. Thumbnails regenerated from the original binary.
@@ -167,8 +173,8 @@ value ImageProcessing {
     }
 
     -- Processing rules:
-    -- 1. All thumbnails (except AI) are encoded as WebP (encoder default quality)
-    -- 2. AI thumbnail is encoded as JPEG (for vision model compatibility)
+    -- 1. All thumbnails (except AI) are encoded as WebP quality 80
+    -- 2. AI thumbnail is encoded as JPEG quality 85 (for vision model compatibility)
     -- 3. Original format is preserved for full-size assets (no conversion)
     -- 4. EXIF data is not stripped (thumbnails are re-encoded, so EXIF is naturally absent)
 }
