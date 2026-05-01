@@ -611,6 +611,9 @@ defmodule BDS.MaintenanceTest do
       |> Enum.join("\n")
     )
 
+    File.mkdir_p!(Path.join([temp_dir, "posts", "2026", "04"]))
+    File.mkdir_p!(Path.join([temp_dir, "media", "2026", "04"]))
+
     File.write!(
       Path.join([temp_dir, "posts", "2026", "04", "orphan-post.md"]),
       "---\nid: orphan\ntitle: Orphan\nslug: orphan\nstatus: published\ncreatedAt: 1\nupdatedAt: 1\npublishedAt: 1\ntags:\ncategories:\n---\nBody\n"
@@ -1249,6 +1252,11 @@ defmodule BDS.MaintenanceTest do
     media_translation_orphan_path = "media/2026/04/orphan.txt.es.meta"
     script_orphan_path = "scripts/orphan.lua"
     template_orphan_path = "templates/orphan-view.liquid"
+
+    File.mkdir_p!(Path.join([temp_dir, "posts", "2026", "04"]))
+    File.mkdir_p!(Path.join([temp_dir, "media", "2026", "04"]))
+    File.mkdir_p!(Path.join(temp_dir, "scripts"))
+    File.mkdir_p!(Path.join(temp_dir, "templates"))
 
     File.write!(Path.join(temp_dir, post_orphan_path), [
       "---",

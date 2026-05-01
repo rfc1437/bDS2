@@ -262,7 +262,7 @@ This suggests data isn't normalized at boundaries. Prefer atoms for internal str
 2. **Extract filesystem / Search side effects out of `Repo.transaction` in `BDS.Media`.** ✅ **DONE 2026-04-30.** See "Priority #2 Completion" section below.
 3. **Fix `MCP.atomize_keys`** to use `String.to_existing_atom/1` with a string-fallback. ✅ **DONE 2026-04-30.** See "Priority #3 Completion" section below.
 4. **Introduce `BDS.PostMedia` Ecto schema** and migrate the 6–8 raw `post_media` queries. ✅ **DONE 2026-04-30.** See "Priority #4 Completion" section below.
-5. **Module split.** `BDS.Generation` (2624) and `BDS.Desktop.ShellLive` (2607) first, then `BDS.AI` (1700+) and `BDS.Posts`. ✅ **PARTIAL 2026-04-30.** `BDS.Generation` reduced 2651 → 1873 (29%). See "Priority #5 Progress" section below.
+5. **Module split.** `BDS.Generation` (2624) and `BDS.Desktop.ShellLive` (2607) first, then `BDS.AI` (1700+) and `BDS.Posts`. ✅ **PARTIAL 2026-04-30 / 2026-05-01.** `BDS.Generation` reduced 2651 → 647 (76%). See "Priority #5 Progress" section below.
 6. **Replace `Repo.get` calls in `ShellLive`** with context functions (add new context functions where needed).
 7. **Move locale from `Process.put` into assigns**, then ban `Process.put` via Credo.
 8. **Extract shared helpers** (`attr/2`, `maybe_put/3`, `blank_to_nil/1`, `progress_callback/1`, rebuild progress reporters) into `BDS.MapUtils` / `BDS.ProgressReporter`.
@@ -407,33 +407,39 @@ Introduced [lib/bds/posts/post_media.ex](lib/bds/posts/post_media.ex) — a prop
 
 ---
 
-## Priority #5 Progress (2026-04-30)
+## Priority #5 Progress (2026-04-30 / 2026-05-01)
 
 **Goal:** Split god modules. Started with the worst offender, `BDS.Generation` (2651 lines).
 
-**Result:** `lib/bds/generation.ex` reduced **2651 → 1873 lines (29%)** by extracting six cohesive submodules under `lib/bds/generation/`:
+**Result:** `lib/bds/generation.ex` reduced **2651 → 647 lines (76%)** by extracting nine cohesive submodules under `lib/bds/generation/`:
 
 | Module | Lines | Responsibility |
 |---|---|---|
-| `BDS.Generation.Paths` | 262 | URL/route/path helpers, language prefixing, pagination math, archive routing |
+| `BDS.Generation.Outputs` | 490 | All `build_*_outputs/*` builders + `*_route_paths` + `additional_languages`, `route_post_output_path`, `suppress_subtree_translation_variants` |
+| `BDS.Generation.Validation` | 445 | `compare_sitemap_to_html`, `plan_validation_paths`, `build_targeted_validation_plan`, `targeted_output?`, `prune_empty_parent_dirs`, post/lang timestamp checks |
+| `BDS.Generation.Data` | 352 | `generation_data/2`, snapshot loaders, post-index builders, translation-lookup helpers |
 | `BDS.Generation.Sitemap` | 280 | sitemap.xml, RSS/Atom feeds, calendar feed, hreflang link assembly |
+| `BDS.Generation.Paths` | 262 | URL/route/path helpers, language prefixing, pagination math, archive routing |
 | `BDS.Generation.Renderers` | 227 | Liquid template rendering wrappers (home, post, archive, date, list, 404) |
 | `BDS.Generation.Progress` | 96 | Generation/validation progress callback helpers |
 | `BDS.Generation.Pagefind` | 70 | Pagefind search-index input file emission |
 | `BDS.Generation.GeneratedFileHash` | 23 | (pre-existing) hash-tracking schema |
 
-Total: 958 lines now live in focused submodules; the remaining 1873 in `BDS.Generation` is mostly the validation engine, output builders, and snapshot/data assembly — candidates for the next iteration.
+Total: 2245 lines now live in focused submodules; the remaining 647 in `BDS.Generation` is the orchestrating `plan_generation/2`, `apply_validation/2`, `validate_site/3`, `write_generated_file`, and `delete_extra_validation_paths` — small enough to manage as a single coordinator.
 
 **Refactor pattern used:** `import BDS.Generation.X, only: [...]` (or `except: [...]`) at the head of `BDS.Generation` so the hundreds of internal call sites needed no changes; `defdelegate` for any function that had to remain reachable through the public `BDS.Generation` namespace (e.g. `post_output_path/1,2`).
 
 **Validation after each extraction:** `mix compile --warnings-as-errors` clean, `mix dialyzer --format short` 0 errors, `mix test` 342/0/4.
 
-**Remaining work in this priority** (in suggested order of decreasing isolation):
+**Date-bug side fix:** `test/bds/maintenance_test.exs` had hardcoded `posts/2026/04/...` paths that worked only when the published-post setup happened to create the same year/month directory. With today's date in May, the orphan writes failed; added explicit `File.mkdir_p!` calls for the hardcoded fixture paths.
 
-1. `BDS.Generation.Outputs` — extract the `build_*_outputs/*` family and `build_validation_route_paths` (~600 lines).
-2. `BDS.Generation.Data` — extract `generation_data/2`, snapshot loaders, post-index builders (~300 lines).
-3. `BDS.Generation.Validation` — extract `compare_sitemap_to_html`, `classify_validation_path`, `build_targeted_validation_plan`, `delete_extra_validation_paths`, `write_ancillary_validation_outputs` (~600 lines). Most coupled — do last.
-4. After `BDS.Generation`, repeat the pattern on `BDS.Desktop.ShellLive` (2607), `BDS.Posts` (1781), `BDS.AI` (1711), `BDS.MCP` (677).
+**Remaining work in this priority:**
+
+- ✅ `BDS.Generation` — done (76% reduction, 647 lines remaining is acceptable for a coordinator).
+- ⏳ `BDS.Desktop.ShellLive` (2607) — next target.
+- ⏳ `BDS.Posts` (1781).
+- ⏳ `BDS.AI` (1711).
+- ⏳ `BDS.MCP` (677).
 
 ---
 
