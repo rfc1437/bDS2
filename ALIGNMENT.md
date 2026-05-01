@@ -61,7 +61,7 @@ Goal: align bDS2 with old bDS behavior. Use the Allium specs as the contract onl
 - Spec: duplicates `ImportMediaRequested` with conflicting argument order across media specs.
 - Action: normalize media specs to one event shape: source path plus project/context, with optional metadata where relevant.
 
-## P2: Import Conflict Resolution Terms
+## P2: Import Conflict Resolution Terms (done)
 
 - Old bDS: conflict resolutions are `ignore`, `overwrite`, and `import`.
 - bDS2 now: accepts/normalizes `skip -> ignore` and `merge -> overwrite`.

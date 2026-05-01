@@ -56,6 +56,11 @@ defmodule BDS.Desktop.ImportShellLiveTest do
     assert html =~ "Ready to import:"
     assert html =~ "Import 5 Items"
     assert html =~ "Post Slug Conflicts"
+    assert html =~ ~s(<option value="ignore" selected)
+    assert html =~ ~s(<option value="overwrite")
+    assert html =~ ~s(<option value="import")
+    refute html =~ ~s(<option value="skip")
+    refute html =~ ~s(<option value="merge")
     assert html =~ "Analyze with..."
     assert html =~ "Posts (2)"
     assert html =~ "Pages (1)"
@@ -63,6 +68,19 @@ defmodule BDS.Desktop.ImportShellLiveTest do
     assert html =~ "Click to add mapping"
     refute html =~ ~s(name="mapped_to")
     refute html =~ "Desktop workbench content routed through the Elixir shell."
+
+    _html =
+      render_change(view, "change_import_conflict_resolution", %{
+        "item_type" => "post",
+        "item_name" => "conflict-me",
+        "resolution" => "overwrite"
+      })
+
+    updated_definition = ImportDefinitions.get_definition(definition.id)
+    updated_report = ImportDefinitions.decode_analysis_result(updated_definition)
+
+    assert [%{resolution: "overwrite"}] =
+             Enum.filter(updated_report.details.posts, &(&1.slug == "conflict-me"))
 
     posts_html =
       view

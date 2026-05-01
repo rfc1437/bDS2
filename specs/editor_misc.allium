@@ -697,7 +697,7 @@ value ImportYearDistribution {
 value ImportConflict {
     item_type: String                   -- post | page | media
     item_name: String
-    resolution: String                  -- import | skip | merge
+    resolution: String                  -- ignore | overwrite | import
 }
 
 value ImportMacro {
@@ -745,8 +745,8 @@ surface ImportAnalysisSurface {
         -- Year-by-year bar charts for posts + media.
 
     @guarantee ConflictsSection
-        -- Collapsible. Per-item dropdown: Import/Skip/Merge.
-        -- Default: Import for new items, Skip for existing matches.
+        -- Collapsible. Per-item dropdown: Ignore/Overwrite/Import.
+        -- Default: Import for new items, Ignore for existing matches.
 
     @guarantee TaxonomySection
         -- Collapsible. Category + tag pills.

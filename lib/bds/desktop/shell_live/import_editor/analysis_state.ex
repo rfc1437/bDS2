@@ -230,10 +230,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
   def importable_entity_count(items) do
     Enum.count(items || [], fn item ->
       item.status == "new" or
-        (item.status == "conflict" and
-           Map.get(item, :resolution, "ignore") not in ["ignore", "skip"])
+        (item.status == "conflict" and conflict_importable?(Map.get(item, :resolution, "ignore")))
     end)
   end
+
+  defp conflict_importable?(resolution), do: resolution in ["overwrite", "merge", "import"]
 
   @spec detail_items(term(), term()) :: term()
   def detail_items(nil, _bucket), do: []

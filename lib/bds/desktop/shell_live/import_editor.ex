@@ -583,8 +583,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                     <input type="hidden" name="item_type" value={Map.get(item, :item_type)} />
                     <input type="hidden" name="item_name" value={Map.get(item, :slug)} />
                     <select class="resolution-select" name="resolution">
-                      <option value="skip" selected={Map.get(item, :resolution) == "skip"}><%= translated("importAnalysis.ignore") %></option>
-                      <option value="merge" selected={Map.get(item, :resolution) == "merge"}><%= translated("importAnalysis.overwrite") %></option>
+                      <option value="ignore" selected={conflict_resolution_selected?(item, "ignore")}><%= translated("importAnalysis.ignore") %></option>
+                      <option value="overwrite" selected={conflict_resolution_selected?(item, "overwrite")}><%= translated("importAnalysis.overwrite") %></option>
                       <option value="import" selected={Map.get(item, :resolution) == "import"}><%= translated("importAnalysis.importNewSlug") %></option>
                     </select>
                   </form>
@@ -883,4 +883,12 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   defp present?(value), do: value not in [nil, ""]
   defp blank?(value), do: value in [nil, ""]
+
+  defp conflict_resolution_selected?(item, "ignore") do
+    Map.get(item, :resolution, "ignore") in ["ignore", "skip"]
+  end
+
+  defp conflict_resolution_selected?(item, "overwrite") do
+    Map.get(item, :resolution) in ["overwrite", "merge"]
+  end
 end
