@@ -94,6 +94,30 @@ defmodule BDS.TagsTest do
     assert [%{"name" => "Beta"}] = Jason.decode!(File.read!(tags_path))
   end
 
+  test "rename_tag keeps committed database changes when tags json flush fails", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, tag} = BDS.Tags.create_tag(%{project_id: project.id, name: "Alpha"})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Tagged Draft",
+               content: "Body",
+               tags: ["Alpha"]
+             })
+
+    meta_path = Path.join(temp_dir, "meta")
+    File.rm_rf!(meta_path)
+    File.write!(meta_path, "not a directory")
+
+    assert {:error, _reason} = BDS.Tags.rename_tag(tag.id, "Beta")
+
+    assert Repo.get!(BDS.Tags.Tag, tag.id).name == "Beta"
+    assert Repo.get!(Post, post.id).tags == ["Beta"]
+  end
+
   test "merge_tags moves source tags onto the target, deduplicates post tags, deletes sources, and refreshes tags.json",
        %{project: project, temp_dir: temp_dir} do
     assert {:ok, source_a} = BDS.Tags.create_tag(%{project_id: project.id, name: "Alpha"})

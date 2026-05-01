@@ -66,10 +66,10 @@ defmodule BDS.Persistence do
   def parse_timestamp(_value), do: nil
 
   def atomic_write(path, contents) when is_binary(path) and is_binary(contents) do
-    :ok = File.mkdir_p(Path.dirname(path))
     temp_path = path <> ".tmp"
 
-    with :ok <- File.write(temp_path, contents),
+    with :ok <- File.mkdir_p(Path.dirname(path)),
+         :ok <- File.write(temp_path, contents),
          :ok <- File.rename(temp_path, path) do
       :ok
     else

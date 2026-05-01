@@ -51,9 +51,9 @@ _None._ All modules previously on the queue have been split; refresh the queue i
 
 ## 3. Side Effects in Transactions
 
-**Status:** ✅ done in `BDS.Media` (2026-04-30). Started elsewhere: `BDS.Templates.update_template/2` now keeps only DB writes inside its transaction and runs template-file rewrites, published-post rewrites, and tags JSON flushes after commit. Open elsewhere — no audit yet for `BDS.Posts`, `BDS.Publishing`, `BDS.Generation`.
+**Status:** ✅ done for explicit `Repo.transaction/1` sites (2026-05-10). `BDS.Media`, `BDS.Templates.update_template/2`, `BDS.Metadata`, `BDS.Tags`, and `BDS.Projects` now keep filesystem/search/template-rebuild side effects outside their DB transactions. Remaining explicit transactions (`BDS.PostLinks`, `BDS.AI.Catalog`, project activation/deletion cleanup, and media link helpers) are DB-only or already run filesystem cleanup after commit. `BDS.Posts`, `BDS.Publishing`, and `BDS.Generation` do not currently use `Repo.transaction/1`.
 
-**Plan:** spot-check every `Repo.transaction/1` outside `BDS.Media`. Rule: only DB writes inside; filesystem and `Search.sync_*` after commit.
+**Rule:** only DB writes inside explicit transactions; filesystem, search sync, template rebuilds, and published-file rewrites run after commit.
 
 ---
 
@@ -171,6 +171,8 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 
 ### 2026-05-10
 
+- **Side effects in transactions**: `BDS.Metadata.update_project_metadata/2`, `sync_project_metadata_from_filesystem/1`, and the shared category/publishing `update_state` path now keep only project/settings row changes inside `Repo.transaction/1`. Metadata JSON files are flushed after commit and `Persistence.atomic_write/2` now returns `{:error, reason}` for directory-creation failures instead of raising. Added regression coverage for a failed metadata filesystem flush preserving the committed project/settings changes.
+- **Side effects in transactions**: `BDS.Tags.sync_tags_from_posts/1`, `delete_tag/1`, `rename_tag/2`, and `merge_tags/2` now commit tag/post-tag DB changes before published-post rewrites and `meta/tags.json` flushes. `BDS.Projects.ensure_default_project/0` and `create_project/1` now commit the project row before rebuilding templates from filesystem files. Added regressions for failed tag JSON flushes and failed template rebuilds preserving committed DB changes. Finished the explicit `Repo.transaction/1` audit: remaining transactions are DB-only or already defer filesystem cleanup until after commit; `BDS.Posts`, `BDS.Publishing`, and `BDS.Generation` have no explicit transaction sites.
 - **Process dictionary for i18n state (Section 2)**: encapsulated behind `BDS.Desktop.UILocale` (`lib/bds/desktop/ui_locale.ex`, ~50 lines). Public surface: `put/1` (set without restore, for LV render boundaries that return lazy `Rendered`), `with_locale/2` (set + try/after restore, for short-lived eager contexts), `current/0` (read, returns `nil` when unset). The two raw `Process.put(:bds_ui_locale, _)` sites (`BDS.Desktop.ShellLive.render/1` and `BDS.Desktop.ShellLive.SidebarComponents.sidebar_content/1`) now call `UILocale.put/1`; the ~30 raw `Process.get(:bds_ui_locale)` reads (every editor `translated/1,2` helper plus `BDS.Desktop.ShellData.effective_ui_language/1`) now call `BDS.Desktop.UILocale.current/0`. The full thread-locale-through-assigns rewrite (~733 HEEx call sites) was deliberately rejected as too invasive; the encapsulation removes the implicit-global smell while preserving Phoenix's lazy `Rendered` evaluation. The render path uses `put/1` (not `with_locale/2`) because Phoenix `~H` returns a `Rendered` whose `dynamic` is invoked by LiveView *after* `render/1` returns; a `try/after Process.delete` would clear the binding before child components materialize. Only `BDS.Desktop.UILocale` is allowed to touch the `:bds_ui_locale` process key. Validates clean: `mix compile --warnings-as-errors`, `mix dialyzer --format short` (Total errors: 0), `mix test` (342 tests, 0 failures, 4 skipped, three consecutive runs).
 
 ### 2026-05-09

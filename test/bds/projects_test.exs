@@ -72,6 +72,26 @@ defmodule BDS.ProjectsTest do
     refute {"not-found", :not_found} in starter_slugs
   end
 
+  test "create_project keeps committed project when template rebuild fails", %{
+    temp_root: temp_root
+  } do
+    temp_dir = Path.join(temp_root, "broken-template-blog")
+    templates_dir = Path.join(temp_dir, "templates")
+    File.mkdir_p!(templates_dir)
+
+    File.write!(
+      Path.join(templates_dir, "broken.liquid"),
+      "---\ntitle: Broken Template\nkind: post\n---\nBody"
+    )
+
+    assert_raise KeyError, fn ->
+      BDS.Projects.create_project(%{name: "Broken Templates", data_path: temp_dir})
+    end
+
+    assert %Project{name: "Broken Templates"} =
+             Repo.get_by(Project, data_path: temp_dir)
+  end
+
   test "set_active_project clears the previous active project and activates the target", %{
     temp_root: temp_root
   } do

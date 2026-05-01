@@ -30,8 +30,9 @@ defmodule BDS.Tags do
       |> Repo.insert()
       |> case do
         {:ok, tag} ->
-          write_tags_json(project_id)
-          {:ok, tag}
+          with :ok <- write_tags_json(project_id) do
+            {:ok, tag}
+          end
 
         error ->
           error
@@ -85,11 +86,14 @@ defmodule BDS.Tags do
         |> Repo.insert!()
       end)
 
-      write_tags_json(project_id)
       list_tags(project_id)
     end)
     |> case do
-      {:ok, tags} -> {:ok, tags}
+      {:ok, tags} ->
+        with :ok <- write_tags_json(project_id) do
+          {:ok, tags}
+        end
+
       {:error, reason} -> {:error, reason}
     end
   end
@@ -111,8 +115,9 @@ defmodule BDS.Tags do
         |> Repo.update()
         |> case do
           {:ok, updated_tag} ->
-            write_tags_json(updated_tag.project_id)
-            {:ok, updated_tag}
+            with :ok <- write_tags_json(updated_tag.project_id) do
+              {:ok, updated_tag}
+            end
 
           error ->
             error
@@ -135,10 +140,15 @@ defmodule BDS.Tags do
           end)
 
           Repo.delete!(tag)
-          write_tags_json(tag.project_id)
+          Enum.map(affected_posts, & &1.id)
         end)
         |> case do
-          {:ok, _} -> {:ok, :deleted}
+          {:ok, post_ids} ->
+            with :ok <- rewrite_published_posts(post_ids),
+                 :ok <- write_tags_json(tag.project_id) do
+              {:ok, :deleted}
+            end
+
           {:error, reason} -> {:error, reason}
         end
     end
@@ -168,11 +178,15 @@ defmodule BDS.Tags do
               |> Tag.changeset(%{name: normalized_name, updated_at: Persistence.now_ms()})
               |> Repo.update!()
 
-            write_tags_json(tag.project_id)
-            updated_tag
+            {updated_tag, Enum.map(affected_posts, & &1.id)}
           end)
           |> case do
-            {:ok, updated_tag} -> {:ok, updated_tag}
+            {:ok, {updated_tag, post_ids}} ->
+              with :ok <- rewrite_published_posts(post_ids),
+                   :ok <- write_tags_json(tag.project_id) do
+                {:ok, updated_tag}
+              end
+
             {:error, reason} -> {:error, reason}
           end
         end
@@ -193,18 +207,23 @@ defmodule BDS.Tags do
 
         Repo.transaction(fn ->
           source_names = Enum.map(source_tags, & &1.name)
+          affected_posts = posts_with_any_tag(target_tag.project_id, source_names)
 
-          posts_with_any_tag(target_tag.project_id, source_names)
-          |> Enum.each(fn post ->
+          Enum.each(affected_posts, fn post ->
             updated_tags = merge_post_tags(post.tags || [], source_names, target_tag.name)
             update_post_tags(post, updated_tags)
           end)
 
           Enum.each(source_tags, &Repo.delete!/1)
-          write_tags_json(target_tag.project_id)
+          Enum.map(affected_posts, & &1.id)
         end)
         |> case do
-          {:ok, _} -> {:ok, :merged}
+          {:ok, post_ids} ->
+            with :ok <- rewrite_published_posts(post_ids),
+                 :ok <- write_tags_json(target_tag.project_id) do
+              {:ok, :merged}
+            end
+
           {:error, reason} -> {:error, reason}
         end
     end
@@ -213,7 +232,6 @@ defmodule BDS.Tags do
   defp write_tags_json(project_id) do
     project = Projects.get_project!(project_id)
     path = Path.join([Projects.project_data_dir(project), "meta", "tags.json"])
-    :ok = File.mkdir_p(Path.dirname(path))
 
     payload =
       project_id
@@ -225,7 +243,7 @@ defmodule BDS.Tags do
         |> maybe_put("postTemplateSlug", tag.post_template_slug)
       end)
 
-    :ok = Persistence.atomic_write(path, Jason.encode!(payload))
+    Persistence.atomic_write(path, Jason.encode!(payload))
   end
 
   defp validate_unique_name(project_id, name) do
@@ -312,8 +330,11 @@ defmodule BDS.Tags do
     post
     |> Post.changeset(%{tags: updated_tags, updated_at: Persistence.now_ms()})
     |> Repo.update!()
+  end
 
-    Posts.rewrite_published_post(post.id)
+  defp rewrite_published_posts(post_ids) do
+    Enum.each(post_ids, &Posts.rewrite_published_post/1)
+    :ok
   end
 
   defp maybe_put(map, _key, nil), do: map

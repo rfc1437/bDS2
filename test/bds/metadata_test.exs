@@ -54,6 +54,27 @@ defmodule BDS.MetadataTest do
     assert loaded.blog_languages == ["de", "fr"]
   end
 
+  test "update_project_metadata keeps committed database changes when filesystem flush fails", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    meta_path = Path.join(temp_dir, "meta")
+    File.rm_rf!(meta_path)
+    File.write!(meta_path, "not a directory")
+
+    assert {:error, _reason} =
+             BDS.Metadata.update_project_metadata(project.id, %{
+               name: "Committed Metadata",
+               description: "Stored before flush"
+             })
+
+    assert BDS.Projects.get_project!(project.id).name == "Committed Metadata"
+
+    assert {:ok, loaded} = BDS.Metadata.get_project_metadata(project.id)
+    assert loaded.name == "Committed Metadata"
+    assert loaded.description == "Stored before flush"
+  end
+
   test "category and publishing updates write their meta files and sync_project_metadata_from_filesystem loads them",
        %{project: project, temp_dir: temp_dir} do
     assert {:ok, _metadata} = BDS.Metadata.add_category(project.id, "news")

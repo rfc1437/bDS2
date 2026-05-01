@@ -88,10 +88,10 @@ defmodule BDS.Metadata do
         |> Repo.update!()
 
       persist_setting(project_id, "project", stringify_project_metadata(project_metadata), now)
-      write_project_metadata_files(updated_project, state, project_metadata)
-      load_state(updated_project)
+      {updated_project, project_metadata}
     end)
     |> unwrap_transaction()
+    |> flush_project_metadata_update(state)
     |> maybe_backfill_embeddings(project_id, state, project_metadata)
   end
 
@@ -106,8 +106,7 @@ defmodule BDS.Metadata do
         |> Enum.sort()
 
       persist_setting(project.id, "categories", %{"categories" => categories}, now)
-      write_categories_json(project, categories)
-      %{state | categories: categories}
+      {%{state | categories: categories}, fn -> write_categories_json(project, categories) end}
     end)
   end
 
@@ -119,9 +118,14 @@ defmodule BDS.Metadata do
 
       persist_setting(project.id, "categories", %{"categories" => categories}, now)
       persist_setting(project.id, "category_meta", %{"categories" => category_settings}, now)
-      write_categories_json(project, categories)
-      write_category_meta_json(project, category_settings)
-      %{state | categories: categories, category_settings: category_settings}
+
+      {%{state | categories: categories, category_settings: category_settings},
+       fn ->
+         with :ok <- write_categories_json(project, categories),
+              :ok <- write_category_meta_json(project, category_settings) do
+           :ok
+         end
+       end}
     end)
   end
 
@@ -133,8 +137,9 @@ defmodule BDS.Metadata do
       category_settings = Map.put(state.category_settings, category, normalized)
 
       persist_setting(project.id, "category_meta", %{"categories" => category_settings}, now)
-      write_category_meta_json(project, category_settings)
-      %{state | category_settings: category_settings}
+
+      {%{state | category_settings: category_settings},
+       fn -> write_category_meta_json(project, category_settings) end}
     end)
   end
 
@@ -144,8 +149,9 @@ defmodule BDS.Metadata do
     update_state(project_id, fn project, state, now ->
       publishing_preferences = normalize_publishing_preferences(prefs)
       persist_setting(project.id, "publishing", publishing_preferences, now)
-      write_publishing_json(project, publishing_preferences)
-      %{state | publishing_preferences: publishing_preferences}
+
+      {%{state | publishing_preferences: publishing_preferences},
+       fn -> write_publishing_json(project, publishing_preferences) end}
     end)
   end
 
@@ -176,13 +182,10 @@ defmodule BDS.Metadata do
       )
 
       persist_setting(project_id, "publishing", filesystem_state.publishing_preferences, now)
-      write_project_json(updated_project, stringify_project_metadata(filesystem_state))
-      write_categories_json(updated_project, filesystem_state.categories)
-      write_category_meta_json(updated_project, filesystem_state.category_settings)
-      write_publishing_json(updated_project, filesystem_state.publishing_preferences)
-      load_state(updated_project)
+      updated_project
     end)
     |> unwrap_transaction()
+    |> flush_synced_project_metadata(filesystem_state)
   end
 
   @spec flush_project_metadata_to_filesystem(String.t()) :: {:ok, metadata_state()}
@@ -200,10 +203,9 @@ defmodule BDS.Metadata do
     state = load_state(project)
     now = Persistence.now_ms()
 
-    Repo.transaction(fn ->
-      updater.(project, state, now)
-    end)
+    Repo.transaction(fn -> updater.(project, state, now) end)
     |> unwrap_transaction()
+    |> flush_state_update()
   end
 
   defp load_state(project) do
@@ -338,11 +340,40 @@ defmodule BDS.Metadata do
     }
   end
 
+  defp flush_project_metadata_update({:ok, {updated_project, project_metadata}}, state) do
+    with :ok <- write_project_metadata_files(updated_project, state, project_metadata) do
+      {:ok, load_state(updated_project)}
+    end
+  end
+
+  defp flush_project_metadata_update(error, _state), do: error
+
+  defp flush_synced_project_metadata({:ok, updated_project}, filesystem_state) do
+    with :ok <- write_project_json(updated_project, stringify_project_metadata(filesystem_state)),
+         :ok <- write_categories_json(updated_project, filesystem_state.categories),
+         :ok <- write_category_meta_json(updated_project, filesystem_state.category_settings),
+         :ok <- write_publishing_json(updated_project, filesystem_state.publishing_preferences) do
+      {:ok, load_state(updated_project)}
+    end
+  end
+
+  defp flush_synced_project_metadata(error, _filesystem_state), do: error
+
+  defp flush_state_update({:ok, {state, write_files}}) when is_function(write_files, 0) do
+    with :ok <- write_files.() do
+      {:ok, state}
+    end
+  end
+
+  defp flush_state_update(error), do: error
+
   defp write_project_metadata_files(project, state, project_metadata) do
-    write_project_json(project, stringify_project_metadata(project_metadata))
-    write_categories_json(project, state.categories)
-    write_category_meta_json(project, state.category_settings)
-    write_publishing_json(project, state.publishing_preferences)
+    with :ok <- write_project_json(project, stringify_project_metadata(project_metadata)),
+         :ok <- write_categories_json(project, state.categories),
+         :ok <- write_category_meta_json(project, state.category_settings),
+         :ok <- write_publishing_json(project, state.publishing_preferences) do
+      :ok
+    end
   end
 
   defp write_project_json(project, project_json),
@@ -363,7 +394,7 @@ defmodule BDS.Metadata do
   defp write_json(project, file_name, payload) do
     meta_dir = Path.join(Projects.project_data_dir(project), "meta")
     path = Path.join(meta_dir, file_name)
-    :ok = Persistence.atomic_write(path, Jason.encode!(payload))
+    Persistence.atomic_write(path, Jason.encode!(payload))
   end
 
   defp read_json(project, file_name) do

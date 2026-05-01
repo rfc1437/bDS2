@@ -84,11 +84,10 @@ defmodule BDS.Projects do
             })
             |> Repo.insert!()
 
-          {:ok, _templates} = Templates.rebuild_templates_from_files(project.id)
           project
         end)
         |> case do
-          {:ok, project} -> {:ok, project}
+          {:ok, project} -> rebuild_project_templates(project)
           {:error, reason} -> {:error, reason}
         end
     end
@@ -127,11 +126,14 @@ defmodule BDS.Projects do
         })
         |> Repo.insert!()
 
-      {:ok, _templates} = Templates.rebuild_templates_from_files(project.id)
       project
     end)
     |> case do
-      {:ok, project} -> sync_filesystem_metadata(project)
+      {:ok, project} ->
+        with {:ok, project} <- rebuild_project_templates(project) do
+          sync_filesystem_metadata(project)
+        end
+
       {:error, reason} -> {:error, reason}
     end
   end
@@ -214,6 +216,12 @@ defmodule BDS.Projects do
     case Metadata.sync_project_metadata_from_filesystem(project.id) do
       {:ok, _metadata} -> {:ok, get_project!(project.id)}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp rebuild_project_templates(%Project{} = project) do
+    with {:ok, _templates} <- Templates.rebuild_templates_from_files(project.id) do
+      {:ok, project}
     end
   end
 
