@@ -361,6 +361,31 @@ defmodule BDS.AITest do
     refute Map.has_key?(payload, "tool_choice")
   end
 
+  test "openai-compatible generation disables thinking for configured models" do
+    Application.put_env(:bds, :test_pid, self())
+
+    server =
+      start_supervised!({Bandit, plug: RecordingCompletionServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+    assert :ok = BDS.AI.put_model_capabilities("qwen3.5-122b", %{disables_reasoning: true})
+
+    assert {:ok, %{content: "Short Title"}} =
+             BDS.AI.OpenAICompatibleRuntime.generate(
+               %{url: "http://127.0.0.1:#{port}/v1", api_key: nil},
+               %{
+                 operation: :chat_title,
+                 model: "qwen3.5-122b",
+                 messages: [%{"role" => "user", "content" => "Topic: posts per month"}],
+                 max_output_tokens: 256
+               },
+               []
+             )
+
+    assert_received {:completion_payload, payload}
+    assert payload["chat_template_kwargs"] == %{"enable_thinking" => false}
+  end
+
   test "airplane mode routes title tasks to airplane endpoint and offline title model" do
     assert {:ok, _endpoint} =
              BDS.AI.put_endpoint(
@@ -506,7 +531,8 @@ defmodule BDS.AITest do
     assert :ok =
              BDS.AI.put_model_capabilities("llama3.2", %{
                supports_attachment: true,
-               supports_tool_calls: false
+               supports_tool_calls: false,
+               disables_reasoning: true
              })
 
     assert {:ok, analysis} =
@@ -529,6 +555,7 @@ defmodule BDS.AITest do
     assert endpoint.kind == :airplane
     assert request.operation == :analyze_image
     assert request.model == "llama3.2"
+    assert BDS.AI.Catalog.model_capabilities("llama3.2").disables_reasoning
   end
 
   test "chat persists user, tool, and assistant messages with usage and blog stats prompt augmentation" do
@@ -702,7 +729,52 @@ defmodule BDS.AITest do
     assert_received {:runtime_request, _endpoint, title_request}
     assert title_request.operation == :chat_title
     assert title_request.model == "title-model"
+    assert title_request.max_output_tokens == 256
     assert Enum.any?(title_request.messages, &(&1["content"] =~ "2-3 words"))
+    assert Enum.any?(title_request.messages, &(&1["content"] =~ "Do not include reasoning"))
+    assert Enum.any?(title_request.messages, &(&1["content"] =~ "How many items"))
+  end
+
+  test "chat retries title generation on later turns while the title is still generated" do
+    {:ok, project} = create_project_fixture("Retry Title Chat")
+    _fixtures = seed_project_content(project.id)
+
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(false)
+    assert :ok = BDS.AI.put_model_preference(:title, "title-model")
+    assert {:ok, conversation} = BDS.AI.start_chat(%{title: "New Chat", model: "gpt-4o-mini"})
+
+    Repo.insert!(%BDS.AI.ChatMessage{
+      conversation_id: conversation.id,
+      role: :user,
+      content: "Earlier turn whose title attempt failed",
+      created_at: Persistence.now_ms()
+    })
+
+    assert {:ok, reply} =
+             BDS.AI.send_chat_message(conversation.id, "How many items are in the blog now?",
+               runtime: FakeRuntime,
+               test_pid: self(),
+               project_id: project.id,
+               secret_backend: FakeSecretBackend
+             )
+
+    assert reply.conversation.title == "Blog Stats"
+    assert BDS.AI.get_chat_conversation(conversation.id).title == "Blog Stats"
+
+    assert_received {:runtime_request, _endpoint, %{operation: :chat}}
+    assert_received {:runtime_request, _endpoint, %{operation: :chat}}
+    assert_received {:runtime_request, _endpoint, %{operation: :chat_title} = title_request}
     assert Enum.any?(title_request.messages, &(&1["content"] =~ "How many items"))
   end
 

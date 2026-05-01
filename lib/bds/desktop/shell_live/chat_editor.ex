@@ -5,6 +5,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   import Phoenix.HTML, only: [raw: 1]
 
   alias BDS.AI
+  alias BDS.MapUtils
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.ChatEditor.{MessageBuild, ModelSelection, ToolTracking}
 
@@ -249,8 +250,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
           )
 
         case result do
-          {:ok, _reply} ->
-            reload.(socket, socket.assigns.workbench)
+          {:ok, reply} ->
+            socket
+            |> update_tab_meta_from_reply(conversation_id, reply)
+            |> reload.(socket.assigns.workbench)
 
           {:error, :cancelled} ->
             reload.(socket, socket.assigns.workbench)
@@ -263,6 +266,23 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
             |> append_output.(translated("Chat"), format_error(reason), nil, "error")
             |> reload.(socket.assigns.workbench)
         end
+    end
+  end
+
+  defp update_tab_meta_from_reply(socket, conversation_id, reply) do
+    title =
+      reply
+      |> MapUtils.attr(:conversation, %{})
+      |> MapUtils.attr(:title)
+
+    if is_binary(title) and String.trim(title) != "" do
+      key = {:chat, conversation_id}
+
+      assign(socket, :tab_meta, Map.update(socket.assigns.tab_meta, key, %{title: title}, fn meta ->
+        Map.put(meta, :title, title)
+      end))
+    else
+      socket
     end
   end
 

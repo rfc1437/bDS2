@@ -111,7 +111,8 @@ defmodule BDS.AI.Catalog do
   def put_model_capabilities(model_id, attrs) when is_binary(model_id) and is_map(attrs) do
     capabilities = %{
       supports_attachment: truthy?(BDS.MapUtils.attr(attrs, :supports_attachment)),
-      supports_tool_calls: truthy?(BDS.MapUtils.attr(attrs, :supports_tool_calls))
+      supports_tool_calls: truthy?(BDS.MapUtils.attr(attrs, :supports_tool_calls)),
+      disables_reasoning: truthy?(BDS.MapUtils.attr(attrs, :disables_reasoning))
     }
 
     put_setting("ai.model_capabilities.#{model_id}", Jason.encode!(capabilities))
@@ -163,7 +164,8 @@ defmodule BDS.AI.Catalog do
 
   @spec model_capabilities(String.t()) :: %{
           supports_attachment: boolean(),
-          supports_tool_calls: boolean()
+          supports_tool_calls: boolean(),
+          disables_reasoning: boolean()
         }
   def model_capabilities(model_id) do
     overrides = decode_model_capabilities_override(model_id)
@@ -173,7 +175,8 @@ defmodule BDS.AI.Catalog do
         {:ok, model} ->
           %{
             supports_attachment: model.supports_attachment or "image" in model.input_modalities,
-            supports_tool_calls: model.supports_tool_calls
+            supports_tool_calls: model.supports_tool_calls,
+            disables_reasoning: false
           }
 
         _other ->
@@ -196,7 +199,8 @@ defmodule BDS.AI.Catalog do
           String.contains?(normalized, "llava"),
       supports_tool_calls:
         String.contains?(normalized, "gpt") or String.contains?(normalized, "claude") or
-          String.contains?(normalized, "tool")
+          String.contains?(normalized, "tool"),
+      disables_reasoning: false
     }
   end
 

@@ -234,6 +234,10 @@
               <div class="setting-control"><label><input type="checkbox" name="settings_ai[online_chat_tools]" checked={@settings_editor.ai["online_chat_tools"]} /> <%= translated("Enable tool calls for the online chat model") %></label></div>
             </div>
             <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Online Chat Reasoning") %></label></div>
+              <div class="setting-control"><label><input type="checkbox" name="settings_ai[online_chat_disable_reasoning]" checked={@settings_editor.ai["online_chat_disable_reasoning"]} /> <%= translated("Disable reasoning output for the online chat model") %></label></div>
+            </div>
+            <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Online Title Model") %></label></div>
               <div class="setting-control"><input type="text" list="settings-ai-online-models" name="settings_ai[online_title_model]" value={@settings_editor.ai["online_title_model"]} /></div>
             </div>
@@ -265,6 +269,10 @@
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Offline Chat Tools") %></label></div>
               <div class="setting-control"><label><input type="checkbox" name="settings_ai[offline_chat_tools]" checked={@settings_editor.ai["offline_chat_tools"]} /> <%= translated("Enable tool calls for the offline chat model") %></label></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Offline Chat Reasoning") %></label></div>
+              <div class="setting-control"><label><input type="checkbox" name="settings_ai[offline_chat_disable_reasoning]" checked={@settings_editor.ai["offline_chat_disable_reasoning"]} /> <%= translated("Disable reasoning output for the offline chat model") %></label></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Offline Title Model") %></label></div>

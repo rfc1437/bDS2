@@ -2,6 +2,7 @@ defmodule BDS.AI.Chat do
   @moduledoc false
 
   import Ecto.Query
+  require Logger
 
   alias BDS.AI
   alias BDS.AI.Catalog
@@ -23,7 +24,7 @@ defmodule BDS.AI.Chat do
 
   @default_system_prompt "You are the bDS AI backend. Be precise, prefer structured JSON when asked, and avoid inventing blog facts."
   @default_max_output_tokens 16_384
-  @title_max_output_tokens 20
+  @title_max_output_tokens 256
   @chat_title_max_length 30
   @chat_max_tool_rounds 10
   @default_context_window 128_000
@@ -383,7 +384,7 @@ defmodule BDS.AI.Chat do
     conversation = Repo.get!(ChatConversation, conversation_id)
 
     cond do
-      chat_user_message_count(conversation_id) != 1 ->
+      chat_user_message_count(conversation_id) < 1 ->
         {:ok, reply}
 
       not generated_chat_title?(conversation.title, conversation.model) ->
@@ -418,7 +419,25 @@ defmodule BDS.AI.Chat do
          :ok <- Runtime.validate_target(:chat_title, model, mode),
          request <- build_chat_title_request(user_content, model),
          {:ok, response} <- runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts) do
-      {:ok, sanitize_chat_title(Map.get(response, :content))}
+      title = sanitize_chat_title(Map.get(response, :content))
+
+      if title == "" do
+        Logger.warning("Chat title generation returned an empty title",
+          model: model,
+          content: inspect(Map.get(response, :content)),
+          usage: inspect(Map.get(response, :usage))
+        )
+      end
+
+      {:ok, title}
+    else
+      {:error, reason} = error ->
+        Logger.warning("Chat title generation failed", reason: inspect(reason))
+        error
+
+      other ->
+        Logger.warning("Chat title generation failed", reason: inspect(other))
+        other
     end
   end
 
@@ -431,7 +450,7 @@ defmodule BDS.AI.Chat do
         %{
           "role" => "system",
           "content" =>
-            "Generate an ultra-short title (2-3 words, max 25 characters) for this conversation. Focus ONLY on the topic. Ignore any capability disclaimers. Output ONLY the title text."
+            "Generate an ultra-short title (2-3 words, max 25 characters) for this conversation. Focus ONLY on the topic. Ignore any capability disclaimers. Do not include reasoning. Output ONLY the title text."
         },
         %{"role" => "user", "content" => "Topic: #{String.slice(user_content, 0, 100)}"}
       ]

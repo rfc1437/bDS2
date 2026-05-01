@@ -36,6 +36,7 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
         "messages" => request.messages,
         "max_tokens" => request.max_output_tokens
       }
+      |> maybe_disable_thinking(request.model)
       |> maybe_put_tools(Map.get(request, :tools, []))
 
     with {:ok, response} <- HttpClient.post(url, headers, Jason.encode!(payload)),
@@ -135,6 +136,18 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
     Map.put(payload, "tools", tools)
     |> Map.put("tool_choice", "auto")
   end
+
+  defp maybe_disable_thinking(payload, model) when is_binary(model) do
+    if BDS.AI.Catalog.model_capabilities(model).disables_reasoning do
+      Map.update(payload, "chat_template_kwargs", %{"enable_thinking" => false}, fn kwargs ->
+        Map.put(kwargs || %{}, "enable_thinking", false)
+      end)
+    else
+      payload
+    end
+  end
+
+  defp maybe_disable_thinking(payload, _model), do: payload
 
   defp normalize_tool_calls(tool_calls) do
     Enum.map(tool_calls, fn tool_call ->

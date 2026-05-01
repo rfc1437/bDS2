@@ -93,6 +93,39 @@ defmodule BDS.Desktop.ShellLiveTest do
     end
   end
 
+  defmodule TitleChatServer do
+    use Plug.Router
+    import Phoenix.ConnTest, except: [post: 2]
+
+    plug(:match)
+    plug(:dispatch)
+
+    post "/v1/chat/completions" do
+      {:ok, request_body, conn} = Plug.Conn.read_body(conn)
+      request = Jason.decode!(request_body)
+      send(Application.fetch_env!(:bds, :test_pid), {:title_chat_request, request})
+
+      content =
+        if Enum.any?(request["messages"] || [], fn message ->
+             String.contains?(message["content"] || "", "Generate an ultra-short title")
+           end) do
+          "Posts 2026"
+        else
+          "Ich habe die Posts pro Monat ermittelt."
+        end
+
+      body =
+        Jason.encode!(%{
+          "choices" => [%{"message" => %{"content" => content}}],
+          "usage" => %{"prompt_tokens" => 8, "completion_tokens" => 5}
+        })
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> send_resp(200, body)
+    end
+  end
+
   @endpoint BDS.Desktop.Endpoint
 
   setup do
@@ -772,6 +805,8 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Offline Endpoint URL"
     assert html =~ "Online API Key"
     assert html =~ "Offline API Key"
+    assert html =~ "Online Chat Reasoning"
+    assert html =~ "Offline Chat Reasoning"
     refute html =~ "Mistral API Key"
     refute html =~ "Anthropic / Online API Key"
 
@@ -782,12 +817,14 @@ defmodule BDS.Desktop.ShellLiveTest do
           "online_api_key" => "online-secret",
           "online_chat_model" => "gpt-4.1",
           "online_chat_tools" => "true",
+          "online_chat_disable_reasoning" => "true",
           "online_title_model" => "gpt-4.1-mini",
           "online_image_analysis_model" => "gpt-4.1-vision",
           "offline_url" => "http://localhost:11434/v1",
           "offline_api_key" => "",
           "offline_chat_model" => "llama3.3",
           "offline_chat_tools" => "true",
+          "offline_chat_disable_reasoning" => "true",
           "offline_title_model" => "llama3.2",
           "offline_image_analysis_model" => "llava:latest",
           "offline_mode" => "true",
@@ -816,8 +853,11 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert {:ok, "llama3.2"} = AI.get_model_preference(:airplane_title)
     assert {:ok, "llava:latest"} = AI.get_model_preference(:airplane_image_analysis)
 
-    assert %{supports_tool_calls: true} = BDS.AI.Catalog.model_capabilities("gpt-4.1")
-    assert %{supports_tool_calls: true} = BDS.AI.Catalog.model_capabilities("llama3.3")
+    assert %{supports_tool_calls: true, disables_reasoning: true} =
+             BDS.AI.Catalog.model_capabilities("gpt-4.1")
+
+    assert %{supports_tool_calls: true, disables_reasoning: true} =
+             BDS.AI.Catalog.model_capabilities("llama3.3")
   end
 
   test "ai settings refresh models from the configured endpoints" do
@@ -2195,12 +2235,78 @@ defmodule BDS.Desktop.ShellLiveTest do
     css = File.read!(Path.expand("../../../priv/ui/app.css", __DIR__))
     assert css =~ ".chat-panel-title {"
     assert css =~ "overflow: visible;"
-    refute css =~ ".chat-panel-title {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  overflow: hidden;"
+
+    refute css =~
+             ".chat-panel-title {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  overflow: hidden;"
 
     render_click(view, "select_chat_model", %{"model" => "llama-next"})
 
     assert AI.get_chat_conversation(conversation.id).model == "llama-next"
     assert render(view) =~ "llama-next"
+  end
+
+  test "chat editor updates the visible new-chat title after the first turn" do
+    Application.put_env(:bds, :test_pid, self())
+    assert :ok = AI.set_airplane_mode(false)
+
+    server =
+      start_supervised!({Bandit, plug: TitleChatServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "online-secret",
+               model: "gpt-4.1"
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "New Chat", model: "gpt-4.1"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+    html = render_click(view, "select_view", %{"view" => "chat"})
+
+    assert html =~ ~s(<span class="chat-item-title">New Chat</span>)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert html =~ ~s(<span class="tab-title">New Chat</span>)
+
+    _html =
+      render_change(view, "change_chat_editor_input", %{"message" => "Posts pro Monat 2026"})
+
+    _html =
+      view
+      |> element("[data-testid='chat-send-button']")
+      |> render_click()
+
+    Process.sleep(350)
+    html = render(view)
+
+    assert_received {:title_chat_request, chat_request}
+
+    refute Enum.any?(chat_request["messages"] || [], fn message ->
+             String.contains?(message["content"] || "", "Generate an ultra-short title")
+           end)
+
+    assert_received {:title_chat_request, title_request}
+
+    assert Enum.any?(title_request["messages"] || [], fn message ->
+             String.contains?(message["content"] || "", "Generate an ultra-short title")
+           end)
+
+    assert AI.get_chat_conversation(conversation.id).title == "Posts 2026"
+    assert html =~ ~s(<span class="tab-title">Posts 2026</span>)
+    assert html =~ ~r/<span class="chat-panel-title-main">\s*Posts 2026\s*<\/span>/
+    assert html =~ ~s(<span class="chat-item-title">Posts 2026</span>)
+    refute html =~ ~s(<span class="tab-title">New Chat</span>)
+    refute html =~ ~s(<span class="chat-item-title">New Chat</span>)
   end
 
   test "chat editor renders legacy model controls, collapsed tool pills, and dismissible A2UI surfaces" do
@@ -2433,7 +2539,9 @@ defmodule BDS.Desktop.ShellLiveTest do
 
   test "chat editor hook reopens server-expanded A2UI surfaces after patches" do
     live_js = File.read!(Path.expand("../../../priv/ui/live.js", __DIR__))
-    chat_editor = File.read!(Path.expand("../../../lib/bds/desktop/shell_live/chat_editor.ex", __DIR__))
+
+    chat_editor =
+      File.read!(Path.expand("../../../lib/bds/desktop/shell_live/chat_editor.ex", __DIR__))
 
     assert chat_editor =~ "data-expanded={surface_expanded_attr(@surface)}"
     assert live_js =~ "this.syncExpandedSurfaces = () =>"
@@ -2508,7 +2616,8 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Here is the chart."
     assert html =~ ~s(<span class="chat-message-role">Assistant</span>)
 
-    assert length(:binary.matches(html, ~s(<span class="chat-message-role">Assistant</span>))) == 1
+    assert length(:binary.matches(html, ~s(<span class="chat-message-role">Assistant</span>))) ==
+             1
   end
 
   test "chat editor marks user message text as compact" do
