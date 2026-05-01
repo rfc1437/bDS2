@@ -51,7 +51,7 @@ _None._ All modules previously on the queue have been split; refresh the queue i
 
 ## 3. Side Effects in Transactions
 
-**Status:** ✅ done in `BDS.Media` (2026-04-30). Open elsewhere — no audit yet for `BDS.Posts`, `BDS.Publishing`, `BDS.Generation`.
+**Status:** ✅ done in `BDS.Media` (2026-04-30). Started elsewhere: `BDS.Templates.update_template/2` now keeps only DB writes inside its transaction and runs template-file rewrites, published-post rewrites, and tags JSON flushes after commit. Open elsewhere — no audit yet for `BDS.Posts`, `BDS.Publishing`, `BDS.Generation`.
 
 **Plan:** spot-check every `Repo.transaction/1` outside `BDS.Media`. Rule: only DB writes inside; filesystem and `Search.sync_*` after commit.
 

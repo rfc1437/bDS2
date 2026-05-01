@@ -218,6 +218,52 @@ defmodule BDS.TemplatesTest do
              Jason.decode!(File.read!(tags_path))
   end
 
+  test "update_template keeps committed database changes when renaming the published file fails",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Article View",
+               kind: :post,
+               content: "<article>{{ content }}</article>"
+             })
+
+    assert {:ok, published} = BDS.Templates.publish_template(template.id)
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Uses Template",
+               content: "Body",
+               template_slug: published.slug
+             })
+
+    assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
+
+    assert {:ok, _tag} =
+             BDS.Tags.create_tag(%{
+               project_id: project.id,
+               name: "Feature",
+               post_template_slug: published.slug
+             })
+
+    blocked_path = Path.join([temp_dir, "templates", "feature-view.liquid.tmp"])
+    File.mkdir_p!(blocked_path)
+
+    assert {:error, _reason} =
+             BDS.Templates.update_template(published.id, %{slug: "feature-view"})
+
+    reloaded_template = Repo.get!(BDS.Templates.Template, published.id)
+    assert reloaded_template.slug == "feature-view"
+    assert reloaded_template.file_path == "templates/feature-view.liquid"
+
+    reloaded_post = Repo.get!(Post, published_post.id)
+    assert reloaded_post.template_slug == "feature-view"
+
+    reloaded_tag = Repo.get_by!(Tag, project_id: project.id, name: "Feature")
+    assert reloaded_tag.post_template_slug == "feature-view"
+  end
+
   test "rebuild_templates_from_files recreates published templates from disk", %{
     project: project,
     temp_dir: temp_dir
@@ -264,9 +310,10 @@ defmodule BDS.TemplatesTest do
     assert template.updated_at == 202
   end
 
-  test "rebuild_templates_from_files removes stale published default templates when no local template files exist", %{
-    project: project
-  } do
+  test "rebuild_templates_from_files removes stale published default templates when no local template files exist",
+       %{
+         project: project
+       } do
     now = BDS.Persistence.now_ms()
 
     stale_template =

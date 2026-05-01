@@ -111,25 +111,37 @@ defmodule BDS.Templates do
           |> Map.put(:updated_at, now)
           |> Map.put(:status, next_status)
 
-        Repo.transaction(fn ->
-          updated_template =
-            template
-            |> Template.changeset(updates)
-            |> Repo.update!()
+        transaction_result =
+          Repo.transaction(fn ->
+            updated_template =
+              template
+              |> Template.changeset(updates)
+              |> Repo.update!()
 
-          if slug_changed? do
-            cascade_template_slug_change(template, updated_template, now)
-          end
+            affected_posts =
+              if slug_changed? do
+                cascade_template_slug_change(template, updated_template, now)
+              else
+                []
+              end
 
-          if template.file_path not in [nil, ""] and next_file_path != template.file_path do
-            rewrite_template_file(template, updated_template)
-          end
+            {updated_template, affected_posts}
+          end)
 
-          updated_template
-        end)
-        |> case do
-          {:ok, updated_template} -> {:ok, updated_template}
-          {:error, reason} -> {:error, reason}
+        case transaction_result do
+          {:ok, {updated_template, affected_posts}} ->
+            case sync_template_update_side_effects(
+                   template,
+                   updated_template,
+                   affected_posts,
+                   slug_changed?
+                 ) do
+              :ok -> {:ok, updated_template}
+              {:error, reason} -> {:error, reason}
+            end
+
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
@@ -215,7 +227,13 @@ defmodule BDS.Templates do
       %Template{file_path: file_path, status: status} = template
       when file_path not in [nil, ""] and status == :published ->
         full_path = full_file_path(template.project_id, template.file_path)
-        :ok = Persistence.atomic_write(full_path, serialize_template_file(template, published_template_body(template)))
+
+        :ok =
+          Persistence.atomic_write(
+            full_path,
+            serialize_template_file(template, published_template_body(template))
+          )
+
         {:ok, template}
 
       %Template{} ->
@@ -368,23 +386,43 @@ defmodule BDS.Templates do
     )
     |> Repo.update_all(set: [post_template_slug: updated_template.slug, updated_at: updated_at])
 
+    affected_posts
+  end
+
+  defp sync_template_update_side_effects(
+         original_template,
+         updated_template,
+         affected_posts,
+         slug_changed?
+       ) do
     Enum.each(affected_posts, fn post ->
       Posts.rewrite_published_post(post.id)
     end)
 
-    Tags.sync_tags_json(original_template.project_id)
+    if slug_changed? do
+      Tags.sync_tags_json(original_template.project_id)
+    end
+
+    if original_template.file_path not in [nil, ""] and
+         updated_template.file_path != original_template.file_path do
+      rewrite_template_file(original_template, updated_template)
+    else
+      :ok
+    end
   end
 
   defp rewrite_template_file(original_template, updated_template) do
     body = published_template_body(original_template)
     new_full_path = full_file_path(updated_template.project_id, updated_template.file_path)
-    :ok = Persistence.atomic_write(new_full_path, serialize_template_file(updated_template, body))
 
-    if original_template.file_path != updated_template.file_path do
-      _ = delete_file_if_present(original_template.project_id, original_template.file_path)
+    result =
+      Persistence.atomic_write(new_full_path, serialize_template_file(updated_template, body))
+
+    if result == :ok and original_template.file_path != updated_template.file_path do
+      delete_file_if_present(original_template.project_id, original_template.file_path)
+    else
+      result
     end
-
-    :ok
   end
 
   defp published_template_body(%Template{content: content}) when is_binary(content), do: content
@@ -444,7 +482,10 @@ defmodule BDS.Templates do
             template.file_path != "" and
             not is_nil(template.file_path)
     )
-    |> Enum.reject(&(MapSet.member?(tracked_paths, &1.file_path) or File.exists?(full_file_path(project_id, &1.file_path))))
+    |> Enum.reject(
+      &(MapSet.member?(tracked_paths, &1.file_path) or
+          File.exists?(full_file_path(project_id, &1.file_path)))
+    )
     |> Enum.each(fn template ->
       clear_template_references(template)
       Repo.delete!(template)
