@@ -24,7 +24,8 @@ defmodule BDS.Desktop.MediaController do
     with %{} = project <- Projects.get_active_project(),
          %MediaRecord{} = media <- Repo.get(MediaRecord, media_id),
          true <- media.project_id == project.id,
-         relative_path when is_binary(relative_path) <- Media.thumbnail_paths(media)[thumbnail_size(size)],
+         relative_path when is_binary(relative_path) <-
+           Media.thumbnail_paths(media)[thumbnail_size(size)],
          absolute_path = Path.join(Projects.project_data_dir(project), relative_path),
          true <- File.exists?(absolute_path) do
       {:ok, thumbnail_content_type(relative_path), absolute_path}
@@ -33,7 +34,8 @@ defmodule BDS.Desktop.MediaController do
     end
   rescue
     error in [Exqlite.Error, DBConnection.OwnershipError] ->
-      if match?(%Exqlite.Error{}, error) and not String.contains?(Exception.message(error), "no such table") do
+      if match?(%Exqlite.Error{}, error) and
+           not String.contains?(Exception.message(error), "no such table") do
         reraise error, __STACKTRACE__
       end
 

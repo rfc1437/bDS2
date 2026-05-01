@@ -6,8 +6,10 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
   alias BDS.Desktop.ShellLive.MenuEditor.PageCategory
   alias BDS.Desktop.ShellLive.MenuEditor.TreeOps
 
+  @spec current_draft(term()) :: term()
   def current_draft(assigns), do: Map.get(assigns.menu_editor_state || %{}, :draft)
 
+  @spec start_page_draft(term()) :: term()
   def start_page_draft(state) do
     item = %{
       item_id: Ecto.UUID.generate(),
@@ -29,6 +31,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
     }
   end
 
+  @spec start_category_draft(term()) :: term()
   def start_category_draft(state) do
     item = %{
       item_id: Ecto.UUID.generate(),
@@ -50,6 +53,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
     }
   end
 
+  @spec finalize_submenu_draft(term()) :: term()
   def finalize_submenu_draft(%{draft: %{item_id: item_id, query: query}} = state) do
     label =
       if(String.trim(query) == "",
@@ -69,12 +73,19 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
 
   def finalize_submenu_draft(state), do: state
 
+  @spec assign_page_to_draft(term(), term()) :: term()
   def assign_page_to_draft(%{draft: %{item_id: item_id}} = state, post) do
     %{
       state
       | items:
           TreeOps.update_item(state.items, item_id, fn item ->
-            %{item | kind: :page, label: post.title, slug: PageCategory.blank_to_nil(post.slug), children: []}
+            %{
+              item
+              | kind: :page,
+                label: post.title,
+                slug: PageCategory.blank_to_nil(post.slug),
+                children: []
+            }
           end),
         draft: nil
     }
@@ -82,6 +93,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
 
   def assign_page_to_draft(state, _post), do: state
 
+  @spec assign_category_to_draft(term(), term()) :: term()
   def assign_category_to_draft(%{draft: %{item_id: item_id}} = state, category) do
     label = PageCategory.blank_to_nil(category.title) || category.name
 
@@ -97,6 +109,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
 
   def assign_category_to_draft(state, _category), do: state
 
+  @spec cancel_draft(term()) :: term()
   def cancel_draft(%{draft: %{item_id: item_id}} = state) do
     items = TreeOps.remove_item(state.items, item_id)
     %{state | items: items, selected_id: TreeOps.first_item_id(items), draft: nil}
@@ -104,6 +117,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
 
   def cancel_draft(state), do: state
 
+  @spec confirm_category_draft(term(), term()) :: term()
   def confirm_category_draft(socket, update_state_fun) do
     project_id = socket.assigns.projects.active_project_id
     draft = current_draft(socket.assigns)
@@ -117,8 +131,12 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
 
     category =
       cond do
-        category != nil -> category
-        normalized == "" -> %{name: "", title: ""}
+        category != nil ->
+          category
+
+        normalized == "" ->
+          %{name: "", title: ""}
+
         true ->
           {:ok, _metadata} = Metadata.add_category(project_id, normalized)
           %{name: normalized, title: normalized}

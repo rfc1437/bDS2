@@ -65,7 +65,9 @@ defmodule BDS.AI.Runtime do
   end
 
   defp resolve_model_for_operation(:analyze_image, :airplane, endpoint, extra) do
-    {:ok, Keyword.get(extra, :model) || model_preference_value(:airplane_image_analysis) || endpoint.model}
+    {:ok,
+     Keyword.get(extra, :model) || model_preference_value(:airplane_image_analysis) ||
+       endpoint.model}
   end
 
   defp resolve_model_for_operation(:analyze_image, :online, endpoint, extra) do
@@ -83,7 +85,8 @@ defmodule BDS.AI.Runtime do
   defp fetch_endpoint_for_mode(mode, secret_backend) do
     with {:ok, endpoint} <- AI.get_endpoint(mode, secret_backend: secret_backend) do
       case endpoint do
-        %{url: url, model: model} = loaded when is_binary(url) and url != "" and is_binary(model) and model != "" ->
+        %{url: url, model: model} = loaded
+        when is_binary(url) and url != "" and is_binary(model) and model != "" ->
           if mode == :online and blank?(loaded.api_key) do
             {:error, %{kind: :endpoint_not_configured, endpoint: mode}}
           else

@@ -1,8 +1,12 @@
 defmodule BDS.Scripting.ApiTest do
   use ExUnit.Case, async: false
 
-  @tiny_png_1 Base.decode64!("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/a6sAAAAASUVORK5CYII=")
-  @tiny_png_2 Base.decode64!("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z/C/HwAF/gL+qJNmNwAAAABJRU5ErkJggg==")
+  @tiny_png_1 Base.decode64!(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/a6sAAAAASUVORK5CYII="
+              )
+  @tiny_png_2 Base.decode64!(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z/C/HwAF/gL+qJNmNwAAAABJRU5ErkJggg=="
+              )
 
   alias BDS.Repo
   alias BDS.Scripts.Script
@@ -60,34 +64,42 @@ defmodule BDS.Scripting.ApiTest do
     assert {:ok, _published_post} = BDS.Posts.publish_post(post.id)
     assert {:ok, _tags} = BDS.Tags.sync_tags_from_posts(project.id)
 
-    source = [
-      "function main()",
-      "  local meta = bds.meta.get_project_metadata()",
-      "  local fetched = bds.posts.get_by_slug('capability-post')",
-      "  local tags = bds.tags.get_all()",
-      "  return {",
-      "    project_name = meta.name,",
-      "    post_title = fetched.title,",
-      "    tag_count = #tags",
-      "  }",
-      "end"
-    ]
-    |> Enum.join("\n")
+    source =
+      [
+        "function main()",
+        "  local meta = bds.meta.get_project_metadata()",
+        "  local fetched = bds.posts.get_by_slug('capability-post')",
+        "  local tags = bds.tags.get_all()",
+        "  return {",
+        "    project_name = meta.name,",
+        "    post_title = fetched.title,",
+        "    tag_count = #tags",
+        "  }",
+        "end"
+      ]
+      |> Enum.join("\n")
 
-    assert {:ok, %{"project_name" => "Scripting API", "post_title" => "Capability Post", "tag_count" => 1}} =
+    assert {:ok,
+            %{
+              "project_name" => "Scripting API",
+              "post_title" => "Capability Post",
+              "tag_count" => 1
+            }} =
              BDS.Scripting.execute_project_script(project.id, source, "main")
   end
 
-  test "macro execution uses explicit project capabilities and degrades failures to empty output", %{
-    project: project
-  } do
-    source = [
-      "function render()",
-      "  local meta = bds.meta.get_project_metadata()",
-      "  return '<strong>' .. meta.name .. '</strong>'",
-      "end"
-    ]
-    |> Enum.join("\n")
+  test "macro execution uses explicit project capabilities and degrades failures to empty output",
+       %{
+         project: project
+       } do
+    source =
+      [
+        "function render()",
+        "  local meta = bds.meta.get_project_metadata()",
+        "  return '<strong>' .. meta.name .. '</strong>'",
+        "end"
+      ]
+      |> Enum.join("\n")
 
     assert {:ok, "<strong>Scripting API</strong>"} =
              BDS.Scripting.execute_macro(project.id, source, [])
@@ -97,9 +109,10 @@ defmodule BDS.Scripting.ApiTest do
     assert {:ok, ""} = BDS.Scripting.execute_macro(project.id, bad_source, [])
   end
 
-  test "project scripting exposes project, post, script, template, metadata, and task namespaces", %{
-    project: project
-  } do
+  test "project scripting exposes project, post, script, template, metadata, and task namespaces",
+       %{
+         project: project
+       } do
     assert {:ok, post} =
              BDS.Posts.create_post(%{
                project_id: project.id,
@@ -278,7 +291,8 @@ defmodule BDS.Scripting.ApiTest do
     source =
       [
         "function main()",
-        "  local updated = bds.projects.update('" <> project.id <> "', { description = 'Updated through Lua' })",
+        "  local updated = bds.projects.update('" <>
+          project.id <> "', { description = 'Updated through Lua' })",
         "  bds.meta.set_publishing_preferences({ ssh_host = 'example.test', ssh_user = 'deploy', ssh_remote_path = '/srv/www', ssh_mode = 'scp' })",
         "  local prefs = bds.meta.get_publishing_preferences()",
         "  local categories = bds.meta.get_categories()",
@@ -450,11 +464,14 @@ defmodule BDS.Scripting.ApiTest do
         "    if not ok then error(name .. ': ' .. tostring(length)) end",
         "    return length",
         "  end",
-        "  local imported = step('media.import', function() return bds.media.import({ source_path = '" <> escape_lua_string(media_source_path) <> "', title = 'Imported Image', alt = 'Alt text', caption = 'Caption', tags = { 'gallery', 'cover' }, language = 'en' }) end)",
+        "  local imported = step('media.import', function() return bds.media.import({ source_path = '" <>
+          escape_lua_string(media_source_path) <>
+          "', title = 'Imported Image', alt = 'Alt text', caption = 'Caption', tags = { 'gallery', 'cover' }, language = 'en' }) end)",
         "  local translation = step('media.upsert_translation', function() return bds.media.upsert_translation(imported.id, 'de', { title = 'Bild', alt = 'Alt de', caption = 'Beschriftung' }) end)",
         "  local fetched_translation = step('media.get_translation', function() return bds.media.get_translation(imported.id, 'de') end)",
         "  local translation_count = count('media.get_translations.count', step('media.get_translations', function() return bds.media.get_translations(imported.id) end))",
-        "  local media_filter = step('media.filter', function() return bds.media.filter({ year = " <> Integer.to_string(Date.utc_today().year) <> ", tags = { 'gallery' } }) end)",
+        "  local media_filter = step('media.filter', function() return bds.media.filter({ year = " <>
+          Integer.to_string(Date.utc_today().year) <> ", tags = { 'gallery' } }) end)",
         "  local media_search = step('media.search', function() return bds.media.search('Imported') end)",
         "  local media_counts = step('media.get_by_year_month', function() return bds.media.get_by_year_month() end)",
         "  local media_tags = step('media.get_tags', function() return bds.media.get_tags() end)",
@@ -464,7 +481,8 @@ defmodule BDS.Scripting.ApiTest do
         "  local thumbnail = step('media.get_thumbnail', function() return bds.media.get_thumbnail(imported.id, 'small') end)",
         "  local regenerated = step('media.regenerate_thumbnails', function() return bds.media.regenerate_thumbnails(imported.id) end)",
         "  local missing = step('media.regenerate_missing_thumbnails', function() return bds.media.regenerate_missing_thumbnails() end)",
-        "  local replaced = step('media.replace_file', function() return bds.media.replace_file(imported.id, '" <> escape_lua_string(replacement_source_path) <> "') end)",
+        "  local replaced = step('media.replace_file', function() return bds.media.replace_file(imported.id, '" <>
+          escape_lua_string(replacement_source_path) <> "') end)",
         "  local rebuilt_media = step('media.rebuild_from_files', function() return bds.media.rebuild_from_files() end)",
         "  local media_reindexed = step('media.reindex_text', function() return bds.media.reindex_text() end)",
         "  local deleted_translation = step('media.delete_translation', function() return bds.media.delete_translation(imported.id, 'de') end)",
@@ -474,13 +492,19 @@ defmodule BDS.Scripting.ApiTest do
         "  local by_month = step('posts.get_by_year_month', function() return bds.posts.get_by_year_month() end)",
         "  local dashboard = step('posts.get_dashboard_stats', function() return bds.posts.get_dashboard_stats() end)",
         "  local filtered = step('posts.filter', function() return bds.posts.filter({ status = 'draft', tags = { 'source' } }) end)",
-        "  local rebuilt_links_before = step('posts.get_links_to.before', function() return bds.posts.get_links_to('" <> source_post.id <> "') end)",
+        "  local rebuilt_links_before = step('posts.get_links_to.before', function() return bds.posts.get_links_to('" <>
+          source_post.id <> "') end)",
         "  step('posts.rebuild_links', function() return bds.posts.rebuild_links() end)",
-        "  local links_to = step('posts.get_links_to.after', function() return bds.posts.get_links_to('" <> source_post.id <> "') end)",
-        "  local linked_by = step('posts.get_linked_by', function() return bds.posts.get_linked_by('" <> target_post.id <> "') end)",
-        "  local preview_url = step('posts.get_preview_url', function() return bds.posts.get_preview_url('" <> source_post.id <> "', { draft = true, lang = 'de' }) end)",
-        "  local published_translation = step('posts.publish_translation', function() return bds.posts.publish_translation('" <> source_post.id <> "', 'de') end)",
-        "  local discarded = step('posts.discard', function() return bds.posts.discard('" <> source_post.id <> "') end)",
+        "  local links_to = step('posts.get_links_to.after', function() return bds.posts.get_links_to('" <>
+          source_post.id <> "') end)",
+        "  local linked_by = step('posts.get_linked_by', function() return bds.posts.get_linked_by('" <>
+          target_post.id <> "') end)",
+        "  local preview_url = step('posts.get_preview_url', function() return bds.posts.get_preview_url('" <>
+          source_post.id <> "', { draft = true, lang = 'de' }) end)",
+        "  local published_translation = step('posts.publish_translation', function() return bds.posts.publish_translation('" <>
+          source_post.id <> "', 'de') end)",
+        "  local discarded = step('posts.discard', function() return bds.posts.discard('" <>
+          source_post.id <> "') end)",
         "  return {",
         "    translation_title = translation and translation.title or nil,",
         "    fetched_translation_title = fetched_translation and fetched_translation.title or nil,",
@@ -563,7 +587,8 @@ defmodule BDS.Scripting.ApiTest do
         "  local metrics = bds.app.get_title_bar_metrics()",
         "  local ready = bds.app.notify_renderer_ready()",
         "  bds.app.set_preview_post_target(nil)",
-        "  local open_result = bds.app.open_folder('" <> escape_lua_string(project.data_path) <> "')",
+        "  local open_result = bds.app.open_folder('" <>
+          escape_lua_string(project.data_path) <> "')",
         "  bds.app.show_item_in_folder('" <> escape_lua_string(sample_file_path) <> "')",
         "  bds.app.trigger_menu_action('new_post')",
         "  local startup = bds.meta.sync_on_startup()",

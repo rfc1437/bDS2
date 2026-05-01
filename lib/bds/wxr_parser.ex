@@ -4,7 +4,12 @@ defmodule BDS.WxrParser do
   require Record
 
   Record.defrecord(:xmlElement, Record.extract(:xmlElement, from_lib: "xmerl/include/xmerl.hrl"))
-  Record.defrecord(:xmlAttribute, Record.extract(:xmlAttribute, from_lib: "xmerl/include/xmerl.hrl"))
+
+  Record.defrecord(
+    :xmlAttribute,
+    Record.extract(:xmlAttribute, from_lib: "xmerl/include/xmerl.hrl")
+  )
+
   Record.defrecord(:xmlText, Record.extract(:xmlText, from_lib: "xmerl/include/xmerl.hrl"))
 
   def parse_file(file_path) when is_binary(file_path) do
@@ -180,7 +185,8 @@ defmodule BDS.WxrParser do
       child when is_tuple(child) and tuple_size(child) > 0 and elem(child, 0) == :xmlElement ->
         text_content(child)
 
-      _other -> ""
+      _other ->
+        ""
     end)
     |> String.trim()
   end

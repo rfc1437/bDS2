@@ -36,7 +36,9 @@ defmodule BDS.Scripting do
     runtime().execute(source, entrypoint, args, opts)
   end
 
-  @spec execute_project_script(String.t(), String.t(), String.t(), [term()], [Runtime.execution_option()]) ::
+  @spec execute_project_script(String.t(), String.t(), String.t(), [term()], [
+          Runtime.execution_option()
+        ]) ::
           {:ok, term()} | {:error, term()}
   def execute_project_script(project_id, source, entrypoint, args \\ [], opts \\ [])
       when is_binary(project_id) and is_binary(source) and is_binary(entrypoint) and
@@ -45,13 +47,20 @@ defmodule BDS.Scripting do
     execute(source, entrypoint, args, Keyword.put(opts, :capabilities, capabilities))
   end
 
-  @spec execute_macro(String.t(), String.t(), [term()], keyword()) :: {:ok, String.t()} | {:error, term()}
+  @spec execute_macro(String.t(), String.t(), [term()], keyword()) ::
+          {:ok, String.t()} | {:error, term()}
   def execute_macro(project_id, source, args, opts \\ [])
       when is_binary(project_id) and is_binary(source) and is_list(args) and is_list(opts) do
     config = Application.fetch_env!(:bds, :scripting)
     timeout = Keyword.get(opts, :timeout, Keyword.fetch!(config, :timeout))
 
-    case execute_project_script(project_id, source, "render", args, Keyword.put(opts, :timeout, timeout)) do
+    case execute_project_script(
+           project_id,
+           source,
+           "render",
+           args,
+           Keyword.put(opts, :timeout, timeout)
+         ) do
       {:ok, nil} -> {:ok, ""}
       {:ok, value} -> {:ok, to_string(value)}
       {:error, _reason} -> {:ok, ""}

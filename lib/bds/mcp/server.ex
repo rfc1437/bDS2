@@ -138,8 +138,11 @@ defmodule BDS.MCP.Server do
     case URI.parse(target) do
       %URI{path: "/mcp"} ->
         case GenServer.call(__MODULE__, {:http_request, request}, 5_000) do
-          {:ok, status, body} -> http_response(status, Jason.encode!(body), "application/json", request.headers)
-          {:error, status, body} -> http_response(status, body, "text/plain", request.headers)
+          {:ok, status, body} ->
+            http_response(status, Jason.encode!(body), "application/json", request.headers)
+
+          {:error, status, body} ->
+            http_response(status, body, "text/plain", request.headers)
         end
 
       _other ->
@@ -170,7 +173,10 @@ defmodule BDS.MCP.Server do
          success_response(id, %{
            "protocolVersion" => Map.get(params, "protocolVersion", "2025-03-26"),
            "capabilities" => %{"tools" => %{}, "resources" => %{}},
-           "serverInfo" => %{"name" => @server_name, "version" => Application.spec(:bds, :vsn) |> to_string()}
+           "serverInfo" => %{
+             "name" => @server_name,
+             "version" => Application.spec(:bds, :vsn) |> to_string()
+           }
          })}
 
       "tools/list" ->
@@ -196,10 +202,17 @@ defmodule BDS.MCP.Server do
     arguments = Map.get(params, "arguments", %{})
 
     case BDS.MCP.call_tool(name, arguments) do
-      {:ok, result} -> {:ok, success_response(id, %{"content" => [%{"type" => "json", "json" => result}]})}
-      {:error, :unknown_tool} -> {:error, error_response(id, -32601, "Unknown tool")}
-      {:error, :not_found} -> {:error, error_response(id, -32004, "Not found")}
-      {:error, reason} -> {:error, error_response(id, -32000, inspect(reason))}
+      {:ok, result} ->
+        {:ok, success_response(id, %{"content" => [%{"type" => "json", "json" => result}]})}
+
+      {:error, :unknown_tool} ->
+        {:error, error_response(id, -32601, "Unknown tool")}
+
+      {:error, :not_found} ->
+        {:error, error_response(id, -32004, "Not found")}
+
+      {:error, reason} ->
+        {:error, error_response(id, -32000, inspect(reason))}
     end
   end
 
@@ -286,7 +299,8 @@ defmodule BDS.MCP.Server do
     |> IO.iodata_to_binary()
   end
 
-  defp http_error_response(status, headers \\ %{}), do: http_response(status, reason_body(status), "text/plain", headers)
+  defp http_error_response(status, headers \\ %{}),
+    do: http_response(status, reason_body(status), "text/plain", headers)
 
   defp reason_body(400), do: "Bad Request"
   defp reason_body(404), do: "Not Found"

@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.ChatEditor.{ModelSelection, ToolSurfaces, ToolTracking}
 
+  @spec build(term()) :: term()
   def build(%{current_tab: %{type: :chat, id: conversation_id}} = assigns) do
     case AI.get_chat_conversation(conversation_id) do
       nil ->

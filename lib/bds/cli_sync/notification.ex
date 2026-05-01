@@ -15,7 +15,9 @@ defmodule BDS.CliSync.Notification do
 
   def changeset(notification, attrs) do
     notification
-    |> cast(attrs, [:entity_type, :entity_id, :action, :from_cli, :seen_at, :created_at], empty_values: [nil])
+    |> cast(attrs, [:entity_type, :entity_id, :action, :from_cli, :seen_at, :created_at],
+      empty_values: [nil]
+    )
     |> validate_required([:entity_type, :entity_id, :action, :from_cli, :created_at])
   end
 end

@@ -54,7 +54,9 @@ defmodule BDS.Rendering.Metadata do
     |> Enum.uniq()
     |> Enum.map(fn language ->
       normalized = I18n.normalize_language(language)
-      href_prefix = LinksAndLanguages.language_prefix(normalized, metadata.main_language || current_language)
+
+      href_prefix =
+        LinksAndLanguages.language_prefix(normalized, metadata.main_language || current_language)
 
       %{
         code: normalized,
@@ -84,9 +86,17 @@ defmodule BDS.Rendering.Metadata do
           order_by: [asc: translation.language]
       )
 
-    [%{href: LinksAndLanguages.post_path(post, nil), hreflang: LinksAndLanguages.normalize_language(post.language, main_language)}] ++
+    [
+      %{
+        href: LinksAndLanguages.post_path(post, nil),
+        hreflang: LinksAndLanguages.normalize_language(post.language, main_language)
+      }
+    ] ++
       Enum.map(translations, fn translation ->
-        %{href: LinksAndLanguages.post_path(post, translation.language, main_language), hreflang: translation.language}
+        %{
+          href: LinksAndLanguages.post_path(post, translation.language, main_language),
+          hreflang: translation.language
+        }
       end)
   end
 

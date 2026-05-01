@@ -3,12 +3,15 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
 
   @home_item_id "menu-home"
 
+  @spec home_item_id() :: term()
   def home_item_id, do: @home_item_id
 
+  @spec home_item() :: term()
   def home_item do
     %{item_id: @home_item_id, kind: :home, label: "Home", slug: nil, children: [], is_home: true}
   end
 
+  @spec ui_item(term()) :: term()
   def ui_item(%{kind: :home}), do: home_item()
 
   def ui_item(item) do
@@ -24,25 +27,37 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     }
   end
 
+  @spec persisted_item(term()) :: term()
   def persisted_item(%{kind: :home}), do: %{kind: :home, label: "Home", slug: nil}
 
   def persisted_item(%{kind: :submenu} = item) do
-    %{kind: :submenu, label: item.label, slug: nil, children: Enum.map(item.children || [], &persisted_item/1)}
+    %{
+      kind: :submenu,
+      label: item.label,
+      slug: nil,
+      children: Enum.map(item.children || [], &persisted_item/1)
+    }
   end
 
   def persisted_item(item) do
     %{kind: item.kind, label: item.label, slug: item.slug}
   end
 
+  @spec first_item_id(term()) :: term()
   def first_item_id([item | _rest]), do: item.item_id
   def first_item_id([]), do: nil
 
+  @spec insert_target(term(), term()) :: term()
   def insert_target(items, nil), do: {[], length(items)}
 
   def insert_target(items, selected_id) do
     case find_path(items, selected_id) do
-      nil -> {[], length(items)}
-      [] -> {[], length(items)}
+      nil ->
+        {[], length(items)}
+
+      [] ->
+        {[], length(items)}
+
       path ->
         case item_at_path(items, path) do
           %{kind: :submenu} -> {path, 0}
@@ -51,9 +66,12 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end
   end
 
+  @spec path_prefix?(term(), term()) :: term()
   def path_prefix?(prefix, path) when length(prefix) > length(path), do: false
+  @spec path_prefix?(term(), term()) :: term()
   def path_prefix?(prefix, path), do: Enum.take(path, length(prefix)) == prefix
 
+  @spec find_path(term(), term(), term()) :: term()
   def find_path(items, item_id, path \\ []) do
     Enum.find_value(Enum.with_index(items), fn {item, index} ->
       next_path = path ++ [index]
@@ -71,6 +89,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end)
   end
 
+  @spec item_at_path(term(), term()) :: term()
   def item_at_path(_items, []), do: nil
 
   def item_at_path(items, [index]) do
@@ -84,6 +103,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end
   end
 
+  @spec items_at_path(term(), term()) :: term()
   def items_at_path(items, []), do: items
 
   def items_at_path(items, [index | rest]) do
@@ -93,6 +113,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end
   end
 
+  @spec replace_items_at_path(term(), term(), term()) :: term()
   def replace_items_at_path(_items, [], replacement), do: replacement
 
   def replace_items_at_path(items, [index | rest], replacement) do
@@ -101,6 +122,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end)
   end
 
+  @spec update_item(term(), term(), term()) :: term()
   def update_item(items, item_id, updater) do
     Enum.map(items, fn item ->
       cond do
@@ -111,6 +133,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end)
   end
 
+  @spec insert_item(term(), term(), term(), term()) :: term()
   def insert_item(items, [], index, item) do
     List.insert_at(items, index, item)
   end
@@ -121,10 +144,12 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end)
   end
 
+  @spec remove_item(term(), term()) :: term()
   def remove_item(items, item_id) do
     remove_item_with_value(items, item_id) |> elem(0)
   end
 
+  @spec remove_item_with_value(term(), term()) :: term()
   def remove_item_with_value(items, item_id) do
     Enum.reduce_while(Enum.with_index(items), {items, nil}, fn {item, index}, _acc ->
       cond do
@@ -135,7 +160,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
           {next_children, removed_item} = remove_item_with_value(item.children, item_id)
 
           if removed_item do
-            {:halt, {List.replace_at(items, index, %{item | children: next_children}), removed_item}}
+            {:halt,
+             {List.replace_at(items, index, %{item | children: next_children}), removed_item}}
           else
             {:cont, {items, nil}}
           end
@@ -146,16 +172,23 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end)
   end
 
+  @spec append_child(term(), term(), term()) :: term()
   def append_child(items, parent_item_id, child) do
     update_item(items, parent_item_id, fn item ->
       %{item | children: (item.children || []) ++ [child]}
     end)
   end
 
-  def move_selected(%{selected_id: selected_id} = state, direction) when direction in [:up, :down] do
+  @spec move_selected(term(), term()) :: term()
+  def move_selected(%{selected_id: selected_id} = state, direction)
+      when direction in [:up, :down] do
     case find_path(state.items, selected_id) do
-      nil -> state
-      [] -> state
+      nil ->
+        state
+
+      [] ->
+        state
+
       path ->
         parent_path = Enum.drop(path, -1)
         index = List.last(path)
@@ -175,10 +208,15 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end
   end
 
+  @spec indent_selected(term()) :: term()
   def indent_selected(%{selected_id: selected_id} = state) do
     case find_path(state.items, selected_id) do
-      nil -> state
-      [] -> state
+      nil ->
+        state
+
+      [] ->
+        state
+
       path ->
         parent_path = Enum.drop(path, -1)
         index = List.last(path)
@@ -193,7 +231,9 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
             case item_at_path(state.items, previous_sibling_path) do
               %{kind: :submenu, item_id: sibling_id} ->
                 case remove_item_with_value(state.items, selected_id) do
-                  {_next_items, nil} -> state
+                  {_next_items, nil} ->
+                    state
+
                   {next_items, removed_item} ->
                     %{
                       state
@@ -208,18 +248,27 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end
   end
 
+  @spec unindent_selected(term()) :: term()
   def unindent_selected(%{selected_id: selected_id} = state) do
     case find_path(state.items, selected_id) do
-      nil -> state
-      [] -> state
-      [_root_index] -> state
+      nil ->
+        state
+
+      [] ->
+        state
+
+      [_root_index] ->
+        state
+
       path ->
         parent_path = Enum.drop(path, -1)
         parent_index = List.last(parent_path)
         grand_parent_path = Enum.drop(parent_path, -1)
 
         case remove_item_with_value(state.items, selected_id) do
-          {_next_items, nil} -> state
+          {_next_items, nil} ->
+            state
+
           {next_items, removed_item} ->
             %{
               state
@@ -229,6 +278,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     end
   end
 
+  @spec delete_selected(term()) :: term()
   def delete_selected(%{selected_id: @home_item_id} = state), do: state
 
   def delete_selected(%{selected_id: selected_id} = state) do
@@ -241,9 +291,11 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
     state
   end
 
-  def drop_selected(state, drag_item_id, target_item_id, _position) when drag_item_id == target_item_id,
-    do: state
+  def drop_selected(state, drag_item_id, target_item_id, _position)
+      when drag_item_id == target_item_id,
+      do: state
 
+  @spec drop_selected(term(), term(), term(), term()) :: term()
   def drop_selected(state, drag_item_id, target_item_id, position) do
     drag_path = find_path(state.items, drag_item_id)
     target_path = find_path(state.items, target_item_id)
@@ -275,7 +327,11 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
   defp insert_dropped_item(state, next_items, dragged_item, target_path, "inside") do
     case item_at_path(next_items, target_path) do
       %{kind: :submenu} ->
-        %{state | items: insert_item(next_items, target_path, 0, dragged_item), selected_id: dragged_item.item_id}
+        %{
+          state
+          | items: insert_item(next_items, target_path, 0, dragged_item),
+            selected_id: dragged_item.item_id
+        }
 
       _other ->
         state
@@ -285,12 +341,22 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
   defp insert_dropped_item(state, next_items, dragged_item, target_path, "before") do
     parent_path = Enum.drop(target_path, -1)
     index = List.last(target_path)
-    %{state | items: insert_item(next_items, parent_path, index, dragged_item), selected_id: dragged_item.item_id}
+
+    %{
+      state
+      | items: insert_item(next_items, parent_path, index, dragged_item),
+        selected_id: dragged_item.item_id
+    }
   end
 
   defp insert_dropped_item(state, next_items, dragged_item, target_path, _position) do
     parent_path = Enum.drop(target_path, -1)
     index = List.last(target_path) + 1
-    %{state | items: insert_item(next_items, parent_path, index, dragged_item), selected_id: dragged_item.item_id}
+
+    %{
+      state
+      | items: insert_item(next_items, parent_path, index, dragged_item),
+        selected_id: dragged_item.item_id
+    }
   end
 end

@@ -85,7 +85,8 @@ defmodule BDS.Scripting.Lua do
 
   defp install_capability(path, value, state) when is_map(value) do
     with {:ok, seeded_state} <- set_capability(path, %{}, state) do
-      Enum.reduce_while(value, {:ok, seeded_state}, fn {name, nested_value}, {:ok, current_state} ->
+      Enum.reduce_while(value, {:ok, seeded_state}, fn {name, nested_value},
+                                                       {:ok, current_state} ->
         case install_capability(path ++ [to_string(name)], nested_value, current_state) do
           {:ok, next_state} -> {:cont, {:ok, next_state}}
           {:error, reason} -> {:halt, {:error, reason}}
@@ -142,7 +143,10 @@ defmodule BDS.Scripting.Lua do
   defp sandbox_run(script, flags, state), do: apply(:luerl_sandbox, :run, [script, flags, state])
 
   defp normalize_sandbox_result({:ok, result, next_state}), do: {:ok, result, next_state}
-  defp normalize_sandbox_result({:error, {:reductions, count}}), do: {:error, {:reductions_exceeded, count}}
+
+  defp normalize_sandbox_result({:error, {:reductions, count}}),
+    do: {:error, {:reductions_exceeded, count}}
+
   defp normalize_sandbox_result({:error, :timeout}), do: {:error, :timeout}
   defp normalize_sandbox_result({:error, reason}), do: {:error, reason}
 

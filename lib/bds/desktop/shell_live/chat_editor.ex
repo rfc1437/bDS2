@@ -8,10 +8,11 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.ChatEditor.{MessageBuild, ModelSelection, ToolTracking}
 
-  embed_templates "chat_editor_html/*"
+  embed_templates("chat_editor_html/*")
 
   # ── Public API: state assignment ───────────────────────────────────────────
 
+  @spec assign_socket(term()) :: term()
   def assign_socket(socket) do
     assign(socket, :chat_editor, MessageBuild.build(socket.assigns))
   end
@@ -25,6 +26,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   # ── Public API: input + surface state ──────────────────────────────────────
 
+  @spec update_input(term(), term(), term()) :: term()
   def update_input(socket, value, reload) do
     %{id: conversation_id} = socket.assigns.current_tab
 
@@ -36,6 +38,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec update_surface_form(term(), term(), term(), term()) :: term()
   def update_surface_form(socket, surface_id, fields, reload)
       when is_binary(surface_id) and is_map(fields) do
     next_data = Map.put(socket.assigns.chat_editor_surface_data, surface_id, fields)
@@ -45,6 +48,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec select_surface_tab(term(), term(), term(), term()) :: term()
   def select_surface_tab(socket, surface_id, index, reload)
       when is_binary(surface_id) and is_integer(index) and index >= 0 do
     socket
@@ -55,10 +59,12 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec current_surface_data(term(), term()) :: term()
   def current_surface_data(socket, surface_id) when is_binary(surface_id) do
     Map.get(socket.assigns.chat_editor_surface_data, surface_id, %{})
   end
 
+  @spec set_action_error(term(), term(), term(), term()) :: term()
   def set_action_error(socket, conversation_id, message, reload)
       when is_binary(conversation_id) and is_binary(message) do
     socket
@@ -69,6 +75,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec clear_action_error(term(), term(), term()) :: term()
   def clear_action_error(socket, conversation_id, reload) when is_binary(conversation_id) do
     socket
     |> assign(
@@ -80,6 +87,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   # ── Public API: messaging ──────────────────────────────────────────────────
 
+  @spec send_message(term(), term(), term()) :: term()
   def send_message(socket, reload, append_output) do
     %{id: conversation_id} = socket.assigns.current_tab
     message = socket.assigns.chat_editor_inputs |> Map.get(conversation_id, "") |> String.trim()
@@ -144,6 +152,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     end
   end
 
+  @spec abort_message(term(), term()) :: term()
   def abort_message(socket, reload) do
     %{id: conversation_id} = socket.assigns.current_tab
 
@@ -167,6 +176,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     end
   end
 
+  @spec note_tool_call(term(), term(), term(), term()) :: term()
   def note_tool_call(socket, conversation_id, tool_call, reload)
       when is_binary(conversation_id) and is_map(tool_call) do
     update_request(
@@ -189,6 +199,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     )
   end
 
+  @spec note_tool_result(term(), term(), term(), term()) :: term()
   def note_tool_result(socket, conversation_id, name, reload)
       when is_binary(conversation_id) and is_binary(name) do
     update_request(
@@ -201,6 +212,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     )
   end
 
+  @spec note_streaming_content(term(), term(), term(), term()) :: term()
   def note_streaming_content(socket, conversation_id, content, reload)
       when is_binary(conversation_id) and is_binary(content) do
     update_request(
@@ -211,6 +223,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     )
   end
 
+  @spec finish_request(term(), term(), term(), term(), term()) :: term()
   def finish_request(socket, ref, result, reload, append_output) when is_reference(ref) do
     case Map.pop(socket.assigns.chat_editor_request_refs, ref) do
       {nil, _remaining_refs} ->
@@ -245,12 +258,14 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   # ── HEEx-callable helpers ─────────────────────────────────────────────────
 
+  @spec message_role_label(term()) :: term()
   def message_role_label(:user), do: translated("chat.role.you")
   def message_role_label(_role), do: translated("chat.role.assistant")
 
   defdelegate tool_call_name(tool_call), to: ToolTracking
   defdelegate tool_call_arguments(tool_call), to: ToolTracking
 
+  @spec tool_surface_type(term()) :: term()
   def tool_surface_type(surface), do: Map.get(surface, :type, "json")
 
   def markdown_html(content) when is_binary(content) do
@@ -264,8 +279,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     raw(html)
   end
 
+  @spec markdown_html(term()) :: term()
   def markdown_html(_content), do: ""
 
+  @spec payload_json(term()) :: term()
   def payload_json(nil), do: "{}"
   def payload_json(payload) when is_map(payload), do: Jason.encode!(payload)
 
@@ -280,15 +297,18 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     |> Float.round(2)
   end
 
+  @spec chart_width(term(), term()) :: term()
   def chart_width(_max_value, _value), do: 0
 
   def truthy?(value) when value in [true, "true", 1, "1", "on"], do: true
+  @spec truthy?(term()) :: term()
   def truthy?(_value), do: false
 
   # ── HEEx components ───────────────────────────────────────────────────────
 
-  attr :markers, :list, required: true
+  attr(:markers, :list, required: true)
 
+  @spec chat_tool_markers(term()) :: term()
   def chat_tool_markers(assigns) do
     ~H"""
     <%= if @markers != [] do %>
@@ -307,8 +327,9 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     """
   end
 
-  attr :surface, :map, required: true
+  attr(:surface, :map, required: true)
 
+  @spec chat_surface(term()) :: term()
   def chat_surface(assigns) do
     ~H"""
     <article class={["chat-inline-surface", "chat-inline-surface-#{@surface.type}"]} data-testid="chat-inline-surface">
@@ -548,7 +569,8 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         fn _match, src, alt -> external_image_link(src, alt) end
       )
 
-    Regex.replace(~r/<img\b(?=[^>]*\bsrc="(https?:\/\/[^\"]+)")[^>]*\/?>/i, html, fn _match, src ->
+    Regex.replace(~r/<img\b(?=[^>]*\bsrc="(https?:\/\/[^\"]+)")[^>]*\/?>/i, html, fn _match,
+                                                                                     src ->
       external_image_link(src, src)
     end)
   end
@@ -571,6 +593,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   defp format_error(reason), do: inspect(reason)
 
+  @spec translated(term(), term()) :: term()
   def translated(text, bindings \\ %{}),
     do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

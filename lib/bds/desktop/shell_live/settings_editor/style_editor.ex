@@ -29,6 +29,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.StyleEditor do
     "zinc"
   ]
 
+  @spec build_style(term()) :: term()
   def build_style(%{projects: %{active_project_id: nil}}), do: nil
 
   def build_style(assigns) do
@@ -40,22 +41,26 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.StyleEditor do
       selected_theme: selected_theme,
       applied_theme: current_theme(assigns),
       preview_mode: preview_mode,
-      preview_url: "http://127.0.0.1:4123/__style-preview?theme=#{selected_theme}&mode=#{preview_mode}"
+      preview_url:
+        "http://127.0.0.1:4123/__style-preview?theme=#{selected_theme}&mode=#{preview_mode}"
     }
   end
 
+  @spec select_style_theme(term(), term(), term()) :: term()
   def select_style_theme(socket, theme, reload) do
     socket
     |> assign(:style_editor_theme, to_string(theme || "default"))
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec change_style_preview_mode(term(), term(), term()) :: term()
   def change_style_preview_mode(socket, mode, reload) do
     socket
     |> assign(:style_editor_preview_mode, to_string(mode || "auto"))
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec apply_style_theme(term(), term(), term()) :: term()
   def apply_style_theme(socket, reload, append_output) do
     project_id = socket.assigns.projects.active_project_id
     theme = socket.assigns[:style_editor_theme] || current_theme(socket.assigns)
@@ -71,6 +76,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.StyleEditor do
     end
   end
 
+  @spec theme_display_name(term()) :: term()
   def theme_display_name(theme) do
     theme
     |> to_string()
@@ -78,6 +84,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.StyleEditor do
     |> String.capitalize()
   end
 
+  @spec current_theme(term()) :: term()
   def current_theme(assigns) do
     case Metadata.get_project_metadata(assigns.projects.active_project_id) do
       {:ok, metadata} ->

@@ -22,7 +22,13 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
   end
 
   def create(socket, project_id, "post", callbacks) do
-    case BDS.Posts.create_post(%{project_id: project_id, title: "", content: "", tags: [], categories: []}) do
+    case BDS.Posts.create_post(%{
+           project_id: project_id,
+           title: "",
+           content: "",
+           tags: [],
+           categories: []
+         }) do
       {:ok, _post} ->
         callbacks.reload.(socket, socket.assigns.workbench)
 
@@ -42,7 +48,12 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
 
           {:error, reason} ->
             socket
-            |> callbacks.append_output.(translated("sidebar.importMedia"), inspect(reason), nil, "error")
+            |> callbacks.append_output.(
+              translated("sidebar.importMedia"),
+              inspect(reason),
+              nil,
+              "error"
+            )
             |> callbacks.reload.(socket.assigns.workbench)
         end
 
@@ -68,13 +79,23 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
       {:ok, script} ->
         callbacks.open_sidebar.(
           socket,
-          %{"route" => "scripts", "id" => script.id, "title" => script.title, "subtitle" => "Automation helpers"},
+          %{
+            "route" => "scripts",
+            "id" => script.id,
+            "title" => script.title,
+            "subtitle" => "Automation helpers"
+          },
           :pin
         )
 
       {:error, reason} ->
         socket
-        |> callbacks.append_output.(translated("sidebar.scripts.newScript"), inspect(reason), nil, "error")
+        |> callbacks.append_output.(
+          translated("sidebar.scripts.newScript"),
+          inspect(reason),
+          nil,
+          "error"
+        )
         |> callbacks.reload.(socket.assigns.workbench)
     end
   end
@@ -90,29 +111,52 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
       {:ok, template} ->
         callbacks.open_sidebar.(
           socket,
-          %{"route" => "templates", "id" => template.id, "title" => template.title, "subtitle" => "Site rendering"},
+          %{
+            "route" => "templates",
+            "id" => template.id,
+            "title" => template.title,
+            "subtitle" => "Site rendering"
+          },
           :pin
         )
 
       {:error, reason} ->
         socket
-        |> callbacks.append_output.(translated("sidebar.templates.newTemplate"), inspect(reason), nil, "error")
+        |> callbacks.append_output.(
+          translated("sidebar.templates.newTemplate"),
+          inspect(reason),
+          nil,
+          "error"
+        )
         |> callbacks.reload.(socket.assigns.workbench)
     end
   end
 
   def create(socket, project_id, "import", callbacks) do
-    case ImportDefinitions.create_definition(%{project_id: project_id, name: translated("sidebar.import.newDefinition")}) do
+    case ImportDefinitions.create_definition(%{
+           project_id: project_id,
+           name: translated("sidebar.import.newDefinition")
+         }) do
       {:ok, definition} ->
         callbacks.open_sidebar.(
           socket,
-          %{"route" => "import", "id" => definition.id, "title" => definition.name, "subtitle" => "Import definitions"},
+          %{
+            "route" => "import",
+            "id" => definition.id,
+            "title" => definition.name,
+            "subtitle" => "Import definitions"
+          },
           :pin
         )
 
       {:error, reason} ->
         socket
-        |> callbacks.append_output.(translated("sidebar.import.newDefinition"), inspect(reason), nil, "error")
+        |> callbacks.append_output.(
+          translated("sidebar.import.newDefinition"),
+          inspect(reason),
+          nil,
+          "error"
+        )
         |> callbacks.reload.(socket.assigns.workbench)
     end
   end

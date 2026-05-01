@@ -9,6 +9,7 @@ defmodule BDS.PostLinks do
   alias BDS.Projects
   alias BDS.Repo
 
+  @spec sync_post_links(Post.t()) :: :ok
   def sync_post_links(%Post{} = post) do
     links =
       post
@@ -41,6 +42,7 @@ defmodule BDS.PostLinks do
     :ok
   end
 
+  @spec delete_post_links(String.t()) :: :ok
   def delete_post_links(post_id) when is_binary(post_id) do
     Repo.delete_all(
       from link in Link,
@@ -50,12 +52,18 @@ defmodule BDS.PostLinks do
     :ok
   end
 
+  @spec list_outgoing_links(String.t()) :: [Link.t()]
   def list_outgoing_links(post_id) when is_binary(post_id) do
-    Repo.all(from link in Link, where: link.source_post_id == ^post_id, order_by: [asc: link.created_at])
+    Repo.all(
+      from link in Link, where: link.source_post_id == ^post_id, order_by: [asc: link.created_at]
+    )
   end
 
+  @spec list_incoming_links(String.t()) :: [Link.t()]
   def list_incoming_links(post_id) when is_binary(post_id) do
-    Repo.all(from link in Link, where: link.target_post_id == ^post_id, order_by: [asc: link.created_at])
+    Repo.all(
+      from link in Link, where: link.target_post_id == ^post_id, order_by: [asc: link.created_at]
+    )
   end
 
   defp post_body(%Post{content: content}) when is_binary(content), do: content
@@ -83,11 +91,15 @@ defmodule BDS.PostLinks do
   defp extract_links(body) when is_binary(body) do
     markdown_links =
       Regex.scan(~r/\[([^\]]+)\]\(([^)]+)\)/, body)
-      |> Enum.map(fn [_full, link_text, href] -> %{link_text: normalize_link_text(link_text), href: href} end)
+      |> Enum.map(fn [_full, link_text, href] ->
+        %{link_text: normalize_link_text(link_text), href: href}
+      end)
 
     html_links =
       Regex.scan(~r/<a\s+[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/is, body)
-      |> Enum.map(fn [_full, href, link_text] -> %{link_text: normalize_link_text(link_text), href: href} end)
+      |> Enum.map(fn [_full, href, link_text] ->
+        %{link_text: normalize_link_text(link_text), href: href}
+      end)
 
     markdown_links ++ html_links
   end
@@ -121,12 +133,17 @@ defmodule BDS.PostLinks do
       [language, year, month, day, slug] ->
         if language_code?(language) and numeric_year?(year) and numeric_month_or_day?(month) and
              numeric_month_or_day?(day),
-          do: slug,
-          else: nil
+           do: slug,
+           else: nil
 
-      [slug] -> slug
-      [language, slug] -> if(language_code?(language), do: slug, else: nil)
-      _other -> nil
+      [slug] ->
+        slug
+
+      [language, slug] ->
+        if(language_code?(language), do: slug, else: nil)
+
+      _other ->
+        nil
     end
   end
 

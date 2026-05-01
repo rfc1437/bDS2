@@ -2,7 +2,11 @@ defmodule BDS.AI.HttpClient do
   @moduledoc false
 
   def get(url, headers) when is_binary(url) and is_map(headers) do
-    request = {String.to_charlist(url), Enum.map(headers, fn {key, value} -> {String.to_charlist(key), String.to_charlist(value)} end)}
+    request =
+      {String.to_charlist(url),
+       Enum.map(headers, fn {key, value} ->
+         {String.to_charlist(key), String.to_charlist(value)}
+       end)}
 
     :inets.start()
     :ssl.start()
@@ -24,7 +28,10 @@ defmodule BDS.AI.HttpClient do
   def post(url, headers, body)
       when is_binary(url) and is_map(headers) and is_binary(body) do
     request =
-      {String.to_charlist(url), Enum.map(headers, fn {key, value} -> {String.to_charlist(key), String.to_charlist(value)} end), ~c"application/json", body}
+      {String.to_charlist(url),
+       Enum.map(headers, fn {key, value} ->
+         {String.to_charlist(key), String.to_charlist(value)}
+       end), ~c"application/json", body}
 
     :inets.start()
     :ssl.start()

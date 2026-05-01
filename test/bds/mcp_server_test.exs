@@ -3,7 +3,10 @@ defmodule BDS.MCPServerTest do
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
-    temp_dir = Path.join(System.tmp_dir!(), "bds-mcp-server-#{System.unique_integer([:positive])}")
+
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-mcp-server-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
@@ -36,7 +39,8 @@ defmodule BDS.MCPServerTest do
              :httpc.request(
                :post,
                {to_charlist("http://127.0.0.1:#{server.port}/mcp"),
-                [{~c"content-type", ~c"application/json"}], ~c"application/json", initialize_body},
+                [{~c"content-type", ~c"application/json"}], ~c"application/json",
+                initialize_body},
                [],
                body_format: :binary
              )
@@ -64,8 +68,10 @@ defmodule BDS.MCPServerTest do
              :httpc.request(
                :post,
                {to_charlist("http://127.0.0.1:#{server.port}/mcp"),
-                [{~c"content-type", ~c"application/json"}, {~c"origin", ~c"https://evil.example"}],
-                ~c"application/json", initialize_body},
+                [
+                  {~c"content-type", ~c"application/json"},
+                  {~c"origin", ~c"https://evil.example"}
+                ], ~c"application/json", initialize_body},
                [],
                body_format: :binary
              )

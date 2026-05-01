@@ -32,11 +32,23 @@ defmodule BDS.ImportAnalysis do
     notify_progress(on_progress, "Loading existing posts...")
     existing_posts = Repo.all(from post in Post, where: post.project_id == ^project_id)
 
-    notify_progress(on_progress, "Loading existing media...", "#{length(existing_posts)} posts in project")
+    notify_progress(
+      on_progress,
+      "Loading existing media...",
+      "#{length(existing_posts)} posts in project"
+    )
+
     existing_media = Repo.all(from media in Media, where: media.project_id == ^project_id)
 
-    notify_progress(on_progress, "Loading existing tags...", "#{length(existing_media)} media in project")
-    existing_tag_names = Repo.all(from tag in Tag, where: tag.project_id == ^project_id, select: tag.name)
+    notify_progress(
+      on_progress,
+      "Loading existing tags...",
+      "#{length(existing_media)} media in project"
+    )
+
+    existing_tag_names =
+      Repo.all(from tag in Tag, where: tag.project_id == ^project_id, select: tag.name)
+
     existing_tag_set = existing_tag_names |> Enum.map(&String.downcase/1) |> MapSet.new()
 
     posts_by_slug = Map.new(existing_posts, &{&1.slug, &1})
@@ -53,15 +65,35 @@ defmodule BDS.ImportAnalysis do
       |> Enum.reject(&is_nil(&1.checksum))
       |> Map.new(&{&1.checksum, &1})
 
-    notify_progress(on_progress, "Analyzing posts...", "#{length(wxr_data.posts)} posts to analyze")
-    analyzed_posts = Enum.map(wxr_data.posts, &analyze_post_item(&1, posts_by_slug, posts_by_checksum, "post"))
+    notify_progress(
+      on_progress,
+      "Analyzing posts...",
+      "#{length(wxr_data.posts)} posts to analyze"
+    )
 
-    notify_progress(on_progress, "Analyzing pages...", "#{length(wxr_data.pages)} pages to analyze")
-    analyzed_pages = Enum.map(wxr_data.pages, &analyze_post_item(&1, posts_by_slug, posts_by_checksum, "page"))
+    analyzed_posts =
+      Enum.map(wxr_data.posts, &analyze_post_item(&1, posts_by_slug, posts_by_checksum, "post"))
 
-    notify_progress(on_progress, "Analyzing media files...", "#{length(wxr_data.media)} media files to analyze")
+    notify_progress(
+      on_progress,
+      "Analyzing pages...",
+      "#{length(wxr_data.pages)} pages to analyze"
+    )
+
+    analyzed_pages =
+      Enum.map(wxr_data.pages, &analyze_post_item(&1, posts_by_slug, posts_by_checksum, "page"))
+
+    notify_progress(
+      on_progress,
+      "Analyzing media files...",
+      "#{length(wxr_data.media)} media files to analyze"
+    )
+
     analyzed_media =
-      Enum.map(wxr_data.media, &analyze_media_item(&1, uploads_folder_path, media_by_name, media_by_checksum))
+      Enum.map(
+        wxr_data.media,
+        &analyze_media_item(&1, uploads_folder_path, media_by_name, media_by_checksum)
+      )
 
     notify_progress(on_progress, "Processing categories and tags...")
     category_items = Enum.map(wxr_data.categories, &analyze_taxonomy_item(&1, existing_tag_set))
@@ -113,10 +145,18 @@ defmodule BDS.ImportAnalysis do
 
     {status, existing} =
       cond do
-        existing_by_slug && existing_by_slug.checksum == content_checksum && not is_nil(existing_by_slug.checksum) -> {"update", existing_by_slug}
-        existing_by_slug -> {"conflict", existing_by_slug}
-        existing_by_checksum -> {"content-duplicate", existing_by_checksum}
-        true -> {"new", nil}
+        existing_by_slug && existing_by_slug.checksum == content_checksum &&
+            not is_nil(existing_by_slug.checksum) ->
+          {"update", existing_by_slug}
+
+        existing_by_slug ->
+          {"conflict", existing_by_slug}
+
+        existing_by_checksum ->
+          {"content-duplicate", existing_by_checksum}
+
+        true ->
+          {"new", nil}
       end
 
     %{
@@ -163,10 +203,18 @@ defmodule BDS.ImportAnalysis do
           existing_by_checksum = Map.get(media_by_checksum, file_checksum)
 
           cond do
-            existing_by_name && existing_by_name.checksum == file_checksum && not is_nil(existing_by_name.checksum) -> {"update", file_checksum, existing_by_name}
-            existing_by_name -> {"conflict", file_checksum, existing_by_name}
-            existing_by_checksum -> {"content-duplicate", file_checksum, existing_by_checksum}
-            true -> {"new", file_checksum, nil}
+            existing_by_name && existing_by_name.checksum == file_checksum &&
+                not is_nil(existing_by_name.checksum) ->
+              {"update", file_checksum, existing_by_name}
+
+            existing_by_name ->
+              {"conflict", file_checksum, existing_by_name}
+
+            existing_by_checksum ->
+              {"content-duplicate", file_checksum, existing_by_checksum}
+
+            true ->
+              {"new", file_checksum, nil}
           end
       end
 
@@ -265,7 +313,9 @@ defmodule BDS.ImportAnalysis do
   defp date_distribution(posts, pages, media) do
     combined_posts = posts ++ pages
 
-    post_counts = Enum.reduce(combined_posts, %{}, &increment_year(&1.created_at || &1.published_at, &2))
+    post_counts =
+      Enum.reduce(combined_posts, %{}, &increment_year(&1.created_at || &1.published_at, &2))
+
     media_counts = Enum.reduce(media, %{}, &increment_year(&1.created_at, &2))
 
     post_counts
@@ -325,7 +375,10 @@ defmodule BDS.ImportAnalysis do
             | total_count: existing.total_count + 1,
               usages: Map.put(existing.usages, params_key, usage),
               post_slugs:
-                if(is_binary(slug), do: MapSet.put(existing.post_slugs, slug), else: existing.post_slugs)
+                if(is_binary(slug),
+                  do: MapSet.put(existing.post_slugs, slug),
+                  else: existing.post_slugs
+                )
           }
 
           Map.put(inner_acc, name, updated)
@@ -393,9 +446,17 @@ defmodule BDS.ImportAnalysis do
 
   defp year_from(value) when is_integer(value) do
     cond do
-      value > 100_000_000_000 -> value |> DateTime.from_unix!(:millisecond) |> DateTime.shift_zone!("Etc/UTC") |> Map.get(:year)
-      value > 1_000_000_000 -> value |> DateTime.from_unix!(:second) |> Map.get(:year)
-      true -> value
+      value > 100_000_000_000 ->
+        value
+        |> DateTime.from_unix!(:millisecond)
+        |> DateTime.shift_zone!("Etc/UTC")
+        |> Map.get(:year)
+
+      value > 1_000_000_000 ->
+        value |> DateTime.from_unix!(:second) |> Map.get(:year)
+
+      true ->
+        value
     end
   rescue
     _error -> nil
@@ -405,10 +466,14 @@ defmodule BDS.ImportAnalysis do
     normalized = String.replace(value, " ", "T")
 
     case NaiveDateTime.from_iso8601(normalized) do
-      {:ok, naive} -> naive.year
+      {:ok, naive} ->
+        naive.year
+
       _other ->
         case DateTime.from_iso8601(value) do
-          {:ok, datetime, _offset} -> datetime.year
+          {:ok, datetime, _offset} ->
+            datetime.year
+
           _ ->
             case Regex.run(~r/(\d{4})/, value) do
               [_, year] -> String.to_integer(year)

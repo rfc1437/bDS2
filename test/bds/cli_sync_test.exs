@@ -38,7 +38,8 @@ defmodule BDS.CliSyncTest do
 
     :ok = Watcher.poll_now(watcher)
 
-    assert_receive {:entity_changed, %{entity: "post", entity_id: "post-1", action: :updated}}, 500
+    assert_receive {:entity_changed, %{entity: "post", entity_id: "post-1", action: :updated}},
+                   500
 
     seen_notification = Repo.get!(BDS.CliSync.Notification, notification.id)
     assert is_integer(seen_notification.seen_at)
@@ -76,7 +77,9 @@ defmodule BDS.CliSyncTest do
 
     assert {:ok, %{processed: 1, unprocessed: 1}} = CliSync.prune_notifications(now)
 
-    remaining_ids = Repo.all(from notification in BDS.CliSync.Notification, select: notification.entity_id)
+    remaining_ids =
+      Repo.all(from notification in BDS.CliSync.Notification, select: notification.entity_id)
+
     assert remaining_ids == ["fresh"]
   end
 end

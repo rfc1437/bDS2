@@ -8,7 +8,11 @@ defmodule BDS.MCP.Proposal do
 
   schema "mcp_proposals" do
     field :kind, :string
-    field :status, Ecto.Enum, values: [:pending, :accepted, :discarded, :expired], default: :pending
+
+    field :status, Ecto.Enum,
+      values: [:pending, :accepted, :discarded, :expired],
+      default: :pending
+
     field :entity_id, :string
     field :data, :map
     field :created_at, :integer
@@ -17,7 +21,9 @@ defmodule BDS.MCP.Proposal do
 
   def changeset(proposal, attrs) do
     proposal
-    |> cast(attrs, [:id, :kind, :status, :entity_id, :data, :created_at, :expires_at], empty_values: [nil])
+    |> cast(attrs, [:id, :kind, :status, :entity_id, :data, :created_at, :expires_at],
+      empty_values: [nil]
+    )
     |> validate_required([:id, :kind, :status, :entity_id, :data, :created_at, :expires_at])
     |> unique_constraint(:status, name: :mcp_proposals_entity_idx)
   end

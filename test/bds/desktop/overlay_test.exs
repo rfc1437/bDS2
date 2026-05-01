@@ -23,7 +23,9 @@ defmodule BDS.Desktop.OverlayTest do
     assert language_picker.kind == :language_picker
     assert language_picker.source_language == "en"
     assert Enum.map(language_picker.available_targets, & &1.code) == ["de", "fr"]
-    assert Enum.find(language_picker.available_targets, &(&1.code == "de")).has_existing_translation == true
+
+    assert Enum.find(language_picker.available_targets, &(&1.code == "de")).has_existing_translation ==
+             true
 
     gallery = Overlay.open(:post, :gallery, context)
 
@@ -74,15 +76,59 @@ defmodule BDS.Desktop.OverlayTest do
       current_tab: %{type: :post, id: "post-1", title: "Trip Notes", subtitle: "Draft"},
       current_post_language: "en",
       posts: [
-        %{id: "post-1", title: "Trip Notes", status: "draft", canonical_url: "/2026/04/26/trip-notes"},
-        %{id: "post-2", title: "Photo Walk", status: "published", canonical_url: "/2026/04/26/photo-walk"},
-        %{id: "post-3", title: "Travel Checklist", status: "draft", canonical_url: "/2026/04/20/travel-checklist"},
-        %{id: "post-4", title: "Packing List", status: "archived", canonical_url: "/2026/03/18/packing-list"}
+        %{
+          id: "post-1",
+          title: "Trip Notes",
+          status: "draft",
+          canonical_url: "/2026/04/26/trip-notes"
+        },
+        %{
+          id: "post-2",
+          title: "Photo Walk",
+          status: "published",
+          canonical_url: "/2026/04/26/photo-walk"
+        },
+        %{
+          id: "post-3",
+          title: "Travel Checklist",
+          status: "draft",
+          canonical_url: "/2026/04/20/travel-checklist"
+        },
+        %{
+          id: "post-4",
+          title: "Packing List",
+          status: "archived",
+          canonical_url: "/2026/03/18/packing-list"
+        }
       ],
       media: [
-        %{id: "media-1", title: "Cover Shot", original_name: "cover-shot.jpg", is_image: true, thumbnail_url: "/media-thumbnail/media-1", image_url: "/media-thumbnail/media-1?size=large", alt_text: "Cover shot"},
-        %{id: "media-2", title: "Street Scene", original_name: "street-scene.jpg", is_image: true, thumbnail_url: "/media-thumbnail/media-2", image_url: "/media-thumbnail/media-2?size=large", alt_text: "Street scene"},
-        %{id: "media-3", title: "Audio Memo", original_name: "memo.m4a", is_image: false, thumbnail_url: nil, image_url: nil, alt_text: nil}
+        %{
+          id: "media-1",
+          title: "Cover Shot",
+          original_name: "cover-shot.jpg",
+          is_image: true,
+          thumbnail_url: "/media-thumbnail/media-1",
+          image_url: "/media-thumbnail/media-1?size=large",
+          alt_text: "Cover shot"
+        },
+        %{
+          id: "media-2",
+          title: "Street Scene",
+          original_name: "street-scene.jpg",
+          is_image: true,
+          thumbnail_url: "/media-thumbnail/media-2",
+          image_url: "/media-thumbnail/media-2?size=large",
+          alt_text: "Street scene"
+        },
+        %{
+          id: "media-3",
+          title: "Audio Memo",
+          original_name: "memo.m4a",
+          is_image: false,
+          thumbnail_url: nil,
+          image_url: nil,
+          alt_text: nil
+        }
       ],
       post_media_ids: ["media-1", "media-2"],
       blog_languages: ["en", "de", "fr"],
@@ -90,9 +136,27 @@ defmodule BDS.Desktop.OverlayTest do
       language_flags: %{"en" => "GB", "de" => "DE", "fr" => "FR"},
       existing_translations: %{"de" => "draft"},
       ai_fields: [
-        %{key: "title", label: "Title", current_value: "Street Scene", suggested_value: "Street Scene at Dusk", locked: false},
-        %{key: "alt", label: "Alt Text", current_value: "", suggested_value: "Street scene at dusk", locked: false},
-        %{key: "caption", label: "Caption", current_value: "Busy corner", suggested_value: "A busy corner at dusk", locked: false}
+        %{
+          key: "title",
+          label: "Title",
+          current_value: "Street Scene",
+          suggested_value: "Street Scene at Dusk",
+          locked: false
+        },
+        %{
+          key: "alt",
+          label: "Alt Text",
+          current_value: "",
+          suggested_value: "Street scene at dusk",
+          locked: false
+        },
+        %{
+          key: "caption",
+          label: "Caption",
+          current_value: "Busy corner",
+          suggested_value: "A busy corner at dusk",
+          locked: false
+        }
       ],
       delete_details: %{
         entity_name: "Street Scene",

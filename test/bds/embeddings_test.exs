@@ -18,7 +18,9 @@ defmodule BDS.EmbeddingsTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
-    temp_dir = Path.join(System.tmp_dir!(), "bds-embeddings-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-embeddings-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
 
     on_exit(fn -> File.rm_rf(temp_dir) end)
@@ -95,12 +97,16 @@ defmodule BDS.EmbeddingsTest do
     assert {:ok, alpha} = BDS.Posts.update_post(alpha.id, %{content: "kitchen flour dough loaf"})
     assert {:ok, alpha} = BDS.Posts.publish_post(alpha.id)
 
-    assert {:ok, updated_scores} = BDS.Embeddings.compute_similarities(alpha.id, [beta.id, gamma.id])
+    assert {:ok, updated_scores} =
+             BDS.Embeddings.compute_similarities(alpha.id, [beta.id, gamma.id])
+
     assert updated_scores[gamma.id] > updated_scores[beta.id]
 
     assert {:ok, :deleted} = BDS.Posts.delete_post(gamma.id)
 
-    assert {:ok, after_delete} = BDS.Embeddings.compute_similarities(alpha.id, [beta.id, gamma.id])
+    assert {:ok, after_delete} =
+             BDS.Embeddings.compute_similarities(alpha.id, [beta.id, gamma.id])
+
     refute Map.has_key?(after_delete, gamma.id)
   end
 
@@ -315,7 +321,6 @@ defmodule BDS.EmbeddingsTest do
     assert BDS.Embeddings.index_path(project.id) =~ "/embeddings.usearch"
   end
 
-
   test "reindex_all rebuilds stored embeddings for the whole project", %{project: project} do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
@@ -349,7 +354,9 @@ defmodule BDS.EmbeddingsTest do
     assert File.exists?(BDS.Embeddings.index_path(project.id))
   end
 
-  test "sync_post refreshes snapshot drift when the embedding hash is already current", %{project: project} do
+  test "sync_post refreshes snapshot drift when the embedding hash is already current", %{
+    project: project
+  } do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
 

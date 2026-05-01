@@ -17,7 +17,9 @@ defmodule BDS.Persistence do
     value
     |> String.trim()
     |> case do
-      "" -> nil
+      "" ->
+        nil
+
       trimmed ->
         case Integer.parse(trimmed) do
           {integer, ""} -> normalize_unix_timestamp(integer)

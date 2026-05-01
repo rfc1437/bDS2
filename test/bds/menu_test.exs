@@ -53,10 +53,11 @@ defmodule BDS.MenuTest do
     assert loaded == menu
   end
 
-  test "sync_menu_from_filesystem loads canonical bDS OPML and preserves a prepended Home entry", %{
-    project: project,
-    temp_dir: temp_dir
-  } do
+  test "sync_menu_from_filesystem loads canonical bDS OPML and preserves a prepended Home entry",
+       %{
+         project: project,
+         temp_dir: temp_dir
+       } do
     meta_dir = Path.join(temp_dir, "meta")
     File.mkdir_p!(meta_dir)
 

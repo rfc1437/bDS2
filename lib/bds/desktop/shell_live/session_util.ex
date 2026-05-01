@@ -19,7 +19,9 @@ defmodule BDS.Desktop.ShellLive.SessionUtil do
     Stream.iterate(1, &(&1 + 1))
     |> Enum.find_value(fn index ->
       candidate =
-        if index == 1, do: @default_new_project_name, else: "#{@default_new_project_name} #{index}"
+        if index == 1,
+          do: @default_new_project_name,
+          else: "#{@default_new_project_name} #{index}"
 
       if MapSet.member?(existing_names, candidate), do: nil, else: candidate
     end)

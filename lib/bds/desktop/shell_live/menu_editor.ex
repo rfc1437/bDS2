@@ -4,6 +4,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
   use Phoenix.Component
 
   alias BDS.Desktop.ShellData
+
   alias BDS.Desktop.ShellLive.MenuEditor.{
     DraftManagement,
     PageCategory,
@@ -12,8 +13,9 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     TreePredicates
   }
 
-  embed_templates "menu_editor_html/*"
+  embed_templates("menu_editor_html/*")
 
+  @spec assign_socket(term()) :: term()
   def assign_socket(socket) do
     case socket.assigns[:current_tab] do
       %{type: :menu_editor, id: tab_id} ->
@@ -36,12 +38,14 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     end
   end
 
+  @spec select_item(term(), term(), term()) :: term()
   def select_item(socket, item_id, reload) do
     socket
     |> State.update_state(fn state -> %{state | selected_id: item_id} end)
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec change_entry(term(), term(), term()) :: term()
   def change_entry(socket, params, reload) do
     query = Map.get(params, "query", "")
 
@@ -50,6 +54,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec submit_entry(term(), term()) :: term()
   def submit_entry(socket, reload) do
     case DraftManagement.current_draft(socket.assigns) do
       %{type: :page} ->
@@ -67,12 +72,14 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     end
   end
 
+  @spec cancel_entry(term(), term()) :: term()
   def cancel_entry(socket, reload) do
     socket
     |> State.update_state(&DraftManagement.cancel_draft/1)
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec select_page(term(), term(), term()) :: term()
   def select_page(socket, post_id, reload) do
     case PageCategory.page_post(socket.assigns.projects.active_project_id, post_id) do
       nil ->
@@ -85,6 +92,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     end
   end
 
+  @spec select_category(term(), term(), term()) :: term()
   def select_category(socket, name, reload) do
     project_id = socket.assigns.projects.active_project_id
 
@@ -99,6 +107,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     end
   end
 
+  @spec toolbar_action(term(), term(), term(), term()) :: term()
   def toolbar_action(socket, action, reload, append_output) do
     case action do
       "add-entry" ->
@@ -144,12 +153,14 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     end
   end
 
+  @spec drop_item(term(), term(), term(), term(), term()) :: term()
   def drop_item(socket, drag_item_id, target_item_id, position, reload) do
     socket
     |> State.update_state(&TreeOps.drop_selected(&1, drag_item_id, target_item_id, position))
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec handle_keydown(term(), term(), term()) :: term()
   def handle_keydown(socket, "Escape", reload) do
     cancel_entry(socket, reload)
   end
@@ -158,14 +169,16 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     reload.(socket, socket.assigns.workbench)
   end
 
-  attr :menu_editor, :map, required: true
+  attr(:menu_editor, :map, required: true)
 
+  @spec menu_editor(term()) :: term()
   def menu_editor(assigns)
 
-  attr :items, :list, required: true
-  attr :menu_editor, :map, required: true
-  attr :depth, :integer, required: true
+  attr(:items, :list, required: true)
+  attr(:menu_editor, :map, required: true)
+  attr(:depth, :integer, required: true)
 
+  @spec menu_tree_level(term()) :: term()
   def menu_tree_level(assigns) do
     ~H"""
     <%= for item <- @items do %>
@@ -289,8 +302,9 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     """
   end
 
-  attr :kind, :atom, required: true
+  attr(:kind, :atom, required: true)
 
+  @spec kind_icon(term()) :: term()
   def kind_icon(assigns) do
     ~H"""
     <%= case @kind do %>
@@ -306,9 +320,11 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     """
   end
 
+  @spec translated(term(), term()) :: term()
   def translated(text, bindings \\ %{}),
     do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
+  @spec row_label(term(), term()) :: term()
   def row_label(item, category_titles) do
     if item.kind == :category_archive do
       Map.get(category_titles || %{}, item.slug, item.label)
@@ -317,6 +333,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     end
   end
 
+  @spec kind_label(term()) :: term()
   def kind_label(:home), do: translated("menuEditor.type.home")
   def kind_label(:page), do: translated("menuEditor.type.page")
   def kind_label(:category_archive), do: translated("menuEditor.type.categoryArchive")
@@ -324,12 +341,17 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
   defdelegate draft_item?(menu_editor, item_id), to: TreePredicates
 
+  @spec editing_title(term()) :: term()
   def editing_title(%{draft: %{type: :category}}), do: translated("menuEditor.addCategoryArchive")
   def editing_title(_menu_editor), do: translated("menuEditor.pagePicker.title")
 
+  @spec editing_hint(term()) :: term()
   def editing_hint(%{draft: %{type: :category}}), do: translated("menuEditor.categoryPicker.hint")
   def editing_hint(_menu_editor), do: translated("menuEditor.createHint")
 
-  def editing_placeholder(%{draft: %{type: :category}}), do: translated("menuEditor.newCategoryPlaceholder")
+  @spec editing_placeholder(term()) :: term()
+  def editing_placeholder(%{draft: %{type: :category}}),
+    do: translated("menuEditor.newCategoryPlaceholder")
+
   def editing_placeholder(_menu_editor), do: translated("menuEditor.newEntryPlaceholder")
 end

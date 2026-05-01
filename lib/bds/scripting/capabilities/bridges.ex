@@ -98,7 +98,11 @@ defmodule BDS.Scripting.Capabilities.Bridges do
   end
 
   def detect_media_language(title, alt, caption, opts) do
-    text = Enum.join([string_or_nil(title) || "", string_or_nil(alt) || "", string_or_nil(caption) || ""], "\n")
+    text =
+      Enum.join(
+        [string_or_nil(title) || "", string_or_nil(alt) || "", string_or_nil(caption) || ""],
+        "\n"
+      )
 
     case AI.detect_language(text, ai_opts(opts)) do
       {:ok, %{language_code: language_code}} -> %{"success" => true, "language" => language_code}
@@ -125,7 +129,8 @@ defmodule BDS.Scripting.Capabilities.Bridges do
 
   # --- Embeddings ---
 
-  def embedding_progress(project_id), do: project_id |> Embeddings.get_indexing_progress() |> unwrap_result()
+  def embedding_progress(project_id),
+    do: project_id |> Embeddings.get_indexing_progress() |> unwrap_result()
 
   def find_similar(post_id, limit) do
     post_id
@@ -148,9 +153,21 @@ defmodule BDS.Scripting.Capabilities.Bridges do
     |> unwrap_result()
   end
 
-  def find_duplicates(project_id), do: project_id |> Embeddings.find_duplicates() |> unwrap_result()
-  def dismiss_pair(post_id_a, post_id_b), do: atom_result(Embeddings.dismiss_duplicate_pair(string_or_nil(post_id_a) || "", string_or_nil(post_id_b) || ""), :ok)
-  def index_unindexed_posts(project_id), do: project_id |> Embeddings.index_unindexed() |> unwrap_result()
+  def find_duplicates(project_id),
+    do: project_id |> Embeddings.find_duplicates() |> unwrap_result()
+
+  def dismiss_pair(post_id_a, post_id_b),
+    do:
+      atom_result(
+        Embeddings.dismiss_duplicate_pair(
+          string_or_nil(post_id_a) || "",
+          string_or_nil(post_id_b) || ""
+        ),
+        :ok
+      )
+
+  def index_unindexed_posts(project_id),
+    do: project_id |> Embeddings.index_unindexed() |> unwrap_result()
 
   # --- Opt builders ---
 

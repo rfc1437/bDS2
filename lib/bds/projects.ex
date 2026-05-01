@@ -134,7 +134,8 @@ defmodule BDS.Projects do
           sync_filesystem_metadata(project)
         end
 
-      {:error, reason} -> {:error, reason}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -166,7 +167,8 @@ defmodule BDS.Projects do
 
   @spec delete_project(String.t()) ::
           {:ok, Project.t()}
-          | {:error, :not_found | :cannot_delete_default_project | :cannot_delete_active_project | term()}
+          | {:error,
+             :not_found | :cannot_delete_default_project | :cannot_delete_active_project | term()}
   def delete_project(project_id) when is_binary(project_id) do
     case Repo.get(Project, project_id) do
       nil ->
@@ -180,7 +182,9 @@ defmodule BDS.Projects do
 
       %Project{} = project ->
         internal_dir = if is_nil(project.data_path), do: project_data_dir(project), else: nil
-        cleanup_dirs = [internal_dir, project_cache_dir(project)] |> Enum.filter(&is_binary/1) |> Enum.uniq()
+
+        cleanup_dirs =
+          [internal_dir, project_cache_dir(project)] |> Enum.filter(&is_binary/1) |> Enum.uniq()
 
         Repo.transaction(fn ->
           Repo.delete!(project)

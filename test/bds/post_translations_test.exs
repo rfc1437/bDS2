@@ -23,7 +23,12 @@ defmodule BDS.PostTranslationsTest do
                "excerpt" => "Kurze Zusammenfassung",
                "content" => "# Hallo Welt\n\nUbersetzter Inhalt"
              },
-             usage: %{input_tokens: 22, output_tokens: 14, cache_read_tokens: 0, cache_write_tokens: 0}
+             usage: %{
+               input_tokens: 22,
+               output_tokens: 14,
+               cache_read_tokens: 0,
+               cache_write_tokens: 0
+             }
            }}
 
         :translate_media ->
@@ -34,7 +39,12 @@ defmodule BDS.PostTranslationsTest do
                "alt" => "Medien Alt",
                "caption" => "Medien Beschriftung"
              },
-             usage: %{input_tokens: 12, output_tokens: 10, cache_read_tokens: 0, cache_write_tokens: 0}
+             usage: %{
+               input_tokens: 12,
+               output_tokens: 10,
+               cache_read_tokens: 0,
+               cache_write_tokens: 0
+             }
            }}
       end
     end
@@ -123,8 +133,9 @@ defmodule BDS.PostTranslationsTest do
     reopened_source = Posts.get_post!(post.id)
     assert reopened_source.status == :draft
     assert reopened_source.content == "Hello world"
+
     assert reopened_source.file_path ==
-         String.replace_suffix(published_translation.file_path, ".de.md", ".md")
+             String.replace_suffix(published_translation.file_path, ".de.md", ".md")
 
     assert {:ok, :deleted} = Posts.delete_post_translation(reopened_translation.id)
     refute File.exists?(translation_path)
@@ -307,7 +318,7 @@ defmodule BDS.PostTranslationsTest do
                  url: "https://api.example.test/v1",
                  api_key: "online-secret",
                  model: "gpt-4o-mini"
-                }
+               }
              )
 
     assert :ok = AI.set_airplane_mode(false)

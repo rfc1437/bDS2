@@ -40,7 +40,13 @@ defmodule BDS.Generation.Data do
       post_snapshot_candidates
       |> Enum.with_index(1)
       |> Enum.reduce(%{}, fn {post, index}, acc ->
-        :ok = report_snapshot_stage_progress(on_snapshot_progress, :posts, index, length(post_snapshot_candidates))
+        :ok =
+          report_snapshot_stage_progress(
+            on_snapshot_progress,
+            :posts,
+            index,
+            length(post_snapshot_candidates)
+          )
 
         case published_post_snapshot(project_data_dir, post) do
           nil -> acc
@@ -54,7 +60,9 @@ defmodule BDS.Generation.Data do
       |> then(fn published ->
         draft_candidates
         |> merge_generation_snapshots(snapshots_by_id)
-        |> Enum.reduce(Map.new(published, &{&1.id, &1}), fn post, acc -> Map.put(acc, post.id, post) end)
+        |> Enum.reduce(Map.new(published, &{&1.id, &1}), fn post, acc ->
+          Map.put(acc, post.id, post)
+        end)
         |> Map.values()
       end)
       |> Enum.sort_by(&{-(&1.created_at || 0), -(&1.published_at || 0), to_string(&1.slug)})
@@ -100,7 +108,12 @@ defmodule BDS.Generation.Data do
   end
 
   @spec resolve_posts_for_language([map()], String.t() | nil, map(), String.t() | nil) :: [map()]
-  def resolve_posts_for_language(posts, target_language, translations_by_post_language, main_language) do
+  def resolve_posts_for_language(
+        posts,
+        target_language,
+        translations_by_post_language,
+        main_language
+      ) do
     target = String.downcase(to_string(target_language || ""))
     main = String.downcase(to_string(main_language || ""))
 
@@ -126,22 +139,42 @@ defmodule BDS.Generation.Data do
 
   @spec build_generation_post_index([map()]) :: map()
   def build_generation_post_index(posts) do
-    Enum.reduce(posts, %{posts_by_category: %{}, posts_by_tag: %{}, posts_by_year: %{}, posts_by_year_month: %{}, posts_by_year_month_day: %{}}, fn post, acc ->
-      {year, month_value, day_value} = local_date_parts!(post.created_at)
-      month = String.pad_leading(Integer.to_string(month_value), 2, "0")
-      day = String.pad_leading(Integer.to_string(day_value), 2, "0")
-      year_month = "#{year}/#{month}"
-      year_month_day = "#{year}/#{month}/#{day}"
+    Enum.reduce(
+      posts,
+      %{
+        posts_by_category: %{},
+        posts_by_tag: %{},
+        posts_by_year: %{},
+        posts_by_year_month: %{},
+        posts_by_year_month_day: %{}
+      },
+      fn post, acc ->
+        {year, month_value, day_value} = local_date_parts!(post.created_at)
+        month = String.pad_leading(Integer.to_string(month_value), 2, "0")
+        day = String.pad_leading(Integer.to_string(day_value), 2, "0")
+        year_month = "#{year}/#{month}"
+        year_month_day = "#{year}/#{month}/#{day}"
 
-      acc
-      |> append_generation_index(:posts_by_year, year, post)
-      |> append_generation_index(:posts_by_year_month, year_month, post)
-      |> append_generation_index(:posts_by_year_month_day, year_month_day, post)
-      |> then(fn indexed ->
-        indexed = Enum.reduce(post.categories || [], indexed, &append_generation_index(&2, :posts_by_category, &1, post))
-        Enum.reduce(post.tags || [], indexed, &append_generation_index(&2, :posts_by_tag, &1, post))
-      end)
-    end)
+        acc
+        |> append_generation_index(:posts_by_year, year, post)
+        |> append_generation_index(:posts_by_year_month, year_month, post)
+        |> append_generation_index(:posts_by_year_month_day, year_month_day, post)
+        |> then(fn indexed ->
+          indexed =
+            Enum.reduce(
+              post.categories || [],
+              indexed,
+              &append_generation_index(&2, :posts_by_category, &1, post)
+            )
+
+          Enum.reduce(
+            post.tags || [],
+            indexed,
+            &append_generation_index(&2, :posts_by_tag, &1, post)
+          )
+        end)
+      end
+    )
   end
 
   ## --- internals -----------------------------------------------------------
@@ -168,9 +201,11 @@ defmodule BDS.Generation.Data do
       "page" => %{render_in_lists: false, show_title: true}
     }
 
-    Enum.reduce(Map.get(plan, :category_settings, %{}) || %{}, defaults, fn {category, settings}, acc ->
+    Enum.reduce(Map.get(plan, :category_settings, %{}) || %{}, defaults, fn {category, settings},
+                                                                            acc ->
       Map.put(acc, category, %{
-        render_in_lists: category_setting_flag(settings, :render_in_lists, "render_in_lists", true),
+        render_in_lists:
+          category_setting_flag(settings, :render_in_lists, "render_in_lists", true),
         show_title: category_setting_flag(settings, :show_title, "show_title", true)
       })
     end)
@@ -207,23 +242,30 @@ defmodule BDS.Generation.Data do
       {:ok, contents} ->
         {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
 
-        %Post{fallback_post |
-          id: DocumentFields.get(fields, "id", fallback_post.id),
-          title: DocumentFields.get(fields, "title", fallback_post.title) || "",
-          slug: DocumentFields.fetch!(fields, "slug"),
-          excerpt: Map.get(fields, "excerpt"),
-          content: nil,
-          status: :published,
-          author: Map.get(fields, "author"),
-          language: Map.get(fields, "language", fallback_post.language),
-          do_not_translate: DocumentFields.get(fields, "doNotTranslate", fallback_post.do_not_translate || false),
-          template_slug: DocumentFields.get(fields, "templateSlug", fallback_post.template_slug),
-          created_at: DocumentFields.get(fields, "createdAt", fallback_post.created_at),
-          updated_at: DocumentFields.get(fields, "updatedAt", fallback_post.updated_at),
-          published_at: DocumentFields.get(fields, "publishedAt", fallback_post.published_at),
-          file_path: fallback_post.file_path,
-          tags: Map.get(fields, "tags", fallback_post.tags || []),
-          categories: Map.get(fields, "categories", fallback_post.categories || [])
+        %Post{
+          fallback_post
+          | id: DocumentFields.get(fields, "id", fallback_post.id),
+            title: DocumentFields.get(fields, "title", fallback_post.title) || "",
+            slug: DocumentFields.fetch!(fields, "slug"),
+            excerpt: Map.get(fields, "excerpt"),
+            content: nil,
+            status: :published,
+            author: Map.get(fields, "author"),
+            language: Map.get(fields, "language", fallback_post.language),
+            do_not_translate:
+              DocumentFields.get(
+                fields,
+                "doNotTranslate",
+                fallback_post.do_not_translate || false
+              ),
+            template_slug:
+              DocumentFields.get(fields, "templateSlug", fallback_post.template_slug),
+            created_at: DocumentFields.get(fields, "createdAt", fallback_post.created_at),
+            updated_at: DocumentFields.get(fields, "updatedAt", fallback_post.updated_at),
+            published_at: DocumentFields.get(fields, "publishedAt", fallback_post.published_at),
+            file_path: fallback_post.file_path,
+            tags: Map.get(fields, "tags", fallback_post.tags || []),
+            categories: Map.get(fields, "categories", fallback_post.categories || [])
         }
 
       {:error, _reason} ->
@@ -231,13 +273,20 @@ defmodule BDS.Generation.Data do
     end
   end
 
-  defp build_generation_route_posts(project_id, project_data_dir, published_posts, on_snapshot_progress) do
+  defp build_generation_route_posts(
+         project_id,
+         project_data_dir,
+         published_posts,
+         on_snapshot_progress
+       ) do
     source_post_ids = Enum.map(published_posts, & &1.id)
 
     translation_candidates =
       Repo.all(
         from translation in Translation,
-          where: translation.project_id == ^project_id and translation.translation_for in ^source_post_ids,
+          where:
+            translation.project_id == ^project_id and
+              translation.translation_for in ^source_post_ids,
           where: translation.status in [:published, :draft],
           order_by: [asc: translation.translation_for, asc: translation.language]
       )
@@ -246,7 +295,13 @@ defmodule BDS.Generation.Data do
       translation_candidates
       |> Enum.with_index(1)
       |> Enum.reduce(%{}, fn {translation, index}, acc ->
-        :ok = report_snapshot_stage_progress(on_snapshot_progress, :translations, index, length(translation_candidates))
+        :ok =
+          report_snapshot_stage_progress(
+            on_snapshot_progress,
+            :translations,
+            index,
+            length(translation_candidates)
+          )
 
         case published_translation_snapshot(project_data_dir, translation) do
           nil -> acc
@@ -288,18 +343,20 @@ defmodule BDS.Generation.Data do
       {:ok, contents} ->
         {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
 
-        %Translation{fallback_translation |
-          id: DocumentFields.get(fields, "id", fallback_translation.id),
-          translation_for: DocumentFields.fetch!(fields, "translationFor"),
-          language: DocumentFields.fetch!(fields, "language"),
-          title: DocumentFields.get(fields, "title", fallback_translation.title) || "",
-          excerpt: Map.get(fields, "excerpt", fallback_translation.excerpt),
-          content: nil,
-          status: :published,
-          created_at: DocumentFields.get(fields, "createdAt", fallback_translation.created_at),
-          updated_at: DocumentFields.get(fields, "updatedAt", fallback_translation.updated_at),
-          published_at: DocumentFields.get(fields, "publishedAt", fallback_translation.published_at),
-          file_path: fallback_translation.file_path
+        %Translation{
+          fallback_translation
+          | id: DocumentFields.get(fields, "id", fallback_translation.id),
+            translation_for: DocumentFields.fetch!(fields, "translationFor"),
+            language: DocumentFields.fetch!(fields, "language"),
+            title: DocumentFields.get(fields, "title", fallback_translation.title) || "",
+            excerpt: Map.get(fields, "excerpt", fallback_translation.excerpt),
+            content: nil,
+            status: :published,
+            created_at: DocumentFields.get(fields, "createdAt", fallback_translation.created_at),
+            updated_at: DocumentFields.get(fields, "updatedAt", fallback_translation.updated_at),
+            published_at:
+              DocumentFields.get(fields, "publishedAt", fallback_translation.published_at),
+            file_path: fallback_translation.file_path
         }
 
       {:error, _reason} ->

@@ -210,8 +210,15 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
   defp related_posts(links, key) do
     Enum.map(links, fn link ->
       case Posts.get_post(Map.fetch!(link, key)) do
-        %Post{} = post -> %{id: post.id, title: post.title || post.slug || post.id, text: link.link_text || post.slug || post.id}
-        _other -> nil
+        %Post{} = post ->
+          %{
+            id: post.id,
+            title: post.title || post.slug || post.id,
+            text: link.link_text || post.slug || post.id
+          }
+
+        _other ->
+          nil
       end
     end)
     |> Enum.reject(&is_nil/1)
@@ -232,15 +239,22 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
 
   defp git_history_target(%{type: :post, id: post_id}) do
     case Posts.get_post(post_id) do
-      %Post{project_id: project_id, file_path: file_path} when file_path not in [nil, ""] -> {project_id, file_path}
-      _other -> nil
+      %Post{project_id: project_id, file_path: file_path} when file_path not in [nil, ""] ->
+        {project_id, file_path}
+
+      _other ->
+        nil
     end
   end
 
   defp git_history_target(%{type: :media, id: media_id}) do
     case Media.get_media(media_id) do
-      %MediaRecord{project_id: project_id, file_path: file_path} when file_path not in [nil, ""] -> {project_id, file_path}
-      _other -> nil
+      %MediaRecord{project_id: project_id, file_path: file_path}
+      when file_path not in [nil, ""] ->
+        {project_id, file_path}
+
+      _other ->
+        nil
     end
   end
 
@@ -287,5 +301,6 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
 
   defp present?(value), do: value not in [nil, ""]
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  defp translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

@@ -87,7 +87,10 @@ defmodule BDS.Maintenance.DiffComputation do
   end
 
   def normalize_nested_diff_value(value) when is_map(value), do: normalize_map_diff_values(value)
-  def normalize_nested_diff_value(value) when is_list(value), do: Enum.map(value, &normalize_nested_diff_value/1)
+
+  def normalize_nested_diff_value(value) when is_list(value),
+    do: Enum.map(value, &normalize_nested_diff_value/1)
+
   def normalize_nested_diff_value(value) when is_atom(value), do: Atom.to_string(value)
   def normalize_nested_diff_value(value), do: value
 end

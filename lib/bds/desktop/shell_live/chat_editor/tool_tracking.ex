@@ -3,10 +3,12 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
 
   @tool_args_max_length 30
 
+  @spec tool_call_name(term()) :: term()
   def tool_call_name(tool_call) when is_map(tool_call) do
     BDS.MapUtils.attr(tool_call, :name) || "tool"
   end
 
+  @spec tool_call_arguments(term()) :: term()
   def tool_call_arguments(tool_call) when is_map(tool_call) do
     BDS.MapUtils.attr(tool_call, :arguments) || BDS.MapUtils.attr(tool_call, :args) || %{}
   end
@@ -25,6 +27,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
     end)
   end
 
+  @spec normalize_tool_calls(term()) :: term()
   def normalize_tool_calls(_tool_calls), do: []
 
   def tool_arguments_preview(arguments) when is_map(arguments) do
@@ -33,6 +36,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
     |> Enum.join(", ")
   end
 
+  @spec tool_arguments_preview(term()) :: term()
   def tool_arguments_preview(_arguments), do: ""
 
   def mark_tool_call_completed(entry, tool_call_id) when is_binary(tool_call_id) do
@@ -47,8 +51,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
     end)
   end
 
+  @spec mark_tool_call_completed(term(), term()) :: term()
   def mark_tool_call_completed(entry, _tool_call_id), do: entry
 
+  @spec tool_markers_from_events(term()) :: term()
   def tool_markers_from_events(nil), do: []
 
   def tool_markers_from_events(%{tool_events: tool_events}) do

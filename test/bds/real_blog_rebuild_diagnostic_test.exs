@@ -53,7 +53,9 @@ defmodule BDS.RealBlogRebuildDiagnosticTest do
       assert task.status == :completed
     end
 
-    test "rebuilds posts from the external real blog path twice in the same project", %{project: project} do
+    test "rebuilds posts from the external real blog path twice in the same project", %{
+      project: project
+    } do
       assert {:ok, _posts} = BDS.Maintenance.rebuild_from_filesystem(project.id, "post")
       assert {:ok, _posts} = BDS.Maintenance.rebuild_from_filesystem(project.id, "post")
     end

@@ -117,7 +117,9 @@ defmodule BDS.Frontmatter do
 
   defp take_block_scalar_lines([line | rest], lines) do
     if String.starts_with?(line, @block_scalar_indent) do
-      take_block_scalar_lines(rest, [String.replace_prefix(line, @block_scalar_indent, "") | lines])
+      take_block_scalar_lines(rest, [
+        String.replace_prefix(line, @block_scalar_indent, "") | lines
+      ])
     else
       {Enum.reverse(lines), [line | rest]}
     end

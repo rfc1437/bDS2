@@ -20,10 +20,12 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     :git_diff
   ]
 
+  @spec assign_socket(term()) :: term()
   def assign_socket(socket) do
     assign(socket, :misc_editor, build(socket.assigns))
   end
 
+  @spec rerun(term()) :: term()
   def rerun(socket) do
     case meta(socket.assigns) do
       %{action: action} when is_binary(action) ->
@@ -37,6 +39,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
+  @spec apply_site_validation(term(), term()) :: term()
   def apply_site_validation(socket, append_output) do
     meta = meta(socket.assigns)
     payload = Map.get(meta, :payload, %{})
@@ -68,6 +71,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
        append_output.(socket, translated("Site Validation"), inspect(error), nil, "error")}
   end
 
+  @spec toggle_duplicate(term(), term(), term()) :: term()
   def toggle_duplicate(socket, pair_id, reload) do
     selected_by_tab = Map.get(socket.assigns, :misc_editor_selected_pairs, %{})
     current = Map.get(selected_by_tab, socket.assigns.current_tab.id, MapSet.new())
@@ -87,6 +91,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec dismiss_duplicate(term(), term(), term(), term(), term()) :: term()
   def dismiss_duplicate(socket, post_id_a, post_id_b, reload, append_output) do
     case Embeddings.dismiss_duplicate_pair(post_id_a, post_id_b) do
       {:ok, _saved_pair} ->
@@ -109,6 +114,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
+  @spec dismiss_selected(term(), term(), term()) :: term()
   def dismiss_selected(socket, reload, append_output) do
     tab_id = socket.assigns.current_tab.id
 
@@ -141,6 +147,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
+  @spec fix_translation_validation(term(), term()) :: term()
   def fix_translation_validation(socket, append_output) do
     report =
       socket.assigns
@@ -166,6 +173,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
        append_output.(socket, translated("Translation Validation"), inspect(error), nil, "error")}
   end
 
+  @spec select_git_diff_file(term(), term()) :: term()
   def select_git_diff_file(socket, file_path) do
     assign(
       socket,
@@ -178,6 +186,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     )
   end
 
+  @spec metadata_diff_repair_request(term(), term(), term()) :: term()
   def metadata_diff_repair_request(socket, field, direction) do
     meta = meta(socket.assigns)
     payload = Map.get(meta, :payload, %{})
@@ -209,6 +218,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
+  @spec metadata_diff_orphan_import_request(term()) :: term()
   def metadata_diff_orphan_import_request(socket) do
     meta = meta(socket.assigns)
     payload = Map.get(meta, :payload, %{})
@@ -232,6 +242,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
+  @spec build(term()) :: term()
   def build(%{current_tab: %{type: type}} = assigns) when type in @misc_routes do
     meta = meta(assigns)
     payload = Map.get(meta, :payload, %{})
@@ -245,11 +256,14 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
+  @spec build(term()) :: term()
   def build(_assigns), do: nil
 
+  @spec translated(term(), term()) :: term()
   def translated(text, bindings \\ %{}),
     do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
+  @spec misc_class(term()) :: term()
   def misc_class(:site_validation), do: "site-validation-view"
   def misc_class(:metadata_diff), do: "metadata-diff-view"
   def misc_class(:translation_validation), do: "translation-validation-view"
@@ -257,10 +271,13 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   def misc_class(:git_diff), do: "git-diff-view"
 
   def summary_items(%{summary: summary}) when is_map(summary), do: Enum.to_list(summary)
+  @spec summary_items(term()) :: term()
   def summary_items(_misc), do: []
 
+  @spec duplicate_checked?(term(), term()) :: term()
   def duplicate_checked?(misc, pair_id), do: MapSet.member?(misc.selected_pairs, pair_id)
 
+  @spec pair_id_from_pair(term()) :: term()
   def pair_id_from_pair(pair), do: pair_identity(pair)
 
   defp build_site_validation(meta, payload) do
@@ -410,6 +427,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     }
   end
 
+  @spec translation_issue_label(term()) :: term()
   def translation_issue_label(issue) do
     case issue_value(issue, :issue) do
       "same-language-as-canonical" ->
@@ -426,6 +444,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
+  @spec translation_issue_languages(term()) :: term()
   def translation_issue_languages(issue) do
     canonical_language = issue_value(issue, :canonical_language)
     translation_language = issue_value(issue, :translation_language)
@@ -440,8 +459,10 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
+  @spec translation_issue_value(term(), term()) :: term()
   def translation_issue_value(issue, key), do: issue_value(issue, key)
 
+  @spec git_diff_language(term()) :: term()
   def git_diff_language(nil), do: "plaintext"
 
   def git_diff_language(file_path) do

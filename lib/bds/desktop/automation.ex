@@ -107,7 +107,9 @@ defmodule BDS.Desktop.Automation do
   end
 
   def handle_call({:native_menu_action, action}, _from, state) do
-    {reply, state} = driver_request(state, %{"command" => "native_menu_action", "action" => action})
+    {reply, state} =
+      driver_request(state, %{"command" => "native_menu_action", "action" => action})
+
     {:reply, normalize_simple_reply(reply), state}
   end
 
@@ -204,7 +206,9 @@ defmodule BDS.Desktop.Automation do
 
     receive_driver_message(state, @request_timeout, fn message ->
       case message do
-        %{"ref" => ^ref, "status" => "ok", "result" => result} -> {:ok, result}
+        %{"ref" => ^ref, "status" => "ok", "result" => result} ->
+          {:ok, result}
+
         %{"ref" => ^ref, "status" => "error", "message" => reason} ->
           raise "desktop automation request failed: #{reason}"
 
@@ -242,7 +246,8 @@ defmodule BDS.Desktop.Automation do
   defp process_driver_messages(state, deadline, matcher) do
     {messages, buffer} = split_driver_buffer(state.driver_buffer)
 
-    case Enum.reduce_while(messages, {%{state | driver_buffer: buffer}, nil}, fn message, {acc, _} ->
+    case Enum.reduce_while(messages, {%{state | driver_buffer: buffer}, nil}, fn message,
+                                                                                 {acc, _} ->
            case decode_driver_message(message) do
              :skip ->
                {:cont, {acc, nil}}
@@ -259,7 +264,11 @@ defmodule BDS.Desktop.Automation do
 
         receive do
           {port, {:data, data}} when port == state.driver_port ->
-            process_driver_messages(%{state | driver_buffer: state.driver_buffer <> data}, deadline, matcher)
+            process_driver_messages(
+              %{state | driver_buffer: state.driver_buffer <> data},
+              deadline,
+              matcher
+            )
 
           {port, {:exit_status, status}} when port == state.driver_port ->
             raise "desktop automation driver exited with status #{status}"
@@ -311,7 +320,9 @@ defmodule BDS.Desktop.Automation do
 
   defp do_wait_for_server(base_url, deadline) do
     case :httpc.request(:get, {String.to_charlist(base_url <> "health"), []}, [], []) do
-      {:ok, {{_, 200, _}, _headers, _body}} -> :ok
+      {:ok, {{_, 200, _}, _headers, _body}} ->
+        :ok
+
       _other ->
         if System.monotonic_time(:millisecond) >= deadline do
           raise "desktop app process did not become healthy in time"

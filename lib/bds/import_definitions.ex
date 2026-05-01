@@ -39,7 +39,10 @@ defmodule BDS.ImportDefinitions do
           |> maybe_put(:name, attr(attrs, :name))
           |> maybe_put(:wxr_file_path, attr(attrs, :wxr_file_path))
           |> maybe_put(:uploads_folder_path, attr(attrs, :uploads_folder_path))
-          |> maybe_put(:last_analysis_result, normalize_analysis_result(attr(attrs, :last_analysis_result)))
+          |> maybe_put(
+            :last_analysis_result,
+            normalize_analysis_result(attr(attrs, :last_analysis_result))
+          )
           |> Map.put(:updated_at, Persistence.now_ms())
 
         definition
@@ -50,7 +53,9 @@ defmodule BDS.ImportDefinitions do
 
   def delete_definition(definition_id) when is_binary(definition_id) do
     case Repo.get(ImportDefinition, definition_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       %ImportDefinition{} = definition ->
         Repo.delete(definition)
         |> case do
@@ -60,7 +65,8 @@ defmodule BDS.ImportDefinitions do
     end
   end
 
-  def decode_analysis_result(%ImportDefinition{last_analysis_result: result}), do: decode_analysis_result(result)
+  def decode_analysis_result(%ImportDefinition{last_analysis_result: result}),
+    do: decode_analysis_result(result)
 
   def decode_analysis_result(result) when is_binary(result) do
     case Jason.decode(result) do

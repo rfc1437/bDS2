@@ -8,7 +8,8 @@ defmodule BDS.ImportExecution do
   alias BDS.Repo
   alias BDS.Tags
 
-  def execute_import(project_id, report, opts \\ []) when is_binary(project_id) and is_map(report) do
+  def execute_import(project_id, report, opts \\ [])
+      when is_binary(project_id) and is_map(report) do
     normalized_report = normalize_report(report)
     default_author = Keyword.get(opts, :default_author) || project_default_author(project_id)
     uploads_folder_path = Keyword.get(opts, :uploads_folder_path)
@@ -42,16 +43,52 @@ defmodule BDS.ImportExecution do
     started_at = System.monotonic_time(:millisecond)
 
     notify_progress(on_progress, "tags", 0, taxonomy_total, "creating_tags", started_at)
-    result = execute_taxonomies(category_items, tag_items, project_id, result, on_progress, started_at)
+
+    result =
+      execute_taxonomies(category_items, tag_items, project_id, result, on_progress, started_at)
 
     notify_progress(on_progress, "posts", 0, length(post_items), "importing_posts", started_at)
-    result = execute_posts(post_items, project_id, default_author, tag_mapping, category_mapping, result, on_progress, :posts, started_at)
+
+    result =
+      execute_posts(
+        post_items,
+        project_id,
+        default_author,
+        tag_mapping,
+        category_mapping,
+        result,
+        on_progress,
+        :posts,
+        started_at
+      )
 
     notify_progress(on_progress, "media", 0, length(media_items), "importing_media", started_at)
-    result = execute_media(media_items, project_id, default_author, result, on_progress, uploads_folder_path, started_at)
+
+    result =
+      execute_media(
+        media_items,
+        project_id,
+        default_author,
+        result,
+        on_progress,
+        uploads_folder_path,
+        started_at
+      )
 
     notify_progress(on_progress, "pages", 0, length(page_items), "importing_pages", started_at)
-    result = execute_posts(page_items, project_id, default_author, tag_mapping, category_mapping, result, on_progress, :pages, started_at)
+
+    result =
+      execute_posts(
+        page_items,
+        project_id,
+        default_author,
+        tag_mapping,
+        category_mapping,
+        result,
+        on_progress,
+        :pages,
+        started_at
+      )
 
     notify_progress(on_progress, "complete", 1, 1, "import_complete", started_at)
     {:ok, result}
@@ -68,41 +105,99 @@ defmodule BDS.ImportExecution do
     |> Enum.reduce(result, fn {item, index}, acc ->
       cond do
         Map.get(item, :exists_in_project) || not is_nil(Map.get(item, :mapped_to)) ->
-          notify_progress(on_progress, "tags", index, total, "skipped_tag:#{item.name}", started_at)
+          notify_progress(
+            on_progress,
+            "tags",
+            index,
+            total,
+            "skipped_tag:#{item.name}",
+            started_at
+          )
+
           put_in(acc, [:tags, :skipped], acc.tags.skipped + 1)
 
         true ->
           case Tags.create_tag(%{project_id: project_id, name: item.name}) do
             {:ok, _tag} ->
-              notify_progress(on_progress, "tags", index, total, "created_tag:#{item.name}", started_at)
+              notify_progress(
+                on_progress,
+                "tags",
+                index,
+                total,
+                "created_tag:#{item.name}",
+                started_at
+              )
+
               put_in(acc, [:tags, :created], acc.tags.created + 1)
 
             {:error, _reason} ->
-              notify_progress(on_progress, "tags", index, total, "skipped_tag:#{item.name}", started_at)
+              notify_progress(
+                on_progress,
+                "tags",
+                index,
+                total,
+                "skipped_tag:#{item.name}",
+                started_at
+              )
+
               put_in(acc, [:tags, :skipped], acc.tags.skipped + 1)
           end
       end
     end)
   end
 
-  defp execute_posts(items, project_id, default_author, tag_mapping, category_mapping, result, on_progress, bucket, started_at) do
+  defp execute_posts(
+         items,
+         project_id,
+         default_author,
+         tag_mapping,
+         category_mapping,
+         result,
+         on_progress,
+         bucket,
+         started_at
+       ) do
     total = length(items)
     phase = Atom.to_string(bucket)
 
     Enum.with_index(items, 1)
     |> Enum.reduce(result, fn {item, index}, acc ->
       notify_progress(on_progress, phase, index, total, "processing:#{item.title}", started_at)
-      execute_post_item(project_id, maybe_apply_page_category(item, bucket), acc, bucket, default_author, tag_mapping, category_mapping)
+
+      execute_post_item(
+        project_id,
+        maybe_apply_page_category(item, bucket),
+        acc,
+        bucket,
+        default_author,
+        tag_mapping,
+        category_mapping
+      )
     end)
   end
 
-  defp execute_media(items, project_id, default_author, result, on_progress, uploads_folder_path, started_at) do
+  defp execute_media(
+         items,
+         project_id,
+         default_author,
+         result,
+         on_progress,
+         uploads_folder_path,
+         started_at
+       ) do
     total = length(items)
 
     items
     |> Enum.with_index(1)
     |> Enum.reduce(result, fn {item, index}, acc ->
-      notify_progress(on_progress, "media", index, total, "processing:#{item.filename}", started_at)
+      notify_progress(
+        on_progress,
+        "media",
+        index,
+        total,
+        "processing:#{item.filename}",
+        started_at
+      )
 
       cond do
         item.status == "missing" ->
@@ -116,7 +211,9 @@ defmodule BDS.ImportExecution do
 
         true ->
           case import_media_item(project_id, item, default_author, uploads_folder_path, acc) do
-            {:ok, _media} -> put_in(acc, [:media, :imported], acc.media.imported + 1)
+            {:ok, _media} ->
+              put_in(acc, [:media, :imported], acc.media.imported + 1)
+
             {:error, reason} ->
               acc
               |> put_in([:media, :errors], acc.media.errors + 1)
@@ -127,7 +224,15 @@ defmodule BDS.ImportExecution do
     end)
   end
 
-  defp execute_post_item(project_id, item, result, bucket, default_author, tag_mapping, category_mapping) do
+  defp execute_post_item(
+         project_id,
+         item,
+         result,
+         bucket,
+         default_author,
+         tag_mapping,
+         category_mapping
+       ) do
     cond do
       item.status in ["update", "content-duplicate", "duplicate"] ->
         put_in(result, [bucket, :skipped], get_in(result, [bucket, :skipped]) + 1)
@@ -177,7 +282,8 @@ defmodule BDS.ImportExecution do
 
   defp overwrite_post_item(item, default_author, tag_mapping, category_mapping) do
     case Repo.get(Post, item.existing_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
 
       %Post{} = post ->
         Posts.update_post(post.id, %{
@@ -194,7 +300,13 @@ defmodule BDS.ImportExecution do
 
   defp import_media_item(project_id, item, default_author, uploads_folder_path, result) do
     source_path = item.source_file || uploads_source_path(item.relative_path, uploads_folder_path)
-    checksum = if(source_path != nil and File.exists?(source_path), do: md5(File.read!(source_path)), else: nil)
+
+    checksum =
+      if(source_path != nil and File.exists?(source_path),
+        do: md5(File.read!(source_path)),
+        else: nil
+      )
+
     linked_post_ids = parent_post_ids(item, result)
 
     if source_path && File.exists?(source_path) do
@@ -221,7 +333,10 @@ defmodule BDS.ImportExecution do
             checksum: checksum
           }
 
-          attrs = if linked_post_ids == [], do: attrs, else: Map.put(attrs, :linked_post_ids, linked_post_ids)
+          attrs =
+            if linked_post_ids == [],
+              do: attrs,
+              else: Map.put(attrs, :linked_post_ids, linked_post_ids)
 
           case Media.import_media(attrs) do
             {:ok, %{id: media_id} = media} ->
@@ -255,8 +370,12 @@ defmodule BDS.ImportExecution do
 
   defp parent_post_ids(item, result) do
     case Map.get(item, :parent_wp_id) do
-      nil -> []
-      0 -> []
+      nil ->
+        []
+
+      0 ->
+        []
+
       wp_id ->
         case Map.get(result.wp_id_to_post_id, wp_id) do
           nil -> []
@@ -265,7 +384,8 @@ defmodule BDS.ImportExecution do
     end
   end
 
-  defp track_wp_id(result, %{wp_id: wp_id}, %{id: post_id}) when is_integer(wp_id) and not is_nil(post_id) do
+  defp track_wp_id(result, %{wp_id: wp_id}, %{id: post_id})
+       when is_integer(wp_id) and not is_nil(post_id) do
     update_in(result, [:wp_id_to_post_id], &Map.put(&1, wp_id, post_id))
   end
 
@@ -333,7 +453,9 @@ defmodule BDS.ImportExecution do
   end
 
   defp maybe_apply_page_category(item, :pages) do
-    categories = (Map.get(item, :categories) || []) |> Enum.uniq() |> Enum.concat(["page"]) |> Enum.uniq()
+    categories =
+      (Map.get(item, :categories) || []) |> Enum.uniq() |> Enum.concat(["page"]) |> Enum.uniq()
+
     %{item | categories: categories}
   end
 
@@ -349,7 +471,11 @@ defmodule BDS.ImportExecution do
           true -> key
         end
 
-      Map.put(acc, key, %{resolved: resolved, needs_creation: not item.exists_in_project and not present_string?(Map.get(item, :mapped_to))})
+      Map.put(acc, key, %{
+        resolved: resolved,
+        needs_creation:
+          not item.exists_in_project and not present_string?(Map.get(item, :mapped_to))
+      })
     end)
   end
 
@@ -443,13 +569,15 @@ defmodule BDS.ImportExecution do
   defp uploads_source_path(relative_path, uploads_folder_path)
 
   defp uploads_source_path(relative_path, uploads_folder_path)
-       when is_binary(relative_path) and is_binary(uploads_folder_path) and uploads_folder_path != "" do
+       when is_binary(relative_path) and is_binary(uploads_folder_path) and
+              uploads_folder_path != "" do
     Path.join(uploads_folder_path, relative_path)
   end
 
   defp uploads_source_path(_relative_path, _uploads_folder_path), do: nil
 
-  defp notify_progress(callback, phase, current, total, detail, started_at) when is_function(callback, 4) do
+  defp notify_progress(callback, phase, current, total, detail, started_at)
+       when is_function(callback, 4) do
     eta = compute_eta(current, total, started_at)
 
     try do
@@ -466,7 +594,9 @@ defmodule BDS.ImportExecution do
     :ok
   end
 
-  defp compute_eta(current, total, started_at) when is_integer(current) and is_integer(total) and current > 0 and total > 0 and current <= total do
+  defp compute_eta(current, total, started_at)
+       when is_integer(current) and is_integer(total) and current > 0 and total > 0 and
+              current <= total do
     elapsed = System.monotonic_time(:millisecond) - started_at
     if current >= total, do: 0, else: trunc(elapsed / current * (total - current))
   end

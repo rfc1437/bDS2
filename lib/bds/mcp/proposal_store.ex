@@ -74,12 +74,15 @@ defmodule BDS.MCP.ProposalStore do
 
   defp mark_status(id, status) do
     case Repo.get(Proposal, id) do
-      nil -> nil
+      nil ->
+        nil
+
       proposal ->
         Repo.delete_all(
           from other in Proposal,
             where:
-              other.id != ^id and other.kind == ^proposal.kind and other.entity_id == ^proposal.entity_id and
+              other.id != ^id and other.kind == ^proposal.kind and
+                other.entity_id == ^proposal.entity_id and
                 other.status == ^status
         )
 
@@ -90,6 +93,7 @@ defmodule BDS.MCP.ProposalStore do
   end
 
   defp derive_entity_id(data) do
-    data["post_id"] || data["script_id"] || data["template_id"] || data["media_id"] || Ecto.UUID.generate()
+    data["post_id"] || data["script_id"] || data["template_id"] || data["media_id"] ||
+      Ecto.UUID.generate()
   end
 end

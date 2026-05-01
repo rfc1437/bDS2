@@ -132,8 +132,12 @@ defmodule BDS.RenderingTest do
 
     assert rendered_target =~ "alts=[en=#{canonical_post_href(target)}]"
     assert rendered_target =~ "[de=/de#{canonical_post_href(target)}]"
-    assert rendered_target =~ "backlinks=[linking-source=Linking Source=#{canonical_post_href(source)}]"
-    assert rendered_target =~ "incoming=[linking-source=Linking Source=#{canonical_post_href(source)}]"
+
+    assert rendered_target =~
+             "backlinks=[linking-source=Linking Source=#{canonical_post_href(source)}]"
+
+    assert rendered_target =~
+             "incoming=[linking-source=Linking Source=#{canonical_post_href(source)}]"
 
     assert {:ok, rendered_source} =
              Rendering.render_post_page(project.id, published_template.slug, %{
@@ -145,7 +149,8 @@ defmodule BDS.RenderingTest do
                template_slug: published_template.slug
              })
 
-    assert rendered_source =~ "outgoing=[linked-target=Linked Target=#{canonical_post_href(target)}]"
+    assert rendered_source =~
+             "outgoing=[linked-target=Linked Target=#{canonical_post_href(target)}]"
   end
 
   test "render_list_page exposes pagination and render_not_found_page localizes default copy", %{
@@ -311,9 +316,10 @@ defmodule BDS.RenderingTest do
     assert rendered =~ "range=1711843200-1711929600"
   end
 
-  test "render_post_page falls back to bundled starter template when the published default template file is missing", %{
-    project: project
-  } do
+  test "render_post_page falls back to bundled starter template when the published default template file is missing",
+       %{
+         project: project
+       } do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{
                public_url: "https://example.com/blog",

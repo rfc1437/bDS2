@@ -98,24 +98,25 @@ defmodule BDS.GenerationTest do
     assert {:ok, result} = BDS.Generation.generate_site(project.id, [:core])
     assert result.sections == [:core]
 
-    expected_paths = [
-      "404.html",
-      "index.html",
-      "sitemap.xml",
-      "feed.xml",
-      "atom.xml",
-      "calendar.json",
-      "pagefind/index.json",
-      "pagefind/pagefind-ui.css",
-      "pagefind/pagefind-ui.js",
-      "de/404.html",
-      "de/index.html",
-      "de/feed.xml",
-      "de/atom.xml",
-      "de/pagefind/index.json",
-      "de/pagefind/pagefind-ui.css",
-      "de/pagefind/pagefind-ui.js"
-    ] ++ Enum.map(PreviewAssets.generated_outputs(), &elem(&1, 0))
+    expected_paths =
+      [
+        "404.html",
+        "index.html",
+        "sitemap.xml",
+        "feed.xml",
+        "atom.xml",
+        "calendar.json",
+        "pagefind/index.json",
+        "pagefind/pagefind-ui.css",
+        "pagefind/pagefind-ui.js",
+        "de/404.html",
+        "de/index.html",
+        "de/feed.xml",
+        "de/atom.xml",
+        "de/pagefind/index.json",
+        "de/pagefind/pagefind-ui.css",
+        "de/pagefind/pagefind-ui.js"
+      ] ++ Enum.map(PreviewAssets.generated_outputs(), &elem(&1, 0))
 
     assert Enum.sort(Enum.map(result.generated_files, & &1.relative_path)) ==
              Enum.sort(expected_paths)
@@ -421,6 +422,7 @@ defmodule BDS.GenerationTest do
            end)
 
     assert {0.5, "Comparing sitemap to html pages..."} in events
+
     assert Enum.any?(events, fn
              {value, message}
              when is_number(value) and value > 0.5 and value < 1.0 and is_binary(message) ->
@@ -587,10 +589,11 @@ defmodule BDS.GenerationTest do
     assert not_found_html =~ "Back to preview home"
   end
 
-  test "generation starter templates render localized archive headings in each output language", %{
-    project: project,
-    temp_dir: temp_dir
-  } do
+  test "generation starter templates render localized archive headings in each output language",
+       %{
+         project: project,
+         temp_dir: temp_dir
+       } do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
                public_url: "https://example.com/blog",
@@ -646,7 +649,8 @@ defmodule BDS.GenerationTest do
              })
 
     media_source_reference =
-      "/" <> Path.join(Path.dirname(media.file_path), media.original_name) <> "?download=1#preview"
+      "/" <>
+        Path.join(Path.dirname(media.file_path), media.original_name) <> "?download=1#preview"
 
     assert {:ok, post} =
              Posts.create_post(%{
@@ -956,7 +960,8 @@ defmodule BDS.GenerationTest do
     assert {:ok, published_missing_post} = Posts.publish_post(missing_post.id)
     assert {:ok, published_updated_post} = Posts.publish_post(updated_post.id)
 
-    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
+    assert {:ok, _result} =
+             BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
 
     missing_post_path = BDS.Generation.post_output_path(published_missing_post)
     updated_post_path = BDS.Generation.post_output_path(published_updated_post)
@@ -1098,7 +1103,10 @@ defmodule BDS.GenerationTest do
              })
 
     Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^translatable_post.id),
-      set: [created_at: DateTime.to_unix(~U[2026-04-15 12:00:00Z]), updated_at: DateTime.to_unix(~U[2026-04-15 12:00:00Z])]
+      set: [
+        created_at: DateTime.to_unix(~U[2026-04-15 12:00:00Z]),
+        updated_at: DateTime.to_unix(~U[2026-04-15 12:00:00Z])
+      ]
     )
 
     assert {:ok, _published_translatable} = Posts.publish_post(translatable_post.id)
@@ -1113,7 +1121,10 @@ defmodule BDS.GenerationTest do
              })
 
     Repo.update_all(from(p in BDS.Posts.Post, where: p.id == ^do_not_translate_post.id),
-      set: [created_at: DateTime.to_unix(~U[2026-04-14 12:00:00Z]), updated_at: DateTime.to_unix(~U[2026-04-14 12:00:00Z])]
+      set: [
+        created_at: DateTime.to_unix(~U[2026-04-14 12:00:00Z]),
+        updated_at: DateTime.to_unix(~U[2026-04-14 12:00:00Z])
+      ]
     )
 
     assert {:ok, _published_do_not_translate} = Posts.publish_post(do_not_translate_post.id)
@@ -1247,7 +1258,9 @@ defmodule BDS.GenerationTest do
     )
 
     assert {:ok, _published_page} = Posts.publish_post(page_post.id)
-    assert {:ok, result} = BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
+
+    assert {:ok, result} =
+             BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
 
     relative_paths = Enum.map(result.generated_files, & &1.relative_path)
 
@@ -1260,7 +1273,11 @@ defmodule BDS.GenerationTest do
     assert File.exists?(Path.join([temp_dir, "html", "page", "2", "index.html"]))
     assert File.exists?(Path.join([temp_dir, "html", "tag", "Elixir", "page", "2", "index.html"]))
     assert File.exists?(Path.join([temp_dir, "html", "2026", "04", "15", "index.html"]))
-    assert File.exists?(Path.join([temp_dir, "html", "2026", "04", "15", "page", "2", "index.html"]))
+
+    assert File.exists?(
+             Path.join([temp_dir, "html", "2026", "04", "15", "page", "2", "index.html"])
+           )
+
     assert File.exists?(Path.join([temp_dir, "html", "about", "index.html"]))
 
     assert {:ok, report} = BDS.Generation.validate_site(project.id)
@@ -1291,7 +1308,9 @@ defmodule BDS.GenerationTest do
              })
 
     assert {:ok, published_post} = Posts.publish_post(post.id)
-    assert {:ok, _result} = BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
+
+    assert {:ok, _result} =
+             BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
 
     post_path = BDS.Generation.post_output_path(published_post)
     post_url_path = relative_path_to_url_path(post_path)

@@ -60,8 +60,11 @@ defmodule BDS.MCP.Tools do
   @spec validate_template(String.t()) :: {:ok, %{valid: boolean(), errors: [String.t()]}}
   def validate_template(source) when is_binary(source) do
     case Liquex.parse(source) do
-      {:ok, _ast} -> {:ok, %{valid: true, errors: []}}
-      {:error, reason, line} -> {:ok, %{valid: false, errors: ["#{inspect(reason)} at line #{line}"]}}
+      {:ok, _ast} ->
+        {:ok, %{valid: true, errors: []}}
+
+      {:error, reason, line} ->
+        {:ok, %{valid: false, errors: ["#{inspect(reason)} at line #{line}"]}}
     end
   end
 
@@ -276,7 +279,8 @@ defmodule BDS.MCP.Tools do
             ttl_ms: @proposal_ttl_app_ms
           )
 
-        {:ok, %{"proposal_id" => proposal.id, "current" => sanitize(media), "proposed" => changes}}
+        {:ok,
+         %{"proposal_id" => proposal.id, "current" => sanitize(media), "proposed" => changes}}
     end
   end
 

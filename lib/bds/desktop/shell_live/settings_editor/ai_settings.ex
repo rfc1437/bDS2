@@ -7,6 +7,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.SettingsEditor.EditorSettings
 
+  @spec ai_form(term()) :: term()
   def ai_form(assigns) do
     {:ok, online_endpoint} = AI.get_endpoint(:online)
     {:ok, airplane_endpoint} = AI.get_endpoint(:airplane)
@@ -30,18 +31,21 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
     }
   end
 
+  @spec endpoint_model_options(term(), term()) :: term()
   def endpoint_model_options(assigns, endpoint_key) do
     assigns
     |> Map.get(:settings_editor_endpoint_models, %{})
     |> Map.get(endpoint_key, [])
   end
 
+  @spec update_ai_draft(term(), term(), term()) :: term()
   def update_ai_draft(socket, params, reload) do
     socket
     |> assign(:settings_editor_ai_draft, normalize_ai_params(params))
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec refresh_ai_models(term(), term(), term(), term()) :: term()
   def refresh_ai_models(socket, endpoint_key, reload, append_output) do
     attrs = ai_attrs(socket.assigns)
 
@@ -65,11 +69,17 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
     end
   end
 
+  @spec save_ai(term(), term(), term()) :: term()
   def save_ai(socket, reload, append_output) do
     attrs = ai_attrs(socket.assigns)
 
     with :ok <-
-           put_endpoint_preferences(:online, attrs.online_url, attrs.online_api_key, attrs.online_chat_model),
+           put_endpoint_preferences(
+             :online,
+             attrs.online_url,
+             attrs.online_api_key,
+             attrs.online_chat_model
+           ),
          :ok <-
            put_endpoint_preferences(
              :airplane,
@@ -85,7 +95,10 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
          :ok <- maybe_put_model_preference(:airplane_chat, attrs.offline_chat_model),
          :ok <- maybe_put_model_preference(:airplane_title, attrs.offline_title_model),
          :ok <-
-           maybe_put_model_preference(:airplane_image_analysis, attrs.offline_image_analysis_model),
+           maybe_put_model_preference(
+             :airplane_image_analysis,
+             attrs.offline_image_analysis_model
+           ),
          :ok <- EditorSettings.put_global_setting("ai.system_prompt", attrs.system_prompt) do
       socket
       |> assign(:settings_editor_ai_draft, %{})
@@ -99,6 +112,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
     end
   end
 
+  @spec reset_ai_prompt(term(), term(), term()) :: term()
   def reset_ai_prompt(socket, reload, append_output) do
     case EditorSettings.put_global_setting("ai.system_prompt", "") do
       :ok ->

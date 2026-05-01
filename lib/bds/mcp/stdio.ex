@@ -9,8 +9,15 @@ defmodule BDS.MCP.Stdio do
       if line != "" do
         response =
           case Jason.decode(line) do
-            {:ok, payload} -> handle_payload(payload)
-            {:error, _reason} -> %{"jsonrpc" => "2.0", "id" => nil, "error" => %{"code" => -32700, "message" => "Parse error"}}
+            {:ok, payload} ->
+              handle_payload(payload)
+
+            {:error, _reason} ->
+              %{
+                "jsonrpc" => "2.0",
+                "id" => nil,
+                "error" => %{"code" => -32700, "message" => "Parse error"}
+              }
           end
 
         IO.write(Jason.encode!(response) <> "\n")
@@ -18,14 +25,22 @@ defmodule BDS.MCP.Stdio do
     end)
   end
 
-  defp handle_payload(%{"jsonrpc" => "2.0", "id" => id, "method" => "initialize", "params" => params}) do
+  defp handle_payload(%{
+         "jsonrpc" => "2.0",
+         "id" => id,
+         "method" => "initialize",
+         "params" => params
+       }) do
     %{
       "jsonrpc" => "2.0",
       "id" => id,
       "result" => %{
         "protocolVersion" => Map.get(params, "protocolVersion", "2025-03-26"),
         "capabilities" => %{"tools" => %{}, "resources" => %{}},
-        "serverInfo" => %{"name" => "Blogging Desktop Server", "version" => Application.spec(:bds, :vsn) |> to_string()}
+        "serverInfo" => %{
+          "name" => "Blogging Desktop Server",
+          "version" => Application.spec(:bds, :vsn) |> to_string()
+        }
       }
     }
   end
@@ -34,10 +49,26 @@ defmodule BDS.MCP.Stdio do
     %{"jsonrpc" => "2.0", "id" => id, "result" => %{"tools" => BDS.MCP.list_tools()}}
   end
 
-  defp handle_payload(%{"jsonrpc" => "2.0", "id" => id, "method" => "tools/call", "params" => %{"name" => name} = params}) do
+  defp handle_payload(%{
+         "jsonrpc" => "2.0",
+         "id" => id,
+         "method" => "tools/call",
+         "params" => %{"name" => name} = params
+       }) do
     case BDS.MCP.call_tool(name, Map.get(params, "arguments", %{})) do
-      {:ok, result} -> %{"jsonrpc" => "2.0", "id" => id, "result" => %{"content" => [%{"type" => "json", "json" => result}]}}
-      {:error, reason} -> %{"jsonrpc" => "2.0", "id" => id, "error" => %{"code" => -32000, "message" => inspect(reason)}}
+      {:ok, result} ->
+        %{
+          "jsonrpc" => "2.0",
+          "id" => id,
+          "result" => %{"content" => [%{"type" => "json", "json" => result}]}
+        }
+
+      {:error, reason} ->
+        %{
+          "jsonrpc" => "2.0",
+          "id" => id,
+          "error" => %{"code" => -32000, "message" => inspect(reason)}
+        }
     end
   end
 
@@ -45,17 +76,38 @@ defmodule BDS.MCP.Stdio do
     %{"jsonrpc" => "2.0", "id" => id, "result" => %{"resources" => BDS.MCP.list_resources()}}
   end
 
-  defp handle_payload(%{"jsonrpc" => "2.0", "id" => id, "method" => "resources/read", "params" => %{"uri" => uri}}) do
+  defp handle_payload(%{
+         "jsonrpc" => "2.0",
+         "id" => id,
+         "method" => "resources/read",
+         "params" => %{"uri" => uri}
+       }) do
     case BDS.MCP.read_resource(uri) do
       {:ok, result} ->
-        %{"jsonrpc" => "2.0", "id" => id, "result" => %{"contents" => [%{"uri" => uri, "mimeType" => "application/json", "text" => Jason.encode!(result)}]}}
+        %{
+          "jsonrpc" => "2.0",
+          "id" => id,
+          "result" => %{
+            "contents" => [
+              %{"uri" => uri, "mimeType" => "application/json", "text" => Jason.encode!(result)}
+            ]
+          }
+        }
 
       {:error, reason} ->
-        %{"jsonrpc" => "2.0", "id" => id, "error" => %{"code" => -32000, "message" => inspect(reason)}}
+        %{
+          "jsonrpc" => "2.0",
+          "id" => id,
+          "error" => %{"code" => -32000, "message" => inspect(reason)}
+        }
     end
   end
 
   defp handle_payload(%{"jsonrpc" => "2.0", "id" => id}) do
-    %{"jsonrpc" => "2.0", "id" => id, "error" => %{"code" => -32601, "message" => "Method not found"}}
+    %{
+      "jsonrpc" => "2.0",
+      "id" => id,
+      "error" => %{"code" => -32601, "message" => "Method not found"}
+    }
   end
 end

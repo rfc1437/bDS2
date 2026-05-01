@@ -3,17 +3,22 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
 
   alias BDS.{Metadata, Tags}
 
+  @spec field_key(term()) :: term()
   def field_key(:tags), do: "tags"
   def field_key(:categories), do: "categories"
 
+  @spec tag_values(term()) :: term()
   def tag_values(form), do: csv_to_list(Map.get(form, "tags", ""))
+  @spec category_values(term()) :: term()
   def category_values(form), do: csv_to_list(Map.get(form, "categories", ""))
 
+  @spec tag_suggestions(term(), term(), term()) :: term()
   def tag_suggestions(form, options, query) do
     selected = MapSet.new(tag_values(form))
     filter_suggestions(options, query, fn option -> option.name end, selected)
   end
 
+  @spec tag_chips(term(), term()) :: term()
   def tag_chips(form, options) do
     option_map = Map.new(options, fn option -> {option.name, option} end)
 
@@ -23,6 +28,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
     end)
   end
 
+  @spec category_suggestions(term(), term(), term()) :: term()
   def category_suggestions(form, options, query) do
     selected = MapSet.new(category_values(form))
     filter_suggestions(options, query, & &1, selected)
@@ -34,11 +40,14 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
     options
     |> Enum.filter(fn option ->
       label = labeler.(option)
-      not MapSet.member?(selected, label) and (query == "" or String.contains?(String.downcase(label), query))
+
+      not MapSet.member?(selected, label) and
+        (query == "" or String.contains?(String.downcase(label), query))
     end)
     |> Enum.take(8)
   end
 
+  @spec query_addable?(term(), term(), term(), term()) :: term()
   def query_addable?(query, selected_values, options, labeler) do
     normalized = normalize_query(query)
 
@@ -54,6 +63,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
     |> String.downcase()
   end
 
+  @spec normalize_list_entry(term()) :: term()
   def normalize_list_entry(value) do
     value
     |> to_string()
@@ -61,6 +71,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
     |> String.downcase()
   end
 
+  @spec ensure_list_value(term(), term(), term()) :: term()
   def ensure_list_value(project_id, :tags, value) do
     if Enum.any?(Tags.list_tags(project_id), &(String.downcase(&1.name) == value)) do
       :ok
@@ -83,6 +94,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
     _error -> :ok
   end
 
+  @spec csv_to_list(term()) :: term()
   def csv_to_list(value) do
     value
     |> to_string()
@@ -91,6 +103,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
     |> Enum.reject(&(&1 == ""))
   end
 
+  @spec tag_chip_style(term()) :: term()
   def tag_chip_style(nil), do: nil
 
   def tag_chip_style(color) do
@@ -121,5 +134,6 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
 
   defp contrast_color(_color), do: "#ffffff"
 
+  @spec ai_overlay_fields(term()) :: term()
   def ai_overlay_fields(selected), do: Enum.filter(selected, & &1.accepted)
 end

@@ -8,6 +8,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Posts.{Post, PostMedia}
 
+  @spec project_metadata(term()) :: term()
   def project_metadata(nil), do: %{main_language: "en", blog_languages: []}
 
   def project_metadata(project_id) do
@@ -17,6 +18,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
     _error -> %{main_language: "en", blog_languages: []}
   end
 
+  @spec canonical_language(term(), term()) :: term()
   def canonical_language(post, metadata) do
     BDS.Desktop.ShellLive.PostEditor.DraftManagement.normalize_language(
       post.language,
@@ -24,28 +26,36 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
     )
   end
 
+  @spec translations(term()) :: term()
   def translations(post_id) do
     {:ok, translations} = Posts.list_post_translations(post_id)
     Map.new(translations, fn translation -> {translation.language, translation} end)
   end
 
+  @spec languages(term()) :: term()
   def languages(metadata) do
-    (([metadata.main_language || "en"] ++ (metadata.blog_languages || [])) ++ Enum.map(I18n.supported_languages(), & &1.code))
+    (([metadata.main_language || "en"] ++ (metadata.blog_languages || [])) ++
+       Enum.map(I18n.supported_languages(), & &1.code))
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end
 
+  @spec template_options(term()) :: term()
   def template_options(project_id) do
     Repo.all(
       from template in Templates.Template,
         where: template.project_id == ^project_id,
         order_by: [asc: template.title, asc: template.slug],
-        select: %{slug: template.slug, title: fragment("COALESCE(?, ?)", template.title, template.slug)}
+        select: %{
+          slug: template.slug,
+          title: fragment("COALESCE(?, ?)", template.title, template.slug)
+        }
     )
   rescue
     _error -> []
   end
 
+  @spec linked_media(term()) :: term()
   def linked_media(post_id) do
     rows =
       Repo.all(
@@ -74,6 +84,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
     _error -> []
   end
 
+  @spec post_links(term()) :: term()
   def post_links(post_id) do
     %{
       backlinks: related_posts(PostLinks.list_incoming_links(post_id), :source_post_id),
@@ -84,15 +95,29 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
   defp related_posts(links, key) do
     Enum.map(links, fn link ->
       case Posts.get_post(Map.fetch!(link, key)) do
-        %Post{} = post -> %{id: post.id, title: post.title || post.slug || post.id, text: link.link_text || post.slug || post.id}
-        _other -> nil
+        %Post{} = post ->
+          %{
+            id: post.id,
+            title: post.title || post.slug || post.id,
+            text: link.link_text || post.slug || post.id
+          }
+
+        _other ->
+          nil
       end
     end)
     |> Enum.reject(&is_nil/1)
   end
 
+  @spec translation_flags(term(), term(), term(), term()) :: term()
   def translation_flags(post, canonical_language, active_language, translations) do
-    canonical = %{language: canonical_language, flag: I18n.flag(canonical_language), status: Atom.to_string(post.status || :draft), active: active_language == canonical_language, label: canonical_language}
+    canonical = %{
+      language: canonical_language,
+      flag: I18n.flag(canonical_language),
+      status: Atom.to_string(post.status || :draft),
+      active: active_language == canonical_language,
+      label: canonical_language
+    }
 
     others =
       translations
@@ -111,6 +136,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
     [canonical | others]
   end
 
+  @spec footer(term(), term(), term(), term()) :: term()
   def footer(post, translation, active_language, canonical_language) do
     if active_language == canonical_language do
       %{
@@ -120,8 +146,8 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
       }
     else
       %{
-        created_at: format_timestamp(translation && translation.created_at || post.created_at),
-        updated_at: format_timestamp(translation && translation.updated_at || post.updated_at),
+        created_at: format_timestamp((translation && translation.created_at) || post.created_at),
+        updated_at: format_timestamp((translation && translation.updated_at) || post.updated_at),
         published_at: format_timestamp(translation && translation.published_at)
       }
     end
@@ -135,10 +161,12 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
     |> Calendar.strftime("%x")
   end
 
+  @spec display_title(term(), term(), term()) :: term()
   def display_title(title, slug, fallback_id) do
     blank_to_nil(title) || blank_to_nil(slug) || fallback_id || translated("Untitled")
   end
 
+  @spec gallery_count(term()) :: term()
   def gallery_count(form) do
     form
     |> Map.get("content", "")
@@ -147,8 +175,11 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
     |> length()
   end
 
-  def preview_url(_post, _active_language, _canonical_language, mode) when mode != :preview, do: nil
+  @spec preview_url(term(), term(), term(), term()) :: term()
+  def preview_url(_post, _active_language, _canonical_language, mode) when mode != :preview,
+    do: nil
 
+  @spec preview_url(term(), term(), term(), term()) :: term()
   def preview_url(%Post{} = post, active_language, canonical_language, :preview) do
     query =
       %{}
@@ -156,7 +187,8 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
       |> maybe_put_query("post_id", post.id)
       |> maybe_put_query("lang", active_language != canonical_language && active_language)
 
-    Preview.base_url() <> canonical_preview_path(post.created_at, post.slug) <> "?" <> URI.encode_query(query)
+    Preview.base_url() <>
+      canonical_preview_path(post.created_at, post.slug) <> "?" <> URI.encode_query(query)
   end
 
   defp canonical_preview_path(created_at_ms, slug) do
@@ -171,10 +203,13 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
   defp maybe_put_query(query, key, value), do: Map.put(query, key, value)
 
   def truthy?(value) when value in [true, "true", "on", 1, "1"], do: true
+  @spec truthy?(term()) :: term()
   def truthy?(_value), do: false
 
+  @spec blank?(term()) :: term()
   def blank?(value), do: blank_to_nil(value) == nil
 
+  @spec blank_to_nil(term()) :: term()
   def blank_to_nil(value) do
     value
     |> to_string()

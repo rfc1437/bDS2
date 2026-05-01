@@ -6,21 +6,25 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.EditorSettings do
   alias BDS.Settings
   alias BDS.Desktop.ShellData
 
+  @spec editor_form() :: term()
   def editor_form do
     %{
       "default_mode" => get_global_setting("ui.preferred_editor_mode") || "markdown",
       "diff_view_style" => get_global_setting("ui.git_diff_view_style") || "inline",
       "wrap_long_lines" => get_global_setting("ui.git_diff_word_wrap") == "true",
-      "hide_unchanged_regions" => get_global_setting("ui.git_diff_hide_unchanged_regions") == "true"
+      "hide_unchanged_regions" =>
+        get_global_setting("ui.git_diff_hide_unchanged_regions") == "true"
     }
   end
 
+  @spec update_editor_draft(term(), term(), term()) :: term()
   def update_editor_draft(socket, params, reload) do
     socket
     |> assign(:settings_editor_editor_draft, normalize_editor_params(params))
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec save_editor(term(), term(), term()) :: term()
   def save_editor(socket, reload, append_output) do
     attrs = editor_attrs(socket.assigns)
 
@@ -43,10 +47,12 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.EditorSettings do
     end
   end
 
+  @spec get_global_setting(term()) :: term()
   def get_global_setting(key) do
     Settings.get_global_setting(key)
   end
 
+  @spec put_global_setting(term(), term()) :: term()
   def put_global_setting(key, value) do
     Settings.put_global_setting(key, value)
   end

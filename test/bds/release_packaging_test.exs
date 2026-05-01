@@ -4,7 +4,9 @@ defmodule BDS.ReleasePackagingTest do
   alias BDS.ReleasePackaging
 
   setup do
-    base_dir = Path.join(System.tmp_dir!(), "bds-release-packaging-#{System.unique_integer([:positive])}")
+    base_dir =
+      Path.join(System.tmp_dir!(), "bds-release-packaging-#{System.unique_integer([:positive])}")
+
     output_dir = Path.join(base_dir, "dist")
     app_release = Path.join(base_dir, "rel/bds")
     mcp_release = Path.join(base_dir, "rel/bds_mcp")
@@ -16,7 +18,12 @@ defmodule BDS.ReleasePackagingTest do
 
     on_exit(fn -> File.rm_rf(base_dir) end)
 
-    %{base_dir: base_dir, output_dir: output_dir, app_release: app_release, mcp_release: mcp_release}
+    %{
+      base_dir: base_dir,
+      output_dir: output_dir,
+      app_release: app_release,
+      mcp_release: mcp_release
+    }
   end
 
   test "build metadata uses a clean future-app payload layout" do
@@ -45,7 +52,8 @@ defmodule BDS.ReleasePackagingTest do
     assert File.exists?(Path.join(metadata.mcp_root, "bin/bds-mcp"))
     assert File.exists?(Path.join(metadata.payload_root, "manifest.json"))
 
-    manifest = metadata.payload_root |> Path.join("manifest.json") |> File.read!() |> Jason.decode!()
+    manifest =
+      metadata.payload_root |> Path.join("manifest.json") |> File.read!() |> Jason.decode!()
 
     assert manifest == %{
              "platform" => "macos",

@@ -197,11 +197,13 @@ defmodule BDS.AITest do
 
   test "put_endpoint, get_endpoint, and delete_endpoint manage encrypted endpoint settings" do
     assert {:ok, endpoint} =
-             BDS.AI.put_endpoint(:online, %{
-               url: "https://api.example.test/v1",
-               api_key: "top-secret",
-               model: "gpt-4o-mini"
-             }, secret_backend: FakeSecretBackend)
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "top-secret",
+                 model: "gpt-4o-mini"
+               }, secret_backend: FakeSecretBackend)
 
     assert endpoint.kind == :online
     assert endpoint.url == "https://api.example.test/v1"
@@ -263,21 +265,26 @@ defmodule BDS.AITest do
 
     assert {:ok, result} = BDS.AI.refresh_model_catalog(http_client: http_client)
     assert result.not_modified == true
-    assert_received {:conditional_headers, %{"accept" => "application/json", "if-none-match" => "W/\"catalog-v1\""}}
+
+    assert_received {:conditional_headers,
+                     %{"accept" => "application/json", "if-none-match" => "W/\"catalog-v1\""}}
   end
 
   test "list_endpoint_models reads openai-compatible models from the configured endpoint" do
     assert {:ok, models} =
-             BDS.AI.list_endpoint_models(%{url: "https://api.example.test/v1", api_key: "online-secret"},
+             BDS.AI.list_endpoint_models(
+               %{url: "https://api.example.test/v1", api_key: "online-secret"},
                http_client: FakeEndpointHttpClient
              )
 
-    assert [%{id: "gpt-4.1", label: "gpt-4.1"}, %{id: "gpt-4.1-mini", label: "gpt-4.1-mini"}] = models
+    assert [%{id: "gpt-4.1", label: "gpt-4.1"}, %{id: "gpt-4.1-mini", label: "gpt-4.1-mini"}] =
+             models
   end
 
   test "list_endpoint_models returns an error for malformed endpoint JSON" do
     assert {:error, %{kind: :invalid_json_response, reason: %Jason.DecodeError{}}} =
-             BDS.AI.list_endpoint_models(%{url: "https://api.example.test/v1", api_key: "online-secret"},
+             BDS.AI.list_endpoint_models(
+               %{url: "https://api.example.test/v1", api_key: "online-secret"},
                http_client: BadJsonEndpointHttpClient
              )
   end
@@ -303,18 +310,22 @@ defmodule BDS.AITest do
 
   test "airplane mode routes title tasks to airplane endpoint and offline title model" do
     assert {:ok, _endpoint} =
-             BDS.AI.put_endpoint(:online, %{
-               url: "https://api.example.test/v1",
-               api_key: "online-secret",
-               model: "gpt-4o-mini"
-             }, secret_backend: FakeSecretBackend)
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               }, secret_backend: FakeSecretBackend)
 
     assert {:ok, _endpoint} =
-             BDS.AI.put_endpoint(:airplane, %{
-               url: "http://localhost:11434/v1",
-               api_key: nil,
-               model: "llama-default"
-             }, secret_backend: FakeSecretBackend)
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{
+                 url: "http://localhost:11434/v1",
+                 api_key: nil,
+                 model: "llama-default"
+               }, secret_backend: FakeSecretBackend)
 
     assert :ok = BDS.AI.set_airplane_mode(true)
     assert :ok = BDS.AI.put_model_preference(:airplane_title, "llama3.1")
@@ -337,18 +348,24 @@ defmodule BDS.AITest do
 
   test "translate_post uses the online title model when airplane mode is disabled" do
     assert {:ok, _endpoint} =
-             BDS.AI.put_endpoint(:online, %{
-               url: "https://api.example.test/v1",
-               api_key: "online-secret",
-               model: "gpt-4o-mini"
-             }, secret_backend: FakeSecretBackend)
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               }, secret_backend: FakeSecretBackend)
 
     assert :ok = BDS.AI.set_airplane_mode(false)
     assert :ok = BDS.AI.put_model_preference(:title, "gpt-4.1-mini")
 
     assert {:ok, translation} =
              BDS.AI.translate_post(
-               %{title: "Hello World", excerpt: "Short summary", content: "# Hello\n\nSource body"},
+               %{
+                 title: "Hello World",
+                 excerpt: "Short summary",
+                 content: "# Hello\n\nSource body"
+               },
                "de",
                runtime: FakeRuntime,
                test_pid: self(),
@@ -366,11 +383,13 @@ defmodule BDS.AITest do
 
   test "analyze_import_taxonomy uses the selected model override and returns only valid existing-term mappings" do
     assert {:ok, _endpoint} =
-             BDS.AI.put_endpoint(:online, %{
-               url: "https://api.example.test/v1",
-               api_key: "online-secret",
-               model: "gpt-4o-mini"
-             }, secret_backend: FakeSecretBackend)
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               }, secret_backend: FakeSecretBackend)
 
     assert :ok = BDS.AI.set_airplane_mode(false)
     assert :ok = BDS.AI.put_model_preference(:title, "gpt-4.1-mini")
@@ -396,23 +415,26 @@ defmodule BDS.AITest do
 
   test "analyze_image requires a vision-capable airplane model before sending image input" do
     assert {:ok, _endpoint} =
-             BDS.AI.put_endpoint(:airplane, %{
-               url: "http://localhost:11434/v1",
-               api_key: nil,
-               model: "llama-default"
-             }, secret_backend: FakeSecretBackend)
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{
+                 url: "http://localhost:11434/v1",
+                 api_key: nil,
+                 model: "llama-default"
+               }, secret_backend: FakeSecretBackend)
 
     assert :ok = BDS.AI.set_airplane_mode(true)
     assert :ok = BDS.AI.put_model_preference(:airplane_image_analysis, "llama3.2")
 
     assert {:error, %{kind: :model_capability_missing}} =
-             BDS.AI.analyze_image(%{
-               mime_type: "image/png",
-               title: "Source",
-               alt: nil,
-               caption: nil,
-               image_url: "file:///tmp/test.png"
-             }, runtime: FakeRuntime, test_pid: self(), secret_backend: FakeSecretBackend)
+             BDS.AI.analyze_image(
+               %{
+                 mime_type: "image/png",
+                 title: "Source",
+                 alt: nil,
+                 caption: nil,
+                 image_url: "file:///tmp/test.png"
+               }, runtime: FakeRuntime, test_pid: self(), secret_backend: FakeSecretBackend)
 
     assert :ok =
              BDS.AI.put_model_capabilities("llama3.2", %{
@@ -421,13 +443,14 @@ defmodule BDS.AITest do
              })
 
     assert {:ok, analysis} =
-             BDS.AI.analyze_image(%{
-               mime_type: "image/png",
-               title: "Source",
-               alt: nil,
-               caption: nil,
-               image_url: "file:///tmp/test.png"
-             }, runtime: FakeRuntime, test_pid: self(), secret_backend: FakeSecretBackend)
+             BDS.AI.analyze_image(
+               %{
+                 mime_type: "image/png",
+                 title: "Source",
+                 alt: nil,
+                 caption: nil,
+                 image_url: "file:///tmp/test.png"
+               }, runtime: FakeRuntime, test_pid: self(), secret_backend: FakeSecretBackend)
 
     assert analysis.alt == "Orange sunset over calm water"
 
@@ -442,11 +465,13 @@ defmodule BDS.AITest do
     :ok = seed_project_content(project.id)
 
     assert {:ok, _endpoint} =
-             BDS.AI.put_endpoint(:online, %{
-               url: "https://api.example.test/v1",
-               api_key: "online-secret",
-               model: "gpt-4o-mini"
-             }, secret_backend: FakeSecretBackend)
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               }, secret_backend: FakeSecretBackend)
 
     assert :ok = BDS.AI.set_airplane_mode(false)
     assert {:ok, conversation} = BDS.AI.start_chat(%{model: "gpt-4o-mini"})
@@ -462,13 +487,13 @@ defmodule BDS.AITest do
     assert reply.assistant_message.content == "You currently have 1 post and 1 media item."
 
     messages = BDS.AI.list_chat_messages(conversation.id)
-  assert Enum.map(messages, & &1.role) == [:user, :assistant, :tool, :assistant]
+    assert Enum.map(messages, & &1.role) == [:user, :assistant, :tool, :assistant]
 
-  assistant_tool_call = Enum.at(messages, 1)
-  tool_message = Enum.at(messages, 2)
-  assistant_message = Enum.at(messages, 3)
+    assistant_tool_call = Enum.at(messages, 1)
+    tool_message = Enum.at(messages, 2)
+    assistant_message = Enum.at(messages, 3)
 
-  assert [%{"id" => "call-blog-stats", "name" => "blog_stats"}] = assistant_tool_call.tool_calls
+    assert [%{"id" => "call-blog-stats", "name" => "blog_stats"}] = assistant_tool_call.tool_calls
     assert tool_message.tool_call_id == "call-blog-stats"
     assert tool_message.content =~ "post_count"
     assert assistant_message.token_usage_input == 64
@@ -489,11 +514,13 @@ defmodule BDS.AITest do
 
   test "cancel_chat aborts an in-flight chat turn" do
     assert {:ok, _endpoint} =
-             BDS.AI.put_endpoint(:online, %{
-               url: "https://api.example.test/v1",
-               api_key: "online-secret",
-               model: "gpt-4o-mini"
-             }, secret_backend: FakeSecretBackend)
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               }, secret_backend: FakeSecretBackend)
 
     assert {:ok, conversation} = BDS.AI.start_chat(%{model: "gpt-4o-mini"})
 

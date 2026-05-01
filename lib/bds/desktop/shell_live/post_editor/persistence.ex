@@ -6,11 +6,16 @@ defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, PostMetadata}
 
+  @spec persist(term(), term(), term(), term(), term()) :: term()
   def persist(%Post{} = post, draft, active_language, metadata, action) do
     canonical_language = PostMetadata.canonical_language(post, metadata)
     translations = PostMetadata.translations(post.id)
 
-    if DraftManagement.editing_canonical_language?(translations, active_language, canonical_language) do
+    if DraftManagement.editing_canonical_language?(
+         translations,
+         active_language,
+         canonical_language
+       ) do
       post
       |> save_canonical_draft(draft)
       |> maybe_publish_post(post.id, action)
@@ -21,12 +26,17 @@ defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
     end
   end
 
+  @spec discard(term(), term(), term()) :: term()
   def discard(%Post{} = post, active_language, metadata) do
     canonical_language = PostMetadata.canonical_language(post, metadata)
     current_translations = PostMetadata.translations(post.id)
 
     cond do
-      not DraftManagement.editing_canonical_language?(current_translations, active_language, canonical_language) ->
+      not DraftManagement.editing_canonical_language?(
+        current_translations,
+        active_language,
+        canonical_language
+      ) ->
         {:ok, post}
 
       post.file_path not in [nil, ""] and post.status == :draft ->
@@ -37,15 +47,18 @@ defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
     end
   end
 
+  @spec has_published_version?(term()) :: term()
   def has_published_version?(%Post{} = post),
     do: not is_nil(post.published_at) or post.file_path not in [nil, ""]
 
+  @spec discard_label(term()) :: term()
   def discard_label(%Post{} = post) do
     if has_published_version?(post),
       do: translated("Discard Changes"),
       else: translated("Discard Draft")
   end
 
+  @spec discard_title(term()) :: term()
   def discard_title(%Post{} = post) do
     if has_published_version?(post),
       do: translated("Discard changes and restore the published version"),

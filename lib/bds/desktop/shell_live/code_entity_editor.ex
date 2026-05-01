@@ -10,12 +10,14 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
 
   embed_templates("code_entity_editor_html/*")
 
+  @spec assign_socket(term()) :: term()
   def assign_socket(socket) do
     socket
     |> assign(:script_editor, build_script(socket.assigns))
     |> assign(:template_editor, build_template(socket.assigns))
   end
 
+  @spec update_script(term(), term(), term()) :: term()
   def update_script(socket, params, reload) do
     %{id: script_id} = socket.assigns.current_tab
 
@@ -27,6 +29,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec save_script(term(), term(), term()) :: term()
   def save_script(socket, reload, append_output) do
     %{id: script_id} = socket.assigns.current_tab
 
@@ -62,6 +65,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     end
   end
 
+  @spec check_script(term(), term(), term()) :: term()
   def check_script(socket, reload, append_output) do
     %{id: script_id} = socket.assigns.current_tab
 
@@ -82,6 +86,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     end
   end
 
+  @spec run_script(term(), term(), term()) :: term()
   def run_script(socket, reload, append_output) do
     %{id: script_id} = socket.assigns.current_tab
 
@@ -111,6 +116,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     end
   end
 
+  @spec delete_script(term(), term(), term()) :: term()
   def delete_script(socket, reload, append_output) do
     %{id: script_id} = socket.assigns.current_tab
 
@@ -124,6 +130,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     end
   end
 
+  @spec update_template(term(), term(), term()) :: term()
   def update_template(socket, params, reload) do
     %{id: template_id} = socket.assigns.current_tab
 
@@ -139,6 +146,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec save_template(term(), term(), term()) :: term()
   def save_template(socket, reload, append_output) do
     %{id: template_id} = socket.assigns.current_tab
 
@@ -169,6 +177,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     end
   end
 
+  @spec validate_template(term(), term(), term()) :: term()
   def validate_template(socket, reload, append_output) do
     %{id: template_id} = socket.assigns.current_tab
 
@@ -195,6 +204,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     end
   end
 
+  @spec delete_template(term(), term(), term()) :: term()
   def delete_template(socket, reload, append_output) do
     %{id: template_id} = socket.assigns.current_tab
 
@@ -211,6 +221,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     end
   end
 
+  @spec build_script(term()) :: term()
   def build_script(%{current_tab: %{type: :scripts, id: script_id}} = assigns) do
     case Scripts.get_script(script_id) do
       nil ->
@@ -236,6 +247,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
 
   def build_script(_assigns), do: nil
 
+  @spec build_template(term()) :: term()
   def build_template(%{current_tab: %{type: :templates, id: template_id}} = assigns) do
     case Templates.get_template(template_id) do
       nil ->
@@ -259,9 +271,11 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
 
   def build_template(_assigns), do: nil
 
+  @spec translated(term(), term()) :: term()
   def translated(text, bindings \\ %{}),
     do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
+  @spec format_timestamp(term()) :: term()
   def format_timestamp(nil), do: ""
   def format_timestamp(timestamp), do: BDS.Persistence.timestamp_to_iso8601(timestamp)
 

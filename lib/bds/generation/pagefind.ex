@@ -19,10 +19,13 @@ defmodule BDS.Generation.Pagefind do
     |> Enum.flat_map(fn language ->
       route_language = route_language(plan.language, language)
       pages = pages_for_language(html_outputs, route_language)
-      prefix = if route_language in [nil, ""], do: ["pagefind"], else: [route_language, "pagefind"]
+
+      prefix =
+        if route_language in [nil, ""], do: ["pagefind"], else: [route_language, "pagefind"]
 
       [
-        {Path.join(prefix ++ ["index.json"]), Jason.encode!(%{"language" => language, "pages" => pages})},
+        {Path.join(prefix ++ ["index.json"]),
+         Jason.encode!(%{"language" => language, "pages" => pages})},
         {Path.join(prefix ++ ["pagefind-ui.js"]), ui_js(language)},
         {Path.join(prefix ++ ["pagefind-ui.css"]), ui_css()}
       ]

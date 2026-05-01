@@ -2,16 +2,86 @@ defmodule BDS.UI.Registry do
   @moduledoc false
 
   @sidebar_views [
-    %{id: :posts, label: "Posts", activity_group: :top, editor_route: :post, entity_tab: true, demo_kind: :entity},
-    %{id: :pages, label: "Pages", activity_group: :top, editor_route: :post, entity_tab: true, demo_kind: :entity},
-    %{id: :media, label: "Media", activity_group: :top, editor_route: :media, entity_tab: true, demo_kind: :entity},
-    %{id: :scripts, label: "Scripts", activity_group: :top, editor_route: :scripts, entity_tab: true, demo_kind: :entity},
-    %{id: :templates, label: "Templates", activity_group: :top, editor_route: :templates, entity_tab: true, demo_kind: :entity},
-    %{id: :tags, label: "Tags", activity_group: :top, editor_route: :tags, singleton: true, demo_kind: :singleton},
-    %{id: :chat, label: "AI Assistant", activity_group: :top, editor_route: :chat, entity_tab: true, demo_kind: :entity},
-    %{id: :import, label: "Import", activity_group: :top, editor_route: :import, entity_tab: true, demo_kind: :entity},
-    %{id: :git, label: "Source Control", activity_group: :bottom, editor_route: :git_diff, entity_tab: true, demo_kind: :entity},
-    %{id: :settings, label: "Settings", activity_group: :bottom, editor_route: :settings, singleton: true, demo_kind: :singleton}
+    %{
+      id: :posts,
+      label: "Posts",
+      activity_group: :top,
+      editor_route: :post,
+      entity_tab: true,
+      demo_kind: :entity
+    },
+    %{
+      id: :pages,
+      label: "Pages",
+      activity_group: :top,
+      editor_route: :post,
+      entity_tab: true,
+      demo_kind: :entity
+    },
+    %{
+      id: :media,
+      label: "Media",
+      activity_group: :top,
+      editor_route: :media,
+      entity_tab: true,
+      demo_kind: :entity
+    },
+    %{
+      id: :scripts,
+      label: "Scripts",
+      activity_group: :top,
+      editor_route: :scripts,
+      entity_tab: true,
+      demo_kind: :entity
+    },
+    %{
+      id: :templates,
+      label: "Templates",
+      activity_group: :top,
+      editor_route: :templates,
+      entity_tab: true,
+      demo_kind: :entity
+    },
+    %{
+      id: :tags,
+      label: "Tags",
+      activity_group: :top,
+      editor_route: :tags,
+      singleton: true,
+      demo_kind: :singleton
+    },
+    %{
+      id: :chat,
+      label: "AI Assistant",
+      activity_group: :top,
+      editor_route: :chat,
+      entity_tab: true,
+      demo_kind: :entity
+    },
+    %{
+      id: :import,
+      label: "Import",
+      activity_group: :top,
+      editor_route: :import,
+      entity_tab: true,
+      demo_kind: :entity
+    },
+    %{
+      id: :git,
+      label: "Source Control",
+      activity_group: :bottom,
+      editor_route: :git_diff,
+      entity_tab: true,
+      demo_kind: :entity
+    },
+    %{
+      id: :settings,
+      label: "Settings",
+      activity_group: :bottom,
+      editor_route: :settings,
+      singleton: true,
+      demo_kind: :singleton
+    }
   ]
 
   @editor_routes [

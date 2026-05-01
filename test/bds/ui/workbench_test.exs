@@ -156,12 +156,18 @@ defmodule BDS.UI.WorkbenchTest do
       )
 
     assert status.right.post_status == nil
-    assert status.right.token_usage == %{input_tokens: 10, output_tokens: 20, cache_read_tokens: 3}
+
+    assert status.right.token_usage == %{
+             input_tokens: 10,
+             output_tokens: 20,
+             cache_read_tokens: 3
+           }
   end
 
   test "menu commands expose generic shell controls through a shared command model" do
     state = Workbench.new(sidebar_visible: false, panel_visible: false)
     groups = MenuBar.default_groups(dev_mode?: false)
+
     item_ids = fn items ->
       items
       |> Enum.reject(&Map.get(&1, :separator, false))
@@ -221,6 +227,10 @@ defmodule BDS.UI.WorkbenchTest do
 
     assert Enum.any?(final_state.tabs, &(&1.type == :settings and &1.id == "settings"))
     assert Enum.any?(final_state.tabs, &(&1.type == :menu_editor and &1.id == "menu_editor"))
-    assert Enum.any?(final_state.tabs, &(&1.type == :find_duplicates and &1.id == "find_duplicates"))
+
+    assert Enum.any?(
+             final_state.tabs,
+             &(&1.type == :find_duplicates and &1.id == "find_duplicates")
+           )
   end
 end

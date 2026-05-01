@@ -26,7 +26,8 @@ defmodule BDS.ReleasePackaging do
     ]
   end
 
-  def build_metadata(platform, version, output_dir) when is_binary(version) and is_binary(output_dir) do
+  def build_metadata(platform, version, output_dir)
+      when is_binary(version) and is_binary(output_dir) do
     normalized_platform = normalize_platform(platform)
     payload_name = "bds2-#{normalized_platform}-#{version}"
     payload_root = Path.join(output_dir, payload_name)
@@ -66,7 +67,9 @@ defmodule BDS.ReleasePackaging do
 
   defp normalize_platform(platform) when platform in [:macos, :linux, :windows], do: platform
   defp normalize_platform(:darwin), do: :macos
-  defp normalize_platform(platform) when is_binary(platform), do: platform |> String.downcase() |> String.to_atom()
+
+  defp normalize_platform(platform) when is_binary(platform),
+    do: platform |> String.downcase() |> String.to_atom()
 
   defp archive_extension(:windows), do: ".zip"
   defp archive_extension(_platform), do: ".tar.gz"
@@ -107,7 +110,9 @@ defmodule BDS.ReleasePackaging do
     relative_entries = collect_entries(metadata.payload_root)
     cwd = metadata.output_dir |> String.to_charlist()
     archive = metadata.archive_path |> String.to_charlist()
-    entries = Enum.map(relative_entries, &String.to_charlist(Path.join(metadata.payload_name, &1)))
+
+    entries =
+      Enum.map(relative_entries, &String.to_charlist(Path.join(metadata.payload_name, &1)))
 
     case :zip.create(archive, entries, cwd: cwd) do
       {:ok, _archive_path} -> :ok
@@ -116,7 +121,13 @@ defmodule BDS.ReleasePackaging do
   end
 
   defp create_archive(metadata) do
-    case System.cmd("tar", ["-czf", metadata.archive_path, "-C", metadata.output_dir, metadata.payload_name]) do
+    case System.cmd("tar", [
+           "-czf",
+           metadata.archive_path,
+           "-C",
+           metadata.output_dir,
+           metadata.payload_name
+         ]) do
       {_output, 0} -> :ok
       {output, status} -> {:error, {:tar_failed, status, output}}
     end

@@ -72,15 +72,20 @@ defmodule BDS.MCPTest do
     assert read_result["post"]["slug"] == "travel-notes"
   end
 
-  test "proposal-backed write tools follow the old app lifecycle for scripts, templates, and metadata", %{
-    project: project,
-    temp_dir: temp_dir
-  } do
+  test "proposal-backed write tools follow the old app lifecycle for scripts, templates, and metadata",
+       %{
+         project: project,
+         temp_dir: temp_dir
+       } do
     source_path = Path.join(temp_dir, "image.txt")
     File.write!(source_path, "image body")
 
     assert {:ok, media} =
-             BDS.Media.import_media(%{project_id: project.id, source_path: source_path, title: "Old"})
+             BDS.Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Old"
+             })
 
     assert {:ok, post} =
              BDS.Posts.create_post(%{
@@ -100,7 +105,10 @@ defmodule BDS.MCPTest do
 
     draft_proposal_id = draft_result["proposal_id"]
     draft_post_id = draft_result["post"]["id"]
-    assert {:ok, _accepted} = BDS.MCP.call_tool("accept_proposal", %{proposalId: draft_proposal_id})
+
+    assert {:ok, _accepted} =
+             BDS.MCP.call_tool("accept_proposal", %{proposalId: draft_proposal_id})
+
     assert BDS.Posts.get_post!(draft_post_id).status == :published
 
     assert {:ok, script_result} =
@@ -111,6 +119,7 @@ defmodule BDS.MCPTest do
              })
 
     script_id = script_result["script"]["id"]
+
     assert {:ok, _accepted_script} =
              BDS.MCP.call_tool("accept_proposal", %{proposalId: script_result["proposal_id"]})
 
@@ -124,6 +133,7 @@ defmodule BDS.MCPTest do
              })
 
     template_id = template_result["template"]["id"]
+
     assert {:ok, _accepted_template} =
              BDS.MCP.call_tool("accept_proposal", %{proposalId: template_result["proposal_id"]})
 
@@ -138,6 +148,7 @@ defmodule BDS.MCPTest do
 
     assert {:ok, _accepted_media} =
              BDS.MCP.call_tool("accept_proposal", %{proposalId: media_proposal["proposal_id"]})
+
     updated_media = Repo.get!(Media, media.id)
     assert updated_media.title == "New Title"
     assert updated_media.alt == "Alt Text"
@@ -202,7 +213,9 @@ defmodule BDS.MCPTest do
     assert ProposalStore.get(expired.id).status == :expired
   end
 
-  test "resource listing and reads follow old app naming for implemented resources", %{project: project} do
+  test "resource listing and reads follow old app naming for implemented resources", %{
+    project: project
+  } do
     assert {:ok, post} =
              BDS.Posts.create_post(%{
                project_id: project.id,

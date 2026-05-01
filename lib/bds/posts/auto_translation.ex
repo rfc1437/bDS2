@@ -122,7 +122,8 @@ defmodule BDS.Posts.AutoTranslation do
 
   defp media_needed?(media_id, language) do
     case Repo.get(Media.Media, media_id) do
-      %Media.Media{language: source_language} when source_language not in [nil, ""] and source_language != language ->
+      %Media.Media{language: source_language}
+      when source_language not in [nil, ""] and source_language != language ->
         not Repo.exists?(
           from translation in Media.Translation,
             where: translation.translation_for == ^media_id and translation.language == ^language

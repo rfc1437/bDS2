@@ -14,10 +14,13 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
     "page" => %{title: "page", render_in_lists: false, show_title: true}
   }
 
+  @spec protected_categories() :: term()
   def protected_categories, do: @protected_categories
 
+  @spec protected_category?(term()) :: term()
   def protected_category?(category), do: MapSet.member?(@protected_categories, category)
 
+  @spec category_rows(term()) :: term()
   def category_rows(metadata) do
     categories = Map.get(metadata, :categories, [])
     settings = Map.get(metadata, :category_settings, %{})
@@ -37,12 +40,14 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
     end)
   end
 
+  @spec update_new_category(term(), term(), term()) :: term()
   def update_new_category(socket, name, reload) do
     socket
     |> assign(:settings_editor_new_category, to_string(name || ""))
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec add_category(term(), term(), term()) :: term()
   def add_category(socket, reload, append_output) do
     project_id = socket.assigns.projects.active_project_id
     name = socket.assigns[:settings_editor_new_category] |> to_string() |> String.trim()
@@ -73,11 +78,13 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
     end
   end
 
+  @spec reset_categories(term(), term(), term()) :: term()
   def reset_categories(socket, reload, append_output) do
     project_id = socket.assigns.projects.active_project_id
 
     result =
-      Enum.reduce_while(category_names(project_metadata(socket.assigns)), :ok, fn category, _acc ->
+      Enum.reduce_while(category_names(project_metadata(socket.assigns)), :ok, fn category,
+                                                                                  _acc ->
         if MapSet.member?(@protected_categories, category) do
           {:cont, :ok}
         else
@@ -102,6 +109,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
     end
   end
 
+  @spec save_category(term(), term(), term(), term()) :: term()
   def save_category(socket, params, reload, append_output) do
     project_id = socket.assigns.projects.active_project_id
     category = Map.get(params, "category", "")
@@ -125,6 +133,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
     end
   end
 
+  @spec remove_category(term(), term(), term(), term()) :: term()
   def remove_category(socket, category, reload, append_output) do
     project_id = socket.assigns.projects.active_project_id
 

@@ -135,7 +135,9 @@ defmodule BDS.ProjectsTest do
     Repo.delete_all(Project)
 
     assert {:ok, default_project} = BDS.Projects.ensure_default_project()
-    assert {:error, :cannot_delete_default_project} = BDS.Projects.delete_project(default_project.id)
+
+    assert {:error, :cannot_delete_default_project} =
+             BDS.Projects.delete_project(default_project.id)
 
     temp_dir = Path.join(temp_root, "active-delete")
     File.mkdir_p!(temp_dir)
@@ -148,7 +150,9 @@ defmodule BDS.ProjectsTest do
     assert %Project{id: ^project_id} = BDS.Projects.get_project(project.id)
   end
 
-  test "delete_project removes internal project data but preserves external data paths", %{temp_root: temp_root} do
+  test "delete_project removes internal project data but preserves external data paths", %{
+    temp_root: temp_root
+  } do
     assert {:ok, internal_project} = BDS.Projects.create_project(%{name: "Internal Project"})
 
     internal_dir = BDS.Projects.project_data_dir(internal_project)
@@ -179,7 +183,9 @@ defmodule BDS.ProjectsTest do
     assert File.read!(marker_path) == "preserve me"
   end
 
-  test "create_project loads project metadata from an existing filesystem-backed blog", %{temp_root: temp_root} do
+  test "create_project loads project metadata from an existing filesystem-backed blog", %{
+    temp_root: temp_root
+  } do
     external_dir = Path.join(temp_root, "imported-blog")
     meta_dir = Path.join(external_dir, "meta")
     File.mkdir_p!(meta_dir)

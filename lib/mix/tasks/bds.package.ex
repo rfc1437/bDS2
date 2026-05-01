@@ -20,8 +20,10 @@ defmodule Mix.Tasks.Bds.Package do
       platform: platform,
       version: version,
       output_dir: opts[:output] || Path.expand("dist/#{platform}", File.cwd!()),
-      app_release_source: opts[:app_release] || Path.expand("_build/#{env_name}/rel/bds", File.cwd!()),
-      mcp_release_source: opts[:mcp_release] || Path.expand("_build/#{env_name}/rel/bds_mcp", File.cwd!())
+      app_release_source:
+        opts[:app_release] || Path.expand("_build/#{env_name}/rel/bds", File.cwd!()),
+      mcp_release_source:
+        opts[:mcp_release] || Path.expand("_build/#{env_name}/rel/bds_mcp", File.cwd!())
     ]
 
     case BDS.ReleasePackaging.package(package_opts) do

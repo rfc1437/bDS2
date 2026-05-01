@@ -22,7 +22,9 @@ defmodule BDS.Desktop.MainWindow do
     restored = restore_bounds()
     {default_width, default_height} = Keyword.get(desktop_config, :window_size, @default_size)
     {min_width, min_height} = Keyword.get(desktop_config, :window_min_size, @default_min_size)
-    startup_bounds = clamp_startup_bounds(restored || %{width: default_width, height: default_height})
+
+    startup_bounds =
+      clamp_startup_bounds(restored || %{width: default_width, height: default_height})
 
     base_opts = [
       app: :bds,
@@ -70,7 +72,9 @@ defmodule BDS.Desktop.MainWindow do
       frame ->
         apply_restored_bounds(frame)
         schedule_persist()
-        {:noreply, %{state | frame: frame, last_bounds: current_bounds(frame) || state.last_bounds}}
+
+        {:noreply,
+         %{state | frame: frame, last_bounds: current_bounds(frame) || state.last_bounds}}
     end
   end
 
@@ -124,9 +128,15 @@ defmodule BDS.Desktop.MainWindow do
   defp current_bounds(frame) do
     with_wx_env(fn ->
       cond do
-        not :wxWindow.isShown(frame) -> nil
-        :wxTopLevelWindow.isFullScreen(frame) -> nil
-        :wxTopLevelWindow.isMaximized(frame) -> nil
+        not :wxWindow.isShown(frame) ->
+          nil
+
+        :wxTopLevelWindow.isFullScreen(frame) ->
+          nil
+
+        :wxTopLevelWindow.isMaximized(frame) ->
+          nil
+
         true ->
           {x, y} = :wxWindow.getPosition(frame)
           {width, height} = :wxWindow.getSize(frame)
@@ -160,7 +170,8 @@ defmodule BDS.Desktop.MainWindow do
   end
 
   defp normalize_bounds(%{x: x, y: y, width: width, height: height})
-       when is_integer(x) and is_integer(y) and is_integer(width) and is_integer(height) and width > 0 and height > 0 do
+       when is_integer(x) and is_integer(y) and is_integer(width) and is_integer(height) and
+              width > 0 and height > 0 do
     {:ok, %{x: x, y: y, width: width, height: height}}
   end
 
@@ -180,7 +191,8 @@ defmodule BDS.Desktop.MainWindow do
     desktop_config = Application.get_env(:bds, :desktop, [])
 
     case Keyword.get(desktop_config, :window_client_area_override) do
-      {x, y, width, height} when is_integer(x) and is_integer(y) and is_integer(width) and is_integer(height) ->
+      {x, y, width, height}
+      when is_integer(x) and is_integer(y) and is_integer(width) and is_integer(height) ->
         %{x: x, y: y, width: width, height: height}
 
       _ ->

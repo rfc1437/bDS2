@@ -344,7 +344,10 @@ defmodule BDS.PostsTest do
 
   test "rebuild_posts_from_files imports canonical bDS translation files alongside canonical posts" do
     temp_dir =
-      Path.join(System.tmp_dir!(), "bds-post-rebuild-legacy-#{System.unique_integer([:positive])}")
+      Path.join(
+        System.tmp_dir!(),
+        "bds-post-rebuild-legacy-#{System.unique_integer([:positive])}"
+      )
 
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
@@ -415,7 +418,10 @@ defmodule BDS.PostsTest do
 
   test "rebuild_posts_from_files parses quoted canonical timestamps and inline empty tag arrays" do
     temp_dir =
-      Path.join(System.tmp_dir!(), "bds-post-rebuild-quoted-#{System.unique_integer([:positive])}")
+      Path.join(
+        System.tmp_dir!(),
+        "bds-post-rebuild-quoted-#{System.unique_integer([:positive])}"
+      )
 
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
@@ -471,7 +477,10 @@ defmodule BDS.PostsTest do
 
   test "rebuild_posts_from_files parses folded multiline title and slug scalars alongside translations" do
     temp_dir =
-      Path.join(System.tmp_dir!(), "bds-post-rebuild-folded-#{System.unique_integer([:positive])}")
+      Path.join(
+        System.tmp_dir!(),
+        "bds-post-rebuild-folded-#{System.unique_integer([:positive])}"
+      )
 
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
@@ -548,8 +557,8 @@ defmodule BDS.PostsTest do
              "Introducing Thirty Ten, my guide to creating a Twenty Ten Child Theme | aaron.jorb.inaaron.jorb.in"
   end
 
-    test "rebuild_posts_from_files realigns an existing slug match to the canonical file id before importing translations",
-      %{project: project} do
+  test "rebuild_posts_from_files realigns an existing slug match to the canonical file id before importing translations",
+       %{project: project} do
     assert {:ok, _stale_post} =
              BDS.Posts.create_post(%{
                project_id: project.id,
@@ -658,7 +667,9 @@ defmodule BDS.PostsTest do
     refute BDS.Repo.get(BDS.Posts.Post, stale_post.id)
   end
 
-  test "rebuild_posts_from_files batches search and embedding refresh after import", %{project: project} do
+  test "rebuild_posts_from_files batches search and embedding refresh after import", %{
+    project: project
+  } do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
 
@@ -781,7 +792,11 @@ defmodule BDS.PostsTest do
     saved_translation = BDS.Repo.get!(BDS.Posts.Translation, translation.id)
     assert saved_translation.content == nil
     assert is_binary(saved_translation.file_path)
-    assert File.exists?(Path.join(BDS.Projects.project_data_dir(project), saved_translation.file_path))
+
+    assert File.exists?(
+             Path.join(BDS.Projects.project_data_dir(project), saved_translation.file_path)
+           )
+
     refute File.exists?(invalid_file_path)
   end
 

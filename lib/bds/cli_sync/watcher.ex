@@ -24,7 +24,11 @@ defmodule BDS.CliSync.Watcher do
   @impl true
   def init(opts) do
     state = %{
-      poll_interval_ms: normalize_positive_integer(Keyword.get(opts, :poll_interval_ms), @default_poll_interval_ms),
+      poll_interval_ms:
+        normalize_positive_integer(
+          Keyword.get(opts, :poll_interval_ms),
+          @default_poll_interval_ms
+        ),
       pubsub: Keyword.get(opts, :pubsub, BDS.PubSub)
     }
 
@@ -49,7 +53,11 @@ defmodule BDS.CliSync.Watcher do
     {:ok, _pruned} = CliSync.prune_notifications()
 
     Enum.each(notifications, fn notification ->
-      Phoenix.PubSub.broadcast(state.pubsub, topic(), {:entity_changed, notification_payload(notification)})
+      Phoenix.PubSub.broadcast(
+        state.pubsub,
+        topic(),
+        {:entity_changed, notification_payload(notification)}
+      )
     end)
 
     state

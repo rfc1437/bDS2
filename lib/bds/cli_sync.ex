@@ -39,12 +39,18 @@ defmodule BDS.CliSync do
     ids = Enum.map(notifications, & &1.id)
 
     if ids != [] do
-      Repo.update_all(from(notification in Notification, where: notification.id in ^ids), set: [seen_at: now])
+      Repo.update_all(from(notification in Notification, where: notification.id in ^ids),
+        set: [seen_at: now]
+      )
     end
 
     {:ok,
      Enum.map(notifications, fn notification ->
-       %{entity_type: notification.entity_type, entity_id: notification.entity_id, action: notification.action}
+       %{
+         entity_type: notification.entity_type,
+         entity_id: notification.entity_id,
+         action: notification.action
+       }
      end)}
   end
 
@@ -52,13 +58,17 @@ defmodule BDS.CliSync do
     {processed_count, _} =
       Repo.delete_all(
         from notification in Notification,
-          where: not is_nil(notification.seen_at) and notification.created_at <= ^(now - @processed_ttl_ms)
+          where:
+            not is_nil(notification.seen_at) and
+              notification.created_at <= ^(now - @processed_ttl_ms)
       )
 
     {unprocessed_count, _} =
       Repo.delete_all(
         from notification in Notification,
-          where: is_nil(notification.seen_at) and notification.created_at <= ^(now - @unprocessed_ttl_ms)
+          where:
+            is_nil(notification.seen_at) and
+              notification.created_at <= ^(now - @unprocessed_ttl_ms)
       )
 
     {:ok, %{processed: processed_count, unprocessed: unprocessed_count}}

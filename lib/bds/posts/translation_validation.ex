@@ -50,7 +50,11 @@ defmodule BDS.Posts.TranslationValidation do
       Repo.all(
         from translation in Translation,
           where: translation.project_id == ^project_id,
-          order_by: [asc: translation.translation_for, asc: translation.language, asc: translation.id]
+          order_by: [
+            asc: translation.translation_for,
+            asc: translation.language,
+            asc: translation.id
+          ]
       )
 
     project_data_dir = Projects.project_data_dir(project)
@@ -67,7 +71,13 @@ defmodule BDS.Posts.TranslationValidation do
       translation_rows
       |> Enum.with_index(1)
       |> Enum.flat_map(fn {translation, index} ->
-        :ok = RebuildFromFiles.report_rebuild_progress(on_progress, index, total_items, "translations")
+        :ok =
+          RebuildFromFiles.report_rebuild_progress(
+            on_progress,
+            index,
+            total_items,
+            "translations"
+          )
 
         case invalid_database_translation_issue(translation, source_post_map, metadata) do
           nil -> []
@@ -80,7 +90,13 @@ defmodule BDS.Posts.TranslationValidation do
       markdown_files
       |> Enum.with_index(length(translation_rows) + 1)
       |> Enum.reduce({0, []}, fn {file_path, index}, {count, issues} ->
-        :ok = RebuildFromFiles.report_rebuild_progress(on_progress, index, total_items, "translations")
+        :ok =
+          RebuildFromFiles.report_rebuild_progress(
+            on_progress,
+            index,
+            total_items,
+            "translations"
+          )
 
         case invalid_filesystem_translation_issue(file_path, source_post_map, metadata) do
           {:ok, nil} -> {count + 1, issues}
@@ -118,11 +134,19 @@ defmodule BDS.Posts.TranslationValidation do
     normalized_report = normalize_report(report)
 
     {deleted_database_rows, flushed_translations, synced_post_ids} =
-      Enum.reduce(normalized_report.invalid_database_rows, {0, 0, MapSet.new()}, fn issue, {deleted, flushed, synced_ids} ->
+      Enum.reduce(normalized_report.invalid_database_rows, {0, 0, MapSet.new()}, fn issue,
+                                                                                    {deleted,
+                                                                                     flushed,
+                                                                                     synced_ids} ->
         case fix_invalid_database_row(issue) do
-          {:deleted, post_id} -> {deleted + 1, flushed, maybe_put_synced_post(synced_ids, post_id)}
-          {:flushed, post_id} -> {deleted, flushed + 1, maybe_put_synced_post(synced_ids, post_id)}
-          :noop -> {deleted, flushed, synced_ids}
+          {:deleted, post_id} ->
+            {deleted + 1, flushed, maybe_put_synced_post(synced_ids, post_id)}
+
+          {:flushed, post_id} ->
+            {deleted, flushed + 1, maybe_put_synced_post(synced_ids, post_id)}
+
+          :noop ->
+            {deleted, flushed, synced_ids}
         end
       end)
 
@@ -365,7 +389,10 @@ defmodule BDS.Posts.TranslationValidation do
     end
   end
 
-  defp fix_invalid_database_row(%{translation_id: translation_id, translation_for: translation_for})
+  defp fix_invalid_database_row(%{
+         translation_id: translation_id,
+         translation_for: translation_for
+       })
        when is_binary(translation_id) do
     case Repo.get(Translation, translation_id) do
       %Translation{} = translation ->
@@ -402,7 +429,11 @@ defmodule BDS.Posts.TranslationValidation do
   end
 
   defp issue_sort_key(issue) do
-    [Map.get(issue, :translation_for), Map.get(issue, :translation_id), Map.get(issue, :file_path)]
+    [
+      Map.get(issue, :translation_for),
+      Map.get(issue, :translation_id),
+      Map.get(issue, :file_path)
+    ]
     |> Enum.map(&to_string(&1 || ""))
     |> Enum.join(":")
   end

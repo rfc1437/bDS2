@@ -6,12 +6,14 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings do
   alias BDS.Metadata
   alias BDS.Desktop.ShellData
 
+  @spec project_metadata(term()) :: term()
   def project_metadata(assigns) do
     case Metadata.get_project_metadata(assigns.projects.active_project_id) do
       {:ok, metadata} -> metadata
     end
   end
 
+  @spec project_form(term()) :: term()
   def project_form(metadata) do
     %{
       "name" => Map.get(metadata, :name, ""),
@@ -28,18 +30,21 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings do
     }
   end
 
+  @spec technology_form(term()) :: term()
   def technology_form(project_form) do
     %{
       "semantic_similarity_enabled" => Map.get(project_form, "semantic_similarity_enabled", false)
     }
   end
 
+  @spec update_project_draft(term(), term(), term()) :: term()
   def update_project_draft(socket, params, reload) do
     socket
     |> assign(:settings_editor_project_draft, normalize_project_params(params))
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec save_project(term(), term(), term()) :: term()
   def save_project(socket, reload, append_output) do
     project_id = socket.assigns.projects.active_project_id
 

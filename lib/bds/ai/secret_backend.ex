@@ -17,7 +17,15 @@ defmodule BDS.AI.SecretBackend do
     with {:ok, binary} <- Base.decode64(encoded),
          <<iv::binary-size(12), tag::binary-size(16), ciphertext::binary>> <- binary,
          plaintext when is_binary(plaintext) <-
-           :crypto.crypto_one_time_aead(:aes_256_gcm, secret_key(), iv, ciphertext, @aad, tag, false) do
+           :crypto.crypto_one_time_aead(
+             :aes_256_gcm,
+             secret_key(),
+             iv,
+             ciphertext,
+             @aad,
+             tag,
+             false
+           ) do
       {:ok, plaintext}
     else
       _other -> {:error, :invalid_ciphertext}

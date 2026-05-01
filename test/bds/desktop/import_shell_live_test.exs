@@ -13,7 +13,9 @@ defmodule BDS.Desktop.ImportShellLiveTest do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
 
-    temp_dir = Path.join(System.tmp_dir!(), "bds-import-shell-live-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-import-shell-live-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
@@ -23,7 +25,8 @@ defmodule BDS.Desktop.ImportShellLiveTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "opening an import definition renders the dedicated import analysis editor instead of the fallback shell frame", %{project: project, temp_dir: temp_dir} do
+  test "opening an import definition renders the dedicated import analysis editor instead of the fallback shell frame",
+       %{project: project, temp_dir: temp_dir} do
     uploads_dir = Path.join(temp_dir, "uploads")
     wxr_path = Path.join(temp_dir, "legacy.xml")
 
@@ -89,7 +92,13 @@ defmodule BDS.Desktop.ImportShellLiveTest do
       },
       post_stats: %{new_count: 1, update_count: 0, conflict_count: 1, duplicate_count: 0},
       page_stats: %{new_count: 1, update_count: 0, conflict_count: 0, duplicate_count: 0},
-      media_stats: %{new_count: 1, update_count: 0, conflict_count: 0, duplicate_count: 0, missing_count: 0},
+      media_stats: %{
+        new_count: 1,
+        update_count: 0,
+        conflict_count: 0,
+        duplicate_count: 0,
+        missing_count: 0
+      },
       category_stats: %{existing_count: 0, mapped_count: 0, new_count: 1},
       tag_stats: %{existing_count: 0, mapped_count: 0, new_count: 1},
       date_distribution: [%{year: 2024, post_count: 2, media_count: 1}],
@@ -119,7 +128,13 @@ defmodule BDS.Desktop.ImportShellLiveTest do
       items: %{
         posts: [
           %{item_type: "post", title: "Hello World", slug: "hello-world", status: "new"},
-          %{item_type: "post", title: "Conflict Me", slug: "conflict-me", status: "conflict", resolution: "ignore"}
+          %{
+            item_type: "post",
+            title: "Conflict Me",
+            slug: "conflict-me",
+            status: "conflict",
+            resolution: "ignore"
+          }
         ],
         pages: [
           %{item_type: "page", title: "About", slug: "about", status: "new"}

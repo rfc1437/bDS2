@@ -114,9 +114,11 @@ defmodule BDS.Maintenance do
     phases = [
       {"Comparing project metadata", fn -> project_metadata_diff_reports(project_id) end},
       {"Comparing post metadata", fn -> post_diff_reports(project_id, project) end},
-      {"Comparing post translations", fn -> post_translation_diff_reports(project_id, project) end},
+      {"Comparing post translations",
+       fn -> post_translation_diff_reports(project_id, project) end},
       {"Comparing media metadata", fn -> media_diff_reports(project_id, project) end},
-      {"Comparing media translations", fn -> media_translation_diff_reports(project_id, project) end},
+      {"Comparing media translations",
+       fn -> media_translation_diff_reports(project_id, project) end},
       {"Comparing script metadata", fn -> script_diff_reports(project_id, project) end},
       {"Comparing template metadata", fn -> template_diff_reports(project_id, project) end},
       {"Comparing embeddings", fn -> Embeddings.diff_reports(project_id) end}
@@ -132,7 +134,9 @@ defmodule BDS.Maintenance do
         fun.()
       end)
 
-    :ok = report_metadata_diff_phase(on_progress, total_phases, total_phases, "Scanning orphan files")
+    :ok =
+      report_metadata_diff_phase(on_progress, total_phases, total_phases, "Scanning orphan files")
+
     orphan_reports = orphan_reports(project_id, project)
     :ok = report_metadata_diff_complete(on_progress)
 

@@ -41,7 +41,9 @@ defmodule BDS.Desktop.ShellLive.TitlebarMenu do
 
   @spec active_group(map()) :: map() | nil
   def active_group(assigns) do
-    Enum.find(assigns.menu_groups || [], fn group -> Atom.to_string(group.id) == assigns.titlebar_menu_group end)
+    Enum.find(assigns.menu_groups || [], fn group ->
+      Atom.to_string(group.id) == assigns.titlebar_menu_group
+    end)
   end
 
   @spec active_items(map()) :: [map()]
@@ -90,7 +92,9 @@ defmodule BDS.Desktop.ShellLive.TitlebarMenu do
   Handle a keydown event on an open titlebar menu. `invoke_fun` is called
   with the action id (string) when the user activates an item.
   """
-  @spec handle_keydown(Phoenix.LiveView.Socket.t(), String.t(), (Phoenix.LiveView.Socket.t(), String.t() -> Phoenix.LiveView.Socket.t())) ::
+  @spec handle_keydown(Phoenix.LiveView.Socket.t(), String.t(), (Phoenix.LiveView.Socket.t(),
+                                                                 String.t() ->
+                                                                   Phoenix.LiveView.Socket.t())) ::
           Phoenix.LiveView.Socket.t()
   def handle_keydown(socket, key, invoke_fun) do
     if socket.assigns.titlebar_menu_group do
@@ -114,7 +118,9 @@ defmodule BDS.Desktop.ShellLive.TitlebarMenu do
   defp rotate_group(socket, offset) do
     groups = socket.assigns.menu_groups || []
     current_group = socket.assigns.titlebar_menu_group
-    current_index = Enum.find_index(groups, fn group -> Atom.to_string(group.id) == current_group end)
+
+    current_index =
+      Enum.find_index(groups, fn group -> Atom.to_string(group.id) == current_group end)
 
     if is_nil(current_index) or groups == [] do
       socket

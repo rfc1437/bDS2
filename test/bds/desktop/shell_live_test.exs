@@ -8,8 +8,10 @@ defmodule BDS.Desktop.ShellLiveTest do
 
   test "shell live modules use contexts instead of direct Repo.get calls" do
     source_files =
-      [Path.expand("../../../lib/bds/desktop/shell_live.ex", __DIR__) |
-       Path.wildcard(Path.join(@shell_live_source_root, "**/*.ex"))]
+      [
+        Path.expand("../../../lib/bds/desktop/shell_live.ex", __DIR__)
+        | Path.wildcard(Path.join(@shell_live_source_root, "**/*.ex"))
+      ]
 
     offenders =
       source_files
@@ -46,12 +48,20 @@ defmodule BDS.Desktop.ShellLiveTest do
   defmodule FakeEndpointModelHttpClient do
     def get("https://api.example.test/v1/models", _headers) do
       {:ok,
-       %{status: 200, headers: %{}, body: Jason.encode!(%{"data" => [%{"id" => "gpt-4.1"}, %{"id" => "gpt-4.1-mini"}]})}}
+       %{
+         status: 200,
+         headers: %{},
+         body: Jason.encode!(%{"data" => [%{"id" => "gpt-4.1"}, %{"id" => "gpt-4.1-mini"}]})
+       }}
     end
 
     def get("http://localhost:11434/v1/models", _headers) do
       {:ok,
-       %{status: 200, headers: %{}, body: Jason.encode!(%{"data" => [%{"id" => "llama3.3"}, %{"id" => "llava:latest"}]})}}
+       %{
+         status: 200,
+         headers: %{},
+         body: Jason.encode!(%{"data" => [%{"id" => "llama3.3"}, %{"id" => "llava:latest"}]})
+       }}
     end
 
     def get(_url, _headers), do: {:error, :not_found}
@@ -61,8 +71,8 @@ defmodule BDS.Desktop.ShellLiveTest do
     use Plug.Router
     import Phoenix.ConnTest, except: [post: 2]
 
-    plug :match
-    plug :dispatch
+    plug(:match)
+    plug(:dispatch)
 
     post "/v1/chat/completions" do
       Process.sleep(300)
@@ -89,7 +99,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
 
-    temp_dir = Path.join(System.tmp_dir!(), "bds-shell-live-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-shell-live-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
 
     on_exit(fn -> File.rm_rf(temp_dir) end)
@@ -158,7 +170,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-sidebar-action="import")
   end
 
-  test "sidebar create actions follow the old-app post, script, template, and import flows", %{project: project} do
+  test "sidebar create actions follow the old-app post, script, template, and import flows", %{
+    project: project
+  } do
     {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
     post_count_before = Repo.aggregate(Post, :count, :id)
     script_count_before = Repo.aggregate(BDS.Scripts.Script, :count, :id)
@@ -218,7 +232,8 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element("[data-testid='sidebar-create-action'][data-sidebar-action='import']")
       |> render_click()
 
-    assert Repo.aggregate(ImportDefinitions.ImportDefinition, :count, :id) == import_count_before + 1
+    assert Repo.aggregate(ImportDefinitions.ImportDefinition, :count, :id) ==
+             import_count_before + 1
 
     created_definition = Repo.one!(ImportDefinitions.ImportDefinition)
     assert created_definition.project_id == project.id
@@ -227,19 +242,27 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-tab-id="#{created_definition.id}")
   end
 
-  test "shell live refreshes the posts sidebar when the CLI watcher broadcasts an entity change", %{project: project} do
+  test "shell live refreshes the posts sidebar when the CLI watcher broadcasts an entity change",
+       %{project: project} do
     {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
     refute html =~ "CLI Added Post"
 
     assert {:ok, post} = Posts.create_post(%{project_id: project.id, title: "CLI Added Post"})
 
-    Phoenix.PubSub.broadcast(BDS.PubSub, Watcher.topic(), {:entity_changed, %{entity: "post", entity_id: post.id, action: :created}})
+    Phoenix.PubSub.broadcast(
+      BDS.PubSub,
+      Watcher.topic(),
+      {:entity_changed, %{entity: "post", entity_id: post.id, action: :created}}
+    )
 
     assert render(view) =~ "CLI Added Post"
   end
 
-  test "shell live closes stale post and media tabs when the CLI watcher broadcasts deletions", %{project: project, temp_dir: temp_dir} do
+  test "shell live closes stale post and media tabs when the CLI watcher broadcasts deletions", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, post} = Posts.create_post(%{project_id: project.id, title: "CLI Delete Post"})
 
     source_path = Path.join(temp_dir, "cli-delete-media.txt")
@@ -264,7 +287,11 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert {:ok, :deleted} = Posts.delete_post(post.id)
 
-    Phoenix.PubSub.broadcast(BDS.PubSub, Watcher.topic(), {:entity_changed, %{entity: "post", entity_id: post.id, action: :deleted}})
+    Phoenix.PubSub.broadcast(
+      BDS.PubSub,
+      Watcher.topic(),
+      {:entity_changed, %{entity: "post", entity_id: post.id, action: :deleted}}
+    )
 
     html = render(view)
     refute html =~ ~s(data-tab-type="post")
@@ -285,7 +312,11 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert {:ok, :deleted} = Media.delete_media(media.id)
 
-    Phoenix.PubSub.broadcast(BDS.PubSub, Watcher.topic(), {:entity_changed, %{entity: "media", entity_id: media.id, action: :deleted}})
+    Phoenix.PubSub.broadcast(
+      BDS.PubSub,
+      Watcher.topic(),
+      {:entity_changed, %{entity: "media", entity_id: media.id, action: :deleted}}
+    )
 
     html = render(view)
     refute html =~ ~s(data-tab-type="media")
@@ -624,7 +655,14 @@ defmodule BDS.Desktop.ShellLiveTest do
 
   test "shell live renders the legacy git activity badge from remote behind count" do
     Application.put_env(:bds, :git_remote_state_provider, fn _project_id, _opts ->
-      {:ok, %{local_branch: "main", upstream_branch: "origin/main", has_upstream: true, ahead: 0, behind: 7}}
+      {:ok,
+       %{
+         local_branch: "main",
+         upstream_branch: "origin/main",
+         has_upstream: true,
+         ahead: 0,
+         behind: 7
+       }}
     end)
 
     {:ok, _view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
@@ -906,7 +944,8 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ ~s(style="width: 280px;")
 
-    html = render_hook(view, "sync_layout", %{"sidebar_width" => 420, "assistant_sidebar_width" => 480})
+    html =
+      render_hook(view, "sync_layout", %{"sidebar_width" => 420, "assistant_sidebar_width" => 480})
 
     assert html =~ ~s(data-testid="sidebar-shell")
     assert html =~ ~s(style="width: 420px;")
@@ -928,7 +967,8 @@ defmodule BDS.Desktop.ShellLiveTest do
   test "sidebar filters and load more are server-driven", %{project: project} do
     seed_sidebar_posts(project.id)
 
-    assert {:ok, _tag} = Tags.create_tag(%{project_id: project.id, name: "tech", color: "#112233"})
+    assert {:ok, _tag} =
+             Tags.create_tag(%{project_id: project.id, name: "tech", color: "#112233"})
 
     {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
@@ -937,7 +977,10 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="sidebar-section-header")
     assert html =~ ~s(class="sidebar-actions")
     assert html =~ ~s(data-testid="sidebar-load-more")
-    assert html_position(html, ~s(data-testid="sidebar-load-more")) > html_position(html, ">Archived<")
+
+    assert html_position(html, ~s(data-testid="sidebar-load-more")) >
+             html_position(html, ">Archived<")
+
     refute html =~ ~s(data-testid="sidebar-filter-tag")
     assert html =~ "Alpha Post"
     refute html =~ "Overflow Post"
@@ -998,9 +1041,18 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Overflow Post"
   end
 
-  test "project switcher, ui language, dashboard recents, and output log are wired", %{temp_dir: temp_dir} do
-    {:ok, other_project} = Projects.create_project(%{name: "Second Blog", data_path: Path.join(temp_dir, "second")})
-    {:ok, recent_post} = Posts.create_post(%{project_id: other_project.id, title: "Recent Shell Post", content: "body"})
+  test "project switcher, ui language, dashboard recents, and output log are wired", %{
+    temp_dir: temp_dir
+  } do
+    {:ok, other_project} =
+      Projects.create_project(%{name: "Second Blog", data_path: Path.join(temp_dir, "second")})
+
+    {:ok, recent_post} =
+      Posts.create_post(%{
+        project_id: other_project.id,
+        title: "Recent Shell Post",
+        content: "body"
+      })
 
     {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
@@ -1044,13 +1096,22 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Activated Second Blog"
   end
 
-  test "task button opens tasks and post panels render real link and git data", %{project: project, temp_dir: temp_dir} do
-    {:ok, target} = Posts.create_post(%{project_id: project.id, title: "Target Post", content: "target body"})
+  test "task button opens tasks and post panels render real link and git data", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    {:ok, target} =
+      Posts.create_post(%{project_id: project.id, title: "Target Post", content: "target body"})
+
     {:ok, target} = Posts.publish_post(target.id)
     target_href = canonical_post_href(target)
 
     {:ok, source} =
-      Posts.create_post(%{project_id: project.id, title: "Linking Source", content: "See [Target](#{target_href})"})
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Linking Source",
+        content: "See [Target](#{target_href})"
+      })
 
     {:ok, source} = Posts.publish_post(source.id)
     :ok = Posts.rebuild_post_links(project.id)
@@ -1087,7 +1148,10 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> render_click()
 
     refute html =~ ~s(class="panel-shell is-hidden")
-    assert html =~ ~s(<button class="panel-tab active" type="button" phx-click="select_panel_tab" phx-value-tab="tasks">)
+
+    assert html =~
+             ~s(<button class="panel-tab active" type="button" phx-click="select_panel_tab" phx-value-tab="tasks">)
+
     assert html =~ ~s(class="task-list") or html =~ "No background tasks running"
   end
 
@@ -1276,7 +1340,9 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     html =
       view
-      |> element("[data-testid='metadata-diff-repair-button'][data-direction='file_to_db'][data-field='title']")
+      |> element(
+        "[data-testid='metadata-diff-repair-button'][data-direction='file_to_db'][data-field='title']"
+      )
       |> render_click()
 
     assert html =~ "Repair Metadata Diff"
@@ -1418,7 +1484,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute orphan_relative_path in Enum.map(diff.orphan_reports, & &1.file_path)
   end
 
-  test "metadata diff embeddings tab exposes repair actions and clears embedding drift", %{project: project} do
+  test "metadata diff embeddings tab exposes repair actions and clears embedding drift", %{
+    project: project
+  } do
     :ok = BDS.Tasks.clear_finished()
 
     assert {:ok, _metadata} =
@@ -1455,7 +1523,9 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     html =
       view
-      |> element("[data-testid='metadata-diff-repair-button'][data-direction='file_to_db'][data-field='content_hash']")
+      |> element(
+        "[data-testid='metadata-diff-repair-button'][data-direction='file_to_db'][data-field='content_hash']"
+      )
       |> render_click()
 
     assert html =~ "Repair Metadata Diff"
@@ -1465,15 +1535,24 @@ defmodule BDS.Desktop.ShellLiveTest do
     send(view.pid, :refresh_task_status)
     _html = render(view)
 
-    assert Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: published_post.id) != nil
+    assert Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: published_post.id) !=
+             nil
 
     assert {:ok, diff} = BDS.Maintenance.metadata_diff(project.id)
-    refute Enum.any?(diff.diff_reports, &(&1.entity_type == "embedding" and &1.entity_id == published_post.id))
+
+    refute Enum.any?(
+             diff.diff_reports,
+             &(&1.entity_type == "embedding" and &1.entity_id == published_post.id)
+           )
   end
 
   test "post tabs render a real editor and drive save publish discard flows", %{project: project} do
-    assert {:ok, _tag} = Tags.create_tag(%{project_id: project.id, name: "alpha", color: "#112233"})
-    assert {:ok, _tag} = Tags.create_tag(%{project_id: project.id, name: "beta", color: "#445566"})
+    assert {:ok, _tag} =
+             Tags.create_tag(%{project_id: project.id, name: "alpha", color: "#112233"})
+
+    assert {:ok, _tag} =
+             Tags.create_tag(%{project_id: project.id, name: "beta", color: "#445566"})
+
     assert {:ok, _metadata} = Metadata.add_category(project.id, "notes")
     assert {:ok, _metadata} = Metadata.add_category(project.id, "guides")
 
@@ -1632,7 +1711,10 @@ defmodule BDS.Desktop.ShellLiveTest do
   defp new_task!(_existing_ids, _name, 0), do: flunk("new task was not created in time")
 
   defp new_task!(existing_ids, name, attempts) do
-    case Enum.find(BDS.Tasks.list_tasks(), &(&1.name == name and not MapSet.member?(existing_ids, &1.id))) do
+    case Enum.find(
+           BDS.Tasks.list_tasks(),
+           &(&1.name == name and not MapSet.member?(existing_ids, &1.id))
+         ) do
       nil ->
         Process.sleep(20)
         new_task!(existing_ids, name, attempts - 1)
@@ -1642,7 +1724,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     end
   end
 
-  test "published post editor loads body from file and renders markdown-only editor", %{project: project} do
+  test "published post editor loads body from file and renders markdown-only editor", %{
+    project: project
+  } do
     {:ok, post} =
       Posts.create_post(%{
         project_id: project.id,
@@ -1665,14 +1749,22 @@ defmodule BDS.Desktop.ShellLiveTest do
       })
 
     assert html =~ ~s(data-testid="post-editor-content")
-    assert Regex.match?(~r/name="post_editor\[content\]"[^>]*># Heading\s+```elixir\s+IO\.puts\(:ok\)\s+```/s, html)
+
+    assert Regex.match?(
+             ~r/name="post_editor\[content\]"[^>]*># Heading\s+```elixir\s+IO\.puts\(:ok\)\s+```/s,
+             html
+           )
+
     assert html =~ ~s(data-monaco-language="markdown-with-macros")
     assert html =~ ~s(phx-hook="MonacoEditor")
     refute html =~ "post-editor-markdown-highlight"
     refute html =~ ~s(phx-value-mode="visual")
   end
 
-  test "media tabs render a real editor and drive explicit save flows", %{project: project, temp_dir: temp_dir} do
+  test "media tabs render a real editor and drive explicit save flows", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     {:ok, post} =
       Posts.create_post(%{
         project_id: project.id,
@@ -1767,7 +1859,10 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert saved_media.language == "fr"
   end
 
-  test "media editor follows the old-app translation editing flow", %{project: project, temp_dir: temp_dir} do
+  test "media editor follows the old-app translation editing flow", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     source_path = Path.join(temp_dir, "hero.txt")
     File.write!(source_path, "media body")
 
@@ -1801,9 +1896,21 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="editor-content media-editor")
     assert html =~ ~s(class="quick-actions-wrapper")
     refute html =~ ~s(class="media-editor-form")
-    assert has_element?(view, "[data-testid='media-editor'] .editor-content.media-editor .media-details")
-    assert has_element?(view, "[data-testid='media-editor'] .editor-content.media-editor .media-details .media-translations-section")
-    assert has_element?(view, "[data-testid='media-editor'] .editor-content.media-editor .media-details .linked-posts-section")
+
+    assert has_element?(
+             view,
+             "[data-testid='media-editor'] .editor-content.media-editor .media-details"
+           )
+
+    assert has_element?(
+             view,
+             "[data-testid='media-editor'] .editor-content.media-editor .media-details .media-translations-section"
+           )
+
+    assert has_element?(
+             view,
+             "[data-testid='media-editor'] .editor-content.media-editor .media-details .linked-posts-section"
+           )
 
     html = render_click(view, "edit_media_translation", %{"id" => media.id, "language" => "de"})
 
@@ -1814,7 +1921,10 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(name="media_translation[caption]")
   end
 
-  test "settings and media editors render localized labels when the UI language changes", %{project: project, temp_dir: temp_dir} do
+  test "settings and media editors render localized labels when the UI language changes", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     source_path = Path.join(temp_dir, "localized-hero.txt")
     File.write!(source_path, "media body")
 
@@ -1862,7 +1972,8 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute media_html =~ "Linked Posts"
   end
 
-  test "remaining step-5 routes render dedicated editors instead of the generic shell placeholder", %{project: project} do
+  test "remaining step-5 routes render dedicated editors instead of the generic shell placeholder",
+       %{project: project} do
     assert {:ok, script} =
              Scripts.create_script(%{
                project_id: project.id,
@@ -2134,7 +2245,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ ~s(data-testid="chat-input-container")
   end
 
-  test "chat editor renders assistant markdown and dispatches assistant navigation actions", %{project: project} do
+  test "chat editor renders assistant markdown and dispatches assistant navigation actions", %{
+    project: project
+  } do
     assert {:ok, post} =
              Posts.create_post(%{
                project_id: project.id,
@@ -2315,7 +2428,10 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute render(view) =~ "Delayed response"
   end
 
-  test "translation validation route renders dedicated cards and fix controls", %{project: project, temp_dir: temp_dir} do
+  test "translation validation route renders dedicated cards and fix controls", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{
                main_language: "en",
@@ -2375,7 +2491,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ invalid_file_path
   end
 
-  test "git diff route renders a structured Monaco diff surface for working tree changes", %{temp_dir: temp_dir} do
+  test "git diff route renders a structured Monaco diff surface for working tree changes", %{
+    temp_dir: temp_dir
+  } do
     posts_dir = Path.join(temp_dir, "posts")
     File.mkdir_p!(posts_dir)
 
@@ -2424,7 +2542,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-selected-settings-section="ai")
   end
 
-  test "template sidebar exposes old-app style delete control and removes template rows", %{project: project} do
+  test "template sidebar exposes old-app style delete control and removes template rows", %{
+    project: project
+  } do
     assert {:ok, template} =
              BDS.Templates.create_template(%{
                project_id: project.id,
@@ -2471,9 +2591,20 @@ defmodule BDS.Desktop.ShellLiveTest do
         sidebar_post(project_id, "beta-post", "Beta Post", now + 2_000, ["design"], ["guides"])
       ] ++
         Enum.map(1..498, fn index ->
-          sidebar_post(project_id, "filler-#{index}", "Filler #{index}", now - index, ["filler"], ["archive"])
+          sidebar_post(
+            project_id,
+            "filler-#{index}",
+            "Filler #{index}",
+            now - index,
+            ["filler"],
+            ["archive"]
+          )
         end) ++
-        [sidebar_post(project_id, "overflow-post", "Overflow Post", now - 10_000, ["tech"], ["notes"])]
+        [
+          sidebar_post(project_id, "overflow-post", "Overflow Post", now - 10_000, ["tech"], [
+            "notes"
+          ])
+        ]
 
     {count, _rows} = Repo.insert_all(Post, entries)
     assert count == length(entries)

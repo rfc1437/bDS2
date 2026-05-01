@@ -44,7 +44,8 @@ defmodule BDS.Generation.Renderers do
   end
 
   @doc "Render an archive page (category, tag, year) with pagination."
-  @spec render_archive_page(map(), String.t(), [map()], String.t() | nil, String.t(), map()) :: String.t()
+  @spec render_archive_page(map(), String.t(), [map()], String.t() | nil, String.t(), map()) ::
+          String.t()
   def render_archive_page(plan, title, posts, language, kind, pagination) do
     fallback = fn ->
       items =
@@ -130,7 +131,15 @@ defmodule BDS.Generation.Renderers do
   end
 
   @doc "Render a list/archive page through the project template, falling back to inline."
-  @spec render_list_output(map(), String.t() | nil, String.t(), [map()], map(), map(), (-> String.t())) ::
+  @spec render_list_output(
+          map(),
+          String.t() | nil,
+          String.t(),
+          [map()],
+          map(),
+          map(),
+          (-> String.t())
+        ) ::
           String.t()
   def render_list_output(
         %{project_id: project_id, language: main_language},

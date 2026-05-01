@@ -59,7 +59,9 @@ defmodule BDS.Git do
          has_lfs: has_lfs_configured?(project_dir)
        }}
     else
-      {:error, :not_found} = error -> error
+      {:error, :not_found} = error ->
+        error
+
       {:error, _reason} ->
         {:ok,
          %{
@@ -74,7 +76,8 @@ defmodule BDS.Git do
 
   def status(project_id, opts \\ []) when is_binary(project_id) and is_list(opts) do
     with {:ok, project_dir} <- project_dir(project_id),
-         {:ok, output} <- run_git(project_dir, ["status", "--porcelain=v1", "--untracked-files=all"], opts) do
+         {:ok, output} <-
+           run_git(project_dir, ["status", "--porcelain=v1", "--untracked-files=all"], opts) do
       {:ok, %{files: parse_status(output)}}
     end
   end
@@ -112,7 +115,8 @@ defmodule BDS.Git do
       when is_binary(project_id) and is_binary(branch) and is_list(opts) do
     with {:ok, project_dir} <- project_dir(project_id),
          {:ok, local_log} <- run_git(project_dir, ["log", "--format=%H%x09%s", branch], opts),
-         {:ok, remote_log} <- run_git(project_dir, ["log", "--format=%H", "origin/#{branch}"], opts) do
+         {:ok, remote_log} <-
+           run_git(project_dir, ["log", "--format=%H", "origin/#{branch}"], opts) do
       local_commits = parse_local_history(local_log)
       remote_hashes = MapSet.new(parse_remote_history(remote_log))
       local_hashes = MapSet.new(Enum.map(local_commits, & &1.hash))
@@ -121,7 +125,9 @@ defmodule BDS.Git do
         remote_hashes
         |> MapSet.difference(local_hashes)
         |> MapSet.to_list()
-        |> Enum.map(fn hash -> %{hash: hash, subject: nil, sync_status: %{kind: :remote_only}} end)
+        |> Enum.map(fn hash ->
+          %{hash: hash, subject: nil, sync_status: %{kind: :remote_only}}
+        end)
 
       commits =
         Enum.map(local_commits, fn commit ->
@@ -136,7 +142,8 @@ defmodule BDS.Git do
   def file_history(project_id, file_path, opts \\ [])
       when is_binary(project_id) and is_binary(file_path) and is_list(opts) do
     with {:ok, project_dir} <- project_dir(project_id),
-         {:ok, output} <- run_git(project_dir, ["log", "--follow", "--format=%H%x09%s", "--", file_path], opts) do
+         {:ok, output} <-
+           run_git(project_dir, ["log", "--follow", "--format=%H%x09%s", "--", file_path], opts) do
       {:ok, %{commits: parse_local_history(output) |> Enum.take(50)}}
     else
       {:error, {:git_failed, _message}} -> {:ok, %{commits: []}}
@@ -147,8 +154,11 @@ defmodule BDS.Git do
   def fetch(project_id, opts \\ []) when is_binary(project_id) and is_list(opts) do
     with {:ok, project_dir} <- project_dir(project_id) do
       case run_git(project_dir, ["fetch", "--all", "--prune"], opts) do
-        {:ok, output} -> {:ok, %{updated: true, output: output}}
-        {:error, {:git_failed, message}} -> structured_git_error(project_dir, :fetch, message, opts)
+        {:ok, output} ->
+          {:ok, %{updated: true, output: output}}
+
+        {:error, {:git_failed, message}} ->
+          structured_git_error(project_dir, :fetch, message, opts)
       end
     end
   end
@@ -177,9 +187,11 @@ defmodule BDS.Git do
   end
 
   def reconcile(project_id, old_commit, new_commit, opts \\ [])
-      when is_binary(project_id) and is_binary(old_commit) and is_binary(new_commit) and is_list(opts) do
+      when is_binary(project_id) and is_binary(old_commit) and is_binary(new_commit) and
+             is_list(opts) do
     with {:ok, project_dir} <- project_dir(project_id),
-         {:ok, output} <- run_git(project_dir, ["diff", "--name-status", old_commit, new_commit], opts) do
+         {:ok, output} <-
+           run_git(project_dir, ["diff", "--name-status", old_commit, new_commit], opts) do
       {:ok, %{changed: parse_changed_files(output)}}
     end
   end
@@ -197,7 +209,14 @@ defmodule BDS.Git do
          {:ok, local_branch} <- current_branch(project_dir, opts) do
       case upstream_branch(project_dir, opts) do
         {:ok, nil} ->
-          {:ok, %{local_branch: local_branch, upstream_branch: nil, has_upstream: false, ahead: 0, behind: 0}}
+          {:ok,
+           %{
+             local_branch: local_branch,
+             upstream_branch: nil,
+             has_upstream: false,
+             ahead: 0,
+             behind: 0
+           }}
 
         {:ok, upstream_branch} ->
           {:ok,
@@ -316,7 +335,11 @@ defmodule BDS.Git do
   end
 
   defp upstream_branch(project_dir, opts) do
-    case run_git(project_dir, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], opts) do
+    case run_git(
+           project_dir,
+           ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+           opts
+         ) do
       {:ok, output} -> {:ok, blank_to_nil(output)}
       {:error, {:git_failed, _message}} -> {:ok, nil}
     end
@@ -364,21 +387,37 @@ defmodule BDS.Git do
   defp parse_changed_files(output) do
     base = fn -> %{added: [], modified: [], deleted: [], renamed: []} end
 
-    Enum.reduce(String.split(output, "\n", trim: true), %{posts: base.(), scripts: base.(), templates: base.()}, fn line, acc ->
-      case String.split(line, "\t", trim: true) do
-        ["A", path] -> update_changed(acc, path, :added, path)
-        ["M", path] -> update_changed(acc, path, :modified, path)
-        ["D", path] -> update_changed(acc, path, :deleted, path)
-        ["R" <> _score, old_path, new_path] -> update_changed(acc, new_path, :renamed, %{old: old_path, new: new_path})
-        _other -> acc
+    Enum.reduce(
+      String.split(output, "\n", trim: true),
+      %{posts: base.(), scripts: base.(), templates: base.()},
+      fn line, acc ->
+        case String.split(line, "\t", trim: true) do
+          ["A", path] ->
+            update_changed(acc, path, :added, path)
+
+          ["M", path] ->
+            update_changed(acc, path, :modified, path)
+
+          ["D", path] ->
+            update_changed(acc, path, :deleted, path)
+
+          ["R" <> _score, old_path, new_path] ->
+            update_changed(acc, new_path, :renamed, %{old: old_path, new: new_path})
+
+          _other ->
+            acc
+        end
       end
-    end)
+    )
   end
 
   defp update_changed(acc, path, key, value) do
     case category_for_path(path) do
-      nil -> acc
-      category -> Map.update!(acc, category, &Map.update!(&1, key, fn items -> items ++ [value] end))
+      nil ->
+        acc
+
+      category ->
+        Map.update!(acc, category, &Map.update!(&1, key, fn items -> items ++ [value] end))
     end
   end
 
@@ -427,6 +466,7 @@ defmodule BDS.Git do
 
   defp auth_guidance(provider, platform) do
     provider_label = provider || :git
+
     "Authentication failed for #{provider_label} on #{platform}. Configure SSH keys or a credential helper that works non-interactively."
   end
 

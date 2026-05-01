@@ -47,7 +47,10 @@ defmodule BDS.Scripting.Capabilities.Crud do
 
   def list_scripts(project_id) do
     Repo.all(
-      from(script in Script, where: script.project_id == ^project_id, order_by: [asc: script.created_at])
+      from(script in Script,
+        where: script.project_id == ^project_id,
+        order_by: [asc: script.created_at]
+      )
     )
     |> Enum.map(&sanitize/1)
   end
@@ -68,7 +71,8 @@ defmodule BDS.Scripting.Capabilities.Crud do
   def fetch_script(project_id, script_id) do
     Repo.one(
       from(script in Script,
-        where: script.project_id == ^project_id and script.id == ^(string_or_nil(script_id) || ""),
+        where:
+          script.project_id == ^project_id and script.id == ^(string_or_nil(script_id) || ""),
         limit: 1
       )
     )
@@ -86,8 +90,11 @@ defmodule BDS.Scripting.Capabilities.Crud do
 
   def update_template(project_id, template_id, attrs) do
     case fetch_template(project_id, template_id) do
-      %Template{} -> Templates.update_template(template_id, normalize_map(attrs)) |> unwrap_result()
-      _other -> nil
+      %Template{} ->
+        Templates.update_template(template_id, normalize_map(attrs)) |> unwrap_result()
+
+      _other ->
+        nil
     end
   end
 
@@ -105,7 +112,10 @@ defmodule BDS.Scripting.Capabilities.Crud do
 
   def list_templates(project_id) do
     Repo.all(
-      from(template in Template, where: template.project_id == ^project_id, order_by: [asc: template.created_at])
+      from(template in Template,
+        where: template.project_id == ^project_id,
+        order_by: [asc: template.created_at]
+      )
     )
     |> Enum.map(&sanitize/1)
   end
@@ -146,7 +156,9 @@ defmodule BDS.Scripting.Capabilities.Crud do
   def fetch_template(project_id, template_id) do
     Repo.one(
       from(template in Template,
-        where: template.project_id == ^project_id and template.id == ^(string_or_nil(template_id) || ""),
+        where:
+          template.project_id == ^project_id and
+            template.id == ^(string_or_nil(template_id) || ""),
         limit: 1
       )
     )
@@ -233,8 +245,14 @@ defmodule BDS.Scripting.Capabilities.Crud do
 
   def merge_tags(project_id, source_tag_ids, target_tag_id) do
     case fetch_tag(project_id, target_tag_id) do
-      %Tag{} -> atom_result(Tags.merge_tags(normalize_string_list(source_tag_ids), target_tag_id), :merged)
-      _other -> false
+      %Tag{} ->
+        atom_result(
+          Tags.merge_tags(normalize_string_list(source_tag_ids), target_tag_id),
+          :merged
+        )
+
+      _other ->
+        false
     end
   end
 

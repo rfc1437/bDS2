@@ -35,6 +35,7 @@ defmodule BDS.DesktopTest do
 
   test "desktop menu bar exposes the native menu groups for the shell window" do
     groups = BDS.Desktop.MenuBar.groups(dev_mode?: false)
+
     item_ids = fn items ->
       items
       |> Enum.reject(&Map.get(&1, :separator, false))
@@ -86,7 +87,10 @@ defmodule BDS.DesktopTest do
     assert menu_item(groups, :view_media).native_label == "Media\tCTRL+2"
     assert menu_item(groups, :toggle_sidebar).native_label == "Toggle Sidebar\tCTRL+B"
     assert menu_item(groups, :toggle_panel).native_label == "Toggle Panel\tCTRL+J"
-    assert menu_item(groups, :toggle_assistant_sidebar).native_label == "Toggle Assistant Sidebar\tCTRL+\\"
+
+    assert menu_item(groups, :toggle_assistant_sidebar).native_label ==
+             "Toggle Assistant Sidebar\tCTRL+\\"
+
     assert menu_item(groups, :publish_selected).native_label == "Publish Selected\tCTRL+SHIFT+P"
     assert menu_item(groups, :preview_post).native_label == "Preview Post\tCTRL+SHIFT+V"
     assert menu_item(groups, :generate_sitemap).native_label == "Generate Site\tCTRL+R"
@@ -135,23 +139,28 @@ defmodule BDS.DesktopTest do
   test "desktop endpoint serves active-project media thumbnails for the live sidebar" do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
-    temp_dir = Path.join(System.tmp_dir!(), "bds-desktop-thumbnail-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-desktop-thumbnail-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
 
     on_exit(fn ->
       File.rm_rf(temp_dir)
     end)
 
-    {:ok, project} = BDS.Projects.create_project(%{name: "Desktop Thumbnails", data_path: temp_dir})
+    {:ok, project} =
+      BDS.Projects.create_project(%{name: "Desktop Thumbnails", data_path: temp_dir})
+
     {:ok, _active} = BDS.Projects.set_active_project(project.id)
 
     source_path = Path.join(temp_dir, "sample.jpg")
     File.write!(source_path, tiny_jpeg_binary())
 
-    assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
-  conn = conn(:get, "/media-thumbnail/#{media.id}?k=#{Desktop.Auth.login_key()}")
-  conn = BDS.Desktop.Endpoint.call(conn, BDS.Desktop.Endpoint.init([]))
+    conn = conn(:get, "/media-thumbnail/#{media.id}?k=#{Desktop.Auth.login_key()}")
+    conn = BDS.Desktop.Endpoint.call(conn, BDS.Desktop.Endpoint.init([]))
 
     assert conn.status == 200
     assert [content_type] = Plug.Conn.get_resp_header(conn, "content-type")
@@ -162,7 +171,7 @@ defmodule BDS.DesktopTest do
   defp menu_item(groups, id) do
     groups
     |> Enum.flat_map(& &1.items)
-    |> Enum.find(&Map.get(&1, :id) == id)
+    |> Enum.find(&(Map.get(&1, :id) == id))
   end
 
   defp tiny_jpeg_binary do

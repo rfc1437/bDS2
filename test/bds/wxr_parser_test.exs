@@ -14,9 +14,29 @@ defmodule BDS.WxrParserTest do
     assert parsed.categories == [%{name: "General", slug: "general", parent: ""}]
     assert parsed.tags == [%{name: "News", slug: "news"}]
 
-    assert [%{wp_id: 101, title: "Hello World", slug: "hello-world", creator: "Importer", status: "publish", post_type: "post", categories: ["General"], tags: ["News"]}] = parsed.posts
+    assert [
+             %{
+               wp_id: 101,
+               title: "Hello World",
+               slug: "hello-world",
+               creator: "Importer",
+               status: "publish",
+               post_type: "post",
+               categories: ["General"],
+               tags: ["News"]
+             }
+           ] = parsed.posts
 
-    assert [%{wp_id: 201, title: "About", slug: "about", post_type: "page", categories: ["General"], tags: []}] = parsed.pages
+    assert [
+             %{
+               wp_id: 201,
+               title: "About",
+               slug: "about",
+               post_type: "page",
+               categories: ["General"],
+               tags: []
+             }
+           ] = parsed.pages
 
     assert [media] = parsed.media
     assert media.wp_id == 301

@@ -115,7 +115,9 @@ defmodule BDS.MaintenanceTest do
 
     assert {:ok, posts} = BDS.Maintenance.rebuild_from_filesystem(project.id, "post")
     assert length(posts) == 1
-    assert Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: "dispatch-post") != nil
+
+    assert Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: "dispatch-post") !=
+             nil
 
     assert {:ok, media_items} = BDS.Maintenance.rebuild_from_filesystem(project.id, "media")
     assert length(media_items) == 1
@@ -313,17 +315,23 @@ defmodule BDS.MaintenanceTest do
     assert_incremental_progress(collect_progress_events())
 
     assert {:ok, _media} =
-             BDS.Maintenance.rebuild_from_filesystem(project.id, "media", on_progress: on_progress)
+             BDS.Maintenance.rebuild_from_filesystem(project.id, "media",
+               on_progress: on_progress
+             )
 
     assert_incremental_progress(collect_progress_events())
 
     assert {:ok, _scripts} =
-             BDS.Maintenance.rebuild_from_filesystem(project.id, "script", on_progress: on_progress)
+             BDS.Maintenance.rebuild_from_filesystem(project.id, "script",
+               on_progress: on_progress
+             )
 
     assert_incremental_progress(collect_progress_events())
 
     assert {:ok, _templates} =
-             BDS.Maintenance.rebuild_from_filesystem(project.id, "template", on_progress: on_progress)
+             BDS.Maintenance.rebuild_from_filesystem(project.id, "template",
+               on_progress: on_progress
+             )
 
     assert_incremental_progress(collect_progress_events())
   end
@@ -396,10 +404,16 @@ defmodule BDS.MaintenanceTest do
     assert Enum.any?(diff_reports, fn report ->
              report.entity_type == "embedding" and report.entity_id == post.id and
                Enum.any?(report.differences, &(&1.name == "content_hash" and &1.file_value != "")) and
-               Enum.any?(report.differences, &(&1.name == "embedding" and &1.db_value == "missing" and &1.file_value == "re-embed required"))
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "embedding" and &1.db_value == "missing" and
+                     &1.file_value == "re-embed required")
+               )
            end)
 
-    assert {:ok, rebuilt_post_ids} = BDS.Maintenance.rebuild_from_filesystem(project.id, "embedding")
+    assert {:ok, rebuilt_post_ids} =
+             BDS.Maintenance.rebuild_from_filesystem(project.id, "embedding")
+
     assert post.id in rebuilt_post_ids
     assert Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: post.id) != nil
     assert File.exists?(index_path)
@@ -652,7 +666,8 @@ defmodule BDS.MaintenanceTest do
     assert Enum.any?(diff_reports, fn report ->
              report.entity_type == "post" and report.entity_id == published_post.id and
                report.label == "Original Post" and
-               report.meta_label == BDS.Persistence.timestamp_to_iso8601(published_post.created_at) and
+               report.meta_label ==
+                 BDS.Persistence.timestamp_to_iso8601(published_post.created_at) and
                Enum.any?(
                  report.differences,
                  &(&1.name == "title" and &1.db_value == "Original Post" and
@@ -798,10 +813,11 @@ defmodule BDS.MaintenanceTest do
            end)
   end
 
-  test "metadata_diff accepts legacy snake_case post frontmatter keys for status and timestamps", %{
-    project: project,
-    temp_dir: temp_dir
-  } do
+  test "metadata_diff accepts legacy snake_case post frontmatter keys for status and timestamps",
+       %{
+         project: project,
+         temp_dir: temp_dir
+       } do
     assert {:ok, post} =
              BDS.Posts.create_post(%{
                project_id: project.id,
@@ -839,19 +855,28 @@ defmodule BDS.MaintenanceTest do
 
     refute Enum.any?(diff_reports, fn report ->
              report.entity_type == "post" and report.entity_id == published_post.id and
-               Enum.any?(report.differences, &(&1.name in ["status", "created_at", "updated_at", "published_at"]))
+               Enum.any?(
+                 report.differences,
+                 &(&1.name in ["status", "created_at", "updated_at", "published_at"])
+               )
            end)
   end
 
   test "metadata_diff treats translation status and timestamps as inherited from the canonical post" do
     legacy_dir =
-      Path.join(System.tmp_dir!(), "bds-maintenance-legacy-translation-#{System.unique_integer([:positive])}")
+      Path.join(
+        System.tmp_dir!(),
+        "bds-maintenance-legacy-translation-#{System.unique_integer([:positive])}"
+      )
 
     File.mkdir_p!(legacy_dir)
     on_exit(fn -> File.rm_rf(legacy_dir) end)
 
     assert {:ok, project} =
-             BDS.Projects.create_project(%{name: "Legacy Translation Diff", data_path: legacy_dir})
+             BDS.Projects.create_project(%{
+               name: "Legacy Translation Diff",
+               data_path: legacy_dir
+             })
 
     posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2026", "04"])
     File.mkdir_p!(posts_dir)
@@ -896,11 +921,17 @@ defmodule BDS.MaintenanceTest do
 
     refute Enum.any?(diff_reports, fn report ->
              report.entity_type == "post_translation" and
-               Enum.any?(report.differences, &(&1.name in ["status", "created_at", "updated_at", "published_at"]))
+               Enum.any?(
+                 report.differences,
+                 &(&1.name in ["status", "created_at", "updated_at", "published_at"])
+               )
            end)
   end
 
-  test "metadata_diff includes project-level metadata drift", %{project: project, temp_dir: temp_dir} do
+  test "metadata_diff includes project-level metadata drift", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{
                name: "Database Blog",
@@ -955,12 +986,18 @@ defmodule BDS.MaintenanceTest do
 
     assert Enum.any?(diff.diff_reports, fn report ->
              report.entity_type == "project" and
-               Enum.any?(report.differences, &(&1.name == "main_language" and &1.db_value == "en" and &1.file_value == "fr"))
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "main_language" and &1.db_value == "en" and &1.file_value == "fr")
+               )
            end)
 
     assert Enum.any?(diff.diff_reports, fn report ->
              report.entity_type == "publishing" and
-               Enum.any?(report.differences, &(&1.name == "ssh_mode" and &1.db_value == "scp" and &1.file_value == "rsync"))
+               Enum.any?(
+                 report.differences,
+                 &(&1.name == "ssh_mode" and &1.db_value == "scp" and &1.file_value == "rsync")
+               )
            end)
   end
 
@@ -986,7 +1023,10 @@ defmodule BDS.MaintenanceTest do
       })
     )
 
-    File.write!(Path.join([temp_dir, "meta", "categories.json"]), Jason.encode!(["notes", "updates"]))
+    File.write!(
+      Path.join([temp_dir, "meta", "categories.json"]),
+      Jason.encode!(["notes", "updates"])
+    )
 
     File.write!(
       Path.join([temp_dir, "meta", "category-meta.json"]),
@@ -1005,34 +1045,42 @@ defmodule BDS.MaintenanceTest do
       })
     )
 
-    write_post_frontmatter(fixture.post_path, %{
-      "id" => fixture.post.id,
-      "title" => "Filesystem Post",
-      "slug" => fixture.post.slug,
-      "excerpt" => "Filesystem summary",
-      "status" => "published",
-      "author" => "Filesystem Writer",
-      "language" => "fr",
-      "doNotTranslate" => false,
-      "templateSlug" => nil,
-      "createdAt" => fixture.post.created_at,
-      "updatedAt" => fixture.post.updated_at + 1,
-      "publishedAt" => fixture.post.published_at,
-      "tags" => ["beta"],
-      "categories" => ["updates"]
-    }, "Filesystem body")
+    write_post_frontmatter(
+      fixture.post_path,
+      %{
+        "id" => fixture.post.id,
+        "title" => "Filesystem Post",
+        "slug" => fixture.post.slug,
+        "excerpt" => "Filesystem summary",
+        "status" => "published",
+        "author" => "Filesystem Writer",
+        "language" => "fr",
+        "doNotTranslate" => false,
+        "templateSlug" => nil,
+        "createdAt" => fixture.post.created_at,
+        "updatedAt" => fixture.post.updated_at + 1,
+        "publishedAt" => fixture.post.published_at,
+        "tags" => ["beta"],
+        "categories" => ["updates"]
+      },
+      "Filesystem body"
+    )
 
-    write_post_frontmatter(fixture.post_translation_path, %{
-      "id" => fixture.post_translation.id,
-      "translationFor" => fixture.post_translation.translation_for,
-      "language" => fixture.post_translation.language,
-      "title" => "Datei Beitrag",
-      "excerpt" => "Datei Zusammenfassung",
-      "status" => "published",
-      "createdAt" => fixture.post_translation.created_at,
-      "updatedAt" => fixture.post_translation.updated_at + 1,
-      "publishedAt" => fixture.post_translation.published_at
-    }, "Datei Inhalt")
+    write_post_frontmatter(
+      fixture.post_translation_path,
+      %{
+        "id" => fixture.post_translation.id,
+        "translationFor" => fixture.post_translation.translation_for,
+        "language" => fixture.post_translation.language,
+        "title" => "Datei Beitrag",
+        "excerpt" => "Datei Zusammenfassung",
+        "status" => "published",
+        "createdAt" => fixture.post_translation.created_at,
+        "updatedAt" => fixture.post_translation.updated_at + 1,
+        "publishedAt" => fixture.post_translation.published_at
+      },
+      "Datei Inhalt"
+    )
 
     File.write!(
       fixture.media_sidecar_path,
@@ -1068,16 +1116,26 @@ defmodule BDS.MaintenanceTest do
       |> Enum.join("\n")
     )
 
-    write_script_frontmatter(fixture.script_path, fixture.script, %{
-      "title" => "Filesystem Script",
-      "entrypoint" => "run",
-      "enabled" => false
-    }, "function run() return false end")
+    write_script_frontmatter(
+      fixture.script_path,
+      fixture.script,
+      %{
+        "title" => "Filesystem Script",
+        "entrypoint" => "run",
+        "enabled" => false
+      },
+      "function run() return false end"
+    )
 
-    write_template_frontmatter(fixture.template_path, fixture.template, %{
-      "title" => "Filesystem Template",
-      "enabled" => false
-    }, "<section>Filesystem</section>")
+    write_template_frontmatter(
+      fixture.template_path,
+      fixture.template,
+      %{
+        "title" => "Filesystem Template",
+        "enabled" => false
+      },
+      "<section>Filesystem</section>"
+    )
 
     items = [
       %{entity_type: "project", entity_id: project.id},
@@ -1163,41 +1221,73 @@ defmodule BDS.MaintenanceTest do
              })
 
     assert {:ok, _metadata} = BDS.Metadata.add_category(project.id, "guides")
-    assert {:ok, _metadata} = BDS.Metadata.update_category_settings(project.id, "notes", %{title: "DB Notes", show_title: true})
+
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_category_settings(project.id, "notes", %{
+               title: "DB Notes",
+               show_title: true
+             })
 
     from(post in BDS.Posts.Post, where: post.id == ^fixture.post.id)
-    |> Repo.update_all(set: [
-      title: "Database Post",
-      excerpt: "Database summary",
-      author: "Database Writer",
-      language: "en",
-      tags: ["gamma"],
-      categories: ["guides"],
-      updated_at: fixture.post.updated_at + 2
-    ])
+    |> Repo.update_all(
+      set: [
+        title: "Database Post",
+        excerpt: "Database summary",
+        author: "Database Writer",
+        language: "en",
+        tags: ["gamma"],
+        categories: ["guides"],
+        updated_at: fixture.post.updated_at + 2
+      ]
+    )
 
-    from(translation in BDS.Posts.Translation, where: translation.id == ^fixture.post_translation.id)
-    |> Repo.update_all(set: [title: "DB Beitrag", excerpt: "DB Zusammenfassung", updated_at: fixture.post_translation.updated_at + 2])
+    from(translation in BDS.Posts.Translation,
+      where: translation.id == ^fixture.post_translation.id
+    )
+    |> Repo.update_all(
+      set: [
+        title: "DB Beitrag",
+        excerpt: "DB Zusammenfassung",
+        updated_at: fixture.post_translation.updated_at + 2
+      ]
+    )
 
     from(media in BDS.Media.Media, where: media.id == ^fixture.media.id)
-    |> Repo.update_all(set: [
-      title: "Database media title",
-      alt: "Database alt",
-      caption: "Database caption",
-      author: "Database Photographer",
-      language: "en",
-      tags: ["gamma"],
-      updated_at: fixture.media.updated_at + 2
-    ])
+    |> Repo.update_all(
+      set: [
+        title: "Database media title",
+        alt: "Database alt",
+        caption: "Database caption",
+        author: "Database Photographer",
+        language: "en",
+        tags: ["gamma"],
+        updated_at: fixture.media.updated_at + 2
+      ]
+    )
 
-    from(translation in BDS.Media.Translation, where: translation.id == ^fixture.media_translation.id)
+    from(translation in BDS.Media.Translation,
+      where: translation.id == ^fixture.media_translation.id
+    )
     |> Repo.update_all(set: [title: "DB Medium", alt: "DB Alt", caption: "DB Bildtext"])
 
     from(script in BDS.Scripts.Script, where: script.id == ^fixture.script.id)
-    |> Repo.update_all(set: [title: "Database Script", entrypoint: "run", enabled: false, updated_at: fixture.script.updated_at + 2])
+    |> Repo.update_all(
+      set: [
+        title: "Database Script",
+        entrypoint: "run",
+        enabled: false,
+        updated_at: fixture.script.updated_at + 2
+      ]
+    )
 
     from(template in BDS.Templates.Template, where: template.id == ^fixture.template.id)
-    |> Repo.update_all(set: [title: "Database Template", enabled: false, updated_at: fixture.template.updated_at + 2])
+    |> Repo.update_all(
+      set: [
+        title: "Database Template",
+        enabled: false,
+        updated_at: fixture.template.updated_at + 2
+      ]
+    )
 
     items = [
       %{entity_type: "project", entity_id: project.id},
@@ -1222,7 +1312,9 @@ defmodule BDS.MaintenanceTest do
     categories_json = Jason.decode!(File.read!(Path.join([temp_dir, "meta", "categories.json"])))
     assert "guides" in categories_json
 
-    category_meta_json = Jason.decode!(File.read!(Path.join([temp_dir, "meta", "category-meta.json"])))
+    category_meta_json =
+      Jason.decode!(File.read!(Path.join([temp_dir, "meta", "category-meta.json"])))
+
     assert category_meta_json["notes"]["title"] == "DB Notes"
 
     publishing_json = Jason.decode!(File.read!(Path.join([temp_dir, "meta", "publishing.json"])))
@@ -1258,96 +1350,120 @@ defmodule BDS.MaintenanceTest do
     File.mkdir_p!(Path.join(temp_dir, "scripts"))
     File.mkdir_p!(Path.join(temp_dir, "templates"))
 
-    File.write!(Path.join(temp_dir, post_orphan_path), [
-      "---",
-      "id: orphan-post",
-      "title: Orphan Post",
-      "slug: orphan-post",
-      "status: published",
-      "createdAt: 1",
-      "updatedAt: 1",
-      "publishedAt: 1",
-      "tags:",
-      "  - orphan",
-      "categories:",
-      "  - notes",
-      "---",
-      "Orphan body",
-      ""
-    ] |> Enum.join("\n"))
+    File.write!(
+      Path.join(temp_dir, post_orphan_path),
+      [
+        "---",
+        "id: orphan-post",
+        "title: Orphan Post",
+        "slug: orphan-post",
+        "status: published",
+        "createdAt: 1",
+        "updatedAt: 1",
+        "publishedAt: 1",
+        "tags:",
+        "  - orphan",
+        "categories:",
+        "  - notes",
+        "---",
+        "Orphan body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
 
-    File.write!(Path.join(temp_dir, post_translation_orphan_path), [
-      "---",
-      "id: orphan-post-es",
-      "translationFor: #{fixture.post.id}",
-      "language: es",
-      "title: Verwaister Beitrag",
-      "excerpt: Verwaiste Zusammenfassung",
-      "status: published",
-      "createdAt: 1",
-      "updatedAt: 1",
-      "publishedAt: 1",
-      "---",
-      "Verwaister Inhalt",
-      ""
-    ] |> Enum.join("\n"))
+    File.write!(
+      Path.join(temp_dir, post_translation_orphan_path),
+      [
+        "---",
+        "id: orphan-post-es",
+        "translationFor: #{fixture.post.id}",
+        "language: es",
+        "title: Verwaister Beitrag",
+        "excerpt: Verwaiste Zusammenfassung",
+        "status: published",
+        "createdAt: 1",
+        "updatedAt: 1",
+        "publishedAt: 1",
+        "---",
+        "Verwaister Inhalt",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
 
     File.write!(media_orphan_file_path, "orphan media")
 
-    File.write!(Path.join(temp_dir, media_orphan_path), [
-      "id: orphan-media",
-      "originalName: orphan.txt",
-      "mimeType: text/plain",
-      "size: 12",
-      "title: Orphan Media",
-      "createdAt: 1",
-      "updatedAt: 1",
-      "tags:",
-      "  - orphan",
-      ""
-    ] |> Enum.join("\n"))
+    File.write!(
+      Path.join(temp_dir, media_orphan_path),
+      [
+        "id: orphan-media",
+        "originalName: orphan.txt",
+        "mimeType: text/plain",
+        "size: 12",
+        "title: Orphan Media",
+        "createdAt: 1",
+        "updatedAt: 1",
+        "tags:",
+        "  - orphan",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
 
-    File.write!(Path.join(temp_dir, media_translation_orphan_path), [
-      "translationFor: orphan-media",
-      "language: es",
-      "title: Verwaistes Medium",
-      "alt: Verwaister Alt",
-      "caption: Verwaister Bildtext",
-      ""
-    ] |> Enum.join("\n"))
+    File.write!(
+      Path.join(temp_dir, media_translation_orphan_path),
+      [
+        "translationFor: orphan-media",
+        "language: es",
+        "title: Verwaistes Medium",
+        "alt: Verwaister Alt",
+        "caption: Verwaister Bildtext",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
 
-    File.write!(Path.join(temp_dir, script_orphan_path), [
-      "---",
-      "id: orphan-script",
-      "projectId: #{project.id}",
-      "slug: orphan-script",
-      "title: Orphan Script",
-      "kind: utility",
-      "entrypoint: main",
-      "enabled: true",
-      "version: 1",
-      "createdAt: 1",
-      "updatedAt: 1",
-      "---",
-      "function main() return true end",
-      ""
-    ] |> Enum.join("\n"))
+    File.write!(
+      Path.join(temp_dir, script_orphan_path),
+      [
+        "---",
+        "id: orphan-script",
+        "projectId: #{project.id}",
+        "slug: orphan-script",
+        "title: Orphan Script",
+        "kind: utility",
+        "entrypoint: main",
+        "enabled: true",
+        "version: 1",
+        "createdAt: 1",
+        "updatedAt: 1",
+        "---",
+        "function main() return true end",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
 
-    File.write!(Path.join(temp_dir, template_orphan_path), [
-      "---",
-      "id: orphan-template",
-      "projectId: #{project.id}",
-      "slug: orphan-view",
-      "title: Orphan View",
-      "kind: list",
-      "enabled: true",
-      "version: 1",
-      "createdAt: 1",
-      "updatedAt: 1",
-      "---",
-      "<section>Orphan</section>",
-      ""
-    ] |> Enum.join("\n"))
+    File.write!(
+      Path.join(temp_dir, template_orphan_path),
+      [
+        "---",
+        "id: orphan-template",
+        "projectId: #{project.id}",
+        "slug: orphan-view",
+        "title: Orphan View",
+        "kind: list",
+        "enabled: true",
+        "version: 1",
+        "createdAt: 1",
+        "updatedAt: 1",
+        "---",
+        "<section>Orphan</section>",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
 
     assert {:ok, %{imported: 6, failed: 0}} =
              BDS.Maintenance.import_metadata_diff_orphans(project.id, [
@@ -1360,11 +1476,26 @@ defmodule BDS.MaintenanceTest do
              ])
 
     assert Repo.get_by(BDS.Posts.Post, project_id: project.id, file_path: post_orphan_path)
-    assert Repo.get_by(BDS.Posts.Translation, project_id: project.id, file_path: post_translation_orphan_path)
+
+    assert Repo.get_by(BDS.Posts.Translation,
+             project_id: project.id,
+             file_path: post_translation_orphan_path
+           )
+
     assert Repo.get_by(BDS.Media.Media, project_id: project.id, sidecar_path: media_orphan_path)
-    assert Repo.get_by(BDS.Media.Translation, project_id: project.id, translation_for: "orphan-media", language: "es")
+
+    assert Repo.get_by(BDS.Media.Translation,
+             project_id: project.id,
+             translation_for: "orphan-media",
+             language: "es"
+           )
+
     assert Repo.get_by(BDS.Scripts.Script, project_id: project.id, file_path: script_orphan_path)
-    assert Repo.get_by(BDS.Templates.Template, project_id: project.id, file_path: template_orphan_path)
+
+    assert Repo.get_by(BDS.Templates.Template,
+             project_id: project.id,
+             file_path: template_orphan_path
+           )
   end
 
   defp collect_progress_events(acc \\ []) do
@@ -1481,7 +1612,8 @@ defmodule BDS.MaintenanceTest do
       post_translation_path: Path.join(temp_dir, published_post_translation.file_path),
       media: Repo.get!(BDS.Media.Media, media.id),
       media_sidecar_path: Path.join(temp_dir, media.sidecar_path),
-      media_translation: Repo.get_by!(BDS.Media.Translation, translation_for: media.id, language: "de"),
+      media_translation:
+        Repo.get_by!(BDS.Media.Translation, translation_for: media.id, language: "de"),
       media_translation_sidecar_path: Path.join(temp_dir, "#{media.file_path}.de.meta"),
       script: Repo.get!(BDS.Scripts.Script, published_script.id),
       script_path: Path.join(temp_dir, published_script.file_path),
@@ -1495,20 +1627,35 @@ defmodule BDS.MaintenanceTest do
       [
         "---",
         "id: #{fields["id"]}",
-        if(fields["translationFor"], do: "translationFor: #{fields["translationFor"]}", else: nil),
+        if(fields["translationFor"],
+          do: "translationFor: #{fields["translationFor"]}",
+          else: nil
+        ),
         if(fields["title"], do: "title: #{fields["title"]}", else: nil),
         if(fields["slug"], do: "slug: #{fields["slug"]}", else: nil),
         if(fields["excerpt"], do: "excerpt: #{fields["excerpt"]}", else: nil),
         if(fields["status"], do: "status: #{fields["status"]}", else: nil),
         if(fields["author"], do: "author: #{fields["author"]}", else: nil),
         if(fields["language"], do: "language: #{fields["language"]}", else: nil),
-        if(Map.has_key?(fields, "doNotTranslate"), do: "doNotTranslate: #{fields["doNotTranslate"]}", else: nil),
-        if(Map.has_key?(fields, "templateSlug"), do: "templateSlug: #{fields["templateSlug"] || ""}", else: nil),
+        if(Map.has_key?(fields, "doNotTranslate"),
+          do: "doNotTranslate: #{fields["doNotTranslate"]}",
+          else: nil
+        ),
+        if(Map.has_key?(fields, "templateSlug"),
+          do: "templateSlug: #{fields["templateSlug"] || ""}",
+          else: nil
+        ),
         "createdAt: #{fields["createdAt"]}",
         "updatedAt: #{fields["updatedAt"]}",
         if(fields["publishedAt"], do: "publishedAt: #{fields["publishedAt"]}", else: nil),
-        if(Map.has_key?(fields, "tags"), do: ["tags:" | Enum.map(fields["tags"], &"  - #{&1}")], else: nil),
-        if(Map.has_key?(fields, "categories"), do: ["categories:" | Enum.map(fields["categories"], &"  - #{&1}")], else: nil),
+        if(Map.has_key?(fields, "tags"),
+          do: ["tags:" | Enum.map(fields["tags"], &"  - #{&1}")],
+          else: nil
+        ),
+        if(Map.has_key?(fields, "categories"),
+          do: ["categories:" | Enum.map(fields["categories"], &"  - #{&1}")],
+          else: nil
+        ),
         "---",
         body,
         ""

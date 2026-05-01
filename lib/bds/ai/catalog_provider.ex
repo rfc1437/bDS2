@@ -17,7 +17,9 @@ defmodule BDS.AI.CatalogProvider do
 
   def changeset(provider, attrs) do
     provider
-    |> cast(attrs, [:id, :name, :env_keys, :package_ref, :api_url, :doc_url, :updated_at], empty_values: [nil])
+    |> cast(attrs, [:id, :name, :env_keys, :package_ref, :api_url, :doc_url, :updated_at],
+      empty_values: [nil]
+    )
     |> validate_required([:id, :name, :updated_at])
   end
 end

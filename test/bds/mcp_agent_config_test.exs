@@ -10,7 +10,9 @@ defmodule BDS.MCPAgentConfigTest do
     %{home_dir: home_dir}
   end
 
-  test "github copilot config uses VS Code mcp.json servers format with stdio entry", %{home_dir: home_dir} do
+  test "github copilot config uses VS Code mcp.json servers format with stdio entry", %{
+    home_dir: home_dir
+  } do
     install_root = Path.join(home_dir, "bDS2.app/Contents/Resources")
     executable_path = Path.join(install_root, "mcp/bin/bds-mcp")
 
@@ -31,7 +33,9 @@ defmodule BDS.MCPAgentConfigTest do
            }
   end
 
-  test "claude code config uses mcpServers format and preserves other entries", %{home_dir: home_dir} do
+  test "claude code config uses mcpServers format and preserves other entries", %{
+    home_dir: home_dir
+  } do
     config_path = Path.join(home_dir, ".claude.json")
     install_root = Path.join(home_dir, "dist")
 
@@ -50,7 +54,11 @@ defmodule BDS.MCPAgentConfigTest do
     written = Jason.decode!(File.read!(result.config_path))
     assert written["theme"] == "dark"
     assert written["mcpServers"]["other"] == %{"command" => "python"}
-    assert written["mcpServers"]["bDS"] == %{"command" => Path.join(install_root, "mcp/bin/bds-mcp"), "args" => []}
+
+    assert written["mcpServers"]["bDS"] == %{
+             "command" => Path.join(install_root, "mcp/bin/bds-mcp"),
+             "args" => []
+           }
   end
 
   test "github copilot uninstall removes only the bDS server entry", %{home_dir: home_dir} do
@@ -74,7 +82,12 @@ defmodule BDS.MCPAgentConfigTest do
     written = Jason.decode!(File.read!(result.config_path))
     assert written["theme"] == "dark"
     refute Map.has_key?(written["servers"], "bDS")
-    assert written["servers"]["other"] == %{"type" => "stdio", "command" => "python", "args" => ["server.py"]}
+
+    assert written["servers"]["other"] == %{
+             "type" => "stdio",
+             "command" => "python",
+             "args" => ["server.py"]
+           }
   end
 
   test "claude code uninstall removes only the bDS server entry", %{home_dir: home_dir} do
@@ -122,7 +135,10 @@ defmodule BDS.MCPAgentConfigTest do
   end
 
   test "packaged executable path resolves inside the distributable payload" do
-    assert AgentConfig.packaged_executable_path("/Applications/bDS2.app/Contents/Resources", :macos) ==
+    assert AgentConfig.packaged_executable_path(
+             "/Applications/bDS2.app/Contents/Resources",
+             :macos
+           ) ==
              "/Applications/bDS2.app/Contents/Resources/mcp/bin/bds-mcp"
 
     assert AgentConfig.packaged_executable_path("C:/Program Files/bDS2/resources", :windows) ==

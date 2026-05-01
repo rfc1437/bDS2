@@ -25,6 +25,7 @@ defmodule BDS.Desktop.AutomationTest do
     assert snapshot.assistant_visible == false
     assert snapshot.panel_visible == false
     assert snapshot.editor_title == "Dashboard"
+
     assert snapshot.activity_labels == [
              "Posts",
              "Pages",
@@ -37,6 +38,7 @@ defmodule BDS.Desktop.AutomationTest do
              "Git",
              "Settings"
            ]
+
     assert "Drafts" in snapshot.sidebar_sections
     assert "Status" in snapshot.editor_meta_labels
 
@@ -155,7 +157,10 @@ defmodule BDS.Desktop.AutomationTest do
   end
 
   defp automation_process_counts do
-    %{app: count_processes("scripts/desktop_automation_app\\.exs"), driver: count_processes("desktop_automation_runner\\.mjs")}
+    %{
+      app: count_processes("scripts/desktop_automation_app\\.exs"),
+      driver: count_processes("desktop_automation_runner\\.mjs")
+    }
   end
 
   defp count_processes(pattern) do

@@ -4,8 +4,14 @@ defmodule BDS.Desktop.MainWindowTest do
   alias BDS.Desktop.MainWindow
 
   setup do
-    path = Path.join(System.tmp_dir!(), "bds-main-window-state-#{System.unique_integer([:positive])}.json")
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "bds-main-window-state-#{System.unique_integer([:positive])}.json"
+      )
+
     previous = Application.get_env(:bds, :desktop, [])
+
     updated =
       previous
       |> Keyword.put(:window_state_path, path)
@@ -21,7 +27,9 @@ defmodule BDS.Desktop.MainWindowTest do
     %{path: path}
   end
 
-  test "window options use a smaller safe default and restore persisted size and position", %{path: path} do
+  test "window options use a smaller safe default and restore persisted size and position", %{
+    path: path
+  } do
     opts = MainWindow.window_options()
 
     assert opts[:size] == {1280, 780}

@@ -13,14 +13,16 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   alias BDS.Repo
   alias BDS.UI.Workbench
 
-  embed_templates "media_editor_html/*"
+  embed_templates("media_editor_html/*")
 
   @post_picker_limit 10
 
+  @spec assign_socket(term()) :: term()
   def assign_socket(socket) do
     assign(socket, :media_editor, build(socket.assigns))
   end
 
+  @spec update(term(), term(), term()) :: term()
   def update(socket, params, reload) do
     case socket.assigns.current_tab do
       %{type: :media, id: media_id} ->
@@ -38,6 +40,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec persist_socket(term(), term(), term(), term()) :: term()
   def persist_socket(socket, media_id, reload, append_output) do
     case Media.get_media(media_id) do
       nil ->
@@ -52,9 +55,18 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
             socket
             |> assign(:workbench, workbench)
-            |> assign(:media_editor_drafts, Map.delete(socket.assigns.media_editor_drafts, media_id))
-            |> assign(:media_editor_save_states, Map.put(socket.assigns.media_editor_save_states, media_id, :saved))
-            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:media, media_id}, tab_meta(updated_media)))
+            |> assign(
+              :media_editor_drafts,
+              Map.delete(socket.assigns.media_editor_drafts, media_id)
+            )
+            |> assign(
+              :media_editor_save_states,
+              Map.put(socket.assigns.media_editor_save_states, media_id, :saved)
+            )
+            |> assign(
+              :tab_meta,
+              Map.put(socket.assigns.tab_meta, {:media, media_id}, tab_meta(updated_media))
+            )
             |> reload.(workbench)
 
           {:error, reason} ->
@@ -65,14 +77,19 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec toggle_quick_actions(term(), term(), term()) :: term()
   def toggle_quick_actions(socket, media_id, reload) do
     workbench = socket.assigns.workbench
 
     socket
-    |> assign(:media_editor_quick_actions_open, Map.update(socket.assigns.media_editor_quick_actions_open, media_id, true, &(!&1)))
+    |> assign(
+      :media_editor_quick_actions_open,
+      Map.update(socket.assigns.media_editor_quick_actions_open, media_id, true, &(!&1))
+    )
     |> reload.(workbench)
   end
 
+  @spec replace_file(term(), term(), term(), term()) :: term()
   def replace_file(socket, media_id, reload, append_output) do
     case FilePicker.choose_file(translated("Replace Media File")) do
       {:ok, source_path} ->
@@ -82,9 +99,18 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
             socket
             |> assign(:workbench, workbench)
-            |> assign(:media_editor_drafts, Map.delete(socket.assigns.media_editor_drafts, media_id))
-            |> assign(:media_editor_save_states, Map.put(socket.assigns.media_editor_save_states, media_id, :saved))
-            |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:media, media_id}, tab_meta(updated_media)))
+            |> assign(
+              :media_editor_drafts,
+              Map.delete(socket.assigns.media_editor_drafts, media_id)
+            )
+            |> assign(
+              :media_editor_save_states,
+              Map.put(socket.assigns.media_editor_save_states, media_id, :saved)
+            )
+            |> assign(
+              :tab_meta,
+              Map.put(socket.assigns.tab_meta, {:media, media_id}, tab_meta(updated_media))
+            )
             |> reload.(workbench)
 
           {:ok, nil} ->
@@ -106,10 +132,16 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec detect_language(term(), term(), term(), term()) :: term()
   def detect_language(socket, media_id, reload, append_output) do
     if Map.get(socket.assigns, :offline_mode, true) do
       socket
-      |> append_output.(translated("Detect Language"), translated("Automatic AI actions stay gated by airplane mode."), nil, "info")
+      |> append_output.(
+        translated("Detect Language"),
+        translated("Automatic AI actions stay gated by airplane mode."),
+        nil,
+        "info"
+      )
       |> reload.(socket.assigns.workbench)
     else
       case Media.get_media(media_id) do
@@ -118,15 +150,26 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
         %MediaRecord{} = media ->
           draft = current_draft(socket.assigns, media)
-          text = Enum.join([Map.get(draft, "title", ""), Map.get(draft, "alt", ""), Map.get(draft, "caption", "")], "\n\n")
+
+          text =
+            Enum.join(
+              [
+                Map.get(draft, "title", ""),
+                Map.get(draft, "alt", ""),
+                Map.get(draft, "caption", "")
+              ],
+              "\n\n"
+            )
 
           case AI.detect_language(text) do
-            {:ok, %{language_code: language_code}} when is_binary(language_code) and language_code != "" ->
+            {:ok, %{language_code: language_code}}
+            when is_binary(language_code) and language_code != "" ->
               normalized = normalize_language(language_code)
 
               case Media.update_media(media.id, %{language: normalized}) do
                 {:ok, updated_media} ->
-                  updated_draft = Map.put(current_draft(socket.assigns, media), "language", normalized)
+                  updated_draft =
+                    Map.put(current_draft(socket.assigns, media), "language", normalized)
 
                   socket
                   |> reconcile_draft(updated_media, updated_draft)
@@ -145,17 +188,28 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
             _other ->
               socket
-              |> append_output.(translated("Detect Language"), translated("Language detection failed."), nil, "error")
+              |> append_output.(
+                translated("Detect Language"),
+                translated("Language detection failed."),
+                nil,
+                "error"
+              )
               |> reload.(socket.assigns.workbench)
           end
       end
     end
   end
 
+  @spec translate(term(), term(), term(), term(), term()) :: term()
   def translate(socket, media_id, language, reload, append_output) do
     if Map.get(socket.assigns, :offline_mode, true) do
       socket
-      |> append_output.(translated("Translate"), translated("Automatic AI actions stay gated by airplane mode."), nil, "info")
+      |> append_output.(
+        translated("Translate"),
+        translated("Automatic AI actions stay gated by airplane mode."),
+        nil,
+        "info"
+      )
       |> reload.(socket.assigns.workbench)
     else
       normalized_language = normalize_language(language)
@@ -165,8 +219,14 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
           case Media.upsert_media_translation(media_id, normalized_language, translation) do
             {:ok, _saved_translation} ->
               socket
-              |> assign(:media_editor_quick_actions_open, Map.put(socket.assigns.media_editor_quick_actions_open, media_id, false))
-              |> assign(:media_editor_translation_forms, Map.delete(socket.assigns.media_editor_translation_forms, media_id))
+              |> assign(
+                :media_editor_quick_actions_open,
+                Map.put(socket.assigns.media_editor_quick_actions_open, media_id, false)
+              )
+              |> assign(
+                :media_editor_translation_forms,
+                Map.delete(socket.assigns.media_editor_translation_forms, media_id)
+              )
               |> reload.(socket.assigns.workbench)
 
             {:error, reason} ->
@@ -183,6 +243,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec apply_ai_suggestions(term(), term(), term(), term(), term()) :: term()
   def apply_ai_suggestions(socket, media_id, fields, reload, append_output) do
     try do
       case Media.get_media(media_id) do
@@ -213,6 +274,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec delete_socket(term(), term(), term(), term()) :: term()
   def delete_socket(socket, media_id, reload, append_output) do
     case Media.delete_media(media_id) do
       {:ok, :deleted} ->
@@ -223,11 +285,26 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
         |> assign(:shell_overlay, nil)
         |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:media, media_id}))
         |> assign(:media_editor_drafts, Map.delete(socket.assigns.media_editor_drafts, media_id))
-        |> assign(:media_editor_quick_actions_open, Map.delete(socket.assigns.media_editor_quick_actions_open, media_id))
-        |> assign(:media_editor_post_pickers_open, Map.delete(socket.assigns.media_editor_post_pickers_open, media_id))
-        |> assign(:media_editor_post_picker_queries, Map.delete(socket.assigns.media_editor_post_picker_queries, media_id))
-        |> assign(:media_editor_save_states, Map.delete(socket.assigns.media_editor_save_states, media_id))
-        |> assign(:media_editor_translation_forms, Map.delete(socket.assigns.media_editor_translation_forms, media_id))
+        |> assign(
+          :media_editor_quick_actions_open,
+          Map.delete(socket.assigns.media_editor_quick_actions_open, media_id)
+        )
+        |> assign(
+          :media_editor_post_pickers_open,
+          Map.delete(socket.assigns.media_editor_post_pickers_open, media_id)
+        )
+        |> assign(
+          :media_editor_post_picker_queries,
+          Map.delete(socket.assigns.media_editor_post_picker_queries, media_id)
+        )
+        |> assign(
+          :media_editor_save_states,
+          Map.delete(socket.assigns.media_editor_save_states, media_id)
+        )
+        |> assign(
+          :media_editor_translation_forms,
+          Map.delete(socket.assigns.media_editor_translation_forms, media_id)
+        )
         |> reload.(workbench)
 
       {:error, reason} ->
@@ -237,28 +314,43 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec toggle_post_picker(term(), term(), term()) :: term()
   def toggle_post_picker(socket, media_id, reload) do
     workbench = socket.assigns.workbench
 
     socket
-    |> assign(:media_editor_post_pickers_open, Map.update(socket.assigns.media_editor_post_pickers_open, media_id, true, &(!&1)))
+    |> assign(
+      :media_editor_post_pickers_open,
+      Map.update(socket.assigns.media_editor_post_pickers_open, media_id, true, &(!&1))
+    )
     |> reload.(workbench)
   end
 
+  @spec set_post_picker_query(term(), term(), term(), term()) :: term()
   def set_post_picker_query(socket, media_id, query, reload) do
     workbench = socket.assigns.workbench
 
     socket
-    |> assign(:media_editor_post_picker_queries, Map.put(socket.assigns.media_editor_post_picker_queries, media_id, to_string(query || "")))
+    |> assign(
+      :media_editor_post_picker_queries,
+      Map.put(socket.assigns.media_editor_post_picker_queries, media_id, to_string(query || ""))
+    )
     |> reload.(workbench)
   end
 
+  @spec link_post(term(), term(), term(), term(), term()) :: term()
   def link_post(socket, media_id, post_id, reload, append_output) do
     case Media.link_media_to_post(media_id, post_id) do
       {:ok, _linked} ->
         socket
-        |> assign(:media_editor_post_pickers_open, Map.put(socket.assigns.media_editor_post_pickers_open, media_id, false))
-        |> assign(:media_editor_post_picker_queries, Map.put(socket.assigns.media_editor_post_picker_queries, media_id, ""))
+        |> assign(
+          :media_editor_post_pickers_open,
+          Map.put(socket.assigns.media_editor_post_pickers_open, media_id, false)
+        )
+        |> assign(
+          :media_editor_post_picker_queries,
+          Map.put(socket.assigns.media_editor_post_picker_queries, media_id, "")
+        )
         |> reload.(socket.assigns.workbench)
 
       {:error, reason} ->
@@ -268,6 +360,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec unlink_post(term(), term(), term(), term(), term()) :: term()
   def unlink_post(socket, media_id, post_id, reload, append_output) do
     case Media.unlink_media_from_post(media_id, post_id) do
       {:ok, _unlinked} ->
@@ -280,6 +373,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec edit_translation(term(), term(), term(), term()) :: term()
   def edit_translation(socket, media_id, language, reload) do
     workbench = socket.assigns.workbench
 
@@ -287,16 +381,20 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
     form = %{
       "language" => language,
-      "title" => translation && translation.title || "",
-      "alt" => translation && translation.alt || "",
-      "caption" => translation && translation.caption || ""
+      "title" => (translation && translation.title) || "",
+      "alt" => (translation && translation.alt) || "",
+      "caption" => (translation && translation.caption) || ""
     }
 
     socket
-    |> assign(:media_editor_translation_forms, Map.put(socket.assigns.media_editor_translation_forms, media_id, form))
+    |> assign(
+      :media_editor_translation_forms,
+      Map.put(socket.assigns.media_editor_translation_forms, media_id, form)
+    )
     |> reload.(workbench)
   end
 
+  @spec update_translation(term(), term(), term(), term()) :: term()
   def update_translation(socket, media_id, params, reload) do
     workbench = socket.assigns.workbench
 
@@ -308,10 +406,14 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     }
 
     socket
-    |> assign(:media_editor_translation_forms, Map.put(socket.assigns.media_editor_translation_forms, media_id, form))
+    |> assign(
+      :media_editor_translation_forms,
+      Map.put(socket.assigns.media_editor_translation_forms, media_id, form)
+    )
     |> reload.(workbench)
   end
 
+  @spec save_translation(term(), term(), term(), term()) :: term()
   def save_translation(socket, media_id, reload, append_output) do
     case Map.get(socket.assigns.media_editor_translation_forms, media_id) do
       %{"language" => language} = form when language not in [nil, ""] ->
@@ -322,7 +424,10 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
              }) do
           {:ok, _translation} ->
             socket
-            |> assign(:media_editor_translation_forms, Map.delete(socket.assigns.media_editor_translation_forms, media_id))
+            |> assign(
+              :media_editor_translation_forms,
+              Map.delete(socket.assigns.media_editor_translation_forms, media_id)
+            )
             |> reload.(socket.assigns.workbench)
 
           {:error, reason} ->
@@ -336,16 +441,23 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec refresh_translation(term(), term(), term(), term(), term()) :: term()
   def refresh_translation(socket, media_id, language, reload, append_output) do
     if Map.get(socket.assigns, :offline_mode, true) do
       socket
-      |> append_output.(translated("Translate"), translated("Automatic AI actions stay gated by airplane mode."), nil, "info")
+      |> append_output.(
+        translated("Translate"),
+        translated("Automatic AI actions stay gated by airplane mode."),
+        nil,
+        "info"
+      )
       |> reload.(socket.assigns.workbench)
     else
       case AI.translate_media(media_id, normalize_language(language)) do
         {:ok, translation} ->
           case Media.upsert_media_translation(media_id, language, translation) do
-            {:ok, _saved_translation} -> socket |> reload.(socket.assigns.workbench)
+            {:ok, _saved_translation} ->
+              socket |> reload.(socket.assigns.workbench)
 
             {:error, reason} ->
               socket
@@ -361,11 +473,15 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec delete_translation(term(), term(), term(), term(), term()) :: term()
   def delete_translation(socket, media_id, language, reload, append_output) do
     case Media.delete_media_translation(media_id, language) do
       {:ok, _deleted?} ->
         socket
-        |> assign(:media_editor_translation_forms, Map.delete(socket.assigns.media_editor_translation_forms, media_id))
+        |> assign(
+          :media_editor_translation_forms,
+          Map.delete(socket.assigns.media_editor_translation_forms, media_id)
+        )
         |> reload.(socket.assigns.workbench)
 
       {:error, reason} ->
@@ -375,6 +491,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
+  @spec build(term()) :: term()
   def build(%{current_tab: %{type: :media, id: media_id}} = assigns) do
     case Media.get_media(media_id) do
       nil ->
@@ -385,7 +502,9 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
         translations = Media.list_media_translations(media.id)
         form = current_draft(assigns, media)
         picker_query = Map.get(assigns.media_editor_post_picker_queries, media.id, "")
-        {picker_results, picker_overflow_count} = post_picker_results(media, linked_posts, picker_query)
+
+        {picker_results, picker_overflow_count} =
+          post_picker_results(media, linked_posts, picker_query)
 
         %{
           id: media.id,
@@ -416,20 +535,26 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
   def build(_assigns), do: nil
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  @spec translated(term(), term()) :: term()
+  def translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
+  @spec media_editor_save_state_label(term()) :: term()
   def media_editor_save_state_label(:dirty), do: translated("Unsaved")
   def media_editor_save_state_label(:saved), do: translated("Saved")
   def media_editor_save_state_label(_state), do: translated("Idle")
 
+  @spec language_label(term()) :: term()
   def language_label(code) do
     code
     |> to_string()
     |> String.upcase()
   end
 
+  @spec normalize_language(term()) :: term()
   def normalize_language(value), do: value |> to_string() |> String.trim() |> String.downcase()
 
+  @spec persist(term(), term()) :: term()
   def persist(%MediaRecord{} = media, draft) do
     Media.update_media(media.id, %{
       title: blank_to_nil(Map.get(draft, "title")),
@@ -444,7 +569,11 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   defp reconcile_draft(socket, %MediaRecord{} = media, draft) do
     persisted = persisted_form(media)
     dirty? = draft != persisted
-    workbench = if dirty?, do: Workbench.mark_dirty(socket.assigns.workbench, :media, media.id), else: Workbench.clear_dirty(socket.assigns.workbench, :media, media.id)
+
+    workbench =
+      if dirty?,
+        do: Workbench.mark_dirty(socket.assigns.workbench, :media, media.id),
+        else: Workbench.clear_dirty(socket.assigns.workbench, :media, media.id)
 
     drafts =
       if dirty? do
@@ -456,8 +585,21 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     socket
     |> assign(:workbench, workbench)
     |> assign(:media_editor_drafts, drafts)
-    |> assign(:media_editor_save_states, Map.put(socket.assigns.media_editor_save_states, media.id, if(dirty?, do: :dirty, else: :idle)))
-    |> assign(:tab_meta, Map.put(socket.assigns.tab_meta, {:media, media.id}, %{title: blank_to_nil(Map.get(draft, "title")) || display_title(media), subtitle: media.original_name || media.mime_type || ""}))
+    |> assign(
+      :media_editor_save_states,
+      Map.put(
+        socket.assigns.media_editor_save_states,
+        media.id,
+        if(dirty?, do: :dirty, else: :idle)
+      )
+    )
+    |> assign(
+      :tab_meta,
+      Map.put(socket.assigns.tab_meta, {:media, media.id}, %{
+        title: blank_to_nil(Map.get(draft, "title")) || display_title(media),
+        subtitle: media.original_name || media.mime_type || ""
+      })
+    )
   end
 
   defp current_draft(assigns, %MediaRecord{} = media) do
@@ -505,10 +647,15 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
         from post in Post,
           where: post.project_id == ^media.project_id,
           order_by: [desc: post.updated_at, desc: post.created_at],
-          select: %{post_id: post.id, title: fragment("COALESCE(?, ?, ?)", post.title, post.slug, post.id)}
+          select: %{
+            post_id: post.id,
+            title: fragment("COALESCE(?, ?, ?)", post.title, post.slug, post.id)
+          }
       )
       |> Enum.reject(&MapSet.member?(linked_ids, &1.post_id))
-      |> Enum.filter(fn post -> normalized_query == "" or String.contains?(String.downcase(post.title), normalized_query) end)
+      |> Enum.filter(fn post ->
+        normalized_query == "" or String.contains?(String.downcase(post.title), normalized_query)
+      end)
 
     {Enum.take(posts, @post_picker_limit), max(length(posts) - @post_picker_limit, 0)}
   end
@@ -518,18 +665,28 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   end
 
   defp preview_url(%MediaRecord{} = media) do
-    if image?(media), do: "/media-thumbnail/#{media.id}?size=large&t=#{media.updated_at}", else: nil
+    if image?(media),
+      do: "/media-thumbnail/#{media.id}?size=large&t=#{media.updated_at}",
+      else: nil
   end
 
-  defp image?(%MediaRecord{} = media), do: String.starts_with?(to_string(media.mime_type || ""), "image/")
+  defp image?(%MediaRecord{} = media),
+    do: String.starts_with?(to_string(media.mime_type || ""), "image/")
 
-  defp display_title(%MediaRecord{} = media), do: blank_to_nil(media.title) || blank_to_nil(media.original_name) || media.id
+  defp display_title(%MediaRecord{} = media),
+    do: blank_to_nil(media.title) || blank_to_nil(media.original_name) || media.id
 
-  defp dimensions_label(%MediaRecord{width: width, height: height}) when is_integer(width) and is_integer(height), do: "#{width} x #{height}"
+  defp dimensions_label(%MediaRecord{width: width, height: height})
+       when is_integer(width) and is_integer(height), do: "#{width} x #{height}"
+
   defp dimensions_label(_media), do: nil
 
-  defp format_file_size(size) when is_integer(size) and size >= 1_048_576, do: :erlang.float_to_binary(size / 1_048_576, decimals: 1) <> " MB"
-  defp format_file_size(size) when is_integer(size), do: :erlang.float_to_binary(size / 1024, decimals: 1) <> " KB"
+  defp format_file_size(size) when is_integer(size) and size >= 1_048_576,
+    do: :erlang.float_to_binary(size / 1_048_576, decimals: 1) <> " MB"
+
+  defp format_file_size(size) when is_integer(size),
+    do: :erlang.float_to_binary(size / 1024, decimals: 1) <> " KB"
+
   defp format_file_size(_size), do: "0.0 KB"
 
   defp detect_language_enabled?(form) do
@@ -567,5 +724,6 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
-  defp reload_with_assigned_workbench(socket, reload), do: reload.(socket, socket.assigns.workbench)
+  defp reload_with_assigned_workbench(socket, reload),
+    do: reload.(socket, socket.assigns.workbench)
 end

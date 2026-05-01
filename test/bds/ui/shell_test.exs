@@ -121,6 +121,7 @@ defmodule BDS.UI.ShellTest do
   test "desktop shell assets persist workbench layout per project" do
     live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
+
     session_util_ex =
       File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/session_util.ex")
 
@@ -214,7 +215,10 @@ defmodule BDS.UI.ShellTest do
     refute live_js =~ "syncTitlebarMenuAnchor"
     refute live_js =~ "handleTitlebarMenuKeyDown"
     refute live_js =~ "keyboardMenuIndex"
-    assert template =~ "phx-window-keydown={if(@titlebar_menu_group, do: \"titlebar_menu_keydown\")}"
+
+    assert template =~
+             "phx-window-keydown={if(@titlebar_menu_group, do: \"titlebar_menu_keydown\")}"
+
     assert template =~ "window-titlebar-menu-group"
     assert live_ex =~ ~s(def handle_event("titlebar_menu_keydown")
     assert live_ex =~ "titlebar_menu_item_index"
@@ -222,7 +226,11 @@ defmodule BDS.UI.ShellTest do
 
   test "desktop shell css keeps the old media editor layout contract" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
-    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex")
+
+    template =
+      File.read!(
+        "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex"
+      )
 
     assert css =~ ".media-preview {"
     assert css =~ "min-height: 300px;"
@@ -246,10 +254,20 @@ defmodule BDS.UI.ShellTest do
     assert css =~ "padding: 6px 10px;"
     assert css =~ ".linked-post-item:hover .unlink-btn {"
     assert css =~ "opacity: 1;"
-    assert Regex.match?(~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= translated\("Quick Actions"\) %><\/span>/s, template)
+
+    assert Regex.match?(
+             ~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= translated\("Quick Actions"\) %><\/span>/s,
+             template
+           )
+
     assert template =~ ~s(class="quick-action-text")
     assert template =~ ~s(class="quick-action-icon">🤖</span>)
-    assert Regex.match?(~r/class="quick-action-text">\s*<strong><%= translated\("AI Suggestions"\) %><\/strong>.*?<\/span>\s*<span class="quick-action-icon">🤖<\/span>/s, template)
+
+    assert Regex.match?(
+             ~r/class="quick-action-text">\s*<strong><%= translated\("AI Suggestions"\) %><\/strong>.*?<\/span>\s*<span class="quick-action-icon">🤖<\/span>/s,
+             template
+           )
+
     refute template =~ ~s|<span class="quick-action-icon">🤖</span>
           <span class="quick-action-text">|
   end
@@ -310,8 +328,14 @@ defmodule BDS.UI.ShellTest do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
-    overlay_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/overlay_components.ex")
-    overlay_template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex")
+
+    overlay_ex =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/overlay_components.ex")
+
+    overlay_template =
+      File.read!(
+        "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex"
+      )
 
     assert template =~ "render_editor_toolbar(assigns)"
     assert template =~ "<ShellOverlayComponents.shell_overlay"
@@ -339,12 +363,22 @@ defmodule BDS.UI.ShellTest do
   test "desktop shell keeps post editor logic in the feature slice" do
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
-    post_editor_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor.ex")
-    post_template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex")
+
+    post_editor_ex =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor.ex")
+
+    post_template =
+      File.read!(
+        "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex"
+      )
 
     assert template =~ "<PostEditor.post_editor"
     assert post_editor_ex =~ "def build(%{current_tab: %{type: :post, id: post_id}} = assigns)"
-    assert Regex.match?(~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= translated\("Quick Actions"\) %><\/span>/s, post_template)
+
+    assert Regex.match?(
+             ~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= translated\("Quick Actions"\) %><\/span>/s,
+             post_template
+           )
 
     refute live_ex =~ "defp update_post_editor("
     refute live_ex =~ "defp persist_post_editor("
@@ -356,7 +390,9 @@ defmodule BDS.UI.ShellTest do
   test "desktop shell keeps media editor logic in the feature slice" do
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
-    media_editor_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/media_editor.ex")
+
+    media_editor_ex =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/media_editor.ex")
 
     assert template =~ "<MediaEditor.media_editor"
     assert media_editor_ex =~ "def build(%{current_tab: %{type: :media, id: media_id}} = assigns)"
@@ -369,8 +405,12 @@ defmodule BDS.UI.ShellTest do
   test "desktop shell keeps sidebar logic in its own slice" do
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
-    sidebar_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/sidebar_components.ex")
-    sidebar_state_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/sidebar_state.ex")
+
+    sidebar_ex =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/sidebar_components.ex")
+
+    sidebar_state_ex =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/sidebar_state.ex")
 
     assert template =~ "<ShellSidebarComponents.sidebar_content"
     assert sidebar_ex =~ "def sidebar_content(assigns)"

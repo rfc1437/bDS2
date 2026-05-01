@@ -22,9 +22,23 @@ defmodule BDS.Scripting.Capabilities.AppShell do
       command = string_or_nil(text)
 
       case :os.type() do
-        {:unix, :darwin} -> match?({_output, 0}, System.cmd("pbcopy", [], input: command, stderr_to_stdout: true))
-        {:unix, _other} -> match?({_output, 0}, System.cmd("xclip", ["-selection", "clipboard"], input: command, stderr_to_stdout: true))
-        {:win32, _other} -> match?({_output, 0}, System.cmd("cmd", ["/c", "clip"], input: command, stderr_to_stdout: true))
+        {:unix, :darwin} ->
+          match?({_output, 0}, System.cmd("pbcopy", [], input: command, stderr_to_stdout: true))
+
+        {:unix, _other} ->
+          match?(
+            {_output, 0},
+            System.cmd("xclip", ["-selection", "clipboard"],
+              input: command,
+              stderr_to_stdout: true
+            )
+          )
+
+        {:win32, _other} ->
+          match?(
+            {_output, 0},
+            System.cmd("cmd", ["/c", "clip"], input: command, stderr_to_stdout: true)
+          )
       end
     end
   rescue
@@ -94,7 +108,11 @@ defmodule BDS.Scripting.Capabilities.AppShell do
   end
 
   def set_preview_post_target(post_id) do
-    :persistent_term.put({BDS.Scripting.Capabilities, :preview_post_target}, string_or_nil(post_id))
+    :persistent_term.put(
+      {BDS.Scripting.Capabilities, :preview_post_target},
+      string_or_nil(post_id)
+    )
+
     true
   end
 

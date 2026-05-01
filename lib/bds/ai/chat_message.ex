@@ -23,18 +23,20 @@ defmodule BDS.AI.ChatMessage do
 
   def changeset(message, attrs) do
     message
-    |> cast(attrs, [
-      :conversation_id,
-      :role,
-      :content,
-      :tool_call_id,
-      :tool_calls,
-      :token_usage_input,
-      :token_usage_output,
-      :cache_read_tokens,
-      :cache_write_tokens,
-      :created_at
-    ], empty_values: [nil])
+    |> cast(
+      attrs,
+      [
+        :conversation_id,
+        :role,
+        :content,
+        :tool_call_id,
+        :tool_calls,
+        :token_usage_input,
+        :token_usage_output,
+        :cache_read_tokens,
+        :cache_write_tokens,
+        :created_at
+      ], empty_values: [nil])
     |> validate_required([:conversation_id, :role, :created_at])
     |> assoc_constraint(:conversation)
   end

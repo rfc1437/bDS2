@@ -19,7 +19,16 @@ defmodule BDS.ImportDefinitions.ImportDefinition do
 
   def changeset(definition, attrs) do
     definition
-    |> cast(attrs, [:id, :project_id, :name, :wxr_file_path, :uploads_folder_path, :last_analysis_result, :created_at, :updated_at])
+    |> cast(attrs, [
+      :id,
+      :project_id,
+      :name,
+      :wxr_file_path,
+      :uploads_folder_path,
+      :last_analysis_result,
+      :created_at,
+      :updated_at
+    ])
     |> validate_required([:id, :project_id, :name, :created_at, :updated_at])
   end
 end

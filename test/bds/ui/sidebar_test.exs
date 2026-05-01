@@ -26,13 +26,24 @@ defmodule BDS.UI.SidebarTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "database-backed sidebar views follow the old app ordering keys", %{project: project, temp_dir: temp_dir} do
+  test "database-backed sidebar views follow the old app ordering keys", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, draft_old} = Posts.create_post(%{project_id: project.id, title: "Draft Old"})
     assert {:ok, draft_new} = Posts.create_post(%{project_id: project.id, title: "Draft New"})
-    assert {:ok, published_old} = Posts.create_post(%{project_id: project.id, title: "Published Old"})
-    assert {:ok, published_new} = Posts.create_post(%{project_id: project.id, title: "Published New"})
-    assert {:ok, archived_old} = Posts.create_post(%{project_id: project.id, title: "Archived Old"})
-    assert {:ok, archived_new} = Posts.create_post(%{project_id: project.id, title: "Archived New"})
+
+    assert {:ok, published_old} =
+             Posts.create_post(%{project_id: project.id, title: "Published Old"})
+
+    assert {:ok, published_new} =
+             Posts.create_post(%{project_id: project.id, title: "Published New"})
+
+    assert {:ok, archived_old} =
+             Posts.create_post(%{project_id: project.id, title: "Archived Old"})
+
+    assert {:ok, archived_new} =
+             Posts.create_post(%{project_id: project.id, title: "Archived New"})
 
     update_post_sidebar_row(draft_old.id, created_at: 1_000, updated_at: 9_000)
     update_post_sidebar_row(draft_new.id, created_at: 2_000, updated_at: 1_000)
@@ -55,26 +66,77 @@ defmodule BDS.UI.SidebarTest do
       file_path: "posts/published-new.md"
     )
 
-    update_post_sidebar_row(archived_old.id, status: :archived, created_at: 5_000, updated_at: 9_000)
-    update_post_sidebar_row(archived_new.id, status: :archived, created_at: 6_000, updated_at: 1_000)
+    update_post_sidebar_row(archived_old.id,
+      status: :archived,
+      created_at: 5_000,
+      updated_at: 9_000
+    )
+
+    update_post_sidebar_row(archived_new.id,
+      status: :archived,
+      created_at: 6_000,
+      updated_at: 1_000
+    )
 
     old_media_path = Path.join(temp_dir, "old-media.txt")
     new_media_path = Path.join(temp_dir, "new-media.txt")
     File.write!(old_media_path, "old media")
     File.write!(new_media_path, "new media")
 
-    assert {:ok, old_media} = Media.import_media(%{project_id: project.id, source_path: old_media_path, title: "Old Media"})
-    assert {:ok, new_media} = Media.import_media(%{project_id: project.id, source_path: new_media_path, title: "New Media"})
+    assert {:ok, old_media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: old_media_path,
+               title: "Old Media"
+             })
+
+    assert {:ok, new_media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: new_media_path,
+               title: "New Media"
+             })
+
     update_media_sidebar_row(old_media.id, created_at: 7_000, updated_at: 9_000)
     update_media_sidebar_row(new_media.id, created_at: 8_000, updated_at: 1_000)
 
-    assert {:ok, old_script} = Scripts.create_script(%{project_id: project.id, title: "Old Script", kind: :utility, content: "print('old')", entrypoint: "main"})
-    assert {:ok, new_script} = Scripts.create_script(%{project_id: project.id, title: "New Script", kind: :utility, content: "print('new')", entrypoint: "main"})
+    assert {:ok, old_script} =
+             Scripts.create_script(%{
+               project_id: project.id,
+               title: "Old Script",
+               kind: :utility,
+               content: "print('old')",
+               entrypoint: "main"
+             })
+
+    assert {:ok, new_script} =
+             Scripts.create_script(%{
+               project_id: project.id,
+               title: "New Script",
+               kind: :utility,
+               content: "print('new')",
+               entrypoint: "main"
+             })
+
     update_script_sidebar_row(old_script.id, 9_000)
     update_script_sidebar_row(new_script.id, 10_000)
 
-    assert {:ok, old_template} = Templates.create_template(%{project_id: project.id, title: "Old Template", kind: :post, content: "old"})
-    assert {:ok, new_template} = Templates.create_template(%{project_id: project.id, title: "New Template", kind: :post, content: "new"})
+    assert {:ok, old_template} =
+             Templates.create_template(%{
+               project_id: project.id,
+               title: "Old Template",
+               kind: :post,
+               content: "old"
+             })
+
+    assert {:ok, new_template} =
+             Templates.create_template(%{
+               project_id: project.id,
+               title: "New Template",
+               kind: :post,
+               content: "new"
+             })
+
     update_template_sidebar_row(old_template.id, 11_000)
     update_template_sidebar_row(new_template.id, 12_000)
 
@@ -83,8 +145,12 @@ defmodule BDS.UI.SidebarTest do
     update_chat_sidebar_row(old_chat.id, 13_000)
     update_chat_sidebar_row(new_chat.id, 14_000)
 
-    assert {:ok, old_definition} = ImportDefinitions.create_definition(%{project_id: project.id, name: "Old Import"})
-    assert {:ok, new_definition} = ImportDefinitions.create_definition(%{project_id: project.id, name: "New Import"})
+    assert {:ok, old_definition} =
+             ImportDefinitions.create_definition(%{project_id: project.id, name: "Old Import"})
+
+    assert {:ok, new_definition} =
+             ImportDefinitions.create_definition(%{project_id: project.id, name: "New Import"})
+
     update_import_sidebar_row(old_definition.id, 15_000)
     update_import_sidebar_row(new_definition.id, 16_000)
 
@@ -125,18 +191,28 @@ defmodule BDS.UI.SidebarTest do
   end
 
   defp update_script_sidebar_row(script_id, updated_at) do
-    Repo.update_all(from(script in BDS.Scripts.Script, where: script.id == ^script_id), set: [updated_at: updated_at])
+    Repo.update_all(from(script in BDS.Scripts.Script, where: script.id == ^script_id),
+      set: [updated_at: updated_at]
+    )
   end
 
   defp update_template_sidebar_row(template_id, updated_at) do
-    Repo.update_all(from(template in BDS.Templates.Template, where: template.id == ^template_id), set: [updated_at: updated_at])
+    Repo.update_all(from(template in BDS.Templates.Template, where: template.id == ^template_id),
+      set: [updated_at: updated_at]
+    )
   end
 
   defp update_chat_sidebar_row(conversation_id, updated_at) do
-    Repo.update_all(from(conversation in BDS.AI.ChatConversation, where: conversation.id == ^conversation_id), set: [updated_at: updated_at])
+    Repo.update_all(
+      from(conversation in BDS.AI.ChatConversation, where: conversation.id == ^conversation_id),
+      set: [updated_at: updated_at]
+    )
   end
 
   defp update_import_sidebar_row(definition_id, updated_at) do
-    Repo.update_all(from(definition in BDS.ImportDefinitions.ImportDefinition, where: definition.id == ^definition_id), set: [updated_at: updated_at])
+    Repo.update_all(
+      from(definition in BDS.ImportDefinitions.ImportDefinition,
+        where: definition.id == ^definition_id
+      ), set: [updated_at: updated_at])
   end
 end

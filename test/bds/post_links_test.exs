@@ -6,7 +6,9 @@ defmodule BDS.PostLinksTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
-    temp_dir = Path.join(System.tmp_dir!(), "bds-post-links-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-links-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
 
     on_exit(fn -> File.rm_rf(temp_dir) end)
@@ -15,9 +17,10 @@ defmodule BDS.PostLinksTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "publishing and updating posts sync outgoing post links and deleting a post removes them", %{
-    project: project
-  } do
+  test "publishing and updating posts sync outgoing post links and deleting a post removes them",
+       %{
+         project: project
+       } do
     assert {:ok, target} =
              BDS.Posts.create_post(%{
                project_id: project.id,

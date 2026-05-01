@@ -57,7 +57,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                 total,
                 detail,
                 reload
-              ), to: ProgressTracking
+              ),
+              to: ProgressTracking
 
   defdelegate finish_execution(socket, ref, result, reload, append_output), to: ProgressTracking
 
@@ -72,6 +73,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   defdelegate clear_taxonomy_mapping(socket, params, reload), to: TaxonomyEditing
   defdelegate analyze_taxonomy_ai(socket, reload, append_output), to: TaxonomyEditing
 
+  @spec assign_socket(term()) :: term()
   def assign_socket(socket) do
     case socket.assigns[:current_tab] do
       %{type: :import, id: definition_id} ->
@@ -140,6 +142,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     end
   end
 
+  @spec toggle_section(term(), term(), term()) :: term()
   def toggle_section(socket, section, reload) do
     with %{id: definition_id} <- socket.assigns.current_tab,
          section_key
@@ -171,6 +174,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     end
   end
 
+  @spec toggle_model_selector(term(), term()) :: term()
   def toggle_model_selector(socket, reload) do
     with %{id: definition_id} <- socket.assigns.current_tab do
       current = Map.get(socket.assigns.import_editor_model_selectors_open, definition_id, false)
@@ -186,6 +190,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     end
   end
 
+  @spec select_ai_model(term(), term(), term()) :: term()
   def select_ai_model(socket, model_id, reload) do
     with %{id: definition_id} <- socket.assigns.current_tab do
       socket
@@ -205,6 +210,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   attr(:import_editor, :map, required: true)
 
+  @spec import_editor(term()) :: term()
   def import_editor(assigns) do
     assigns =
       assigns
@@ -547,6 +553,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:expanded, :boolean, required: true)
   attr(:section, :string, required: true)
 
+  @spec conflict_section(term()) :: term()
   def conflict_section(assigns) do
     ~H"""
     <section class="import-detail-section conflicts-section">
@@ -597,6 +604,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:section, :string, required: true)
   attr(:show_type, :boolean, default: false)
 
+  @spec post_detail_section(term()) :: term()
   def post_detail_section(assigns) do
     ~H"""
     <section class="import-detail-section">
@@ -646,6 +654,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:expanded, :boolean, required: true)
   attr(:section, :string, required: true)
 
+  @spec media_detail_section(term()) :: term()
   def media_detail_section(assigns) do
     ~H"""
     <section class="import-detail-section">
@@ -685,6 +694,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:label, :string, required: true)
   attr(:stats, :map, required: true)
 
+  @spec stat_card(term()) :: term()
   def stat_card(assigns) do
     ~H"""
     <div class="import-stat-card">
@@ -703,6 +713,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:label, :string, required: true)
   attr(:stats, :map, required: true)
 
+  @spec other_stat_card(term()) :: term()
   def other_stat_card(assigns) do
     ~H"""
     <div class="import-stat-card import-stat-card-other">
@@ -720,6 +731,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:label, :string, required: true)
   attr(:stats, :map, required: true)
 
+  @spec media_stat_card(term()) :: term()
   def media_stat_card(assigns) do
     ~H"""
     <div class="import-stat-card">
@@ -739,6 +751,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:label, :string, required: true)
   attr(:stats, :map, required: true)
 
+  @spec taxonomy_stat_card(term()) :: term()
   def taxonomy_stat_card(assigns) do
     ~H"""
     <div class="import-stat-card">
@@ -759,6 +772,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:edit, :map, default: nil)
   attr(:type, :string, required: true)
 
+  @spec taxonomy_group(term()) :: term()
   def taxonomy_group(assigns) do
     ~H"""
     <div class="taxonomy-group">

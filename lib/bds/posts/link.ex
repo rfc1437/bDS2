@@ -18,8 +18,15 @@ defmodule BDS.Posts.Link do
         }
 
   schema "post_links" do
-    belongs_to :source_post, BDS.Posts.Post, foreign_key: :source_post_id, references: :id, type: :string
-    belongs_to :target_post, BDS.Posts.Post, foreign_key: :target_post_id, references: :id, type: :string
+    belongs_to :source_post, BDS.Posts.Post,
+      foreign_key: :source_post_id,
+      references: :id,
+      type: :string
+
+    belongs_to :target_post, BDS.Posts.Post,
+      foreign_key: :target_post_id,
+      references: :id,
+      type: :string
 
     field :link_text, :string
     field :created_at, :integer

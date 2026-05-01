@@ -23,13 +23,14 @@ defmodule BDS.GitTest do
     project: project,
     project_dir: project_dir
   } do
-    runner = fake_runner(fn
-      "git", ["init", "-b", "master"], _opts -> {"", 0}
-      "git", ["lfs", "track" | _rest], _opts -> {"Tracking *.png\n", 0}
-      "git", ["rev-parse", "--abbrev-ref", "HEAD"], _opts -> {"master\n", 0}
-      "git", ["remote", "get-url", "origin"], _opts -> {"", 2}
-      "git", ["lfs", "ls-files"], _opts -> {"", 0}
-    end)
+    runner =
+      fake_runner(fn
+        "git", ["init", "-b", "master"], _opts -> {"", 0}
+        "git", ["lfs", "track" | _rest], _opts -> {"Tracking *.png\n", 0}
+        "git", ["rev-parse", "--abbrev-ref", "HEAD"], _opts -> {"master\n", 0}
+        "git", ["remote", "get-url", "origin"], _opts -> {"", 2}
+        "git", ["lfs", "ls-files"], _opts -> {"", 0}
+      end)
 
     assert {:ok, repo} = Git.initialize_repo(project.id, runner: runner)
 
@@ -40,22 +41,41 @@ defmodule BDS.GitTest do
     assert File.read!(Path.join(project_dir, ".gitattributes")) =~ "*.png filter=lfs"
   end
 
-  test "status, diff, history, and provider detection are parsed from git output", %{project: project} do
-    runner = fake_runner(fn
-      "git", ["status", "--porcelain=v1", "--untracked-files=all"], _opts ->
-        {"A  posts/new.md\n M meta/project.json\nR  old.txt -> new.txt\n?? note.txt\n", 0}
+  test "status, diff, history, and provider detection are parsed from git output", %{
+    project: project
+  } do
+    runner =
+      fake_runner(fn
+        "git", ["status", "--porcelain=v1", "--untracked-files=all"], _opts ->
+          {"A  posts/new.md\n M meta/project.json\nR  old.txt -> new.txt\n?? note.txt\n", 0}
 
-      "git", ["diff", "--cached", "--no-ext-diff"], _opts -> {"staged diff", 0}
-      "git", ["diff", "--no-ext-diff"], _opts -> {"unstaged diff", 0}
-      "git", ["remote", "get-url", "origin"], _opts -> {"git@github.com:owner/repo.git\n", 0}
-      "git", ["rev-parse", "--abbrev-ref", "HEAD"], _opts -> {"main\n", 0}
-      "git", ["log", "--format=%H%x09%s", "main"], _opts -> {"a1\tLocal commit\nb2\tShared commit\n", 0}
-      "git", ["log", "--format=%H", "origin/main"], _opts -> {"b2\nc3\n", 0}
-    end)
+        "git", ["diff", "--cached", "--no-ext-diff"], _opts ->
+          {"staged diff", 0}
+
+        "git", ["diff", "--no-ext-diff"], _opts ->
+          {"unstaged diff", 0}
+
+        "git", ["remote", "get-url", "origin"], _opts ->
+          {"git@github.com:owner/repo.git\n", 0}
+
+        "git", ["rev-parse", "--abbrev-ref", "HEAD"], _opts ->
+          {"main\n", 0}
+
+        "git", ["log", "--format=%H%x09%s", "main"], _opts ->
+          {"a1\tLocal commit\nb2\tShared commit\n", 0}
+
+        "git", ["log", "--format=%H", "origin/main"], _opts ->
+          {"b2\nc3\n", 0}
+      end)
 
     assert {:ok, status} = Git.status(project.id, runner: runner)
     assert Enum.any?(status.files, &(&1.path == "posts/new.md" and &1.status == :added))
-    assert Enum.any?(status.files, &(&1.path == "new.txt" and &1.status == :renamed and &1.old_path == "old.txt"))
+
+    assert Enum.any?(
+             status.files,
+             &(&1.path == "new.txt" and &1.status == :renamed and &1.old_path == "old.txt")
+           )
+
     assert Enum.any?(status.files, &(&1.path == "note.txt" and &1.status == :untracked))
 
     assert {:ok, diff} = Git.diff(project.id, runner: runner)
@@ -93,12 +113,20 @@ defmodule BDS.GitTest do
   end
 
   test "remote_state reports upstream ahead and behind counts", %{project: project} do
-    runner = fake_runner(fn
-      "git", ["rev-parse", "--abbrev-ref", "HEAD"], _opts -> {"main\n", 0}
-      "git", ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], _opts -> {"origin/main\n", 0}
-      "git", ["rev-list", "--count", "origin/main..HEAD"], _opts -> {"2\n", 0}
-      "git", ["rev-list", "--count", "HEAD..origin/main"], _opts -> {"5\n", 0}
-    end)
+    runner =
+      fake_runner(fn
+        "git", ["rev-parse", "--abbrev-ref", "HEAD"], _opts ->
+          {"main\n", 0}
+
+        "git", ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], _opts ->
+          {"origin/main\n", 0}
+
+        "git", ["rev-list", "--count", "origin/main..HEAD"], _opts ->
+          {"2\n", 0}
+
+        "git", ["rev-list", "--count", "HEAD..origin/main"], _opts ->
+          {"5\n", 0}
+      end)
 
     assert {:ok, remote_state} = Git.remote_state(project.id, runner: runner)
     assert remote_state.local_branch == "main"
@@ -117,16 +145,29 @@ defmodule BDS.GitTest do
       send(parent, {:git_command, command, args, opts})
 
       case {command, args} do
-        {"git", ["fetch", "--all", "--prune"]} -> {"", 0}
-        {"git", ["pull", "--ff-only"]} -> {"", 0}
-        {"git", ["push"]} -> {"", 0}
-        {"git", ["add", "-A"]} -> {"", 0}
-        {"git", ["commit", "-m", "save everything"]} -> {"", 0}
+        {"git", ["fetch", "--all", "--prune"]} ->
+          {"", 0}
+
+        {"git", ["pull", "--ff-only"]} ->
+          {"", 0}
+
+        {"git", ["push"]} ->
+          {"", 0}
+
+        {"git", ["add", "-A"]} ->
+          {"", 0}
+
+        {"git", ["commit", "-m", "save everything"]} ->
+          {"", 0}
+
         {"git", ["diff", "--name-status", "old", "new"]} ->
           {"A\tposts/2026/04/new-post.md\nM\tscripts/tool.lua\nD\ttemplates/old.liquid\n", 0}
 
-        {"git", ["lfs", "prune", "--recent"]} -> {"", 0}
-        _other -> {"", 0}
+        {"git", ["lfs", "prune", "--recent"]} ->
+          {"", 0}
+
+        _other ->
+          {"", 0}
       end
     end
 
@@ -151,10 +192,14 @@ defmodule BDS.GitTest do
   end
 
   test "fetch returns structured auth errors with provider guidance", %{project: project} do
-    runner = fake_runner(fn
-      "git", ["remote", "get-url", "origin"], _opts -> {"git@gitlab.com:owner/repo.git\n", 0}
-      "git", ["fetch", "--all", "--prune"], _opts -> {"fatal: Authentication failed for 'origin'", 128}
-    end)
+    runner =
+      fake_runner(fn
+        "git", ["remote", "get-url", "origin"], _opts ->
+          {"git@gitlab.com:owner/repo.git\n", 0}
+
+        "git", ["fetch", "--all", "--prune"], _opts ->
+          {"fatal: Authentication failed for 'origin'", 128}
+      end)
 
     assert {:error, error} = Git.fetch(project.id, runner: runner)
     assert error.kind == :auth

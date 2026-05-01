@@ -79,31 +79,31 @@ defmodule BDS.PreviewTest do
              BDS.Preview.request(project.id, "/pagefind/pagefind-ui.js")
 
     assert {:ok, %{body: pico_css, content_type: "text/css"}} =
-         BDS.Preview.request(project.id, "/assets/pico.min.css")
+             BDS.Preview.request(project.id, "/assets/pico.min.css")
 
     assert pico_css =~ ":root"
 
     assert {:ok, %{body: bds_css, content_type: "text/css"}} =
-         BDS.Preview.request(project.id, "/assets/bds.css")
+             BDS.Preview.request(project.id, "/assets/bds.css")
 
     assert bds_css =~ ".blog-menu"
 
-        assert {:ok, %{body: calendar_runtime, content_type: "application/javascript"}} =
-           BDS.Preview.request(project.id, "/assets/calendar-runtime.js")
+    assert {:ok, %{body: calendar_runtime, content_type: "application/javascript"}} =
+             BDS.Preview.request(project.id, "/assets/calendar-runtime.js")
 
-        assert calendar_runtime =~ "loadCalendarData"
-        assert calendar_runtime =~ "window.location.assign"
+    assert calendar_runtime =~ "loadCalendarData"
+    assert calendar_runtime =~ "window.location.assign"
 
-        assert {:ok, %{body: tag_cloud_runtime, content_type: "application/javascript"}} =
-           BDS.Preview.request(project.id, "/assets/tag-cloud.js")
+    assert {:ok, %{body: tag_cloud_runtime, content_type: "application/javascript"}} =
+             BDS.Preview.request(project.id, "/assets/tag-cloud.js")
 
-        assert tag_cloud_runtime =~ "data-tag-cloud-words"
+    assert tag_cloud_runtime =~ "data-tag-cloud-words"
 
-        assert {:ok, %{body: _prev_png, content_type: "image/png"}} =
-           BDS.Preview.request(project.id, "/images/prev.png")
+    assert {:ok, %{body: _prev_png, content_type: "image/png"}} =
+             BDS.Preview.request(project.id, "/images/prev.png")
 
-        assert {:ok, %{body: _loading_gif, content_type: "image/gif"}} =
-           BDS.Preview.request(project.id, "/images/loading.gif")
+    assert {:ok, %{body: _loading_gif, content_type: "image/gif"}} =
+             BDS.Preview.request(project.id, "/images/loading.gif")
 
     assert {:ok, %{body: "media body", content_type: "text/plain"}} =
              BDS.Preview.request(project.id, "/media/2026/04/image.txt")
@@ -152,6 +152,7 @@ defmodule BDS.PreviewTest do
     assert {:ok, published_post} = Posts.publish_post(post.id)
 
     published_datetime = DateTime.from_unix!(published_post.created_at, :millisecond)
+
     published_path =
       "/#{published_datetime.year}/#{String.pad_leading(Integer.to_string(published_datetime.month), 2, "0")}/#{String.pad_leading(Integer.to_string(published_datetime.day), 2, "0")}/#{published_post.slug}"
 
@@ -162,7 +163,9 @@ defmodule BDS.PreviewTest do
     assert {:ok, {{_version, 200, _reason}, _headers, published_html}} =
              :httpc.request(
                :get,
-               {to_charlist("http://#{server.host}:#{server.port}#{published_path}?draft=true&post_id=#{published_post.id}"), []},
+               {to_charlist(
+                  "http://#{server.host}:#{server.port}#{published_path}?draft=true&post_id=#{published_post.id}"
+                ), []},
                [],
                body_format: :binary
              )
@@ -449,7 +452,11 @@ defmodule BDS.PreviewTest do
     assert generated_html =~ ~s(/assets/pico.amber.min.css)
 
     assert {:ok, %{body: draft_html, content_type: "text/html"}} =
-             BDS.Preview.preview_draft(project.id, "/draft/theme-draft?theme=amber&mode=dark", post.id)
+             BDS.Preview.preview_draft(
+               project.id,
+               "/draft/theme-draft?theme=amber&mode=dark",
+               post.id
+             )
 
     assert draft_html =~ ~s(data-theme="dark")
     assert draft_html =~ ~s(data-mode="dark")

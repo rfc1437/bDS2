@@ -5,6 +5,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.ImportEditor.AnalysisState
 
+  @spec execute_import(term(), term(), term()) :: term()
   def execute_import(socket, reload, _append_output) do
     with %{id: definition_id} <- socket.assigns.current_tab,
          %{} = definition <- ImportDefinitions.get_definition(definition_id),
@@ -24,7 +25,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
               uploads_folder_path: definition.uploads_folder_path,
               default_author: default_author,
               on_progress: fn phase, current, total, detail ->
-                send(live_view_pid, {:import_execution_progress, definition_id, phase, current, total, detail})
+                send(
+                  live_view_pid,
+                  {:import_execution_progress, definition_id, phase, current, total, detail}
+                )
               end
             )
           end)
@@ -50,7 +54,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
             ref: task.ref
           })
         )
-        |> Phoenix.Component.assign(:import_editor_execution_task_refs, Map.put(socket.assigns.import_editor_execution_task_refs, task.ref, definition_id))
+        |> Phoenix.Component.assign(
+          :import_editor_execution_task_refs,
+          Map.put(socket.assigns.import_editor_execution_task_refs, task.ref, definition_id)
+        )
         |> reload.(socket.assigns.workbench)
       end
     else
@@ -58,6 +65,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
     end
   end
 
+  @spec note_execution_progress(term(), term(), term(), term(), term(), term(), term()) :: term()
   def note_execution_progress(socket, definition_id, phase, current, total, detail, reload) do
     {detail_text, eta} = decompose_progress_detail(detail)
     translated_phase = translate_execution_phase(phase)
@@ -65,30 +73,44 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
     socket
     |> Phoenix.Component.assign(
       :import_editor_execution_states,
-      Map.update(socket.assigns.import_editor_execution_states, definition_id, default_execution_state(), fn state ->
-        state
-        |> Map.put(:is_executing, true)
-        |> Map.put(:phase, translated_phase)
-        |> Map.put(:current, current)
-        |> Map.put(:total, total)
-        |> Map.put(:detail, detail_text)
-        |> Map.put(:eta, eta)
-      end)
+      Map.update(
+        socket.assigns.import_editor_execution_states,
+        definition_id,
+        default_execution_state(),
+        fn state ->
+          state
+          |> Map.put(:is_executing, true)
+          |> Map.put(:phase, translated_phase)
+          |> Map.put(:current, current)
+          |> Map.put(:total, total)
+          |> Map.put(:detail, detail_text)
+          |> Map.put(:eta, eta)
+        end
+      )
     )
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec finish_execution(term(), term(), term(), term(), term()) :: term()
   def finish_execution(socket, ref, result, reload, append_output) do
     case Map.get(socket.assigns.import_editor_execution_task_refs, ref) do
       nil ->
         socket
 
       definition_id ->
-        previous_state = Map.get(socket.assigns.import_editor_execution_states, definition_id, default_execution_state())
+        previous_state =
+          Map.get(
+            socket.assigns.import_editor_execution_states,
+            definition_id,
+            default_execution_state()
+          )
 
         socket =
           socket
-          |> Phoenix.Component.assign(:import_editor_execution_task_refs, Map.delete(socket.assigns.import_editor_execution_task_refs, ref))
+          |> Phoenix.Component.assign(
+            :import_editor_execution_task_refs,
+            Map.delete(socket.assigns.import_editor_execution_task_refs, ref)
+          )
 
         case result do
           {:ok, execution_result} ->
@@ -106,7 +128,12 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
                   ref: nil
               })
             )
-            |> append_output.(translated("activity.import"), translated("importAnalysis.importComplete", %{count: previous_state.count}), nil, "info")
+            |> append_output.(
+              translated("activity.import"),
+              translated("importAnalysis.importComplete", %{count: previous_state.count}),
+              nil,
+              "info"
+            )
             |> reload.(socket.assigns.workbench)
 
           {:error, %{message: message}} ->
@@ -144,7 +171,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
     end
   end
 
-  def handle_task_down(socket, kind, ref, reason, reload, append_output) when reason not in [:normal, :shutdown] do
+  @spec handle_task_down(term(), term(), term(), term(), term(), term()) :: term()
+  def handle_task_down(socket, kind, ref, reason, reload, append_output)
+      when reason not in [:normal, :shutdown] do
     message = inspect(reason)
 
     case kind do
@@ -157,10 +186,18 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
             socket
 
           definition_id ->
-            previous_state = Map.get(socket.assigns.import_editor_execution_states, definition_id, default_execution_state())
+            previous_state =
+              Map.get(
+                socket.assigns.import_editor_execution_states,
+                definition_id,
+                default_execution_state()
+              )
 
             socket
-            |> Phoenix.Component.assign(:import_editor_execution_task_refs, Map.delete(socket.assigns.import_editor_execution_task_refs, ref))
+            |> Phoenix.Component.assign(
+              :import_editor_execution_task_refs,
+              Map.delete(socket.assigns.import_editor_execution_task_refs, ref)
+            )
             |> Phoenix.Component.assign(
               :import_editor_execution_states,
               Map.put(socket.assigns.import_editor_execution_states, definition_id, %{
@@ -177,8 +214,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
     end
   end
 
+  @spec handle_task_down(term(), term(), term(), term(), term(), term()) :: term()
   def handle_task_down(socket, _kind, _ref, _reason, _reload, _append_output), do: socket
 
+  @spec default_execution_state() :: term()
   def default_execution_state do
     %{
       is_executing: false,
@@ -195,6 +234,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
     }
   end
 
+  @spec execution_progress_width(term()) :: term()
   def execution_progress_width(state) do
     current = Map.get(state, :current, 0)
     total = Map.get(state, :total, 0)
@@ -205,25 +245,36 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
     end
   end
 
+  @spec decompose_progress_detail(term()) :: term()
   def decompose_progress_detail(%{detail: detail, eta: eta}), do: {to_string_or_nil(detail), eta}
-  def decompose_progress_detail(detail) when is_binary(detail) or is_nil(detail), do: {detail, nil}
+
+  def decompose_progress_detail(detail) when is_binary(detail) or is_nil(detail),
+    do: {detail, nil}
+
   def decompose_progress_detail(detail), do: {to_string_or_nil(detail), nil}
 
+  @spec to_string_or_nil(term()) :: term()
   def to_string_or_nil(nil), do: nil
   def to_string_or_nil(value) when is_binary(value), do: value
   def to_string_or_nil(value), do: inspect(value)
 
+  @spec format_eta(term()) :: term()
   def format_eta(nil), do: nil
 
   def format_eta(ms) when is_integer(ms) and ms >= 0 do
     seconds = div(ms, 1000)
 
     if seconds < 60 do
-      translated("importAnalysis.eta", %{value: translated("importAnalysis.etaSeconds", %{count: seconds})})
+      translated("importAnalysis.eta", %{
+        value: translated("importAnalysis.etaSeconds", %{count: seconds})
+      })
     else
       m = div(seconds, 60)
       s = rem(seconds, 60)
-      translated("importAnalysis.eta", %{value: translated("importAnalysis.etaMinutes", %{minutes: m, seconds: s})})
+
+      translated("importAnalysis.eta", %{
+        value: translated("importAnalysis.etaMinutes", %{minutes: m, seconds: s})
+      })
     end
   end
 
@@ -240,7 +291,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
     end
   end
 
+  @spec translate_execution_phase(term()) :: term()
   def translate_execution_phase(other), do: other
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  defp translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

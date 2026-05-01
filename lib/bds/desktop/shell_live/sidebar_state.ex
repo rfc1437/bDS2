@@ -7,13 +7,17 @@ defmodule BDS.Desktop.ShellLive.SidebarState do
     if is_map(filters) and Map.get(filters, :enabled) do
       panel_state = filter_panel_state(socket, view_id)
 
-      Map.put(sidebar_data, :filters, Map.merge(filters, %{
-        filter_panel_visible: panel_state.visible,
-        archive_collapsed: panel_state.archive_collapsed,
-        tags_collapsed: panel_state.tags_collapsed,
-        categories_collapsed: panel_state.categories_collapsed,
-        expanded_year: panel_state.expanded_year
-      }))
+      Map.put(
+        sidebar_data,
+        :filters,
+        Map.merge(filters, %{
+          filter_panel_visible: panel_state.visible,
+          archive_collapsed: panel_state.archive_collapsed,
+          tags_collapsed: panel_state.tags_collapsed,
+          categories_collapsed: panel_state.categories_collapsed,
+          expanded_year: panel_state.expanded_year
+        })
+      )
     else
       sidebar_data
     end
@@ -22,7 +26,12 @@ defmodule BDS.Desktop.ShellLive.SidebarState do
   def put_filter_panel_state(socket, updater) do
     view_id = Atom.to_string(socket.assigns.workbench.active_view)
     state = socket |> filter_panel_state(view_id) |> updater.()
-    Phoenix.Component.assign(socket, :sidebar_filter_panels, Map.put(socket.assigns.sidebar_filter_panels, view_id, state))
+
+    Phoenix.Component.assign(
+      socket,
+      :sidebar_filter_panels,
+      Map.put(socket.assigns.sidebar_filter_panels, view_id, state)
+    )
   end
 
   def current_filters(socket, view_id) do
@@ -33,8 +42,17 @@ defmodule BDS.Desktop.ShellLive.SidebarState do
 
   def put_filters(socket, updater) do
     view_id = Atom.to_string(socket.assigns.workbench.active_view)
-    filters = current_filters(socket, view_id) |> updater.() |> normalize_filters(socket.assigns.sidebar_data)
-    Phoenix.Component.assign(socket, :sidebar_filters_by_view, Map.put(socket.assigns.sidebar_filters_by_view, view_id, filters))
+
+    filters =
+      current_filters(socket, view_id)
+      |> updater.()
+      |> normalize_filters(socket.assigns.sidebar_data)
+
+    Phoenix.Component.assign(
+      socket,
+      :sidebar_filters_by_view,
+      Map.put(socket.assigns.sidebar_filters_by_view, view_id, filters)
+    )
   end
 
   def toggle_filter_value(filters, key, value) do

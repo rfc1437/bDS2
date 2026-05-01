@@ -10,9 +10,11 @@ defmodule BDS.Scripting.Capabilities.Projects do
   alias BDS.Repo
   alias BDS.Tags
 
-  def create_project(attrs), do: attrs |> normalize_map() |> ProjectsCtx.create_project() |> unwrap_result()
+  def create_project(attrs),
+    do: attrs |> normalize_map() |> ProjectsCtx.create_project() |> unwrap_result()
 
-  def delete_project(project_id), do: boolean_result(ProjectsCtx.delete_project(string_or_nil(project_id)))
+  def delete_project(project_id),
+    do: boolean_result(ProjectsCtx.delete_project(string_or_nil(project_id)))
 
   def delete_project_with_data(project_id) do
     case string_or_nil(project_id) && ProjectsCtx.get_project(string_or_nil(project_id)) do
@@ -113,8 +115,12 @@ defmodule BDS.Scripting.Capabilities.Projects do
     normalized_name = string_or_nil(name) |> to_string() |> String.trim()
 
     cond do
-      normalized_name == "" -> metadata_tags(project_id)
-      load_tag_by_name(project_id, normalized_name) -> metadata_tags(project_id)
+      normalized_name == "" ->
+        metadata_tags(project_id)
+
+      load_tag_by_name(project_id, normalized_name) ->
+        metadata_tags(project_id)
+
       true ->
         create_tag(project_id, %{"name" => normalized_name})
         metadata_tags(project_id)

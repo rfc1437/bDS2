@@ -16,6 +16,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
     %{id: :openai_codex, label: "OpenAI Codex", supported?: false}
   ]
 
+  @spec mcp_rows() :: term()
   def mcp_rows do
     Enum.map(@mcp_agents, fn agent ->
       %{
@@ -28,6 +29,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
     end)
   end
 
+  @spec toggle_mcp_agent(term(), term(), term(), term()) :: term()
   def toggle_mcp_agent(socket, agent, reload, append_output) do
     case find_mcp_agent(agent) do
       %{id: agent_id, supported?: true} = config ->

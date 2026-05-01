@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.PublishingSettings do
   alias BDS.Metadata
   alias BDS.Desktop.ShellData
 
+  @spec publishing_form(term()) :: term()
   def publishing_form(metadata) do
     prefs = Map.get(metadata, :publishing_preferences, %{})
 
@@ -17,12 +18,14 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.PublishingSettings do
     }
   end
 
+  @spec update_publishing_draft(term(), term(), term()) :: term()
   def update_publishing_draft(socket, params, reload) do
     socket
     |> assign(:settings_editor_publishing_draft, normalize_publishing_params(params))
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec save_publishing(term(), term(), term()) :: term()
   def save_publishing(socket, reload, append_output) do
     project_id = socket.assigns.projects.active_project_id
 
@@ -39,6 +42,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.PublishingSettings do
     end
   end
 
+  @spec clear_publishing(term(), term(), term()) :: term()
   def clear_publishing(socket, reload, append_output) do
     project_id = socket.assigns.projects.active_project_id
 

@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ModelSelection do
 
   import Phoenix.Component, only: [assign: 3]
 
+  @spec toggle_model_selector(term(), term()) :: term()
   def toggle_model_selector(socket, reload) do
     %{id: conversation_id} = socket.assigns.current_tab
     current = Map.get(socket.assigns.chat_model_selectors_open, conversation_id, false)
@@ -18,6 +19,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ModelSelection do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec set_model(term(), term(), term(), term()) :: term()
   def set_model(socket, model_id, reload, append_output) do
     %{id: conversation_id} = socket.assigns.current_tab
 
@@ -37,6 +39,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ModelSelection do
     end
   end
 
+  @spec group_available_models(term()) :: term()
   def group_available_models(models) when is_list(models) do
     models
     |> Enum.group_by(&Map.get(&1, :provider, "other"))
@@ -54,6 +57,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ModelSelection do
     |> Enum.sort_by(&String.downcase(to_string(&1.label)))
   end
 
+  @spec needs_api_key?(term()) :: term()
   def needs_api_key?(true), do: false
 
   def needs_api_key?(false) do

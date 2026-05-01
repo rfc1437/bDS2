@@ -46,7 +46,13 @@ defmodule BDS.Scripting.Capabilities.Util do
   end
 
   def normalize_input(list) when is_list(list) do
-    if Enum.all?(list, &match?({key, _value} when is_integer(key) or is_float(key) or is_binary(key) or is_atom(key), &1)) do
+    if Enum.all?(
+         list,
+         &match?(
+           {key, _value} when is_integer(key) or is_float(key) or is_binary(key) or is_atom(key),
+           &1
+         )
+       ) do
       normalized =
         Map.new(list, fn {key, value} -> {normalize_input_key(key), normalize_input(value)} end)
 

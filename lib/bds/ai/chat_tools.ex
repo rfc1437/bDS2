@@ -14,8 +14,10 @@ defmodule BDS.AI.ChatTools do
     project_id = project_id || active_project_id()
 
     %{
-      post_count: Repo.aggregate(from(post in Post, where: post.project_id == ^project_id), :count, :id),
-      media_count: Repo.aggregate(from(media in Media, where: media.project_id == ^project_id), :count, :id),
+      post_count:
+        Repo.aggregate(from(post in Post, where: post.project_id == ^project_id), :count, :id),
+      media_count:
+        Repo.aggregate(from(media in Media, where: media.project_id == ^project_id), :count, :id),
       tag_count: Chat.count_distinct_string_list(Post, :tags, project_id),
       category_count: Chat.count_distinct_string_list(Post, :categories, project_id)
     }
@@ -132,9 +134,28 @@ defmodule BDS.AI.ChatTools do
       project_tools =
         if is_binary(project_id) do
           [
-            %{name: "blog_stats", spec: tool_spec("blog_stats", "Return aggregate blog statistics", %{"type" => "object", "properties" => %{}})},
-            %{name: "list_posts", spec: tool_spec("list_posts", "List recent posts in the active project", limit_schema())},
-            %{name: "list_media", spec: tool_spec("list_media", "List recent media items in the active project", limit_schema())}
+            %{
+              name: "blog_stats",
+              spec:
+                tool_spec("blog_stats", "Return aggregate blog statistics", %{
+                  "type" => "object",
+                  "properties" => %{}
+                })
+            },
+            %{
+              name: "list_posts",
+              spec:
+                tool_spec("list_posts", "List recent posts in the active project", limit_schema())
+            },
+            %{
+              name: "list_media",
+              spec:
+                tool_spec(
+                  "list_media",
+                  "List recent media items in the active project",
+                  limit_schema()
+                )
+            }
           ]
         else
           []
@@ -142,14 +163,62 @@ defmodule BDS.AI.ChatTools do
 
       project_tools ++
         [
-          %{name: "render_card", spec: tool_spec("render_card", "Return a structured card payload", render_card_schema())},
-          %{name: "render_table", spec: tool_spec("render_table", "Return a structured table payload", render_table_schema())},
-          %{name: "render_chart", spec: tool_spec("render_chart", "Return a structured chart payload", render_chart_schema())},
-          %{name: "render_form", spec: tool_spec("render_form", "Return a structured form payload", render_form_schema())},
-          %{name: "render_metric", spec: tool_spec("render_metric", "Return a structured metric payload", render_metric_schema())},
-          %{name: "render_list", spec: tool_spec("render_list", "Return a structured list payload", render_list_schema())},
-          %{name: "render_tabs", spec: tool_spec("render_tabs", "Return a structured tabs payload", render_tabs_schema())},
-          %{name: "render_mindmap", spec: tool_spec("render_mindmap", "Return a structured mindmap payload", render_mindmap_schema())}
+          %{
+            name: "render_card",
+            spec:
+              tool_spec("render_card", "Return a structured card payload", render_card_schema())
+          },
+          %{
+            name: "render_table",
+            spec:
+              tool_spec(
+                "render_table",
+                "Return a structured table payload",
+                render_table_schema()
+              )
+          },
+          %{
+            name: "render_chart",
+            spec:
+              tool_spec(
+                "render_chart",
+                "Return a structured chart payload",
+                render_chart_schema()
+              )
+          },
+          %{
+            name: "render_form",
+            spec:
+              tool_spec("render_form", "Return a structured form payload", render_form_schema())
+          },
+          %{
+            name: "render_metric",
+            spec:
+              tool_spec(
+                "render_metric",
+                "Return a structured metric payload",
+                render_metric_schema()
+              )
+          },
+          %{
+            name: "render_list",
+            spec:
+              tool_spec("render_list", "Return a structured list payload", render_list_schema())
+          },
+          %{
+            name: "render_tabs",
+            spec:
+              tool_spec("render_tabs", "Return a structured tabs payload", render_tabs_schema())
+          },
+          %{
+            name: "render_mindmap",
+            spec:
+              tool_spec(
+                "render_mindmap",
+                "Return a structured mindmap payload",
+                render_mindmap_schema()
+              )
+          }
         ]
     else
       []

@@ -17,7 +17,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
   alias BDS.Desktop.ShellLive.SettingsEditor.PublishingSettings
   alias BDS.Desktop.ShellLive.SettingsEditor.StyleEditor
 
-  embed_templates "settings_editor_html/*"
+  embed_templates("settings_editor_html/*")
 
   @settings_sections ~w(project editor content ai technology publishing data mcp)
   @supported_languages ["en", "de", "fr", "it", "es"]
@@ -45,6 +45,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
   defdelegate theme_display_name(theme), to: StyleEditor
   defdelegate protected_category?(category), to: ManagedCategories
 
+  @spec assign_socket(term()) :: term()
   def assign_socket(socket) do
     case socket.assigns[:current_tab] do
       %{type: :settings} ->
@@ -64,12 +65,14 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
     end
   end
 
+  @spec update_search(term(), term(), term()) :: term()
   def update_search(socket, query, reload) do
     socket
     |> assign(:settings_editor_search, to_string(query || ""))
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec build_settings(term()) :: term()
   def build_settings(%{projects: %{active_project_id: nil}}), do: nil
 
   def build_settings(assigns) do
@@ -82,7 +85,10 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
       )
 
     editor_form =
-      Map.merge(EditorSettings.editor_form(), Map.get(assigns, :settings_editor_editor_draft, %{}))
+      Map.merge(
+        EditorSettings.editor_form(),
+        Map.get(assigns, :settings_editor_editor_draft, %{})
+      )
 
     ai_form =
       Map.merge(AISettings.ai_form(assigns), Map.get(assigns, :settings_editor_ai_draft, %{}))
@@ -142,6 +148,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
     }
   end
 
+  @spec translated(term(), term()) :: term()
   def translated(text, bindings \\ %{}),
     do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
@@ -171,7 +178,10 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
     Enum.filter(@settings_sections, fn section ->
       case section do
         "project" ->
-          section_matches?(query, ~w(project name description data url language author bookmarklet))
+          section_matches?(
+            query,
+            ~w(project name description data url language author bookmarklet)
+          )
 
         "editor" ->
           section_matches?(query, ~w(editor mode markdown preview diff wrap unchanged))
@@ -195,7 +205,10 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
           section_matches?(query, ~w(data rebuild maintenance links thumbnails filesystem))
 
         "mcp" ->
-          section_matches?(query, ~w(mcp claude copilot gemini opencode mistral codex agent server))
+          section_matches?(
+            query,
+            ~w(mcp claude copilot gemini opencode mistral codex agent server)
+          )
       end
     end)
   end

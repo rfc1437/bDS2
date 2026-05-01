@@ -14,9 +14,12 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
                        "render_tabs"
                      ])
 
+  @spec render_tool?(term()) :: term()
   def render_tool?(name) when is_binary(name), do: MapSet.member?(@render_tool_names, name)
+  @spec render_tool?(term()) :: term()
   def render_tool?(_name), do: false
 
+  @spec build_render_surfaces(term(), term(), term()) :: term()
   def build_render_surfaces(tool_calls, message_id, assigns) do
     tool_calls
     |> Enum.with_index()
@@ -28,6 +31,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
     end)
   end
 
+  @spec build_render_surface(term(), term(), term()) :: term()
   def build_render_surface(%{name: name, arguments: arguments}, surface_id, assigns) do
     if MapSet.member?(@render_tool_names, name) do
       do_build_render_surface(name, arguments || %{}, surface_id, assigns)
@@ -51,6 +55,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
     end
   end
 
+  @spec normalize_tool_surface(term()) :: term()
   def normalize_tool_surface(_content), do: nil
 
   defp do_build_render_surface("render_card", arguments, surface_id, _assigns) do
@@ -150,7 +155,12 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
           label: map_value(field, "label", key),
           input_type: map_value(field, "inputType") || map_value(field, "input_type", "text"),
           placeholder: map_value(field, "placeholder"),
-          value: Map.get(stored_fields, key, map_value(field, "defaultValue") || map_value(field, "default_value")),
+          value:
+            Map.get(
+              stored_fields,
+              key,
+              map_value(field, "defaultValue") || map_value(field, "default_value")
+            ),
           options: decode_surface_options(map_value(field, "options", [])),
           required?: truthy?(map_value(field, "required", false))
         }
@@ -161,8 +171,12 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
       type: "form",
       title: map_value(arguments, "title"),
       fields: fields,
-      submit_label: map_value(arguments, "submitLabel") || map_value(arguments, "submit_label", translated("chat.stop")),
-      submit_action: map_value(arguments, "submitAction") || map_value(arguments, "submit_action", "submitForm")
+      submit_label:
+        map_value(arguments, "submitLabel") ||
+          map_value(arguments, "submit_label", translated("chat.stop")),
+      submit_action:
+        map_value(arguments, "submitAction") ||
+          map_value(arguments, "submit_action", "submitForm")
     }
   end
 
@@ -181,7 +195,11 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
             |> List.wrap()
             |> Enum.with_index()
             |> Enum.map(fn {content, content_index} ->
-              build_tab_surface(content, "#{surface_id}-tab-#{tab_index}-#{content_index}", assigns)
+              build_tab_surface(
+                content,
+                "#{surface_id}-tab-#{tab_index}-#{content_index}",
+                assigns
+              )
             end)
         }
       end)
@@ -203,11 +221,21 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
     type = map_value(content, "type", "text")
 
     case type do
-      render_type when render_type in ["card", "chart", "form", "list", "metric", "mindmap", "table", "tabs"] ->
-        do_build_render_surface("render_#{render_type}", Map.delete(content, "type"), surface_id, assigns)
+      render_type
+      when render_type in ["card", "chart", "form", "list", "metric", "mindmap", "table", "tabs"] ->
+        do_build_render_surface(
+          "render_#{render_type}",
+          Map.delete(content, "type"),
+          surface_id,
+          assigns
+        )
 
       "text" ->
-        %{id: surface_id, type: "text", body: map_value(content, "body") || map_value(content, "text", "")}
+        %{
+          id: surface_id,
+          type: "text",
+          body: map_value(content, "body") || map_value(content, "text", "")
+        }
 
       _other ->
         %{id: surface_id, type: "json", raw: content}

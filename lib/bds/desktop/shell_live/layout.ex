@@ -32,6 +32,7 @@ defmodule BDS.Desktop.ShellLive.Layout do
   end
 
   defp maybe_set_sidebar_width(workbench, nil), do: workbench
+
   defp maybe_set_sidebar_width(workbench, width),
     do: Workbench.set_sidebar_width(workbench, parse_width(width))
 

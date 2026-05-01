@@ -225,6 +225,7 @@ defmodule BDS.UI.Workbench do
   end
 
   defp transient_tab?(type, _intent) when type in [:chat, :import], do: false
+
   defp transient_tab?(type, intent) do
     if MapSet.member?(@singleton_tabs, type), do: false, else: transient_from_intent(intent)
   end

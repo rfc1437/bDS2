@@ -21,8 +21,12 @@ defmodule BDS.Scripting.Capabilities.Media do
 
   def update_media(project_id, media_id, attrs) do
     case fetch_media(project_id, media_id) do
-      %MediaRecord{} -> Media.update_media(media_id, attrs |> normalize_map() |> normalize_media_attrs()) |> unwrap_result()
-      _other -> nil
+      %MediaRecord{} ->
+        Media.update_media(media_id, attrs |> normalize_map() |> normalize_media_attrs())
+        |> unwrap_result()
+
+      _other ->
+        nil
     end
   end
 
@@ -40,7 +44,10 @@ defmodule BDS.Scripting.Capabilities.Media do
 
   def list_media(project_id) do
     Repo.all(
-      from(media in MediaRecord, where: media.project_id == ^project_id, order_by: [asc: media.created_at])
+      from(media in MediaRecord,
+        where: media.project_id == ^project_id,
+        order_by: [asc: media.created_at]
+      )
     )
     |> Enum.map(&sanitize/1)
   end
@@ -82,7 +89,11 @@ defmodule BDS.Scripting.Capabilities.Media do
   def upsert_media_translation(project_id, media_id, language, attrs) do
     case fetch_media(project_id, media_id) do
       %MediaRecord{} ->
-        Media.upsert_media_translation(media_id, string_or_nil(language) || "", normalize_media_translation_attrs(normalize_map(attrs)))
+        Media.upsert_media_translation(
+          media_id,
+          string_or_nil(language) || "",
+          normalize_media_translation_attrs(normalize_map(attrs))
+        )
         |> unwrap_result()
 
       _other ->
@@ -117,7 +128,9 @@ defmodule BDS.Scripting.Capabilities.Media do
       key = {datetime.year, datetime.month}
       Map.update(acc, key, 1, &(&1 + 1))
     end)
-    |> Enum.map(fn {{year, month}, count} -> %{"year" => year, "month" => month, "count" => count} end)
+    |> Enum.map(fn {{year, month}, count} ->
+      %{"year" => year, "month" => month, "count" => count}
+    end)
     |> Enum.sort_by(fn row -> {-row["year"], -row["month"]} end)
   end
 
@@ -131,7 +144,12 @@ defmodule BDS.Scripting.Capabilities.Media do
   def media_tags(project_id), do: media_tags_with_counts(project_id) |> Enum.map(& &1["tag"])
 
   def media_tags_with_counts(project_id) do
-    Repo.all(from(media in MediaRecord, where: media.project_id == ^project_id, order_by: [asc: media.created_at]))
+    Repo.all(
+      from(media in MediaRecord,
+        where: media.project_id == ^project_id,
+        order_by: [asc: media.created_at]
+      )
+    )
     |> Enum.flat_map(&(&1.tags || []))
     |> Enum.reduce(%{}, fn tag, acc -> Map.update(acc, tag, 1, &(&1 + 1)) end)
     |> Enum.map(fn {tag, count} -> %{"tag" => tag, "count" => count} end)
@@ -174,7 +192,9 @@ defmodule BDS.Scripting.Capabilities.Media do
         case Media.regenerate_thumbnails(media.id) do
           {:ok, _media} ->
             Media.thumbnail_paths(media)
-            |> Enum.map(fn {size, relative_path} -> {to_string(size), Path.join(project_path(project_id), relative_path)} end)
+            |> Enum.map(fn {size, relative_path} ->
+              {to_string(size), Path.join(project_path(project_id), relative_path)}
+            end)
             |> Map.new()
 
           {:error, _reason} ->
@@ -227,14 +247,40 @@ defmodule BDS.Scripting.Capabilities.Media do
     tags = Map.get(media, "tags", [])
     language = Map.get(media, "language")
 
-    matches_year = compare_optional(Map.get(filters, "year"), fn year -> created_at.year == integer_or_default(year, created_at.year) end)
-    matches_month = compare_optional(Map.get(filters, "month"), fn month -> created_at.month == integer_or_default(month, created_at.month) end)
-    matches_language = compare_optional(blank_to_nil(Map.get(filters, "language")), fn value -> language == value end)
-    matches_tags = compare_optional(Map.get(filters, "tags"), fn required_tags -> Enum.all?(normalize_string_list(required_tags), &(&1 in tags)) end)
-    matches_from = compare_optional(parse_datetime(Map.get(filters, "from") || Map.get(filters, "start_date")), fn from_dt -> DateTime.compare(created_at, from_dt) != :lt end)
-    matches_to = compare_optional(parse_datetime(Map.get(filters, "to") || Map.get(filters, "end_date")), fn to_dt -> DateTime.compare(created_at, to_dt) != :gt end)
+    matches_year =
+      compare_optional(Map.get(filters, "year"), fn year ->
+        created_at.year == integer_or_default(year, created_at.year)
+      end)
 
-    matches_year and matches_month and matches_language and matches_tags and matches_from and matches_to
+    matches_month =
+      compare_optional(Map.get(filters, "month"), fn month ->
+        created_at.month == integer_or_default(month, created_at.month)
+      end)
+
+    matches_language =
+      compare_optional(blank_to_nil(Map.get(filters, "language")), fn value ->
+        language == value
+      end)
+
+    matches_tags =
+      compare_optional(Map.get(filters, "tags"), fn required_tags ->
+        Enum.all?(normalize_string_list(required_tags), &(&1 in tags))
+      end)
+
+    matches_from =
+      compare_optional(
+        parse_datetime(Map.get(filters, "from") || Map.get(filters, "start_date")),
+        fn from_dt -> DateTime.compare(created_at, from_dt) != :lt end
+      )
+
+    matches_to =
+      compare_optional(
+        parse_datetime(Map.get(filters, "to") || Map.get(filters, "end_date")),
+        fn to_dt -> DateTime.compare(created_at, to_dt) != :gt end
+      )
+
+    matches_year and matches_month and matches_language and matches_tags and matches_from and
+      matches_to
   end
 
   def media_datetime(media) do
@@ -247,8 +293,11 @@ defmodule BDS.Scripting.Capabilities.Media do
           _other -> DateTime.utc_now()
         end
 
-      value when is_integer(value) -> DateTime.from_unix!(value, :millisecond)
-      _other -> DateTime.utc_now()
+      value when is_integer(value) ->
+        DateTime.from_unix!(value, :millisecond)
+
+      _other ->
+        DateTime.utc_now()
     end
   end
 end

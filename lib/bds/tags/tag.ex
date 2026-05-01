@@ -7,6 +7,17 @@ defmodule BDS.Tags.Tag do
   @primary_key {:id, :string, autogenerate: false}
   @foreign_key_type :string
 
+  @type t :: %__MODULE__{
+          id: String.t() | nil,
+          project_id: String.t() | nil,
+          name: String.t() | nil,
+          color: String.t() | nil,
+          post_template_slug: String.t() | nil,
+          created_at: integer() | nil,
+          updated_at: integer() | nil,
+          project: term()
+        }
+
   schema "tags" do
     field :name, :string
     field :color, :string
@@ -17,6 +28,7 @@ defmodule BDS.Tags.Tag do
     belongs_to :project, BDS.Projects.Project, type: :string
   end
 
+  @spec changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def changeset(tag, attrs) do
     tag
     |> cast(

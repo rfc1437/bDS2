@@ -70,7 +70,9 @@ defmodule BDS.Media.Thumbnails do
       missing_paths =
         media
         |> thumbnail_paths()
-        |> Enum.map(fn {_size, relative_path} -> Path.join(Projects.project_data_dir(project), relative_path) end)
+        |> Enum.map(fn {_size, relative_path} ->
+          Path.join(Projects.project_data_dir(project), relative_path)
+        end)
         |> Enum.reject(&File.exists?/1)
 
       next_acc =

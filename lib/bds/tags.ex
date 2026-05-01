@@ -10,6 +10,11 @@ defmodule BDS.Tags do
   alias BDS.Repo
   alias BDS.Tags.Tag
 
+  @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
+  @type tag_result :: {:ok, Tag.t()} | {:error, Ecto.Changeset.t() | term()}
+  @type action_result :: {:ok, :deleted | :merged} | {:error, :not_found | term()}
+
+  @spec create_tag(attrs()) :: tag_result()
   def create_tag(attrs) do
     project_id = attr(attrs, :project_id)
     name = attr(attrs, :name) |> to_string() |> String.trim()
@@ -40,15 +45,18 @@ defmodule BDS.Tags do
     end
   end
 
+  @spec list_tags(String.t()) :: [Tag.t()]
   def list_tags(project_id) do
     Repo.all(from tag in Tag, where: tag.project_id == ^project_id, order_by: [asc: tag.name])
   end
 
+  @spec sync_tags_json(String.t()) :: :ok
   def sync_tags_json(project_id) do
     write_tags_json(project_id)
     :ok
   end
 
+  @spec sync_tags_from_posts(String.t()) :: {:ok, [Tag.t()]} | {:error, term()}
   def sync_tags_from_posts(project_id) do
     Repo.transaction(fn ->
       existing_names =
@@ -94,10 +102,12 @@ defmodule BDS.Tags do
           {:ok, tags}
         end
 
-      {:error, reason} -> {:error, reason}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
+  @spec update_tag(String.t(), attrs()) :: tag_result() | {:error, :not_found}
   def update_tag(tag_id, attrs) do
     case Repo.get(Tag, tag_id) do
       nil ->
@@ -125,6 +135,7 @@ defmodule BDS.Tags do
     end
   end
 
+  @spec delete_tag(String.t()) :: action_result()
   def delete_tag(tag_id) do
     case Repo.get(Tag, tag_id) do
       nil ->
@@ -149,11 +160,13 @@ defmodule BDS.Tags do
               {:ok, :deleted}
             end
 
-          {:error, reason} -> {:error, reason}
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
 
+  @spec rename_tag(String.t(), String.t()) :: tag_result() | {:error, :not_found}
   def rename_tag(tag_id, new_name) do
     case Repo.get(Tag, tag_id) do
       nil ->
@@ -187,12 +200,14 @@ defmodule BDS.Tags do
                 {:ok, updated_tag}
               end
 
-            {:error, reason} -> {:error, reason}
+            {:error, reason} ->
+              {:error, reason}
           end
         end
     end
   end
 
+  @spec merge_tags([String.t()], String.t()) :: action_result()
   def merge_tags(source_tag_ids, target_tag_id) do
     case Repo.get(Tag, target_tag_id) do
       nil ->
@@ -224,7 +239,8 @@ defmodule BDS.Tags do
               {:ok, :merged}
             end
 
-          {:error, reason} -> {:error, reason}
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end

@@ -7,6 +7,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.State do
   alias BDS.Menu
   alias BDS.Desktop.ShellLive.MenuEditor.{PageCategory, TreeOps, TreePredicates}
 
+  @spec ensure_state(term()) :: term()
   def ensure_state(assigns) do
     project_id = assigns.projects.active_project_id
 
@@ -16,11 +17,13 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.State do
     end
   end
 
+  @spec update_state(term(), term()) :: term()
   def update_state(socket, updater) do
     state = ensure_state(socket.assigns)
     assign(socket, :menu_editor_state, updater.(state))
   end
 
+  @spec build(term(), term()) :: term()
   def build(_assigns, state) do
     categories = PageCategory.category_options(state.project_id)
     draft = state.draft
@@ -35,7 +38,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.State do
       draft_query: draft_query,
       filtered_pages:
         if(match?(%{type: :page}, draft),
-          do: PageCategory.filter_page_posts(PageCategory.page_posts(state.project_id), draft_query),
+          do:
+            PageCategory.filter_page_posts(PageCategory.page_posts(state.project_id), draft_query),
           else: []
         ),
       filtered_categories:
@@ -53,6 +57,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.State do
     }
   end
 
+  @spec save(term(), term(), term()) :: term()
   def save(socket, reload, append_output) do
     state = socket.assigns.menu_editor_state
 
@@ -60,12 +65,22 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.State do
       Menu.update_menu(state.project_id, Enum.map(state.items, &TreeOps.persisted_item/1))
 
     socket
-    |> append_output.(translated("menuEditor.tabTitle"), translated("menuEditor.saved"), nil, "info")
+    |> append_output.(
+      translated("menuEditor.tabTitle"),
+      translated("menuEditor.saved"),
+      nil,
+      "info"
+    )
     |> reload.(socket.assigns.workbench)
   end
 
   defp load_state(nil) do
-    %{project_id: nil, items: [TreeOps.home_item()], selected_id: TreeOps.home_item_id(), draft: nil}
+    %{
+      project_id: nil,
+      items: [TreeOps.home_item()],
+      selected_id: TreeOps.home_item_id(),
+      draft: nil
+    }
   end
 
   defp load_state(project_id) do

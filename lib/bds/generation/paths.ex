@@ -49,18 +49,37 @@ defmodule BDS.Generation.Paths do
   def root_output_path(nil, 1), do: "index.html"
   def root_output_path("", 1), do: "index.html"
   def root_output_path(route_language, 1), do: Path.join(route_language, "index.html")
-  def root_output_path(nil, page_number), do: Path.join(["page", Integer.to_string(page_number), "index.html"])
+
+  def root_output_path(nil, page_number),
+    do: Path.join(["page", Integer.to_string(page_number), "index.html"])
+
   def root_output_path("", page_number), do: root_output_path(nil, page_number)
-  def root_output_path(route_language, page_number), do: Path.join([route_language, "page", Integer.to_string(page_number), "index.html"])
+
+  def root_output_path(route_language, page_number),
+    do: Path.join([route_language, "page", Integer.to_string(page_number), "index.html"])
 
   @spec page_output_path(String.t(), language()) :: String.t()
   def page_output_path(slug, nil), do: Path.join([slug, "index.html"])
   def page_output_path(slug, ""), do: page_output_path(slug, nil)
   def page_output_path(slug, language), do: Path.join([language, slug, "index.html"])
 
-  @spec pagination_for_page(pos_integer(), pos_integer(), non_neg_integer(), pos_integer(), language(), [String.t()]) ::
+  @spec pagination_for_page(
+          pos_integer(),
+          pos_integer(),
+          non_neg_integer(),
+          pos_integer(),
+          language(),
+          [String.t()]
+        ) ::
           map()
-  def pagination_for_page(page_number, total_pages, total_items, items_per_page, route_language, segments) do
+  def pagination_for_page(
+        page_number,
+        total_pages,
+        total_items,
+        items_per_page,
+        route_language,
+        segments
+      ) do
     %{
       current_page: page_number,
       total_pages: total_pages,
@@ -75,8 +94,12 @@ defmodule BDS.Generation.Paths do
 
   @spec archive_or_root_href(language(), [String.t()], integer()) :: String.t()
   def archive_or_root_href(_route_language, _segments, page_number) when page_number < 1, do: ""
-  def archive_or_root_href(route_language, [], page_number), do: root_page_href(route_language, page_number)
-  def archive_or_root_href(route_language, segments, page_number), do: archive_href(route_language, segments, page_number)
+
+  def archive_or_root_href(route_language, [], page_number),
+    do: root_page_href(route_language, page_number)
+
+  def archive_or_root_href(route_language, segments, page_number),
+    do: archive_href(route_language, segments, page_number)
 
   @spec root_page_href(language(), integer()) :: String.t()
   def root_page_href(route_language, page_number) when page_number <= 1 do
@@ -147,7 +170,9 @@ defmodule BDS.Generation.Paths do
 
   @spec archive_route_segment(any()) :: String.t()
   def archive_route_segment(nil), do: ""
-  def archive_route_segment(value), do: value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
+
+  def archive_route_segment(value),
+    do: value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
 
   @spec normalize_base_url(String.t() | nil) :: String.t() | nil
   def normalize_base_url(nil), do: nil

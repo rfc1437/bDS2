@@ -34,31 +34,41 @@ defmodule BDS.AI.Model do
 
   def changeset(model, attrs) do
     model
-    |> cast(attrs, [
+    |> cast(
+      attrs,
+      [
+        :provider,
+        :model_id,
+        :name,
+        :family,
+        :supports_attachment,
+        :supports_reasoning,
+        :supports_tool_calls,
+        :supports_structured_output,
+        :supports_temperature,
+        :knowledge,
+        :release_date,
+        :last_updated_date,
+        :open_weights,
+        :input_price,
+        :output_price,
+        :cache_read_price,
+        :cache_write_price,
+        :context_window,
+        :max_input_tokens,
+        :max_output_tokens,
+        :interleaved,
+        :status,
+        :updated_at
+      ], empty_values: [nil])
+    |> validate_required([
       :provider,
       :model_id,
       :name,
-      :family,
-      :supports_attachment,
-      :supports_reasoning,
-      :supports_tool_calls,
-      :supports_structured_output,
-      :supports_temperature,
-      :knowledge,
-      :release_date,
-      :last_updated_date,
-      :open_weights,
-      :input_price,
-      :output_price,
-      :cache_read_price,
-      :cache_write_price,
       :context_window,
       :max_input_tokens,
       :max_output_tokens,
-      :interleaved,
-      :status,
       :updated_at
-    ], empty_values: [nil])
-    |> validate_required([:provider, :model_id, :name, :context_window, :max_input_tokens, :max_output_tokens, :updated_at])
+    ])
   end
 end

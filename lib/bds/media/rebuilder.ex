@@ -19,7 +19,8 @@ defmodule BDS.Media.Rebuilder do
 
   @type rebuild_opts :: keyword()
 
-  @spec rebuild_media_from_files(String.t(), rebuild_opts()) :: {:ok, [Media.t()]} | {:error, term()}
+  @spec rebuild_media_from_files(String.t(), rebuild_opts()) ::
+          {:ok, [Media.t()]} | {:error, term()}
   def rebuild_media_from_files(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
     on_progress = progress_callback(opts)
@@ -61,9 +62,10 @@ defmodule BDS.Media.Rebuilder do
         translation_sidecars
         |> Enum.with_index(length(canonical_sidecars) + 1)
         |> Enum.each(fn {sidecar, index} ->
-          Sidecars.upsert_translation_from_sidecar(project, canonical_media_by_binary_path, sidecar,
-            sync_search: false
-          )
+          Sidecars.upsert_translation_from_sidecar(
+            project,
+            canonical_media_by_binary_path,
+            sidecar, sync_search: false)
 
           :ok = report_rebuild_progress(on_progress, index, total_files, "media files")
         end)

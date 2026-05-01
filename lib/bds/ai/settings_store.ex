@@ -21,8 +21,8 @@ defmodule BDS.AI.SettingsStore do
   def put_setting(key, value) when is_binary(key) and is_binary(value) do
     now = Persistence.now_ms()
 
-    (%Setting{}
-     |> Setting.changeset(%{key: key, value: value, updated_at: now}))
+    %Setting{}
+    |> Setting.changeset(%{key: key, value: value, updated_at: now})
     |> Repo.insert(
       on_conflict: [set: [value: value, updated_at: now]],
       conflict_target: [:key]

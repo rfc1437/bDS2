@@ -30,12 +30,13 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
       }
       |> maybe_put_auth(endpoint.api_key)
 
-    payload = %{
-      "model" => request.model,
-      "messages" => request.messages,
-      "max_tokens" => request.max_output_tokens
-    }
-    |> maybe_put_tools(request.tools)
+    payload =
+      %{
+        "model" => request.model,
+        "messages" => request.messages,
+        "max_tokens" => request.max_output_tokens
+      }
+      |> maybe_put_tools(request.tools)
 
     with {:ok, response} <- HttpClient.post(url, headers, Jason.encode!(payload)),
          200 <- response.status do
@@ -55,7 +56,9 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
 
       json =
         case content do
-          nil -> nil
+          nil ->
+            nil
+
           value when is_binary(value) ->
             case Jason.decode(value) do
               {:ok, decoded} when is_map(decoded) -> decoded
@@ -77,10 +80,17 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
 
   defp models_url(url) do
     cond do
-      String.ends_with?(url, "/chat/completions") -> String.replace_suffix(url, "/chat/completions", "/models")
-      String.ends_with?(url, "/models") -> url
-      String.ends_with?(url, "/") -> url <> "models"
-      true -> url <> "/models"
+      String.ends_with?(url, "/chat/completions") ->
+        String.replace_suffix(url, "/chat/completions", "/models")
+
+      String.ends_with?(url, "/models") ->
+        url
+
+      String.ends_with?(url, "/") ->
+        url <> "models"
+
+      true ->
+        url <> "/models"
     end
   end
 
@@ -114,7 +124,9 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
 
   defp maybe_put_auth(headers, nil), do: headers
   defp maybe_put_auth(headers, ""), do: headers
-  defp maybe_put_auth(headers, api_key), do: Map.put(headers, "authorization", "Bearer #{api_key}")
+
+  defp maybe_put_auth(headers, api_key),
+    do: Map.put(headers, "authorization", "Bearer #{api_key}")
 
   defp maybe_put_tools(payload, []), do: payload
   defp maybe_put_tools(payload, nil), do: payload

@@ -64,7 +64,11 @@ defmodule BDS.Preview do
     {:reply, reply, next_state}
   end
 
-  def handle_call({:ensure_preview, project_id, _data_dir, _owner_pid}, _from, %{current: %{project_id: project_id, is_running: true}} = state) do
+  def handle_call(
+        {:ensure_preview, project_id, _data_dir, _owner_pid},
+        _from,
+        %{current: %{project_id: project_id, is_running: true}} = state
+      ) do
     {:reply, {:ok, public_server(state.current)}, state}
   end
 
@@ -224,7 +228,9 @@ defmodule BDS.Preview do
   end
 
   defp draft_preview_translation(_post_id, nil, _post_language), do: nil
-  defp draft_preview_translation(_post_id, requested_language, post_language) when requested_language == post_language, do: nil
+
+  defp draft_preview_translation(_post_id, requested_language, post_language)
+       when requested_language == post_language, do: nil
 
   defp draft_preview_translation(post_id, requested_language, _post_language) do
     Repo.get_by(Translation, translation_for: post_id, language: requested_language)
@@ -456,7 +462,10 @@ defmodule BDS.Preview do
     {uri.path || "/", URI.decode_query(uri.query || "")}
   end
 
-  defp apply_response_overrides(%{content_type: content_type, body: body} = response, query_params)
+  defp apply_response_overrides(
+         %{content_type: content_type, body: body} = response,
+         query_params
+       )
        when is_binary(content_type) and is_binary(body) do
     if String.starts_with?(content_type, "text/html") do
       %{response | body: apply_preview_overrides(body, query_params)}
@@ -465,7 +474,8 @@ defmodule BDS.Preview do
     end
   end
 
-  defp apply_preview_overrides(body, query_params) when is_binary(body) and is_map(query_params) do
+  defp apply_preview_overrides(body, query_params)
+       when is_binary(body) and is_map(query_params) do
     theme_override = normalize_pico_theme_override(query_params["theme"])
     mode_override = normalize_mode_override(query_params["mode"])
 
@@ -506,7 +516,9 @@ defmodule BDS.Preview do
       [html_tag] ->
         replacement =
           if String.contains?(html_tag, attribute <> "=") do
-            Regex.replace(~r/\s#{attribute}="[^"]*"/, html_tag, ~s( #{attribute}="#{value}"), global: false)
+            Regex.replace(~r/\s#{attribute}="[^"]*"/, html_tag, ~s( #{attribute}="#{value}"),
+              global: false
+            )
           else
             String.replace_suffix(html_tag, ">", ~s( #{attribute}="#{value}">))
           end
@@ -520,7 +532,11 @@ defmodule BDS.Preview do
 
   defp not_found_assigns(query_params) do
     %{}
-    |> maybe_put_assign("pico_stylesheet_href", normalize_pico_theme_override(query_params["theme"]), &PreviewAssets.stylesheet_href/1)
+    |> maybe_put_assign(
+      "pico_stylesheet_href",
+      normalize_pico_theme_override(query_params["theme"]),
+      &PreviewAssets.stylesheet_href/1
+    )
   end
 
   defp maybe_put_assign(assigns, _key, nil, _mapper), do: assigns

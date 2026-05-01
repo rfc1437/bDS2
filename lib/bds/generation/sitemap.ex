@@ -34,17 +34,20 @@ defmodule BDS.Generation.Sitemap do
           build_hreflang_links(plan.base_url, "/", plan.language, all_languages)
         )
       ] ++
-        Enum.map(Paths.root_pagination_pages(length(published_list_posts), plan.max_posts_per_page), fn page_number ->
-          page_path = "/page/#{page_number}"
+        Enum.map(
+          Paths.root_pagination_pages(length(published_list_posts), plan.max_posts_per_page),
+          fn page_number ->
+            page_path = "/page/#{page_number}"
 
-          url_entry(
-            Paths.url_for_path(plan.base_url, page_path),
-            latest_post_updated_at,
-            "daily",
-            "0.9",
-            build_hreflang_links(plan.base_url, page_path, plan.language, all_languages)
-          )
-        end) ++
+            url_entry(
+              Paths.url_for_path(plan.base_url, page_path),
+              latest_post_updated_at,
+              "daily",
+              "0.9",
+              build_hreflang_links(plan.base_url, page_path, plan.language, all_languages)
+            )
+          end
+        ) ++
         Enum.map(translatable_posts, fn post ->
           post_path = Paths.relative_path_to_url_path(Paths.post_output_path(post))
 
@@ -100,28 +103,34 @@ defmodule BDS.Generation.Sitemap do
             build_hreflang_links(plan.base_url, year_path, plan.language, all_languages)
           )
         end) ++
-        Enum.map(Enum.sort_by(post_index.posts_by_year_month, &elem(&1, 0), :desc), fn {year_month, _posts} ->
-          month_path = "/#{year_month}"
+        Enum.map(
+          Enum.sort_by(post_index.posts_by_year_month, &elem(&1, 0), :desc),
+          fn {year_month, _posts} ->
+            month_path = "/#{year_month}"
 
-          url_entry(
-            Paths.url_for_path(plan.base_url, month_path),
-            latest_post_updated_at,
-            "monthly",
-            "0.5",
-            build_hreflang_links(plan.base_url, month_path, plan.language, all_languages)
-          )
-        end) ++
-        Enum.map(Enum.sort_by(post_index.posts_by_year_month_day, &elem(&1, 0), :desc), fn {year_month_day, _posts} ->
-          day_path = "/#{year_month_day}"
+            url_entry(
+              Paths.url_for_path(plan.base_url, month_path),
+              latest_post_updated_at,
+              "monthly",
+              "0.5",
+              build_hreflang_links(plan.base_url, month_path, plan.language, all_languages)
+            )
+          end
+        ) ++
+        Enum.map(
+          Enum.sort_by(post_index.posts_by_year_month_day, &elem(&1, 0), :desc),
+          fn {year_month_day, _posts} ->
+            day_path = "/#{year_month_day}"
 
-          url_entry(
-            Paths.url_for_path(plan.base_url, day_path),
-            latest_post_updated_at,
-            "monthly",
-            "0.4",
-            build_hreflang_links(plan.base_url, day_path, plan.language, all_languages)
-          )
-        end) ++
+            url_entry(
+              Paths.url_for_path(plan.base_url, day_path),
+              latest_post_updated_at,
+              "monthly",
+              "0.4",
+              build_hreflang_links(plan.base_url, day_path, plan.language, all_languages)
+            )
+          end
+        ) ++
         Enum.map(Enum.sort_by(post_index.posts_by_category, &elem(&1, 0)), fn {category, _posts} ->
           category_path = "/category/#{Paths.archive_route_segment(category)}"
 

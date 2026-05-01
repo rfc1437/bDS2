@@ -22,8 +22,11 @@ defmodule BDS.Scripting.Capabilities.Posts do
 
   def update_post(project_id, post_id, attrs) do
     case fetch_post(project_id, post_id) do
-      %Post{} -> Posts.update_post(post_id, normalize_map(attrs)) |> unwrap_result(&post_payload/1)
-      _other -> nil
+      %Post{} ->
+        Posts.update_post(post_id, normalize_map(attrs)) |> unwrap_result(&post_payload/1)
+
+      _other ->
+        nil
     end
   end
 
@@ -42,7 +45,9 @@ defmodule BDS.Scripting.Capabilities.Posts do
   end
 
   def list_posts(project_id) do
-    Repo.all(from(post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at]))
+    Repo.all(
+      from(post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at])
+    )
     |> Enum.map(&post_payload/1)
   end
 
@@ -80,13 +85,19 @@ defmodule BDS.Scripting.Capabilities.Posts do
   end
 
   def generate_unique_post_slug(project_id, title, exclude_post_id) do
-    Posts.unique_slug_for_title(project_id, string_or_nil(title) || "", string_or_nil(exclude_post_id))
+    Posts.unique_slug_for_title(
+      project_id,
+      string_or_nil(title) || "",
+      string_or_nil(exclude_post_id)
+    )
   end
 
   def posts_by_status(project_id, status) do
     normalized_status = string_or_nil(status) || ""
 
-    Repo.all(from(post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at]))
+    Repo.all(
+      from(post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at])
+    )
     |> Enum.filter(&(to_string(&1.status) == normalized_status))
     |> Enum.map(&post_payload/1)
   end
@@ -143,8 +154,11 @@ defmodule BDS.Scripting.Capabilities.Posts do
 
   def publish_post_translation(project_id, post_id, language) do
     case fetch_post(project_id, post_id) do
-      %Post{} -> Posts.publish_post_translation(post_id, string_or_nil(language) || "") |> unwrap_result()
-      _other -> nil
+      %Post{} ->
+        Posts.publish_post_translation(post_id, string_or_nil(language) || "") |> unwrap_result()
+
+      _other ->
+        nil
     end
   end
 
@@ -174,7 +188,10 @@ defmodule BDS.Scripting.Capabilities.Posts do
 
   def post_tags(project_id), do: names_with_counts(project_id, :tags) |> Enum.map(& &1["name"])
   def post_tags_with_counts(project_id), do: names_with_counts(project_id, :tags)
-  def post_categories(project_id), do: names_with_counts(project_id, :categories) |> Enum.map(& &1["name"])
+
+  def post_categories(project_id),
+    do: names_with_counts(project_id, :categories) |> Enum.map(& &1["name"])
+
   def post_categories_with_counts(project_id), do: names_with_counts(project_id, :categories)
 
   def list_post_translations(project_id, post_id) do
@@ -209,9 +226,14 @@ defmodule BDS.Scripting.Capabilities.Posts do
 
   def has_published_post_version(project_id, post_id) do
     case fetch_post(project_id, post_id) do
-      %Post{status: :published} -> true
-      %Post{published_at: published_at, file_path: file_path} -> not is_nil(published_at) or file_path not in [nil, ""]
-      _other -> false
+      %Post{status: :published} ->
+        true
+
+      %Post{published_at: published_at, file_path: file_path} ->
+        not is_nil(published_at) or file_path not in [nil, ""]
+
+      _other ->
+        false
     end
   end
 

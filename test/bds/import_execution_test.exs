@@ -12,7 +12,9 @@ defmodule BDS.ImportExecutionTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
-    temp_dir = Path.join(System.tmp_dir!(), "bds-import-execution-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-import-execution-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
@@ -20,7 +22,10 @@ defmodule BDS.ImportExecutionTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "execute_import creates tags, posts, pages, and media from the analysis report", %{project: project, temp_dir: temp_dir} do
+  test "execute_import creates tags, posts, pages, and media from the analysis report", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     uploads_dir = Path.join(temp_dir, "uploads")
     File.mkdir_p!(Path.join(uploads_dir, "2024/05"))
     File.write!(Path.join(uploads_dir, "2024/05/import-asset.txt"), "legacy attachment")
@@ -46,7 +51,11 @@ defmodule BDS.ImportExecutionTest do
     tag_names = project.id |> Tags.list_tags() |> Enum.map(& &1.name) |> Enum.sort()
     assert tag_names == ["General", "News"]
 
-    posts = Repo.all(from post in Posts.Post, where: post.project_id == ^project.id, order_by: [asc: post.slug])
+    posts =
+      Repo.all(
+        from post in Posts.Post, where: post.project_id == ^project.id, order_by: [asc: post.slug]
+      )
+
     assert Enum.map(posts, & &1.slug) == ["about", "hello-world"]
 
     hello_world = Enum.find(posts, &(&1.slug == "hello-world"))
@@ -63,12 +72,17 @@ defmodule BDS.ImportExecutionTest do
     assert about.content == nil
     assert "page" in about.categories
 
-    imported_media = Repo.one!(from media in BDS.Media.Media, where: media.project_id == ^project.id)
+    imported_media =
+      Repo.one!(from media in BDS.Media.Media, where: media.project_id == ^project.id)
+
     assert imported_media.original_name == "import-asset.txt"
     assert File.exists?(Path.join(temp_dir, imported_media.file_path))
   end
 
-  test "execute_import skips conflicts by default and can import them with a new slug", %{project: project, temp_dir: temp_dir} do
+  test "execute_import skips conflicts by default and can import them with a new slug", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, _existing_post} =
              Posts.create_post(%{
                project_id: project.id,
@@ -82,21 +96,39 @@ defmodule BDS.ImportExecutionTest do
 
     assert {:ok, report} = ImportAnalysis.analyze_wxr(project.id, wxr_path, nil)
 
-    assert {:ok, skipped_result} = ImportExecution.execute_import(project.id, report, default_author: "Imported Author")
+    assert {:ok, skipped_result} =
+             ImportExecution.execute_import(project.id, report, default_author: "Imported Author")
+
     assert skipped_result.posts == %{imported: 0, skipped: 1, errors: 0}
     assert Repo.aggregate(Posts.Post, :count, :id) == 1
 
-    import_report = put_in(report.items.posts, [%{List.first(report.items.posts) | resolution: "import"}])
+    import_report =
+      put_in(report.items.posts, [%{List.first(report.items.posts) | resolution: "import"}])
 
-    assert {:ok, imported_result} = ImportExecution.execute_import(project.id, import_report, default_author: "Imported Author")
+    assert {:ok, imported_result} =
+             ImportExecution.execute_import(project.id, import_report,
+               default_author: "Imported Author"
+             )
+
     assert imported_result.posts == %{imported: 1, skipped: 0, errors: 0}
-    slugs = Repo.all(from post in Posts.Post, where: post.project_id == ^project.id, select: post.slug, order_by: [asc: post.slug])
+
+    slugs =
+      Repo.all(
+        from post in Posts.Post,
+          where: post.project_id == ^project.id,
+          select: post.slug,
+          order_by: [asc: post.slug]
+      )
+
     assert length(slugs) == 2
     assert "conflict-me" in slugs
     assert Enum.any?(slugs, &(&1 != "conflict-me"))
   end
 
-  test "execute_import reports phase progress while importing", %{project: project, temp_dir: temp_dir} do
+  test "execute_import reports phase progress while importing", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     uploads_dir = Path.join(temp_dir, "uploads")
     File.mkdir_p!(Path.join(uploads_dir, "2024/05"))
     File.write!(Path.join(uploads_dir, "2024/05/import-asset.txt"), "legacy attachment")

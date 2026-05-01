@@ -3,6 +3,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreePredicates do
 
   alias BDS.Desktop.ShellLive.MenuEditor.TreeOps
 
+  @spec can_move_up?(term(), term()) :: term()
   def can_move_up?(items, selected_id) do
     case TreeOps.find_path(items, selected_id) do
       [_parent, index] -> index > 0
@@ -12,9 +13,12 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreePredicates do
     end
   end
 
+  @spec can_move_down?(term(), term()) :: term()
   def can_move_down?(items, selected_id) do
     case TreeOps.find_path(items, selected_id) do
-      nil -> false
+      nil ->
+        false
+
       path ->
         parent_path = Enum.drop(path, -1)
         index = List.last(path)
@@ -22,10 +26,15 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreePredicates do
     end
   end
 
+  @spec can_indent?(term(), term()) :: term()
   def can_indent?(items, selected_id) do
     case TreeOps.find_path(items, selected_id) do
-      nil -> false
-      [] -> false
+      nil ->
+        false
+
+      [] ->
+        false
+
       [_index] = path ->
         index = List.last(path)
         index > 0 and match?(%{kind: :submenu}, TreeOps.item_at_path(items, [index - 1]))
@@ -34,10 +43,14 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreePredicates do
         index = List.last(path)
 
         index > 0 and
-          match?(%{kind: :submenu}, TreeOps.item_at_path(items, Enum.drop(path, -1) ++ [index - 1]))
+          match?(
+            %{kind: :submenu},
+            TreeOps.item_at_path(items, Enum.drop(path, -1) ++ [index - 1])
+          )
     end
   end
 
+  @spec can_unindent?(term(), term()) :: term()
   def can_unindent?(items, selected_id) do
     case TreeOps.find_path(items, selected_id) do
       [_index] -> false
@@ -46,9 +59,11 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreePredicates do
     end
   end
 
+  @spec can_delete?(term()) :: term()
   def can_delete?(selected_id),
     do: is_binary(selected_id) and selected_id != TreeOps.home_item_id()
 
+  @spec draft_item?(term(), term()) :: term()
   def draft_item?(menu_editor, item_id) do
     match?(%{item_id: ^item_id}, menu_editor.draft)
   end

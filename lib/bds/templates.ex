@@ -15,6 +15,10 @@ defmodule BDS.Templates do
   alias BDS.Tags
   alias BDS.Templates.Template
 
+  @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
+  @type template_result :: {:ok, Template.t()} | {:error, Ecto.Changeset.t() | term()}
+
+  @spec create_template(attrs()) :: {:ok, Template.t()} | {:error, Ecto.Changeset.t()}
   def create_template(attrs) do
     now = Persistence.now_ms()
     project_id = attr(attrs, :project_id)
@@ -41,6 +45,7 @@ defmodule BDS.Templates do
   @spec get_template(String.t()) :: Template.t() | nil
   def get_template(template_id), do: Repo.get(Template, template_id)
 
+  @spec publish_template(String.t()) :: template_result() | {:error, :not_found}
   def publish_template(template_id) do
     case Repo.get(Template, template_id) do
       nil ->
@@ -72,6 +77,7 @@ defmodule BDS.Templates do
     end
   end
 
+  @spec update_template(String.t(), attrs()) :: template_result() | {:error, :not_found}
   def update_template(template_id, attrs) do
     case Repo.get(Template, template_id) do
       nil ->
@@ -151,6 +157,7 @@ defmodule BDS.Templates do
     end
   end
 
+  @spec rebuild_templates_from_files(String.t(), keyword()) :: {:ok, [Template.t()]}
   def rebuild_templates_from_files(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
 
@@ -178,6 +185,8 @@ defmodule BDS.Templates do
     {:ok, templates}
   end
 
+  @spec delete_template(String.t(), keyword()) ::
+          {:ok, :deleted} | {:error, :not_found | {:has_references, map()} | term()}
   def delete_template(template_id, opts \\ []) do
     case Repo.get(Template, template_id) do
       nil ->
@@ -204,6 +213,7 @@ defmodule BDS.Templates do
     end
   end
 
+  @spec sync_template_from_file(String.t()) :: {:ok, Template.t()} | {:error, :not_found}
   def sync_template_from_file(template_id) do
     case Repo.get(Template, template_id) do
       nil ->
@@ -224,6 +234,7 @@ defmodule BDS.Templates do
     end
   end
 
+  @spec sync_published_template_file(String.t()) :: {:ok, Template.t()} | {:error, :not_found}
   def sync_published_template_file(template_id) do
     case Repo.get(Template, template_id) do
       nil ->
@@ -246,6 +257,8 @@ defmodule BDS.Templates do
     end
   end
 
+  @spec import_orphan_template_file(String.t(), String.t()) ::
+          {:ok, Template.t()} | {:error, :not_found}
   def import_orphan_template_file(project_id, relative_path) do
     project = Projects.get_project!(project_id)
     full_path = Path.join(Projects.project_data_dir(project), relative_path)

@@ -9,7 +9,9 @@ defmodule BDS.ImportAnalysisTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
-    temp_dir = Path.join(System.tmp_dir!(), "bds-import-analysis-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-import-analysis-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
@@ -17,7 +19,10 @@ defmodule BDS.ImportAnalysisTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "analyze_wxr summarizes new items, date distribution, and macros", %{project: project, temp_dir: temp_dir} do
+  test "analyze_wxr summarizes new items, date distribution, and macros", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     uploads_dir = Path.join(temp_dir, "uploads")
     File.mkdir_p!(Path.join(uploads_dir, "2024/05"))
     File.write!(Path.join(uploads_dir, "2024/05/import-asset.txt"), "legacy attachment")
@@ -32,8 +37,19 @@ defmodule BDS.ImportAnalysisTest do
     assert report.site_info.language == "en"
     assert report.site_info.source_file == wxr_path
 
-    assert report.post_stats == %{new_count: 1, update_count: 0, conflict_count: 0, duplicate_count: 0}
-    assert report.page_stats == %{new_count: 1, update_count: 0, conflict_count: 0, duplicate_count: 0}
+    assert report.post_stats == %{
+             new_count: 1,
+             update_count: 0,
+             conflict_count: 0,
+             duplicate_count: 0
+           }
+
+    assert report.page_stats == %{
+             new_count: 1,
+             update_count: 0,
+             conflict_count: 0,
+             duplicate_count: 0
+           }
 
     assert report.media_stats == %{
              new_count: 1,
@@ -64,19 +80,39 @@ defmodule BDS.ImportAnalysisTest do
                }
              ]
            } = report.macros
+
     assert report.conflicts == []
 
-    assert [%{title: "Hello World", slug: "hello-world", status: "new", item_type: "post", post_type: "post"}] =
+    assert [
+             %{
+               title: "Hello World",
+               slug: "hello-world",
+               status: "new",
+               item_type: "post",
+               post_type: "post"
+             }
+           ] =
              report.items.posts
 
-    assert [%{title: "About", slug: "about", status: "new", item_type: "page"} = page_item] = report.items.pages
+    assert [%{title: "About", slug: "about", status: "new", item_type: "page"} = page_item] =
+             report.items.pages
+
     assert Map.get(page_item, :post_type) == "page"
 
-    assert [%{title: "Import Asset", filename: "import-asset.txt", relative_path: "2024/05/import-asset.txt", status: "new", item_type: "media"}] =
+    assert [
+             %{
+               title: "Import Asset",
+               filename: "import-asset.txt",
+               relative_path: "2024/05/import-asset.txt",
+               status: "new",
+               item_type: "media"
+             }
+           ] =
              report.items.media
   end
 
-  test "analyze_wxr detects update, conflict, duplicate, existing taxonomy, and missing uploads", %{project: project, temp_dir: temp_dir} do
+  test "analyze_wxr detects update, conflict, duplicate, existing taxonomy, and missing uploads",
+       %{project: project, temp_dir: temp_dir} do
     assert {:ok, _category} = Tags.create_tag(%{project_id: project.id, name: "General"})
     assert {:ok, _tag} = Tags.create_tag(%{project_id: project.id, name: "News"})
 
@@ -119,8 +155,19 @@ defmodule BDS.ImportAnalysisTest do
 
     assert {:ok, report} = ImportAnalysis.analyze_wxr(project.id, wxr_path, nil)
 
-    assert report.post_stats == %{new_count: 0, update_count: 1, conflict_count: 1, duplicate_count: 1}
-    assert report.page_stats == %{new_count: 0, update_count: 0, conflict_count: 0, duplicate_count: 0}
+    assert report.post_stats == %{
+             new_count: 0,
+             update_count: 1,
+             conflict_count: 1,
+             duplicate_count: 1
+           }
+
+    assert report.page_stats == %{
+             new_count: 0,
+             update_count: 0,
+             conflict_count: 0,
+             duplicate_count: 0
+           }
 
     assert report.media_stats == %{
              new_count: 0,
@@ -134,16 +181,28 @@ defmodule BDS.ImportAnalysisTest do
     assert report.tag_stats == %{existing_count: 1, mapped_count: 0, new_count: 0}
 
     assert Enum.any?(report.conflicts, fn conflict ->
-             conflict.item_type == "post" and conflict.item_name == "conflict-me" and conflict.resolution == "ignore"
+             conflict.item_type == "post" and conflict.item_name == "conflict-me" and
+               conflict.resolution == "ignore"
            end)
 
     assert Enum.any?(report.items.posts, &(&1.slug == "update-me" and &1.status == "update"))
     assert Enum.any?(report.items.posts, &(&1.slug == "conflict-me" and &1.status == "conflict"))
-    assert Enum.any?(report.items.posts, &(&1.slug == "duplicate-me" and &1.status == "content-duplicate"))
-    assert Enum.any?(report.items.media, &(&1.filename == "missing-asset.txt" and &1.status == "missing"))
+
+    assert Enum.any?(
+             report.items.posts,
+             &(&1.slug == "duplicate-me" and &1.status == "content-duplicate")
+           )
+
+    assert Enum.any?(
+             report.items.media,
+             &(&1.filename == "missing-asset.txt" and &1.status == "missing")
+           )
   end
 
-  test "analyze_wxr reports legacy progress steps while building the import report", %{project: project, temp_dir: temp_dir} do
+  test "analyze_wxr reports legacy progress steps while building the import report", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     uploads_dir = Path.join(temp_dir, "uploads")
     File.mkdir_p!(Path.join(uploads_dir, "2024/05"))
     File.write!(Path.join(uploads_dir, "2024/05/import-asset.txt"), "legacy attachment")

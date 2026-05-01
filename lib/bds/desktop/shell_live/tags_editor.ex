@@ -11,12 +11,14 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
   alias BDS.Tags.Tag
   alias BDS.Templates.Template
 
-  embed_templates "tags_editor_html/*"
+  embed_templates("tags_editor_html/*")
 
+  @spec assign_socket(term()) :: term()
   def assign_socket(socket) do
     assign(socket, :tags_editor, build(socket.assigns))
   end
 
+  @spec toggle_selection(term(), term(), term()) :: term()
   def toggle_selection(socket, tag_name, reload) do
     selected = Map.get(socket.assigns, :tags_editor_selected, [])
 
@@ -33,6 +35,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec update_new_tag(term(), term(), term()) :: term()
   def update_new_tag(socket, params, reload) do
     socket
     |> assign(:tags_editor_new_tag, %{
@@ -42,11 +45,16 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec create_tag(term(), term(), term()) :: term()
   def create_tag(socket, reload, append_output) do
     project_id = socket.assigns.projects.active_project_id
     draft = Map.get(socket.assigns, :tags_editor_new_tag, %{})
 
-    case Tags.create_tag(%{project_id: project_id, name: Map.get(draft, "name"), color: blank_to_nil(Map.get(draft, "color"))}) do
+    case Tags.create_tag(%{
+           project_id: project_id,
+           name: Map.get(draft, "name"),
+           color: blank_to_nil(Map.get(draft, "color"))
+         }) do
       {:ok, _tag} ->
         socket
         |> assign(:tags_editor_new_tag, %{"name" => "", "color" => ""})
@@ -59,6 +67,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
     end
   end
 
+  @spec update_edit_tag(term(), term(), term()) :: term()
   def update_edit_tag(socket, params, reload) do
     socket
     |> assign(:tags_editor_edit_draft, %{
@@ -69,16 +78,26 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec save_tag(term(), term(), term()) :: term()
   def save_tag(socket, reload, append_output) do
     selected = Map.get(socket.assigns, :tags_editor_selected, [])
     draft = Map.get(socket.assigns, :tags_editor_edit_draft, %{})
 
     case selected do
       [tag_name] ->
-        case Repo.get_by(Tag, project_id: socket.assigns.projects.active_project_id, name: tag_name) do
-          nil -> reload.(socket, socket.assigns.workbench)
+        case Repo.get_by(Tag,
+               project_id: socket.assigns.projects.active_project_id,
+               name: tag_name
+             ) do
+          nil ->
+            reload.(socket, socket.assigns.workbench)
+
           %Tag{} = tag ->
-            with {:ok, _updated_tag} <- Tags.update_tag(tag.id, %{color: blank_to_nil(Map.get(draft, "color")), post_template_slug: blank_to_nil(Map.get(draft, "post_template_slug"))}),
+            with {:ok, _updated_tag} <-
+                   Tags.update_tag(tag.id, %{
+                     color: blank_to_nil(Map.get(draft, "color")),
+                     post_template_slug: blank_to_nil(Map.get(draft, "post_template_slug"))
+                   }),
                  {:ok, renamed_tag} <- maybe_rename_tag(tag, Map.get(draft, "name", tag.name)) do
               socket
               |> assign(:tags_editor_selected, [renamed_tag.name])
@@ -92,15 +111,22 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
             end
         end
 
-      _other -> reload.(socket, socket.assigns.workbench)
+      _other ->
+        reload.(socket, socket.assigns.workbench)
     end
   end
 
+  @spec delete_selected(term(), term(), term()) :: term()
   def delete_selected(socket, reload, append_output) do
     case Map.get(socket.assigns, :tags_editor_selected, []) do
       [tag_name] ->
-        case Repo.get_by(Tag, project_id: socket.assigns.projects.active_project_id, name: tag_name) do
-          nil -> reload.(socket, socket.assigns.workbench)
+        case Repo.get_by(Tag,
+               project_id: socket.assigns.projects.active_project_id,
+               name: tag_name
+             ) do
+          nil ->
+            reload.(socket, socket.assigns.workbench)
+
           %Tag{} = tag ->
             case Tags.delete_tag(tag.id) do
               {:ok, _deleted} ->
@@ -116,16 +142,19 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
             end
         end
 
-      _other -> reload.(socket, socket.assigns.workbench)
+      _other ->
+        reload.(socket, socket.assigns.workbench)
     end
   end
 
+  @spec update_merge_target(term(), term(), term()) :: term()
   def update_merge_target(socket, target, reload) do
     socket
     |> assign(:tags_editor_merge_target, to_string(target || ""))
     |> reload.(socket.assigns.workbench)
   end
 
+  @spec merge_selected(term(), term(), term()) :: term()
   def merge_selected(socket, reload, append_output) do
     selected = Map.get(socket.assigns, :tags_editor_selected, [])
     target_name = Map.get(socket.assigns, :tags_editor_merge_target, "")
@@ -136,12 +165,19 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
 
       true ->
         project_id = socket.assigns.projects.active_project_id
-        tags = Repo.all(from tag in Tag, where: tag.project_id == ^project_id and tag.name in ^selected)
+
+        tags =
+          Repo.all(
+            from tag in Tag, where: tag.project_id == ^project_id and tag.name in ^selected
+          )
+
         target = Enum.find(tags, &(&1.name == target_name))
         sources = Enum.reject(tags, &(&1.name == target_name))
 
         case target do
-          nil -> reload.(socket, socket.assigns.workbench)
+          nil ->
+            reload.(socket, socket.assigns.workbench)
+
           _target ->
             case Tags.merge_tags(Enum.map(sources, & &1.id), target.id) do
               {:ok, _merged} ->
@@ -160,23 +196,41 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
     end
   end
 
+  @spec sync(term(), term(), term()) :: term()
   def sync(socket, reload, append_output) do
     _ = append_output
     :ok = Tags.sync_tags_json(socket.assigns.projects.active_project_id)
     reload.(socket, socket.assigns.workbench)
   end
 
+  @spec build(term()) :: term()
   def build(%{current_tab: %{type: :tags}} = assigns) do
     project_id = assigns.projects.active_project_id
-    tags = Repo.all(from tag in Tag, where: tag.project_id == ^project_id, order_by: [asc: tag.name])
+
+    tags =
+      Repo.all(from tag in Tag, where: tag.project_id == ^project_id, order_by: [asc: tag.name])
+
     counts = tag_counts(project_id)
     selected = Map.get(assigns, :tags_editor_selected, [])
-    edit_tag = if length(selected) == 1, do: Enum.find(tags, &(&1.name == hd(selected))), else: nil
+
+    edit_tag =
+      if length(selected) == 1, do: Enum.find(tags, &(&1.name == hd(selected))), else: nil
+
     edit_draft = Map.get(assigns, :tags_editor_edit_draft, edit_draft(edit_tag))
-    templates = Repo.all(from template in Template, where: template.project_id == ^project_id, order_by: [asc: template.title], select: %{slug: template.slug, title: template.title})
+
+    templates =
+      Repo.all(
+        from template in Template,
+          where: template.project_id == ^project_id,
+          order_by: [asc: template.title],
+          select: %{slug: template.slug, title: template.title}
+      )
 
     %{
-      tags: Enum.map(tags, fn tag -> %{name: tag.name, color: tag.color, count: Map.get(counts, tag.name, 0)} end),
+      tags:
+        Enum.map(tags, fn tag ->
+          %{name: tag.name, color: tag.color, count: Map.get(counts, tag.name, 0)}
+        end),
       selected: selected,
       new_tag: Map.get(assigns, :tags_editor_new_tag, %{"name" => "", "color" => ""}),
       edit_draft: edit_draft,
@@ -187,14 +241,18 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
 
   def build(_assigns), do: nil
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  @spec translated(term(), term()) :: term()
+  def translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
+  @spec tag_font_size(term(), term()) :: term()
   def tag_font_size(count, counts) do
     max_count = Enum.max([1 | Enum.map(counts, & &1.count)])
     ratio = if max_count <= 1, do: 0.0, else: (count - 1) / max(max_count - 1, 1)
     Float.round(0.85 + (1.8 - 0.85) * ratio, 2)
   end
 
+  @spec tag_style(term(), term()) :: term()
   def tag_style(tag, counts) do
     size = tag_font_size(tag.count, counts)
 
@@ -217,7 +275,13 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
   defp maybe_seed_edit_draft(socket, _selected), do: assign(socket, :tags_editor_edit_draft, %{})
 
   defp edit_draft(nil), do: %{}
-  defp edit_draft(%Tag{} = tag), do: %{"name" => tag.name, "color" => tag.color || "", "post_template_slug" => tag.post_template_slug || ""}
+
+  defp edit_draft(%Tag{} = tag),
+    do: %{
+      "name" => tag.name,
+      "color" => tag.color || "",
+      "post_template_slug" => tag.post_template_slug || ""
+    }
 
   defp maybe_rename_tag(%Tag{} = tag, next_name) do
     normalized = String.trim(to_string(next_name || tag.name))
@@ -237,6 +301,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
   end
 
   defp blank_to_nil(nil), do: nil
+
   defp blank_to_nil(value) do
     case String.trim(to_string(value)) do
       "" -> nil

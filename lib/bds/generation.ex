@@ -2,13 +2,16 @@ defmodule BDS.Generation do
   @moduledoc false
 
   import Ecto.Query
+
   import BDS.Generation.Paths,
     except: [post_output_path: 1, post_output_path: 2]
+
   import BDS.Generation.Sitemap,
     only: [
       render: 1,
       render_multi_language: 6
     ]
+
   import BDS.Generation.Progress
   import BDS.Generation.Outputs
   import BDS.Generation.Data
@@ -89,7 +92,8 @@ defmodule BDS.Generation do
           {:ok, validation_report()} | {:error, term()}
   def validate_site(project_id, sections \\ @core_sections, opts \\ [])
 
-  def validate_site(project_id, sections, opts) when is_binary(project_id) and is_list(sections) and is_list(opts) do
+  def validate_site(project_id, sections, opts)
+      when is_binary(project_id) and is_list(sections) and is_list(opts) do
     with {:ok, plan} <- plan_generation(project_id, sections) do
       on_progress = callback(opts)
       :ok = report_validation_progress(on_progress, 0.0, "Collecting sitemap URLs...")
@@ -104,9 +108,12 @@ defmodule BDS.Generation do
       {:ok, generated_files_list} = list_generated_files(project_id)
       generated_file_updated_at = generated_file_updated_at_map(generated_files_list)
       additional_languages = additional_languages(plan)
-      published_route_posts = suppress_subtree_translation_variants(data.published_route_posts, additional_languages)
 
-      {sitemap_content, sitemap_to_write, additional_expected_paths, additional_post_timestamp_checks} =
+      published_route_posts =
+        suppress_subtree_translation_variants(data.published_route_posts, additional_languages)
+
+      {sitemap_content, sitemap_to_write, additional_expected_paths,
+       additional_post_timestamp_checks} =
         build_validation_sitemap_artifacts(
           plan,
           data,
@@ -155,8 +162,8 @@ defmodule BDS.Generation do
 
   @spec apply_validation(String.t(), [section()] | map()) :: {:ok, map()} | {:error, term()}
   def apply_validation(project_id, sections) when is_binary(project_id) and is_list(sections) do
-        with {:ok, plan} <- plan_generation(project_id, sections),
-          {:ok, actual_files} <- disk_generated_files(project_id) do
+    with {:ok, plan} <- plan_generation(project_id, sections),
+         {:ok, actual_files} <- disk_generated_files(project_id) do
       expected_outputs = build_outputs(plan)
       expected_paths = MapSet.new(Enum.map(expected_outputs, &elem(&1, 0)))
       project = Projects.get_project!(project_id)
@@ -190,7 +197,8 @@ defmodule BDS.Generation do
         generated_files_on_disk
         |> Map.keys()
         |> Enum.filter(fn relative_path ->
-          path_section(relative_path) in plan.sections and not MapSet.member?(expected_paths, relative_path)
+          path_section(relative_path) in plan.sections and
+            not MapSet.member?(expected_paths, relative_path)
         end)
         |> Enum.each(fn relative_path ->
           _ = File.rm(output_path(project, relative_path))
@@ -215,6 +223,7 @@ defmodule BDS.Generation do
       expected_output_map = Map.new(expected_outputs)
       project = Projects.get_project!(project_id)
       published_posts = list_published_posts(project_id)
+
       targeted_plan =
         build_targeted_validation_plan(
           plan_validation_paths(report_paths(report), additional_languages(plan)),
@@ -224,7 +233,12 @@ defmodule BDS.Generation do
       outputs_to_render =
         expected_outputs
         |> Enum.filter(fn {relative_path, _content} ->
-          targeted_output?(relative_path, targeted_plan, plan.language, additional_languages(plan))
+          targeted_output?(
+            relative_path,
+            targeted_plan,
+            plan.language,
+            additional_languages(plan)
+          )
         end)
 
       Enum.each(outputs_to_render, fn {relative_path, content} ->
@@ -243,7 +257,10 @@ defmodule BDS.Generation do
 
       {:ok,
        %{
-         rendered_url_count: Enum.count(outputs_to_render, fn {relative_path, _content} -> route_html_path?(relative_path) end),
+         rendered_url_count:
+           Enum.count(outputs_to_render, fn {relative_path, _content} ->
+             route_html_path?(relative_path)
+           end),
          deleted_url_count: deleted_url_count,
          removed_empty_dir_count: removed_empty_dir_count
        }}
@@ -257,15 +274,21 @@ defmodule BDS.Generation do
   defdelegate post_output_path(post, language), to: Paths
 
   @typedoc "Result returned by `write_generated_file/3,4`."
-  @type write_result :: %{relative_path: String.t(), content_hash: String.t(), written?: boolean()}
+  @type write_result :: %{
+          relative_path: String.t(),
+          content_hash: String.t(),
+          written?: boolean()
+        }
 
   @spec write_generated_file(String.t(), String.t(), String.t()) :: {:ok, write_result()}
   def write_generated_file(project_id, relative_path, content),
     do: write_generated_file(project_id, relative_path, content, [])
 
-  @spec write_generated_file(String.t(), String.t(), String.t(), keyword()) :: {:ok, write_result()}
+  @spec write_generated_file(String.t(), String.t(), String.t(), keyword()) ::
+          {:ok, write_result()}
   def write_generated_file(project_id, relative_path, content, opts)
-      when is_binary(project_id) and is_binary(relative_path) and is_binary(content) and is_list(opts) do
+      when is_binary(project_id) and is_binary(relative_path) and is_binary(content) and
+             is_list(opts) do
     project = Projects.get_project!(project_id)
     content_hash = sha256(content)
     now = Persistence.now_ms()
@@ -331,8 +354,12 @@ defmodule BDS.Generation do
     data = generation_data(plan)
     published_translations = flattened_generation_translations(data.translations_by_post)
     translations_by_post_language = translation_lookup_map(published_translations)
-    translatable_published_posts = Enum.reject(data.published_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
-    translatable_published_list_posts = Enum.reject(data.published_list_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
+
+    translatable_published_posts =
+      Enum.reject(data.published_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
+
+    translatable_published_list_posts =
+      Enum.reject(data.published_list_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
 
     localized_posts_by_language =
       additional_languages(plan)
@@ -421,7 +448,10 @@ defmodule BDS.Generation do
 
     pagefind_outputs =
       if :core in plan.sections do
-        BDS.Generation.Pagefind.build_outputs(plan, core_outputs ++ page_outputs ++ single_outputs ++ archive_outputs)
+        BDS.Generation.Pagefind.build_outputs(
+          plan,
+          core_outputs ++ page_outputs ++ single_outputs ++ archive_outputs
+        )
       else
         []
       end
@@ -433,7 +463,9 @@ defmodule BDS.Generation do
         []
       end
 
-    core_outputs ++ page_outputs ++ single_outputs ++ archive_outputs ++ sitemap ++ pagefind_outputs ++ asset_outputs
+    core_outputs ++
+      page_outputs ++
+      single_outputs ++ archive_outputs ++ sitemap ++ pagefind_outputs ++ asset_outputs
   end
 
   defp build_validation_sitemap_artifacts(
@@ -454,17 +486,27 @@ defmodule BDS.Generation do
 
     additional_language_sets =
       Enum.map(additional_languages(plan), fn language ->
-        language_posts = Enum.reject(data.published_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
-        language_list_posts = Enum.reject(data.published_list_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
+        language_posts =
+          Enum.reject(data.published_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
+
+        language_list_posts =
+          Enum.reject(data.published_list_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
+
         language_post_index = build_generation_post_index(language_list_posts)
 
-        {language,
-         language_posts,
-         build_validation_route_paths(plan, language_posts, language_list_posts, language_post_index, language)}
+        {language, language_posts,
+         build_validation_route_paths(
+           plan,
+           language_posts,
+           language_list_posts,
+           language_post_index,
+           language
+         )}
       end)
 
     all_collection_paths =
-      main_paths ++ Enum.flat_map(additional_language_sets, fn {_language, _posts, paths} -> paths end)
+      main_paths ++
+        Enum.flat_map(additional_language_sets, fn {_language, _posts, paths} -> paths end)
 
     total_route_count = max(length(all_collection_paths), 1)
 
@@ -497,7 +539,8 @@ defmodule BDS.Generation do
 
     sitemap_to_write =
       case additional_languages(plan) do
-        [] -> sitemap_content
+        [] ->
+          sitemap_content
 
         languages ->
           render_multi_language(
@@ -510,7 +553,8 @@ defmodule BDS.Generation do
           )
       end
 
-    {sitemap_content, sitemap_to_write, additional_expected_paths, additional_post_timestamp_checks}
+    {sitemap_content, sitemap_to_write, additional_expected_paths,
+     additional_post_timestamp_checks}
   end
 
   defp disk_generated_files(project_id) do
@@ -544,21 +588,52 @@ defmodule BDS.Generation do
     segments = String.split(relative_path, "/", trim: true)
 
     case strip_language_prefix(segments) do
-      ["404.html"] -> :core
-      ["index.html"] -> :core
-      ["page", _page, "index.html"] -> :core
-      ["sitemap.xml"] -> :core
-      ["feed.xml"] -> :core
-      ["atom.xml"] -> :core
-      ["calendar.json"] -> :core
-      ["pagefind" | _rest] -> :core
-      [year, month, day, "index.html"] when byte_size(year) == 4 and byte_size(month) == 2 and byte_size(day) == 2 -> :date
-      [year, month, day, _slug, "index.html"] when byte_size(year) == 4 and byte_size(month) == 2 and byte_size(day) == 2 -> :single
-      ["category" | _rest] -> :category
-      ["tag" | _rest] -> :tag
-      [year, "index.html"] when byte_size(year) == 4 -> :date
-      [year, month, "index.html"] when byte_size(year) == 4 and byte_size(month) == 2 -> :date
-      _other -> :core
+      ["404.html"] ->
+        :core
+
+      ["index.html"] ->
+        :core
+
+      ["page", _page, "index.html"] ->
+        :core
+
+      ["sitemap.xml"] ->
+        :core
+
+      ["feed.xml"] ->
+        :core
+
+      ["atom.xml"] ->
+        :core
+
+      ["calendar.json"] ->
+        :core
+
+      ["pagefind" | _rest] ->
+        :core
+
+      [year, month, day, "index.html"]
+      when byte_size(year) == 4 and byte_size(month) == 2 and byte_size(day) == 2 ->
+        :date
+
+      [year, month, day, _slug, "index.html"]
+      when byte_size(year) == 4 and byte_size(month) == 2 and byte_size(day) == 2 ->
+        :single
+
+      ["category" | _rest] ->
+        :category
+
+      ["tag" | _rest] ->
+        :tag
+
+      [year, "index.html"] when byte_size(year) == 4 ->
+        :date
+
+      [year, month, "index.html"] when byte_size(year) == 4 and byte_size(month) == 2 ->
+        :date
+
+      _other ->
+        :core
     end
   end
 
@@ -615,7 +690,9 @@ defmodule BDS.Generation do
                   generated_file.relative_path == ^relative_path
           )
 
-          {pruned_count, _last_dir} = prune_empty_parent_dirs(Path.dirname(full_path), output_path(project, ""))
+          {pruned_count, _last_dir} =
+            prune_empty_parent_dirs(Path.dirname(full_path), output_path(project, ""))
+
           {deleted_count + 1, removed_dir_count + pruned_count}
 
         {:error, :enoent} ->
@@ -634,7 +711,12 @@ defmodule BDS.Generation do
       end)
 
     Enum.each(ancillary_paths, fn relative_path ->
-      _ = write_generated_file(project_id, relative_path, Map.fetch!(expected_output_map, relative_path))
+      _ =
+        write_generated_file(
+          project_id,
+          relative_path,
+          Map.fetch!(expected_output_map, relative_path)
+        )
     end)
 
     :ok

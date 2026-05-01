@@ -12,7 +12,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   alias BDS.Posts.{Post, PostMedia, Translation}
   alias BDS.Tags.Tag
 
-  embed_templates "overlay_html/*"
+  embed_templates("overlay_html/*")
 
   def context(assigns, tab_title, tab_subtitle) do
     project_id = assigns.projects.active_project_id
@@ -23,7 +23,12 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     media = media(project_id)
 
     %{
-      current_tab: %{type: current_tab.type, id: current_tab.id, title: tab_title, subtitle: tab_subtitle},
+      current_tab: %{
+        type: current_tab.type,
+        id: current_tab.id,
+        title: tab_title,
+        subtitle: tab_subtitle
+      },
       current_post_language: source_language(current_tab, metadata),
       current_media_language: source_language(current_tab, metadata),
       posts: posts,
@@ -59,7 +64,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
 
   def markdown_link(text, url), do: "[#{text}](#{url})"
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  def translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   def project_metadata(nil), do: %{main_language: "en", blog_languages: []}
 
@@ -77,7 +83,15 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       from post in Post,
         where: post.project_id == ^project_id,
         order_by: [desc: post.updated_at, desc: post.created_at],
-        select: %{id: post.id, title: post.title, slug: post.slug, status: post.status, published_at: post.published_at, updated_at: post.updated_at, language: post.language}
+        select: %{
+          id: post.id,
+          title: post.title,
+          slug: post.slug,
+          status: post.status,
+          published_at: post.published_at,
+          updated_at: post.updated_at,
+          language: post.language
+        }
     )
     |> Enum.map(fn post ->
       %{
@@ -96,7 +110,14 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       from media in MediaRecord,
         where: media.project_id == ^project_id,
         order_by: [desc: media.updated_at, desc: media.created_at],
-        select: %{id: media.id, title: media.title, original_name: media.original_name, mime_type: media.mime_type, alt: media.alt, caption: media.caption}
+        select: %{
+          id: media.id,
+          title: media.title,
+          original_name: media.original_name,
+          mime_type: media.mime_type,
+          alt: media.alt,
+          caption: media.caption
+        }
     )
     |> Enum.map(fn media ->
       %{
@@ -149,7 +170,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   defp existing_translations(_tab), do: %{}
 
   defp blog_languages(metadata) do
-    ([metadata.main_language || "en"] ++ (metadata.blog_languages || []) ++ Enum.map(I18n.supported_languages(), & &1.code))
+    ([metadata.main_language || "en"] ++
+       (metadata.blog_languages || []) ++ Enum.map(I18n.supported_languages(), & &1.code))
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end
@@ -193,9 +215,27 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     case Posts.get_post(post_id) do
       %Post{} = post ->
         [
-          %{key: "title", label: ShellData.translate("Title", %{}, page_language), current_value: post.title || title, suggested_value: refine_title(post.title || title), locked: false},
-          %{key: "excerpt", label: ShellData.translate("Excerpt", %{}, page_language), current_value: post.excerpt || subtitle, suggested_value: refine_excerpt(post.title || title, post.excerpt || subtitle), locked: false},
-          %{key: "slug", label: ShellData.translate("Slug", %{}, page_language), current_value: post.slug || slugify(post.title || title), suggested_value: refine_slug(post.slug || slugify(post.title || title)), locked: post.status == :published}
+          %{
+            key: "title",
+            label: ShellData.translate("Title", %{}, page_language),
+            current_value: post.title || title,
+            suggested_value: refine_title(post.title || title),
+            locked: false
+          },
+          %{
+            key: "excerpt",
+            label: ShellData.translate("Excerpt", %{}, page_language),
+            current_value: post.excerpt || subtitle,
+            suggested_value: refine_excerpt(post.title || title, post.excerpt || subtitle),
+            locked: false
+          },
+          %{
+            key: "slug",
+            label: ShellData.translate("Slug", %{}, page_language),
+            current_value: post.slug || slugify(post.title || title),
+            suggested_value: refine_slug(post.slug || slugify(post.title || title)),
+            locked: post.status == :published
+          }
         ]
 
       _other ->
@@ -209,9 +249,27 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     case Media.get_media(media_id) do
       %MediaRecord{} = media ->
         [
-          %{key: "title", label: ShellData.translate("Title", %{}, page_language), current_value: media.title || title, suggested_value: refine_title(media.title || title), locked: false},
-          %{key: "alt", label: ShellData.translate("Alt Text", %{}, page_language), current_value: media.alt || "", suggested_value: media.alt || title, locked: false},
-          %{key: "caption", label: ShellData.translate("Caption", %{}, page_language), current_value: media.caption || "", suggested_value: refine_excerpt(title, media.caption || title), locked: false}
+          %{
+            key: "title",
+            label: ShellData.translate("Title", %{}, page_language),
+            current_value: media.title || title,
+            suggested_value: refine_title(media.title || title),
+            locked: false
+          },
+          %{
+            key: "alt",
+            label: ShellData.translate("Alt Text", %{}, page_language),
+            current_value: media.alt || "",
+            suggested_value: media.alt || title,
+            locked: false
+          },
+          %{
+            key: "caption",
+            label: ShellData.translate("Caption", %{}, page_language),
+            current_value: media.caption || "",
+            suggested_value: refine_excerpt(title, media.caption || title),
+            locked: false
+          }
         ]
 
       _other ->
@@ -248,7 +306,13 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       reference_list: reference_list
     }
   rescue
-    _error -> %{title: ShellData.translate("Delete Media", %{}, page_language), entity_name: media_id, entity_type: "media", reference_list: []}
+    _error ->
+      %{
+        title: ShellData.translate("Delete Media", %{}, page_language),
+        entity_name: media_id,
+        entity_type: "media",
+        reference_list: []
+      }
   end
 
   defp delete_details(%{type: :tags}, page_language) do
@@ -263,16 +327,33 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       reference_list: []
     }
   rescue
-    _error -> %{title: ShellData.translate("Delete Tag", %{}, page_language), entity_name: "tag", entity_type: "tag", reference_list: []}
+    _error ->
+      %{
+        title: ShellData.translate("Delete Tag", %{}, page_language),
+        entity_name: "tag",
+        entity_type: "tag",
+        reference_list: []
+      }
   end
 
   defp delete_details(_tab, page_language) do
-    %{title: ShellData.translate("Delete", %{}, page_language), entity_name: "", entity_type: "item", reference_list: []}
+    %{
+      title: ShellData.translate("Delete", %{}, page_language),
+      entity_name: "",
+      entity_type: "item",
+      reference_list: []
+    }
   end
 
   defp merge_details(project_id, page_language) do
     tags =
-      Repo.all(from tag in Tag, where: tag.project_id == ^project_id, order_by: [asc: tag.name], limit: 3, select: tag.name)
+      Repo.all(
+        from tag in Tag,
+          where: tag.project_id == ^project_id,
+          order_by: [asc: tag.name],
+          limit: 3,
+          select: tag.name
+      )
 
     target = List.first(tags) || "tag"
 
@@ -283,7 +364,13 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       message: ShellData.translate("Cannot be undone.", %{}, page_language)
     }
   rescue
-    _error -> %{target: "tag", count: 1, title: ShellData.translate("Merge Tags", %{}, page_language), message: ShellData.translate("Cannot be undone.", %{}, page_language)}
+    _error ->
+      %{
+        target: "tag",
+        count: 1,
+        title: ShellData.translate("Merge Tags", %{}, page_language),
+        message: ShellData.translate("Cannot be undone.", %{}, page_language)
+      }
   end
 
   defp canonical_post_url(post) do
@@ -302,7 +389,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     if base == "", do: "#{title} overview", else: base <> "."
   end
 
-  defp refine_slug(slug), do: slug |> to_string() |> String.trim_trailing("-") |> Kernel.<>("-updated")
+  defp refine_slug(slug),
+    do: slug |> to_string() |> String.trim_trailing("-") |> Kernel.<>("-updated")
 
   defp slugify(value) do
     value

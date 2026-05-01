@@ -46,7 +46,10 @@ defmodule BDS.Desktop.ShellLive.TaskLocalization do
     |> Map.put(:message, localize_task_message(Map.get(task, :message), locale))
     |> Map.put(:group_name, localize_task_group(Map.get(task, :group_name), locale))
     |> Map.put(:status_label, localize_task_status_label(task.status, locale))
-    |> Map.put(:progress_label, if(is_number(progress), do: progress_percent(progress), else: nil))
+    |> Map.put(
+      :progress_label,
+      if(is_number(progress), do: progress_percent(progress), else: nil)
+    )
   end
 
   defp localize_task_message(nil, _locale), do: nil

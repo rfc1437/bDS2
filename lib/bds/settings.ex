@@ -18,7 +18,11 @@ defmodule BDS.Settings do
     setting = Repo.get(Setting, key) || %Setting{}
 
     setting
-    |> Setting.changeset(%{key: key, value: to_string(value || ""), updated_at: Persistence.now_ms()})
+    |> Setting.changeset(%{
+      key: key,
+      value: to_string(value || ""),
+      updated_at: Persistence.now_ms()
+    })
     |> Repo.insert_or_update()
     |> case do
       {:ok, _setting} -> :ok

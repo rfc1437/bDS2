@@ -42,7 +42,9 @@ defmodule BDS.Desktop.ShellCommandsTest do
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "open_in_browser starts preview for the active project and returns a preview url", %{project: project} do
+  test "open_in_browser starts preview for the active project and returns a preview url", %{
+    project: project
+  } do
     assert {:ok, result} = ShellCommands.execute("open_in_browser")
 
     assert result.kind == "open_url"
@@ -51,7 +53,10 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert result.project_id == project.id
   end
 
-  test "validate_translations returns an editor payload with current translation gaps", %{project: project, temp_dir: temp_dir} do
+  test "validate_translations returns an editor payload with current translation gaps", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     assert {:ok, post} =
              BDS.Posts.create_post(%{
                project_id: project.id,
@@ -165,7 +170,8 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert is_map(completed.result.payload.summary)
   end
 
-  test "rebuild_posts_from_files rebuilds embeddings for published posts when semantic similarity is enabled", %{project: project} do
+  test "rebuild_posts_from_files rebuilds embeddings for published posts when semantic similarity is enabled",
+       %{project: project} do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
 
@@ -178,7 +184,9 @@ defmodule BDS.Desktop.ShellCommandsTest do
              })
 
     assert {:ok, published_post} = BDS.Posts.publish_post(post.id)
-    assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: published_post.id) != nil
+
+    assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: published_post.id) !=
+             nil
 
     BDS.Repo.delete_all(BDS.Embeddings.Key)
 
@@ -186,10 +194,14 @@ defmodule BDS.Desktop.ShellCommandsTest do
     completed = wait_for_task(result.task_id, &(&1.status == :completed))
 
     assert completed.group_name == "Maintenance"
-    assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: published_post.id) != nil
+
+    assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: published_post.id) !=
+             nil
   end
 
-  test "repair_metadata_diff exposes live in-task progress from the repair worker", %{project: project} do
+  test "repair_metadata_diff exposes live in-task progress from the repair worker", %{
+    project: project
+  } do
     original = Application.get_env(:bds, :tasks, [])
 
     Application.put_env(
@@ -216,7 +228,8 @@ defmodule BDS.Desktop.ShellCommandsTest do
     progressed =
       wait_for_task(
         result.task_id,
-        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.2 and &1.progress < 1.0),
+        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.2 and
+            &1.progress < 1.0),
         5_000
       )
 
@@ -243,7 +256,9 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert is_map(completed.result.payload.summary)
   end
 
-  test "rebuild_embedding_index exposes live in-task progress while rebuilding posts", %{project: project} do
+  test "rebuild_embedding_index exposes live in-task progress while rebuilding posts", %{
+    project: project
+  } do
     original = Application.get_env(:bds, :tasks, [])
     original_embeddings = Application.get_env(:bds, :embeddings)
 
@@ -289,7 +304,8 @@ defmodule BDS.Desktop.ShellCommandsTest do
     progressed =
       wait_for_task(
         result.task_id,
-        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.0 and &1.progress < 1.0 and
+        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.0 and
+            &1.progress < 1.0 and
             is_binary(&1.message) and String.contains?(&1.message, "/")),
         10_000
       )
@@ -297,7 +313,11 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert progressed.group_name == "Embeddings"
     assert String.contains?(progressed.message, "/")
 
-    assert wait_for_task(result.task_id, &(&1.status == :completed and &1.progress == 1.0), 10_000).status ==
+    assert wait_for_task(
+             result.task_id,
+             &(&1.status == :completed and &1.progress == 1.0),
+             10_000
+           ).status ==
              :completed
   end
 
@@ -307,15 +327,19 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert result.kind == "task_queued"
     assert result.action == "rebuild_database"
 
-    tasks = wait_for_tasks_by_name([
-      "Rebuild Posts From Files",
-      "Rebuild Media From Files",
-      "Rebuild Scripts From Files",
-      "Rebuild Templates From Files",
-      "Rebuild Post Links",
-      "Regenerate Missing Thumbnails",
-      "Rebuild Embedding Index"
-    ], &(&1.status == :completed))
+    tasks =
+      wait_for_tasks_by_name(
+        [
+          "Rebuild Posts From Files",
+          "Rebuild Media From Files",
+          "Rebuild Scripts From Files",
+          "Rebuild Templates From Files",
+          "Rebuild Post Links",
+          "Regenerate Missing Thumbnails",
+          "Rebuild Embedding Index"
+        ],
+        &(&1.status == :completed)
+      )
 
     assert Enum.all?(tasks, &(&1.group_name == "Maintenance"))
     assert Enum.all?(tasks, &(&1.status == :completed))
@@ -429,32 +453,40 @@ defmodule BDS.Desktop.ShellCommandsTest do
     _posts_task =
       wait_for_named_task(
         "Rebuild Posts From Files",
-        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.0 and &1.progress < 1.0),
+        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.0 and
+            &1.progress < 1.0),
         10_000
       )
 
     phase_one_tasks =
       BDS.Tasks.list_tasks()
-      |> Enum.filter(&(&1.name in [
-        "Rebuild Posts From Files",
-        "Rebuild Media From Files",
-        "Rebuild Scripts From Files",
-        "Rebuild Templates From Files"
-      ]))
+      |> Enum.filter(
+        &(&1.name in [
+            "Rebuild Posts From Files",
+            "Rebuild Media From Files",
+            "Rebuild Scripts From Files",
+            "Rebuild Templates From Files"
+          ])
+      )
 
     assert Enum.count(phase_one_tasks, &(&1.status == :running)) == 1
 
     assert Enum.find(phase_one_tasks, &(&1.status == :running)).name == "Rebuild Posts From Files"
 
-    tasks = wait_for_tasks_by_name([
-      "Rebuild Posts From Files",
-      "Rebuild Media From Files",
-      "Rebuild Scripts From Files",
-      "Rebuild Templates From Files",
-      "Rebuild Post Links",
-      "Regenerate Missing Thumbnails",
-      "Rebuild Embedding Index"
-    ], &(&1.status == :completed), 20_000)
+    tasks =
+      wait_for_tasks_by_name(
+        [
+          "Rebuild Posts From Files",
+          "Rebuild Media From Files",
+          "Rebuild Scripts From Files",
+          "Rebuild Templates From Files",
+          "Rebuild Post Links",
+          "Regenerate Missing Thumbnails",
+          "Rebuild Embedding Index"
+        ],
+        &(&1.status == :completed),
+        20_000
+      )
 
     assert Enum.all?(tasks, &(&1.status == :completed))
   end
@@ -505,7 +537,8 @@ defmodule BDS.Desktop.ShellCommandsTest do
     progressed =
       wait_for_named_task(
         "Rebuild Posts From Files",
-        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.0 and &1.progress < 1.0),
+        &(&1.status == :running and is_number(&1.progress) and &1.progress > 0.0 and
+            &1.progress < 1.0),
         5_000
       )
 
@@ -515,15 +548,20 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert wait_for_task(progressed.id, &(&1.status == :completed and &1.progress == 1.0), 5_000).status ==
              :completed
 
-    tasks = wait_for_tasks_by_name([
-      "Rebuild Posts From Files",
-      "Rebuild Media From Files",
-      "Rebuild Scripts From Files",
-      "Rebuild Templates From Files",
-      "Rebuild Post Links",
-      "Regenerate Missing Thumbnails",
-      "Rebuild Embedding Index"
-    ], &(&1.status == :completed), 20_000)
+    tasks =
+      wait_for_tasks_by_name(
+        [
+          "Rebuild Posts From Files",
+          "Rebuild Media From Files",
+          "Rebuild Scripts From Files",
+          "Rebuild Templates From Files",
+          "Rebuild Post Links",
+          "Regenerate Missing Thumbnails",
+          "Rebuild Embedding Index"
+        ],
+        &(&1.status == :completed),
+        20_000
+      )
 
     assert Enum.all?(tasks, &(&1.status == :completed))
   end
@@ -537,7 +575,11 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert is_binary(result.task_id)
     assert is_binary(result.task_group_id)
 
-    tasks = wait_for_tasks_by_name(["Reindex Search Text", "Reindex Media Search Text"], &(&1.status == :completed))
+    tasks =
+      wait_for_tasks_by_name(
+        ["Reindex Search Text", "Reindex Media Search Text"],
+        &(&1.status == :completed)
+      )
 
     assert Enum.all?(tasks, &(&1.group_name == "Search"))
     assert Enum.all?(tasks, &(&1.group_id == result.task_group_id))

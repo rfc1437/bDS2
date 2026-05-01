@@ -141,7 +141,12 @@ defmodule BDS.Media.Sidecars do
     media
   end
 
-  @spec upsert_translation_from_sidecar(BDS.Projects.Project.t(), %{required(Path.t()) => Media.t()}, map(), keyword()) ::
+  @spec upsert_translation_from_sidecar(
+          BDS.Projects.Project.t(),
+          %{required(Path.t()) => Media.t()},
+          map(),
+          keyword()
+        ) ::
           Translation.t() | :skip | :ok
   def upsert_translation_from_sidecar(project, canonical_media_by_binary_path, sidecar, opts) do
     case Map.get(canonical_media_by_binary_path, sidecar.binary_path) do

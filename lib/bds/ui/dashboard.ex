@@ -75,11 +75,15 @@ defmodule BDS.UI.Dashboard do
   end
 
   defp post_stats(posts) do
-    Enum.reduce(posts, %{total_posts: 0, draft_count: 0, published_count: 0, archived_count: 0}, fn post, acc ->
-      acc
-      |> Map.update!(:total_posts, &(&1 + 1))
-      |> increment_status(post.status)
-    end)
+    Enum.reduce(
+      posts,
+      %{total_posts: 0, draft_count: 0, published_count: 0, archived_count: 0},
+      fn post, acc ->
+        acc
+        |> Map.update!(:total_posts, &(&1 + 1))
+        |> increment_status(post.status)
+      end
+    )
   end
 
   defp media_stats(media_items) do
@@ -116,7 +120,9 @@ defmodule BDS.UI.Dashboard do
     |> Enum.flat_map(&normalize_terms(&1.categories))
     |> Enum.frequencies()
     |> Enum.map(fn {category, count} -> %{category: category, count: count} end)
-    |> Enum.sort_by(fn %{category: category, count: count} -> {-count, String.downcase(category)} end)
+    |> Enum.sort_by(fn %{category: category, count: count} ->
+      {-count, String.downcase(category)}
+    end)
   end
 
   defp recent_posts(posts) do
@@ -151,7 +157,9 @@ defmodule BDS.UI.Dashboard do
   defp increment_status(counts, _status), do: counts
 
   defp maybe_increment_image_count(counts, mime_type) when is_binary(mime_type) do
-    if String.starts_with?(mime_type, "image/"), do: Map.update!(counts, :image_count, &(&1 + 1)), else: counts
+    if String.starts_with?(mime_type, "image/"),
+      do: Map.update!(counts, :image_count, &(&1 + 1)),
+      else: counts
   end
 
   defp maybe_increment_image_count(counts, _mime_type), do: counts

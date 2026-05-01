@@ -13,6 +13,10 @@ defmodule BDS.Scripts do
   alias BDS.Scripts.Script
   alias BDS.Slug
 
+  @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
+  @type script_result :: {:ok, Script.t()} | {:error, Ecto.Changeset.t() | term()}
+
+  @spec create_script(attrs()) :: {:ok, Script.t()} | {:error, Ecto.Changeset.t()}
   def create_script(attrs) do
     now = Persistence.now_ms()
     project_id = attr(attrs, :project_id)
@@ -41,6 +45,7 @@ defmodule BDS.Scripts do
   @spec get_script(String.t()) :: Script.t() | nil
   def get_script(script_id), do: Repo.get(Script, script_id)
 
+  @spec publish_script(String.t()) :: script_result() | {:error, :not_found}
   def publish_script(script_id) do
     case Repo.get(Script, script_id) do
       nil ->
@@ -72,6 +77,7 @@ defmodule BDS.Scripts do
     end
   end
 
+  @spec update_script(String.t(), attrs()) :: script_result() | {:error, :not_found}
   def update_script(script_id, attrs) do
     case Repo.get(Script, script_id) do
       nil ->
@@ -109,6 +115,7 @@ defmodule BDS.Scripts do
     end
   end
 
+  @spec delete_script(String.t()) :: {:ok, :deleted} | {:error, :not_found | term()}
   def delete_script(script_id) do
     case Repo.get(Script, script_id) do
       nil ->
@@ -121,6 +128,7 @@ defmodule BDS.Scripts do
     end
   end
 
+  @spec rebuild_scripts_from_files(String.t(), keyword()) :: {:ok, [Script.t()]}
   def rebuild_scripts_from_files(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
 
@@ -146,6 +154,7 @@ defmodule BDS.Scripts do
     {:ok, scripts}
   end
 
+  @spec sync_script_from_file(String.t()) :: {:ok, Script.t()} | {:error, :not_found}
   def sync_script_from_file(script_id) do
     case Repo.get(Script, script_id) do
       nil ->
@@ -166,6 +175,7 @@ defmodule BDS.Scripts do
     end
   end
 
+  @spec sync_published_script_file(String.t()) :: {:ok, Script.t()} | {:error, :not_found}
   def sync_published_script_file(script_id) do
     case Repo.get(Script, script_id) do
       nil ->
@@ -183,6 +193,8 @@ defmodule BDS.Scripts do
     end
   end
 
+  @spec import_orphan_script_file(String.t(), String.t()) ::
+          {:ok, Script.t()} | {:error, :not_found}
   def import_orphan_script_file(project_id, relative_path) do
     project = Projects.get_project!(project_id)
     full_path = Path.join(Projects.project_data_dir(project), relative_path)

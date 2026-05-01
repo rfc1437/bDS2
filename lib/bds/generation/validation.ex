@@ -9,6 +9,7 @@ defmodule BDS.Generation.Validation do
       relative_path_to_url_path: 1,
       url_path_to_relative_index_path: 1
     ]
+
   import BDS.Generation.Progress, only: [report_validation_compare_progress: 3]
   import BDS.Generation.Sitemap, only: [extract_locs: 1, loc_to_project_path: 2]
 
@@ -20,7 +21,11 @@ defmodule BDS.Generation.Validation do
   end
 
   @spec build_post_timestamp_checks(String.t(), [map()], map()) :: [map()]
-  def build_post_timestamp_checks(project_data_dir, published_route_posts, generated_file_updated_at) do
+  def build_post_timestamp_checks(
+        project_data_dir,
+        published_route_posts,
+        generated_file_updated_at
+      ) do
     Enum.map(published_route_posts, fn post ->
       relative_path = BDS.Generation.Paths.post_output_path(post)
 
@@ -69,13 +74,19 @@ defmodule BDS.Generation.Validation do
       |> Enum.map(&loc_to_project_path(&1, params.base_url))
       |> Enum.reduce(MapSet.new(), &MapSet.put(&2, normalize_url_path(&1)))
       |> then(fn expected_paths ->
-        Enum.reduce(Map.get(params, :additional_expected_paths, []), expected_paths, fn path, acc ->
+        Enum.reduce(Map.get(params, :additional_expected_paths, []), expected_paths, fn path,
+                                                                                        acc ->
           MapSet.put(acc, normalize_url_path(path))
         end)
       end)
 
     {existing_html_path_set, zero_byte_html_path_set} =
-      collect_html_index_paths(index_paths, params.html_dir, params.on_progress, total_compare_steps)
+      collect_html_index_paths(
+        index_paths,
+        params.html_dir,
+        params.on_progress,
+        total_compare_steps
+      )
 
     missing_url_paths =
       expected_path_set
@@ -119,11 +130,14 @@ defmodule BDS.Generation.Validation do
             acc
 
           true ->
-            html_path = Path.join(params.html_dir, url_path_to_relative_index_path(normalized_url_path))
+            html_path =
+              Path.join(params.html_dir, url_path_to_relative_index_path(normalized_url_path))
 
-            case {File.stat(html_path, time: :posix), File.stat(check.post_file_path, time: :posix)} do
+            case {File.stat(html_path, time: :posix),
+                  File.stat(check.post_file_path, time: :posix)} do
               {{:ok, html_stat}, {:ok, post_stat}} ->
-                effective_generated_at_ms = max(mtime_ms(html_stat), check.generated_updated_at_ms || 0)
+                effective_generated_at_ms =
+                  max(mtime_ms(html_stat), check.generated_updated_at_ms || 0)
 
                 if mtime_ms(post_stat) > effective_generated_at_ms do
                   MapSet.put(acc, normalized_url_path)
@@ -233,7 +247,18 @@ defmodule BDS.Generation.Validation do
           nil ->
             case Regex.run(~r|^/(\d{4})/(\d{2})/(\d{2})/([^/]+)$|, path) do
               [_, year, month, day, slug] ->
-                update_in(plan.requested_post_routes, &[ %{year: String.to_integer(year), month: String.to_integer(month), day: String.to_integer(day), slug: slug} | &1 ])
+                update_in(
+                  plan.requested_post_routes,
+                  &[
+                    %{
+                      year: String.to_integer(year),
+                      month: String.to_integer(month),
+                      day: String.to_integer(day),
+                      slug: slug
+                    }
+                    | &1
+                  ]
+                )
 
               nil ->
                 case Regex.run(~r|^/(\d{4})/(\d{2})(?:/page/\d+)?$|, path) do
@@ -281,29 +306,43 @@ defmodule BDS.Generation.Validation do
         end)
 
       enriched =
-        Enum.reduce(initial_plan.requested_post_routes, %{initial_plan | requested_post_routes: targeted_post_routes}, fn route, acc ->
-          case Enum.find(published_posts, &post_matches_route?(&1, route)) do
-            nil ->
-              acc
-              |> update_in([:requested_years], &MapSet.put(&1, route.year))
-              |> update_in([:requested_year_months], &MapSet.put(&1, route_month_key(route.year, route.month)))
-              |> Map.put(:request_root_routes, true)
+        Enum.reduce(
+          initial_plan.requested_post_routes,
+          %{initial_plan | requested_post_routes: targeted_post_routes},
+          fn route, acc ->
+            case Enum.find(published_posts, &post_matches_route?(&1, route)) do
+              nil ->
+                acc
+                |> update_in([:requested_years], &MapSet.put(&1, route.year))
+                |> update_in(
+                  [:requested_year_months],
+                  &MapSet.put(&1, route_month_key(route.year, route.month))
+                )
+                |> Map.put(:request_root_routes, true)
 
-            post ->
-              {year, month, _day} = local_date_parts!(post.created_at)
+              post ->
+                {year, month, _day} = local_date_parts!(post.created_at)
 
-              acc
-              |> update_in([:requested_category_slugs], fn set ->
-                Enum.reduce(post.categories || [], set, &MapSet.put(&2, archive_route_segment(&1)))
-              end)
-              |> update_in([:requested_tag_slugs], fn set ->
-                Enum.reduce(post.tags || [], set, &MapSet.put(&2, archive_route_segment(&1)))
-              end)
-              |> update_in([:requested_years], &MapSet.put(&1, year))
-              |> update_in([:requested_year_months], &MapSet.put(&1, route_month_key(year, month)))
-              |> Map.put(:request_root_routes, true)
+                acc
+                |> update_in([:requested_category_slugs], fn set ->
+                  Enum.reduce(
+                    post.categories || [],
+                    set,
+                    &MapSet.put(&2, archive_route_segment(&1))
+                  )
+                end)
+                |> update_in([:requested_tag_slugs], fn set ->
+                  Enum.reduce(post.tags || [], set, &MapSet.put(&2, archive_route_segment(&1)))
+                end)
+                |> update_in([:requested_years], &MapSet.put(&1, year))
+                |> update_in(
+                  [:requested_year_months],
+                  &MapSet.put(&1, route_month_key(year, month))
+                )
+                |> Map.put(:request_root_routes, true)
+            end
           end
-        end)
+        )
 
       language_plans =
         initial_plan.language_plans
@@ -314,8 +353,10 @@ defmodule BDS.Generation.Validation do
 
       %{
         enriched
-        | requested_category_slugs: MapSet.intersection(enriched.requested_category_slugs, available_category_slugs),
-          requested_tag_slugs: MapSet.intersection(enriched.requested_tag_slugs, available_tag_slugs),
+        | requested_category_slugs:
+            MapSet.intersection(enriched.requested_category_slugs, available_category_slugs),
+          requested_tag_slugs:
+            MapSet.intersection(enriched.requested_tag_slugs, available_tag_slugs),
           language_plans: language_plans
       }
     end
@@ -351,13 +392,15 @@ defmodule BDS.Generation.Validation do
           {nil, path}
         end
 
-      _other -> {nil, path}
+      _other ->
+        {nil, path}
     end
   end
 
   @spec targeted_output?(String.t(), map(), String.t() | nil, [String.t()]) :: boolean()
   def targeted_output?(relative_path, targeted_plan, main_language, additional_languages) do
-    {language, stripped_path} = extract_relative_output_language(relative_path, additional_languages)
+    {language, stripped_path} =
+      extract_relative_output_language(relative_path, additional_languages)
 
     plan =
       case language do
@@ -384,7 +427,11 @@ defmodule BDS.Generation.Validation do
     end
   end
 
-  defp targeted_output_for_plan?(_relative_path, %{requires_fallback_section_render: true}, _main?), do: true
+  defp targeted_output_for_plan?(
+         _relative_path,
+         %{requires_fallback_section_render: true},
+         _main?
+       ), do: true
 
   defp targeted_output_for_plan?(relative_path, plan, _main?) do
     cond do
@@ -400,8 +447,18 @@ defmodule BDS.Generation.Validation do
         MapSet.member?(plan.requested_tag_slugs, slug)
 
       Regex.match?(~r|^(\d{4})/(\d{2})/(\d{2})/([^/]+)/index\.html$|, relative_path) ->
-        [_, year, month, day, slug] = Regex.run(~r|^(\d{4})/(\d{2})/(\d{2})/([^/]+)/index\.html$|, relative_path)
-        MapSet.member?(plan.requested_post_routes, route_key(String.to_integer(year), String.to_integer(month), String.to_integer(day), slug))
+        [_, year, month, day, slug] =
+          Regex.run(~r|^(\d{4})/(\d{2})/(\d{2})/([^/]+)/index\.html$|, relative_path)
+
+        MapSet.member?(
+          plan.requested_post_routes,
+          route_key(
+            String.to_integer(year),
+            String.to_integer(month),
+            String.to_integer(day),
+            slug
+          )
+        )
 
       Regex.match?(~r|^(\d{4})/(\d{2})/index\.html$|, relative_path) ->
         [_, year, month] = Regex.run(~r|^(\d{4})/(\d{2})/index\.html$|, relative_path)

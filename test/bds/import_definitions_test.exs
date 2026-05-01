@@ -6,15 +6,22 @@ defmodule BDS.ImportDefinitionsTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
-    temp_dir = Path.join(System.tmp_dir!(), "bds-import-definitions-#{System.unique_integer([:positive])}")
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-import-definitions-#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
-    {:ok, project} = BDS.Projects.create_project(%{name: "Import Definitions", data_path: temp_dir})
+    {:ok, project} =
+      BDS.Projects.create_project(%{name: "Import Definitions", data_path: temp_dir})
+
     %{project: project, temp_dir: temp_dir}
   end
 
-  test "get, update, and delete round-trip import definition editor state", %{project: project, temp_dir: temp_dir} do
+  test "get, update, and delete round-trip import definition editor state", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     uploads_folder_path = Path.join(temp_dir, "uploads")
     wxr_file_path = Path.join(temp_dir, "legacy.xml")
 
@@ -40,15 +47,22 @@ defmodule BDS.ImportDefinitionsTest do
                name: "Renamed Import",
                wxr_file_path: Path.join(temp_dir, "renamed.xml"),
                uploads_folder_path: Path.join(temp_dir, "renamed-uploads"),
-               last_analysis_result: %{site_info: %{title: "Renamed Blog"}, post_stats: %{new_count: 2}}
+               last_analysis_result: %{
+                 site_info: %{title: "Renamed Blog"},
+                 post_stats: %{new_count: 2}
+               }
              })
 
     assert updated.name == "Renamed Import"
     assert updated.wxr_file_path == Path.join(temp_dir, "renamed.xml")
     assert updated.uploads_folder_path == Path.join(temp_dir, "renamed-uploads")
-    assert updated.last_analysis_result == Jason.encode!(%{site_info: %{title: "Renamed Blog"}, post_stats: %{new_count: 2}})
 
-    assert [%{id: listed_id, title: "Renamed Import"}] = ImportDefinitions.list_definitions(project.id)
+    assert updated.last_analysis_result ==
+             Jason.encode!(%{site_info: %{title: "Renamed Blog"}, post_stats: %{new_count: 2}})
+
+    assert [%{id: listed_id, title: "Renamed Import"}] =
+             ImportDefinitions.list_definitions(project.id)
+
     assert listed_id == definition.id
 
     assert {:ok, :deleted} = ImportDefinitions.delete_definition(definition.id)

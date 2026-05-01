@@ -25,8 +25,16 @@ defmodule BDS.Generation.Outputs do
     end)
   end
 
-  @spec build_validation_route_paths(map(), [map()], [map()], map(), String.t() | nil) :: [String.t()]
-  def build_validation_route_paths(plan, route_posts, published_list_posts, post_index, route_language) do
+  @spec build_validation_route_paths(map(), [map()], [map()], map(), String.t() | nil) :: [
+          String.t()
+        ]
+  def build_validation_route_paths(
+        plan,
+        route_posts,
+        published_list_posts,
+        post_index,
+        route_language
+      ) do
     [
       core_route_paths(plan, published_list_posts, route_language),
       page_route_paths(plan, route_posts, route_language),
@@ -250,7 +258,9 @@ defmodule BDS.Generation.Outputs do
     Enum.flat_map(posts_by_tag, fn {tag, posts} ->
       tag_slug = archive_route_segment(tag)
 
-      build_paginated_archive_outputs(plan, languages, ["tag", tag_slug], posts, fn page_posts, language, pagination ->
+      build_paginated_archive_outputs(plan, languages, ["tag", tag_slug], posts, fn page_posts,
+                                                                                    language,
+                                                                                    pagination ->
         render_archive_page(plan, tag, page_posts, language, "tag", pagination)
       end)
     end)
@@ -260,23 +270,31 @@ defmodule BDS.Generation.Outputs do
   def build_date_outputs(plan, post_index, languages) do
     year_outputs =
       Enum.flat_map(post_index.posts_by_year, fn {year, posts} ->
-        build_paginated_archive_outputs(plan, languages, [Integer.to_string(year)], posts, fn page_posts, language, pagination ->
-          render_date_archive_page(
-            plan,
-            Integer.to_string(year),
-            %{kind: "year", year: year},
-            page_posts,
-            language,
-            pagination
-          )
-        end)
+        build_paginated_archive_outputs(
+          plan,
+          languages,
+          [Integer.to_string(year)],
+          posts,
+          fn page_posts, language, pagination ->
+            render_date_archive_page(
+              plan,
+              Integer.to_string(year),
+              %{kind: "year", year: year},
+              page_posts,
+              language,
+              pagination
+            )
+          end
+        )
       end)
 
     month_outputs =
       Enum.flat_map(post_index.posts_by_year_month, fn {year_month, posts} ->
         [year, month] = String.split(year_month, "/", parts: 2)
 
-        build_paginated_archive_outputs(plan, languages, [year, month], posts, fn page_posts, language, pagination ->
+        build_paginated_archive_outputs(plan, languages, [year, month], posts, fn page_posts,
+                                                                                  language,
+                                                                                  pagination ->
           render_date_archive_page(
             plan,
             "#{year}-#{month}",
@@ -292,11 +310,18 @@ defmodule BDS.Generation.Outputs do
       Enum.flat_map(post_index.posts_by_year_month_day, fn {year_month_day, posts} ->
         [year, month, day] = String.split(year_month_day, "/", parts: 3)
 
-        build_paginated_archive_outputs(plan, languages, [year, month, day], posts, fn page_posts, language, pagination ->
+        build_paginated_archive_outputs(plan, languages, [year, month, day], posts, fn page_posts,
+                                                                                       language,
+                                                                                       pagination ->
           render_date_archive_page(
             plan,
             "#{year}-#{month}-#{day}",
-            %{kind: "day", year: String.to_integer(year), month: String.to_integer(month), day: String.to_integer(day)},
+            %{
+              kind: "day",
+              year: String.to_integer(year),
+              month: String.to_integer(month),
+              day: String.to_integer(day)
+            },
             page_posts,
             language,
             pagination
@@ -323,19 +348,32 @@ defmodule BDS.Generation.Outputs do
       Enum.flat_map(additional_languages, fn localized_language ->
         localized_prefix = route_language(plan.language, localized_language)
         localized_source_posts = Map.get(localized_posts_by_language, localized_language, [])
-        localized_posts = build_list_posts(plan.base_url, localized_source_posts, localized_prefix)
+
+        localized_posts =
+          build_list_posts(plan.base_url, localized_source_posts, localized_prefix)
 
         build_root_outputs(plan, localized_language, localized_posts) ++
           [
-            {Path.join(localized_language, "404.html"), render_not_found_output(plan, localized_language)},
-            {Path.join(localized_language, "feed.xml"), render_feed(plan, localized_language, localized_source_posts)},
-            {Path.join(localized_language, "atom.xml"), render_atom(plan, localized_language, localized_source_posts)}
+            {Path.join(localized_language, "404.html"),
+             render_not_found_output(plan, localized_language)},
+            {Path.join(localized_language, "feed.xml"),
+             render_feed(plan, localized_language, localized_source_posts)},
+            {Path.join(localized_language, "atom.xml"),
+             render_atom(plan, localized_language, localized_source_posts)}
           ]
       end)
   end
 
-  @spec build_page_outputs(String.t(), String.t(), [map()], map(), map()) :: [{String.t(), iodata()}]
-  def build_page_outputs(project_id, main_language, published_posts, translations_by_post_language, localized_posts_by_language) do
+  @spec build_page_outputs(String.t(), String.t(), [map()], map(), map()) :: [
+          {String.t(), iodata()}
+        ]
+  def build_page_outputs(
+        project_id,
+        main_language,
+        published_posts,
+        translations_by_post_language,
+        localized_posts_by_language
+      ) do
     page_outputs =
       published_posts
       |> Enum.filter(&("page" in (&1.categories || [])))
@@ -355,7 +393,14 @@ defmodule BDS.Generation.Outputs do
              language: canonical_variant.language,
              excerpt: canonical_variant.excerpt
            },
-           fn -> render_post_page(canonical_variant.title, body, post.slug, canonical_variant.language) end
+           fn ->
+             render_post_page(
+               canonical_variant.title,
+               body,
+               post.slug,
+               canonical_variant.language
+             )
+           end
          )}
       end)
 
@@ -404,13 +449,22 @@ defmodule BDS.Generation.Outputs do
          plan.project_name,
          page_posts,
          %{kind: "core"},
-         pagination_for_page(page_number, total_pages, length(posts), plan.max_posts_per_page, route_language, []),
+         pagination_for_page(
+           page_number,
+           total_pages,
+           length(posts),
+           plan.max_posts_per_page,
+           route_language,
+           []
+         ),
          fn -> render_home(plan, language) end
        )}
     end)
   end
 
-  @spec build_paginated_archive_outputs(map(), [String.t()], [String.t()], [map()], (... -> iodata())) :: [{String.t(), iodata()}]
+  @spec build_paginated_archive_outputs(map(), [String.t()], [String.t()], [map()], (... ->
+                                                                                       iodata())) ::
+          [{String.t(), iodata()}]
   def build_paginated_archive_outputs(plan, languages, segments, posts, render_fun) do
     total_pages = page_count(length(posts), plan.max_posts_per_page)
 
@@ -425,13 +479,22 @@ defmodule BDS.Generation.Outputs do
          render_fun.(
            page_posts,
            language,
-           pagination_for_page(page_number, total_pages, length(posts), plan.max_posts_per_page, route_language, segments)
+           pagination_for_page(
+             page_number,
+             total_pages,
+             length(posts),
+             plan.max_posts_per_page,
+             route_language,
+             segments
+           )
          )}
       end)
     end)
   end
 
-  @spec build_single_outputs(String.t(), String.t(), [map()], map(), map()) :: [{String.t(), iodata()}]
+  @spec build_single_outputs(String.t(), String.t(), [map()], map(), map()) :: [
+          {String.t(), iodata()}
+        ]
   def build_single_outputs(
         project_id,
         main_language,
@@ -457,7 +520,12 @@ defmodule BDS.Generation.Outputs do
              excerpt: canonical_variant.excerpt
            },
            fn ->
-             render_post_page(canonical_variant.title, body, post.slug, canonical_variant.language)
+             render_post_page(
+               canonical_variant.title,
+               body,
+               post.slug,
+               canonical_variant.language
+             )
            end
          )}
       end)

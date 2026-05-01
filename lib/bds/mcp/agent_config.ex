@@ -30,7 +30,9 @@ defmodule BDS.MCP.AgentConfig do
   end
 
   def config_path(:claude_code, home_dir), do: Path.join(home_dir, ".claude.json")
-  def config_path(:github_copilot, home_dir), do: Path.join([home_dir, "Library", "Application Support", "Code", "User", "mcp.json"])
+
+  def config_path(:github_copilot, home_dir),
+    do: Path.join([home_dir, "Library", "Application Support", "Code", "User", "mcp.json"])
 
   def packaged_executable_path(install_root, platform) when is_binary(install_root) do
     executable_name =
@@ -90,12 +92,21 @@ defmodule BDS.MCP.AgentConfig do
   defp merge_config(:github_copilot, config, command, args) do
     servers = Map.get(config, "servers", %{})
 
-    Map.put(config, "servers", Map.put(servers, @server_name, %{"type" => "stdio", "command" => command, "args" => args}))
+    Map.put(
+      config,
+      "servers",
+      Map.put(servers, @server_name, %{"type" => "stdio", "command" => command, "args" => args})
+    )
   end
 
   defp merge_config(:claude_code, config, command, args) do
     servers = Map.get(config, "mcpServers", %{})
-    Map.put(config, "mcpServers", Map.put(servers, @server_name, %{"command" => command, "args" => args}))
+
+    Map.put(
+      config,
+      "mcpServers",
+      Map.put(servers, @server_name, %{"command" => command, "args" => args})
+    )
   end
 
   defp remove_server_entry(:github_copilot, config) do

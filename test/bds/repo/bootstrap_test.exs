@@ -21,7 +21,8 @@ defmodule BDS.Repo.BootstrapTest do
   end
 
   test "ensure_schema creates persistence tables in a blank sqlite database" do
-    temp_db = Path.join(System.tmp_dir!(), "bds-bootstrap-#{System.unique_integer([:positive])}.db")
+    temp_db =
+      Path.join(System.tmp_dir!(), "bds-bootstrap-#{System.unique_integer([:positive])}.db")
 
     Application.put_env(:bds, TempRepo,
       database: temp_db,
@@ -39,7 +40,11 @@ defmodule BDS.Repo.BootstrapTest do
     assert :ok = BDS.RepoBootstrap.ensure_schema(repo: TempRepo)
 
     tables =
-      Ecto.Adapters.SQL.query!(TempRepo, "SELECT name FROM sqlite_master WHERE type = 'table'", []).rows
+      Ecto.Adapters.SQL.query!(
+        TempRepo,
+        "SELECT name FROM sqlite_master WHERE type = 'table'",
+        []
+      ).rows
       |> Enum.map(&hd/1)
 
     assert "projects" in tables
@@ -52,7 +57,8 @@ defmodule BDS.Repo.BootstrapTest do
 
     assert :ok = BDS.RepoBootstrap.ensure_ready(migrate?: false)
 
-    assert %Project{id: "default", name: "My Blog", is_active: true} = BDS.Projects.get_active_project()
+    assert %Project{id: "default", name: "My Blog", is_active: true} =
+             BDS.Projects.get_active_project()
   end
 
   test "dev repo config disables query logging by default" do

@@ -107,7 +107,7 @@ _None._ All modules previously on the queue have been split; refresh the queue i
 
 ## 10. Missing `@spec`
 
-**Status:** ✅ done for core contexts (2026-04-30). Open for LiveView editor modules and the smaller contexts (`Tags`, `Templates`, `Scripts`, `PostLinks`).
+**Status:** ✅ done (2026-05-01). Core contexts, LiveView editor modules, and the smaller contexts (`Tags`, `Templates`, `Scripts`, `PostLinks`) now have public `@spec` coverage. `BDS.SpecCoverageTest` scans the Section 10 module set and fails when a public function/arity lacks a matching spec.
 
 **Convention reminder:** Ecto schemas need explicit `@type t`; use `term()` for associations; use `@typedoc` + named types for repeated map shapes; for attrs maps use `%{optional(atom()) => term(), optional(String.t()) => term()}`.
 
@@ -154,6 +154,8 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ## Changelog
 
 ### 2026-05-01
+
+- **Missing `@spec`**: closed Section 10 by adding public specs to the remaining smaller contexts (`BDS.Tags`, `BDS.Templates`, `BDS.Scripts`, `BDS.PostLinks`) and LiveView editor modules under `BDS.Desktop.ShellLive.*Editor`. Added `BDS.Tags.Tag.t/0` to match the existing schema typing convention and introduced `BDS.SpecCoverageTest`, which scans the Section 10 module set for public function/arity entries without matching specs.
 
 - **`BDS.Tasks` memory growth**: added configurable TTL eviction for terminal tasks in the `BDS.Tasks` GenServer (`:finished_task_ttl_ms`, default 1 h). Finished tasks are pruned by delayed GenServer cleanup and on task read calls; active tasks are preserved. Added regression coverage that completes a task with a tiny TTL and verifies it disappears without `clear_finished/0` while a running task remains. Section 13 is closed.
 

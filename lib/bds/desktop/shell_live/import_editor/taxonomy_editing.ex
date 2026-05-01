@@ -4,6 +4,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
   alias BDS.{AI, ImportDefinitions, Metadata, Tags}
   alias BDS.Desktop.ShellData
 
+  @spec start_taxonomy_edit(term(), term(), term()) :: term()
   def start_taxonomy_edit(
         socket,
         %{"type" => type, "name" => name, "mapped_to" => mapped_to},
@@ -25,6 +26,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     end
   end
 
+  @spec cancel_taxonomy_edit(term(), term()) :: term()
   def cancel_taxonomy_edit(socket, reload) do
     with %{id: definition_id} <- socket.assigns.current_tab do
       socket
@@ -38,6 +40,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     end
   end
 
+  @spec save_taxonomy_edit(term(), term(), term()) :: term()
   def save_taxonomy_edit(
         socket,
         %{"type" => type, "name" => name, "mapped_to" => mapped_to},
@@ -68,10 +71,12 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     end
   end
 
+  @spec clear_taxonomy_mapping(term(), term(), term()) :: term()
   def clear_taxonomy_mapping(socket, %{"type" => type, "name" => name}, reload) do
     save_taxonomy_edit(socket, %{"type" => type, "name" => name, "mapped_to" => ""}, reload)
   end
 
+  @spec analyze_taxonomy_ai(term(), term(), term()) :: term()
   def analyze_taxonomy_ai(socket, reload, append_output) do
     with %{id: definition_id} <- socket.assigns.current_tab,
          %{} = definition <- ImportDefinitions.get_definition(definition_id),
@@ -142,6 +147,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     end
   end
 
+  @spec update_taxonomy_mapping(term(), term(), term(), term()) :: term()
   def update_taxonomy_mapping(report, type, name, mapped_to) do
     bucket_key = if(type == "categories", do: :categories, else: :tags)
     normalized_value = mapped_to |> to_string() |> String.trim() |> blank_to_nil()
@@ -164,6 +170,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     )
   end
 
+  @spec rebuild_taxonomy_stats(term()) :: term()
   def rebuild_taxonomy_stats(items) do
     %{
       existing_count: Enum.count(items, & &1.exists_in_project),
@@ -172,9 +179,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     }
   end
 
+  @spec stat_key(term()) :: term()
   def stat_key(:categories), do: :category_stats
   def stat_key(:tags), do: :tag_stats
 
+  @spec apply_taxonomy_mappings(term(), term()) :: term()
   def apply_taxonomy_mappings(report, analysis) do
     report
     |> update_in(
@@ -198,6 +207,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     end)
   end
 
+  @spec apply_taxonomy_mapping_bucket(term(), term()) :: term()
   def apply_taxonomy_mapping_bucket(items, mappings) do
     Enum.map(items || [], fn item ->
       case Map.fetch(mappings, item.name) do
@@ -207,6 +217,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     end)
   end
 
+  @spec existing_taxonomy_terms(term()) :: term()
   def existing_taxonomy_terms(project_id) do
     {:ok, metadata} = Metadata.get_project_metadata(project_id)
 
@@ -216,6 +227,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     }
   end
 
+  @spec normalize_taxonomy_mapping_value(term(), term(), term()) :: term()
   def normalize_taxonomy_mapping_value(project_id, type, mapped_to) do
     normalized_value = mapped_to |> to_string() |> String.trim() |> blank_to_nil()
 
@@ -231,6 +243,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     end
   end
 
+  @spec auto_mapped_count(term(), term()) :: term()
   def auto_mapped_count(previous_report, next_report) do
     previous_count =
       (Map.get(previous_report.items, :categories, []) ++
@@ -244,6 +257,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     max(next_count - previous_count, 0)
   end
 
+  @spec taxonomy_pill_class(term()) :: term()
   def taxonomy_pill_class(item) do
     cond do
       item.exists_in_project -> "import-taxonomy-pill exists"
@@ -252,9 +266,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     end
   end
 
+  @spec taxonomy_item_editing?(term(), term(), term()) :: term()
   def taxonomy_item_editing?(%{type: type, name: name}, type, name), do: true
   def taxonomy_item_editing?(_edit, _type, _name), do: false
 
+  @spec taxonomy_mapping_tooltip(term()) :: term()
   def taxonomy_mapping_tooltip(item) do
     action =
       if present?(item.mapped_to),
@@ -264,6 +280,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     translated("importAnalysis.mappingTooltip", %{action: action})
   end
 
+  @spec maybe_put_option(term(), term(), term()) :: term()
   def maybe_put_option(opts, _key, nil), do: opts
   def maybe_put_option(opts, key, value), do: Keyword.put(opts, key, value)
 

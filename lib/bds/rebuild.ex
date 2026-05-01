@@ -7,7 +7,11 @@ defmodule BDS.Rebuild do
     timeout = Keyword.get(opts, :timeout, :infinity)
 
     items
-    |> Task.async_stream(mapper, max_concurrency: max_concurrency, ordered: ordered, timeout: timeout)
+    |> Task.async_stream(mapper,
+      max_concurrency: max_concurrency,
+      ordered: ordered,
+      timeout: timeout
+    )
     |> Enum.map(fn
       {:ok, item} -> item
       {:exit, reason} -> exit(reason)

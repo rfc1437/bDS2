@@ -168,14 +168,16 @@ defmodule BDS.Desktop.Overlay do
   def close_lightbox(%{kind: :gallery} = overlay), do: %{overlay | lightbox: nil}
   def close_lightbox(overlay), do: overlay
 
-  def lightbox_next(%{kind: :gallery, lightbox: lightbox, images: images} = overlay) when is_map(lightbox) and images != [] do
+  def lightbox_next(%{kind: :gallery, lightbox: lightbox, images: images} = overlay)
+      when is_map(lightbox) and images != [] do
     next_index = rem(lightbox.current_index + 1, length(images))
     %{overlay | lightbox: lightbox_from_index(images, next_index)}
   end
 
   def lightbox_next(overlay), do: overlay
 
-  def lightbox_previous(%{kind: :gallery, lightbox: lightbox, images: images} = overlay) when is_map(lightbox) and images != [] do
+  def lightbox_previous(%{kind: :gallery, lightbox: lightbox, images: images} = overlay)
+      when is_map(lightbox) and images != [] do
     next_index = rem(lightbox.current_index - 1 + length(images), length(images))
     %{overlay | lightbox: lightbox_from_index(images, next_index)}
   end
