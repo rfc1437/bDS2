@@ -65,11 +65,11 @@ _None._ All modules previously on the queue have been split; refresh the queue i
 
 ## 5. Bang File Operations in Long-Running Code
 
-**Status:** open (limited scope).
+**Status:** ✅ done (2026-05-10). Scoped `File.read!` / `File.write!` sites reachable from rebuild workers and LiveView events have been replaced with `{:ok, _} | {:error, _}` propagation.
 
-**Scope:** only `File.read!`/`File.write!` reachable from a GenServer worker, scheduled task, or LiveView event matter. Mandatory-config reads at boot are fine.
+**Scope audited:** `BDS.Posts.RebuildFromFiles`, `BDS.Media`, `BDS.MCP`, `BDS.Generation`, and the MCP settings UI config probe. Mandatory-config reads at boot remain out of scope.
 
-**Plan:** sweep `BDS.Posts.RebuildFromFiles`, `BDS.Media`, `BDS.MCP`, `BDS.Generation`. Replace bang variants with `{:ok, _} | {:error, _}` propagation only on those paths.
+**Rule:** long-running rebuild/sync/import paths and LiveView event-triggered config writes must not crash on expected filesystem read/write failures; return tagged errors instead.
 
 ---
 
@@ -170,6 +170,9 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ## Changelog
 
 ### 2026-05-10
+
+- **Bang file operations in long-running code**: `BDS.Media.Sidecars.parse_canonical_sidecar/2` and `parse_translation_sidecar/1` now use `File.read/1` and return `{:ok, sidecar}` or `{:error, {:read_sidecar, path, reason}}` instead of raising. Media rebuild collects parsed sidecars and returns the first sidecar read error before mutating rows; media sync/import sidecar entrypoints propagate the same errors. Added regression coverage for an unreadable `.meta` sidecar directory preserving the worker instead of crashing it.
+- **Bang file operations in long-running code**: `BDS.Posts.RebuildFromFiles.parse_rebuild_file/2` now uses `File.read/1` and returns `{:ok, rebuild_file}` or `{:error, {:read_rebuild_file, path, reason}}`; post rebuild/import/sync-from-file callers propagate the tagged error. `BDS.Generation.apply_validation/2` now hashes existing generated files with `File.read/1` and returns `{:error, {:read_generated_file, path, reason}}` on read failures. `BDS.MCP.AgentConfig` now uses `File.mkdir_p/1`, `File.read/1`, `Jason.decode/1`, and `File.write/2`, returning tagged config read/write/create/decode errors instead of raising; the settings editor reports those errors through its existing output surface and its config probe no longer uses bang reads. Added regressions for unreadable post files, unreadable generated files, unreadable MCP config, and unwritable MCP config. Section 5 is closed.
 
 - **Side effects in transactions**: `BDS.Metadata.update_project_metadata/2`, `sync_project_metadata_from_filesystem/1`, and the shared category/publishing `update_state` path now keep only project/settings row changes inside `Repo.transaction/1`. Metadata JSON files are flushed after commit and `Persistence.atomic_write/2` now returns `{:error, reason}` for directory-creation failures instead of raising. Added regression coverage for a failed metadata filesystem flush preserving the committed project/settings changes.
 - **Side effects in transactions**: `BDS.Tags.sync_tags_from_posts/1`, `delete_tag/1`, `rename_tag/2`, and `merge_tags/2` now commit tag/post-tag DB changes before published-post rewrites and `meta/tags.json` flushes. `BDS.Projects.ensure_default_project/0` and `create_project/1` now commit the project row before rebuilding templates from filesystem files. Added regressions for failed tag JSON flushes and failed template rebuilds preserving committed DB changes. Finished the explicit `Repo.transaction/1` audit: remaining transactions are DB-only or already defer filesystem cleanup until after commit; `BDS.Posts`, `BDS.Publishing`, and `BDS.Generation` have no explicit transaction sites.

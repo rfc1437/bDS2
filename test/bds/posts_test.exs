@@ -458,6 +458,17 @@ defmodule BDS.PostsTest do
     assert post.published_at == 1_036_497_600_000
   end
 
+  test "rebuild_posts_from_files returns an error for unreadable post files", %{project: project} do
+    posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2026", "04"])
+    File.mkdir_p!(posts_dir)
+
+    file_path = Path.join(posts_dir, "unreadable.md")
+    File.mkdir_p!(file_path)
+
+    assert {:error, {:read_rebuild_file, ^file_path, :eisdir}} =
+             BDS.Posts.rebuild_posts_from_files(project.id)
+  end
+
   test "rebuild_posts_from_files parses folded multiline title and slug scalars alongside translations" do
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-post-rebuild-folded-#{System.unique_integer([:positive])}")

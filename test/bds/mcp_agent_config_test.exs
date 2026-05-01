@@ -99,6 +99,28 @@ defmodule BDS.MCPAgentConfigTest do
     assert written["mcpServers"]["other"] == %{"command" => "python", "args" => ["server.py"]}
   end
 
+  test "add_to_config returns an error for unreadable existing config", %{home_dir: home_dir} do
+    config_path = Path.join(home_dir, ".claude.json")
+    File.mkdir_p!(config_path)
+
+    assert {:error, {:read_config, ^config_path, :eisdir}} =
+             AgentConfig.add_to_config(:claude_code,
+               home_dir: home_dir,
+               install_root: Path.join(home_dir, "dist"),
+               platform: :linux
+             )
+  end
+
+  test "remove_from_config returns an error for unwritable config path", %{home_dir: home_dir} do
+    config_path = Path.join(home_dir, ".claude.json")
+
+    File.chmod!(home_dir, 0o555)
+    on_exit(fn -> File.chmod!(home_dir, 0o755) end)
+
+    assert {:error, {:write_config, ^config_path, :eacces}} =
+             AgentConfig.remove_from_config(:claude_code, home_dir: home_dir)
+  end
+
   test "packaged executable path resolves inside the distributable payload" do
     assert AgentConfig.packaged_executable_path("/Applications/bDS2.app/Contents/Resources", :macos) ==
              "/Applications/bDS2.app/Contents/Resources/mcp/bin/bds-mcp"

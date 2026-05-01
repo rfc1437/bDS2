@@ -910,6 +910,20 @@ defmodule BDS.GenerationTest do
     assert clean_report.updated_post_url_paths == []
   end
 
+  test "apply_validation returns an error for unreadable generated files", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    unreadable_path = Path.join([temp_dir, "html", "obsolete", "index.html"])
+    File.mkdir_p!(Path.dirname(unreadable_path))
+    File.write!(unreadable_path, "<html>obsolete</html>")
+    File.chmod!(unreadable_path, 0o000)
+    on_exit(fn -> File.chmod!(unreadable_path, 0o644) end)
+
+    assert {:error, {:read_generated_file, ^unreadable_path, :eacces}} =
+             BDS.Generation.apply_validation(project.id, [:core])
+  end
+
   test "validate_site regenerates sitemap and reports missing, extra, and updated post url paths",
        %{project: project, temp_dir: temp_dir} do
     assert {:ok, _metadata} =

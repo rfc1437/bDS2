@@ -117,9 +117,8 @@ defmodule BDS.Posts.Translations do
         project = Projects.get_project!(translation.project_id)
         full_path = Path.join(Projects.project_data_dir(project), translation.file_path)
 
-        if File.exists?(full_path) do
-          rebuild_file = RebuildFromFiles.parse_rebuild_file(project, full_path)
-
+        with true <- File.exists?(full_path),
+             {:ok, rebuild_file} <- RebuildFromFiles.parse_rebuild_file(project, full_path) do
           {:ok,
            RebuildFromFiles.upsert_post_translation_from_rebuild_file(
              translation.project_id,
@@ -127,7 +126,8 @@ defmodule BDS.Posts.Translations do
              sync_search: true
            )}
         else
-          {:error, :not_found}
+          false -> {:error, :not_found}
+          {:error, reason} -> {:error, reason}
         end
     end
   end

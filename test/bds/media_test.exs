@@ -325,6 +325,23 @@ defmodule BDS.MediaTest do
     end)
   end
 
+  test "rebuild_media_from_files returns an error for unreadable sidecars", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    media_dir = Path.join([temp_dir, "media", "2026", "04"])
+    File.mkdir_p!(media_dir)
+
+    binary_path = Path.join(media_dir, "asset.jpg")
+    sidecar_path = binary_path <> ".meta"
+
+    File.write!(binary_path, tiny_jpeg_binary())
+    File.mkdir_p!(sidecar_path)
+
+    assert {:error, {:read_sidecar, ^sidecar_path, :eisdir}} =
+             BDS.Media.rebuild_media_from_files(project.id)
+  end
+
   test "import_media generates the four thumbnail files in bucketed thumbnail paths", %{
     project: project,
     temp_dir: temp_dir

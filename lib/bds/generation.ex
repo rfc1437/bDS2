@@ -155,10 +155,10 @@ defmodule BDS.Generation do
 
   @spec apply_validation(String.t(), [section()] | map()) :: {:ok, map()} | {:error, term()}
   def apply_validation(project_id, sections) when is_binary(project_id) and is_list(sections) do
-    with {:ok, plan} <- plan_generation(project_id, sections) do
+        with {:ok, plan} <- plan_generation(project_id, sections),
+          {:ok, actual_files} <- disk_generated_files(project_id) do
       expected_outputs = build_outputs(plan)
       expected_paths = MapSet.new(Enum.map(expected_outputs, &elem(&1, 0)))
-      actual_files = disk_generated_files(project_id)
       project = Projects.get_project!(project_id)
       now = Persistence.now_ms()
 
@@ -186,24 +186,26 @@ defmodule BDS.Generation do
         end
       end)
 
-      disk_generated_files(project_id)
-      |> Map.keys()
-      |> Enum.filter(fn relative_path ->
-        path_section(relative_path) in plan.sections and not MapSet.member?(expected_paths, relative_path)
-      end)
-      |> Enum.each(fn relative_path ->
-        _ = File.rm(output_path(project, relative_path))
+      with {:ok, generated_files_on_disk} <- disk_generated_files(project_id) do
+        generated_files_on_disk
+        |> Map.keys()
+        |> Enum.filter(fn relative_path ->
+          path_section(relative_path) in plan.sections and not MapSet.member?(expected_paths, relative_path)
+        end)
+        |> Enum.each(fn relative_path ->
+          _ = File.rm(output_path(project, relative_path))
 
-        Repo.delete_all(
-          from generated_file in GeneratedFileHash,
-            where:
-              generated_file.project_id == ^project_id and
-                generated_file.relative_path == ^relative_path
-        )
-      end)
+          Repo.delete_all(
+            from generated_file in GeneratedFileHash,
+              where:
+                generated_file.project_id == ^project_id and
+                  generated_file.relative_path == ^relative_path
+          )
+        end)
 
-      {:ok, generated_files} = list_generated_files(project_id)
-      {:ok, %{sections: plan.sections, generated_files: generated_files}}
+        {:ok, generated_files} = list_generated_files(project_id)
+        {:ok, %{sections: plan.sections, generated_files: generated_files}}
+      end
     end
   end
 
@@ -521,18 +523,20 @@ defmodule BDS.Generation do
         |> Path.join("**/*")
         |> Path.wildcard(match_dot: false)
         |> Enum.filter(&File.regular?/1)
-        |> Enum.map(fn path ->
+        |> Enum.reduce_while({:ok, %{}}, fn path, {:ok, files} ->
           relative_path = Path.relative_to(path, html_root)
 
-          {relative_path,
-           path
-           |> File.read!()
-           |> sha256()}
+          case File.read(path) do
+            {:ok, contents} ->
+              {:cont, {:ok, Map.put(files, relative_path, sha256(contents))}}
+
+            {:error, reason} ->
+              {:halt, {:error, {:read_generated_file, path, reason}}}
+          end
         end)
-        |> Map.new()
 
       {:error, :enoent} ->
-        %{}
+        {:ok, %{}}
     end
   end
 

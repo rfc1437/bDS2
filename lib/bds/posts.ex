@@ -193,7 +193,7 @@ defmodule BDS.Posts do
     end
   end
 
-  @spec rebuild_posts_from_files(String.t(), rebuild_opts()) :: {:ok, [Post.t()]}
+  @spec rebuild_posts_from_files(String.t(), rebuild_opts()) :: {:ok, [Post.t()]} | {:error, term()}
   defdelegate rebuild_posts_from_files(project_id, opts \\ []), to: RebuildFromFiles
 
   @spec discard_post_changes(String.t()) ::
@@ -211,9 +211,12 @@ defmodule BDS.Posts do
         full_path = Path.join(Projects.project_data_dir(project), post.file_path)
 
         if File.exists?(full_path) do
-          restored_post = RebuildFromFiles.upsert_post_from_file(post.project_id, project, full_path)
-          :ok = PostLinks.sync_post_links(restored_post)
-          {:ok, restored_post}
+            with {:ok, restored_post} <- RebuildFromFiles.upsert_post_from_file(post.project_id, project, full_path) do
+              :ok = PostLinks.sync_post_links(restored_post)
+              {:ok, restored_post}
+            else
+              {:error, reason} -> {:error, reason}
+            end
         else
           {:error, :not_found}
         end
@@ -259,9 +262,12 @@ defmodule BDS.Posts do
         full_path = Path.join(Projects.project_data_dir(project), post.file_path)
 
         if File.exists?(full_path) do
-          repaired_post = RebuildFromFiles.upsert_post_from_file(post.project_id, project, full_path)
-          :ok = PostLinks.sync_post_links(repaired_post)
-          {:ok, repaired_post}
+            with {:ok, repaired_post} <- RebuildFromFiles.upsert_post_from_file(post.project_id, project, full_path) do
+              :ok = PostLinks.sync_post_links(repaired_post)
+              {:ok, repaired_post}
+            else
+              {:error, reason} -> {:error, reason}
+            end
         else
           {:error, :not_found}
         end

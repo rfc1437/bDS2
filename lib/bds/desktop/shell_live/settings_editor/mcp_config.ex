@@ -31,13 +31,22 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
   def toggle_mcp_agent(socket, agent, reload, append_output) do
     case find_mcp_agent(agent) do
       %{id: agent_id, supported?: true} = config ->
-        if mcp_configured?(config) do
-          {:ok, _payload} = AgentConfig.remove_from_config(agent_id)
-          reload.(socket, socket.assigns.workbench)
-        else
-          install_root = Application.app_dir(:bds)
-          {:ok, _payload} = AgentConfig.add_to_config(agent_id, install_root: install_root)
-          reload.(socket, socket.assigns.workbench)
+        result =
+          if mcp_configured?(config) do
+            AgentConfig.remove_from_config(agent_id)
+          else
+            install_root = Application.app_dir(:bds)
+            AgentConfig.add_to_config(agent_id, install_root: install_root)
+          end
+
+        case result do
+          {:ok, _payload} ->
+            reload.(socket, socket.assigns.workbench)
+
+          {:error, reason} ->
+            socket
+            |> append_output.(translated("MCP"), format_config_error(reason), nil, "error")
+            |> reload.(socket.assigns.workbench)
         end
 
       _other ->
@@ -63,21 +72,34 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
     _error -> nil
   end
 
+  defp format_config_error({:read_config, path, reason}) do
+    translated("Could not read MCP config %{path}: %{reason}", path: path, reason: inspect(reason))
+  end
+
+  defp format_config_error({:write_config, path, reason}) do
+    translated("Could not write MCP config %{path}: %{reason}", path: path, reason: inspect(reason))
+  end
+
+  defp format_config_error({:create_config_dir, path, reason}) do
+    translated("Could not create MCP config folder %{path}: %{reason}", path: path, reason: inspect(reason))
+  end
+
+  defp format_config_error({:decode_config, path, _reason}) do
+    translated("Could not parse MCP config %{path}", path: path)
+  end
+
   defp mcp_configured?(%{supported?: false}), do: false
 
   defp mcp_configured?(%{id: agent_id}) do
     path = AgentConfig.config_path(agent_id, System.user_home!())
 
-    if File.exists?(path) do
-      path
-      |> File.read!()
-      |> Jason.decode!()
-      |> mcp_server_present?(agent_id)
+    with true <- File.exists?(path),
+         {:ok, contents} <- File.read(path),
+         {:ok, config} <- Jason.decode(contents) do
+      mcp_server_present?(config, agent_id)
     else
-      false
+      _other -> false
     end
-  rescue
-    _error -> false
   end
 
   defp mcp_config_path(%{supported?: false}), do: nil

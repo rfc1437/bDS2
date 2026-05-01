@@ -67,28 +67,35 @@ defmodule BDS.Media.Sidecars do
     )
   end
 
-  @spec parse_canonical_sidecar(BDS.Projects.Project.t(), Path.t()) :: map()
+  @spec parse_canonical_sidecar(BDS.Projects.Project.t(), Path.t()) ::
+          {:ok, map()} | {:error, {:read_sidecar, Path.t(), File.posix()}}
   def parse_canonical_sidecar(project, sidecar_path) do
-    {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
-    relative_sidecar_path = Path.relative_to(sidecar_path, Projects.project_data_dir(project))
-    relative_file_path = String.trim_trailing(relative_sidecar_path, ".meta")
+    with {:ok, contents} <- read_sidecar(sidecar_path),
+         {:ok, fields} <- Sidecar.parse_document(contents) do
+      relative_sidecar_path = Path.relative_to(sidecar_path, Projects.project_data_dir(project))
+      relative_file_path = String.trim_trailing(relative_sidecar_path, ".meta")
 
-    %{
-      fields: fields,
-      relative_sidecar_path: relative_sidecar_path,
-      relative_file_path: relative_file_path,
-      filename: Path.basename(relative_file_path)
-    }
+      {:ok,
+       %{
+         fields: fields,
+         relative_sidecar_path: relative_sidecar_path,
+         relative_file_path: relative_file_path,
+         filename: Path.basename(relative_file_path)
+       }}
+    end
   end
 
-  @spec parse_translation_sidecar(Path.t()) :: map()
+  @spec parse_translation_sidecar(Path.t()) ::
+          {:ok, map()} | {:error, {:read_sidecar, Path.t(), File.posix()}}
   def parse_translation_sidecar(sidecar_path) do
-    {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
-
-    %{
-      fields: fields,
-      binary_path: binary_path_for_translation_sidecar(sidecar_path)
-    }
+    with {:ok, contents} <- read_sidecar(sidecar_path),
+         {:ok, fields} <- Sidecar.parse_document(contents) do
+      {:ok,
+       %{
+         fields: fields,
+         binary_path: binary_path_for_translation_sidecar(sidecar_path)
+       }}
+    end
   end
 
   @spec upsert_media_from_sidecar(BDS.Projects.Project.t(), map(), keyword()) :: Media.t()
@@ -192,10 +199,12 @@ defmodule BDS.Media.Sidecars do
         project = Projects.get_project!(media.project_id)
         sidecar_path = Path.join(Projects.project_data_dir(project), media.sidecar_path)
 
-        if File.exists?(sidecar_path) do
-          {:ok, upsert_media_from_sidecar(project, parse_canonical_sidecar(project, sidecar_path), sync_search: true)}
-        else
-          {:error, :not_found}
+        case parse_existing_canonical_sidecar(project, sidecar_path) do
+          {:ok, sidecar} ->
+            {:ok, upsert_media_from_sidecar(project, sidecar, sync_search: true)}
+
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
@@ -232,23 +241,23 @@ defmodule BDS.Media.Sidecars do
             translation_sidecar_path(media, translation.language)
           )
 
-        if File.exists?(sidecar_path) do
-          sidecar = parse_translation_sidecar(sidecar_path)
+        case parse_existing_translation_sidecar(sidecar_path) do
+          {:ok, sidecar} ->
+            case BDS.Media.upsert_media_translation(
+                   media.id,
+                   DocumentFields.fetch!(sidecar.fields, "language"),
+                   %{
+                     title: DocumentFields.get(sidecar.fields, "title"),
+                     alt: DocumentFields.get(sidecar.fields, "alt"),
+                     caption: DocumentFields.get(sidecar.fields, "caption")
+                   }
+                 ) do
+              {:ok, updated_translation} -> {:ok, updated_translation}
+              error -> error
+            end
 
-          case BDS.Media.upsert_media_translation(
-                 media.id,
-                 DocumentFields.fetch!(sidecar.fields, "language"),
-                 %{
-                   title: DocumentFields.get(sidecar.fields, "title"),
-                   alt: DocumentFields.get(sidecar.fields, "alt"),
-                   caption: DocumentFields.get(sidecar.fields, "caption")
-                 }
-               ) do
-            {:ok, updated_translation} -> {:ok, updated_translation}
-            error -> error
-          end
-        else
-          {:error, :not_found}
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
@@ -259,10 +268,12 @@ defmodule BDS.Media.Sidecars do
     project = Projects.get_project!(project_id)
     sidecar_path = Path.join(Projects.project_data_dir(project), relative_path)
 
-    if File.exists?(sidecar_path) do
-      {:ok, upsert_media_from_sidecar(project, parse_canonical_sidecar(project, sidecar_path), sync_search: true)}
-    else
-      {:error, :not_found}
+    case parse_existing_canonical_sidecar(project, sidecar_path) do
+      {:ok, sidecar} ->
+        {:ok, upsert_media_from_sidecar(project, sidecar, sync_search: true)}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -272,35 +283,35 @@ defmodule BDS.Media.Sidecars do
     project = Projects.get_project!(project_id)
     sidecar_path = Path.join(Projects.project_data_dir(project), relative_path)
 
-    if File.exists?(sidecar_path) do
-      sidecar = parse_translation_sidecar(sidecar_path)
+    case parse_existing_translation_sidecar(sidecar_path) do
+      {:ok, sidecar} ->
+        case Repo.get(Media, DocumentFields.get(sidecar.fields, "translationFor")) do
+          nil ->
+            {:error, :not_found}
 
-      case Repo.get(Media, DocumentFields.get(sidecar.fields, "translationFor")) do
-        nil ->
-          {:error, :not_found}
+          media ->
+            case Repo.get_by(Translation,
+                   translation_for: media.id,
+                   language: DocumentFields.fetch!(sidecar.fields, "language")
+                 ) do
+              nil ->
+                BDS.Media.upsert_media_translation(
+                  media.id,
+                  DocumentFields.fetch!(sidecar.fields, "language"),
+                  %{
+                    title: DocumentFields.get(sidecar.fields, "title"),
+                    alt: DocumentFields.get(sidecar.fields, "alt"),
+                    caption: DocumentFields.get(sidecar.fields, "caption")
+                  }
+                )
 
-        media ->
-          case Repo.get_by(Translation,
-                 translation_for: media.id,
-                 language: DocumentFields.fetch!(sidecar.fields, "language")
-               ) do
-            nil ->
-              BDS.Media.upsert_media_translation(
-                media.id,
-                DocumentFields.fetch!(sidecar.fields, "language"),
-                %{
-                  title: DocumentFields.get(sidecar.fields, "title"),
-                  alt: DocumentFields.get(sidecar.fields, "alt"),
-                  caption: DocumentFields.get(sidecar.fields, "caption")
-                }
-              )
+              _translation ->
+                {:error, :conflict}
+            end
+        end
 
-            _translation ->
-              {:error, :conflict}
-          end
-      end
-    else
-      {:error, :not_found}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -325,5 +336,28 @@ defmodule BDS.Media.Sidecars do
     sidecar_path
     |> String.trim_trailing(".meta")
     |> File.exists?()
+  end
+
+  defp parse_existing_canonical_sidecar(project, sidecar_path) do
+    if File.exists?(sidecar_path) do
+      parse_canonical_sidecar(project, sidecar_path)
+    else
+      {:error, :not_found}
+    end
+  end
+
+  defp parse_existing_translation_sidecar(sidecar_path) do
+    if File.exists?(sidecar_path) do
+      parse_translation_sidecar(sidecar_path)
+    else
+      {:error, :not_found}
+    end
+  end
+
+  defp read_sidecar(sidecar_path) do
+    case File.read(sidecar_path) do
+      {:ok, contents} -> {:ok, contents}
+      {:error, reason} -> {:error, {:read_sidecar, sidecar_path, reason}}
+    end
   end
 end

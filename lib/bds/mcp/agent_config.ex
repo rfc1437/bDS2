@@ -9,26 +9,24 @@ defmodule BDS.MCP.AgentConfig do
     command = Keyword.get(opts, :command, default_command(opts))
     args = Keyword.get(opts, :args, default_args(opts))
 
-    File.mkdir_p!(Path.dirname(config_path))
-
-    config = read_config(config_path)
-    updated = merge_config(agent, config, command, args)
-    File.write!(config_path, Jason.encode!(updated, pretty: true))
-
-    {:ok, %{config_path: config_path, server_name: @server_name}}
+    with :ok <- ensure_config_dir(config_path),
+         {:ok, config} <- read_config(config_path),
+         updated <- merge_config(agent, config, command, args),
+         :ok <- write_config(config_path, updated) do
+      {:ok, %{config_path: config_path, server_name: @server_name}}
+    end
   end
 
   def remove_from_config(agent, opts \\ []) when is_atom(agent) and is_list(opts) do
     home_dir = Keyword.get(opts, :home_dir, System.user_home!())
     config_path = config_path(agent, home_dir)
 
-    File.mkdir_p!(Path.dirname(config_path))
-
-    config = read_config(config_path)
-    updated = remove_server_entry(agent, config)
-    File.write!(config_path, Jason.encode!(updated, pretty: true))
-
-    {:ok, %{config_path: config_path, server_name: @server_name}}
+    with :ok <- ensure_config_dir(config_path),
+         {:ok, config} <- read_config(config_path),
+         updated <- remove_server_entry(agent, config),
+         :ok <- write_config(config_path, updated) do
+      {:ok, %{config_path: config_path, server_name: @server_name}}
+    end
   end
 
   def config_path(:claude_code, home_dir), do: Path.join(home_dir, ".claude.json")
@@ -53,12 +51,39 @@ defmodule BDS.MCP.AgentConfig do
   defp default_args(_opts), do: []
 
   defp read_config(path) do
-    if File.exists?(path) do
-      path
-      |> File.read!()
-      |> Jason.decode!()
-    else
-      %{}
+    cond do
+      File.exists?(path) ->
+        with {:ok, contents} <- read_config_file(path),
+             {:ok, config} <- Jason.decode(contents) do
+          {:ok, config}
+        else
+          {:error, %Jason.DecodeError{} = reason} -> {:error, {:decode_config, path, reason}}
+          {:error, reason} -> {:error, reason}
+        end
+
+      true ->
+        {:ok, %{}}
+    end
+  end
+
+  defp ensure_config_dir(config_path) do
+    case File.mkdir_p(Path.dirname(config_path)) do
+      :ok -> :ok
+      {:error, reason} -> {:error, {:create_config_dir, Path.dirname(config_path), reason}}
+    end
+  end
+
+  defp read_config_file(path) do
+    case File.read(path) do
+      {:ok, contents} -> {:ok, contents}
+      {:error, reason} -> {:error, {:read_config, path, reason}}
+    end
+  end
+
+  defp write_config(path, config) do
+    case File.write(path, Jason.encode!(config, pretty: true)) do
+      :ok -> :ok
+      {:error, reason} -> {:error, {:write_config, path, reason}}
     end
   end
 

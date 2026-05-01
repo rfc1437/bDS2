@@ -14,64 +14,66 @@ defmodule BDS.Posts.RebuildFromFiles do
   alias BDS.Repo
   alias BDS.Search
 
-  @spec rebuild_posts_from_files(String.t(), keyword()) :: {:ok, [Post.t()]}
+  @spec rebuild_posts_from_files(String.t(), keyword()) :: {:ok, [Post.t()]} | {:error, term()}
   def rebuild_posts_from_files(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
     on_progress = progress_callback(opts)
 
-    rebuild_files =
+    rebuild_results =
       project
       |> Projects.project_data_dir()
       |> Path.join("posts")
       |> TranslationValidation.list_matching_files("*.md")
       |> Rebuild.parallel_map(&parse_rebuild_file(project, &1))
 
-    total_files = length(rebuild_files)
-    :ok = report_rebuild_started(on_progress, total_files, "post files")
+    with {:ok, rebuild_files} <- collect_rebuild_files(rebuild_results) do
+      total_files = length(rebuild_files)
+      :ok = report_rebuild_started(on_progress, total_files, "post files")
 
-    {translation_files, post_files} =
-      Enum.split_with(rebuild_files, &TranslationValidation.translation_rebuild_file?/1)
+      {translation_files, post_files} =
+        Enum.split_with(rebuild_files, &TranslationValidation.translation_rebuild_file?/1)
 
-    posts =
-      post_files
-      |> Enum.with_index(1)
-      |> Enum.map(fn {file, index} ->
-        post =
-          upsert_post_from_rebuild_file(project_id, file,
-            sync_search: false,
-            sync_embeddings: false
-          )
+      posts =
+        post_files
+        |> Enum.with_index(1)
+        |> Enum.map(fn {file, index} ->
+          post =
+            upsert_post_from_rebuild_file(project_id, file,
+              sync_search: false,
+              sync_embeddings: false
+            )
 
+          :ok = report_rebuild_progress(on_progress, index, total_files, "post files")
+          post
+        end)
+
+      translation_files
+      |> Enum.with_index(length(post_files) + 1)
+      |> Enum.each(fn {file, index} ->
+        upsert_post_translation_from_rebuild_file(project_id, file, sync_search: false)
         :ok = report_rebuild_progress(on_progress, index, total_files, "post files")
-        post
       end)
 
-    translation_files
-    |> Enum.with_index(length(post_files) + 1)
-    |> Enum.each(fn {file, index} ->
-      upsert_post_translation_from_rebuild_file(project_id, file, sync_search: false)
-      :ok = report_rebuild_progress(on_progress, index, total_files, "post files")
-    end)
+      if Keyword.get(opts, :reindex_search, true) do
+        :ok = report_rebuild_phase(on_progress, 0.97, "Refreshing post search index")
 
-    if Keyword.get(opts, :reindex_search, true) do
-      :ok = report_rebuild_phase(on_progress, 0.97, "Refreshing post search index")
+        :ok =
+          Search.reindex_posts(project_id,
+            on_progress: scaled_progress_reporter(on_progress, 0.97, 0.99)
+          )
+      end
 
-      :ok =
-        Search.reindex_posts(project_id,
-          on_progress: scaled_progress_reporter(on_progress, 0.97, 0.99)
-        )
+      if Keyword.get(opts, :rebuild_embeddings, true) do
+        :ok = report_rebuild_phase(on_progress, 0.99, "Refreshing post embeddings")
+
+        {:ok, _rebuilt_post_ids} =
+          Embeddings.rebuild_project(project_id,
+            on_progress: scaled_progress_reporter(on_progress, 0.99, 1.0)
+          )
+      end
+
+      {:ok, posts}
     end
-
-    if Keyword.get(opts, :rebuild_embeddings, true) do
-      :ok = report_rebuild_phase(on_progress, 0.99, "Refreshing post embeddings")
-
-      {:ok, _rebuilt_post_ids} =
-        Embeddings.rebuild_project(project_id,
-          on_progress: scaled_progress_reporter(on_progress, 0.99, 1.0)
-        )
-    end
-
-    {:ok, posts}
   end
 
   @spec import_orphan_post_file(String.t(), String.t()) ::
@@ -81,20 +83,20 @@ defmodule BDS.Posts.RebuildFromFiles do
     full_path = Path.join(Projects.project_data_dir(project), relative_path)
 
     if File.exists?(full_path) do
-      rebuild_file = parse_rebuild_file(project, full_path)
+      with {:ok, rebuild_file} <- parse_rebuild_file(project, full_path) do
+        if TranslationValidation.translation_rebuild_file?(rebuild_file) do
+          {:error, :unsupported_file}
+        else
+          fields =
+            rebuild_file.fields
+            |> Map.put("id", unique_post_id(Map.get(rebuild_file.fields, "id")))
+            |> Map.put(
+              "slug",
+              Slugs.unique_for_import(project_id, Map.fetch!(rebuild_file.fields, "slug"))
+            )
 
-      if TranslationValidation.translation_rebuild_file?(rebuild_file) do
-        {:error, :unsupported_file}
-      else
-        fields =
-          rebuild_file.fields
-          |> Map.put("id", unique_post_id(Map.get(rebuild_file.fields, "id")))
-          |> Map.put(
-            "slug",
-            Slugs.unique_for_import(project_id, Map.fetch!(rebuild_file.fields, "slug"))
-          )
-
-        {:ok, upsert_post_from_rebuild_file(project_id, %{rebuild_file | fields: fields})}
+          {:ok, upsert_post_from_rebuild_file(project_id, %{rebuild_file | fields: fields})}
+        end
       end
     else
       {:error, :not_found}
@@ -108,33 +110,33 @@ defmodule BDS.Posts.RebuildFromFiles do
     full_path = Path.join(Projects.project_data_dir(project), relative_path)
 
     if File.exists?(full_path) do
-      rebuild_file = parse_rebuild_file(project, full_path)
+      with {:ok, rebuild_file} <- parse_rebuild_file(project, full_path) do
+        if TranslationValidation.translation_rebuild_file?(rebuild_file) do
+          source_post_id = Map.fetch!(rebuild_file.fields, "translationFor")
+          language = TranslationValidation.normalize_language(Map.fetch!(rebuild_file.fields, "language"))
 
-      if TranslationValidation.translation_rebuild_file?(rebuild_file) do
-        source_post_id = Map.fetch!(rebuild_file.fields, "translationFor")
-        language = TranslationValidation.normalize_language(Map.fetch!(rebuild_file.fields, "language"))
+          case Repo.get(Post, source_post_id) do
+            nil ->
+              {:error, :not_found}
 
-        case Repo.get(Post, source_post_id) do
-          nil ->
-            {:error, :not_found}
+            %Post{} = post ->
+              if TranslationValidation.normalize_language(post.language) == language or
+                   Repo.get_by(Translation, translation_for: source_post_id, language: language) do
+                {:error, :conflict}
+              else
+                fields = Map.put(rebuild_file.fields, "id", Ecto.UUID.generate())
 
-          %Post{} = post ->
-            if TranslationValidation.normalize_language(post.language) == language or
-                 Repo.get_by(Translation, translation_for: source_post_id, language: language) do
-              {:error, :conflict}
-            else
-              fields = Map.put(rebuild_file.fields, "id", Ecto.UUID.generate())
-
-              {:ok,
-               upsert_post_translation_from_rebuild_file(
-                 project_id,
-                 %{rebuild_file | fields: fields},
-                 sync_search: true
-               )}
+                {:ok,
+                 upsert_post_translation_from_rebuild_file(
+                   project_id,
+                   %{rebuild_file | fields: fields},
+                   sync_search: true
+                 )}
+              end
             end
+        else
+          {:error, :unsupported_file}
         end
-      else
-        {:error, :unsupported_file}
       end
     else
       {:error, :not_found}
@@ -143,8 +145,9 @@ defmodule BDS.Posts.RebuildFromFiles do
 
   @doc false
   def upsert_post_from_file(project_id, project, path) do
-    rebuild_file = parse_rebuild_file(project, path)
-    upsert_post_from_rebuild_file(project_id, rebuild_file)
+    with {:ok, rebuild_file} <- parse_rebuild_file(project, path) do
+      {:ok, upsert_post_from_rebuild_file(project_id, rebuild_file)}
+    end
   end
 
   @doc false
@@ -244,14 +247,15 @@ defmodule BDS.Posts.RebuildFromFiles do
 
   @doc false
   def parse_rebuild_file(project, path) do
-    contents = File.read!(path)
-    {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
-
-    %{
-      path: path,
-      relative_path: Path.relative_to(path, Projects.project_data_dir(project)),
-      fields: fields
-    }
+    with {:ok, contents} <- read_rebuild_file(path),
+         {:ok, %{fields: fields}} <- Frontmatter.parse_document(contents) do
+      {:ok,
+       %{
+         path: path,
+         relative_path: Path.relative_to(path, Projects.project_data_dir(project)),
+         fields: fields
+       }}
+    end
   end
 
   @doc false
@@ -315,6 +319,24 @@ defmodule BDS.Posts.RebuildFromFiles do
       Ecto.UUID.generate()
     else
       id
+    end
+  end
+
+  defp collect_rebuild_files(results) do
+    Enum.reduce_while(results, {:ok, []}, fn
+      {:ok, rebuild_file}, {:ok, rebuild_files} -> {:cont, {:ok, [rebuild_file | rebuild_files]}}
+      {:error, reason}, {:ok, _rebuild_files} -> {:halt, {:error, reason}}
+    end)
+    |> case do
+      {:ok, rebuild_files} -> {:ok, Enum.reverse(rebuild_files)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp read_rebuild_file(path) do
+    case File.read(path) do
+      {:ok, contents} -> {:ok, contents}
+      {:error, reason} -> {:error, {:read_rebuild_file, path, reason}}
     end
   end
 end
