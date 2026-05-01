@@ -203,7 +203,9 @@ defmodule BDS.AITest do
                  url: "https://api.example.test/v1",
                  api_key: "top-secret",
                  model: "gpt-4o-mini"
-               }, secret_backend: FakeSecretBackend)
+               },
+               secret_backend: FakeSecretBackend
+             )
 
     assert endpoint.kind == :online
     assert endpoint.url == "https://api.example.test/v1"
@@ -316,7 +318,9 @@ defmodule BDS.AITest do
                  url: "https://api.example.test/v1",
                  api_key: "online-secret",
                  model: "gpt-4o-mini"
-               }, secret_backend: FakeSecretBackend)
+               },
+               secret_backend: FakeSecretBackend
+             )
 
     assert {:ok, _endpoint} =
              BDS.AI.put_endpoint(
@@ -325,7 +329,9 @@ defmodule BDS.AITest do
                  url: "http://localhost:11434/v1",
                  api_key: nil,
                  model: "llama-default"
-               }, secret_backend: FakeSecretBackend)
+               },
+               secret_backend: FakeSecretBackend
+             )
 
     assert :ok = BDS.AI.set_airplane_mode(true)
     assert :ok = BDS.AI.put_model_preference(:airplane_title, "llama3.1")
@@ -354,7 +360,9 @@ defmodule BDS.AITest do
                  url: "https://api.example.test/v1",
                  api_key: "online-secret",
                  model: "gpt-4o-mini"
-               }, secret_backend: FakeSecretBackend)
+               },
+               secret_backend: FakeSecretBackend
+             )
 
     assert :ok = BDS.AI.set_airplane_mode(false)
     assert :ok = BDS.AI.put_model_preference(:title, "gpt-4.1-mini")
@@ -389,7 +397,9 @@ defmodule BDS.AITest do
                  url: "https://api.example.test/v1",
                  api_key: "online-secret",
                  model: "gpt-4o-mini"
-               }, secret_backend: FakeSecretBackend)
+               },
+               secret_backend: FakeSecretBackend
+             )
 
     assert :ok = BDS.AI.set_airplane_mode(false)
     assert :ok = BDS.AI.put_model_preference(:title, "gpt-4.1-mini")
@@ -421,7 +431,9 @@ defmodule BDS.AITest do
                  url: "http://localhost:11434/v1",
                  api_key: nil,
                  model: "llama-default"
-               }, secret_backend: FakeSecretBackend)
+               },
+               secret_backend: FakeSecretBackend
+             )
 
     assert :ok = BDS.AI.set_airplane_mode(true)
     assert :ok = BDS.AI.put_model_preference(:airplane_image_analysis, "llama3.2")
@@ -434,7 +446,11 @@ defmodule BDS.AITest do
                  alt: nil,
                  caption: nil,
                  image_url: "file:///tmp/test.png"
-               }, runtime: FakeRuntime, test_pid: self(), secret_backend: FakeSecretBackend)
+               },
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend
+             )
 
     assert :ok =
              BDS.AI.put_model_capabilities("llama3.2", %{
@@ -450,7 +466,11 @@ defmodule BDS.AITest do
                  alt: nil,
                  caption: nil,
                  image_url: "file:///tmp/test.png"
-               }, runtime: FakeRuntime, test_pid: self(), secret_backend: FakeSecretBackend)
+               },
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend
+             )
 
     assert analysis.alt == "Orange sunset over calm water"
 
@@ -471,7 +491,9 @@ defmodule BDS.AITest do
                  url: "https://api.example.test/v1",
                  api_key: "online-secret",
                  model: "gpt-4o-mini"
-               }, secret_backend: FakeSecretBackend)
+               },
+               secret_backend: FakeSecretBackend
+             )
 
     assert :ok = BDS.AI.set_airplane_mode(false)
     assert {:ok, conversation} = BDS.AI.start_chat(%{model: "gpt-4o-mini"})
@@ -506,10 +528,49 @@ defmodule BDS.AITest do
 
     assert Enum.any?(first_request.messages, fn message ->
              message["role"] == "system" and String.contains?(message["content"], "Posts: 1") and
-               String.contains?(message["content"], "Media: 1")
+               String.contains?(message["content"], "Media: 1") and
+               String.contains?(message["content"], "Available blog data tools") and
+               String.contains?(message["content"], "list_posts") and
+               String.contains?(message["content"], "list_media")
            end)
 
+    tool_descriptions =
+      first_request.tools
+      |> Map.new(fn tool ->
+        {get_in(tool, ["function", "name"]), get_in(tool, ["function", "description"])}
+      end)
+
+    assert tool_descriptions["blog_stats"] =~ "aggregate"
+    assert tool_descriptions["list_posts"] =~ "titles"
+    assert tool_descriptions["list_posts"] =~ "URLs"
+    assert tool_descriptions["list_media"] =~ "filenames"
+
     assert Enum.any?(second_request.messages, fn message -> message["role"] == "tool" end)
+  end
+
+  test "non-stat chat tools expose concrete project data" do
+    {:ok, project} = create_project_fixture("Concrete Tools")
+    :ok = seed_project_content(project.id)
+
+    [post] =
+      Repo.all(
+        from post in Post,
+          where: post.project_id == ^project.id,
+          select: post
+      )
+
+    assert %{posts: [listed_post], total: 1} =
+             BDS.AI.ChatTools.execute("list_posts", %{"limit" => 5}, project.id)
+
+    assert listed_post["title"] == post.title
+    assert listed_post["slug"] == post.slug
+    assert listed_post["url"] == "/posts/#{post.slug}"
+    assert listed_post["updated_at"] == post.updated_at
+
+    assert [listed_media] = BDS.AI.ChatTools.execute("list_media", %{"limit" => 5}, project.id)
+    assert listed_media.filename == "image.png"
+    assert listed_media.mime_type == "image/png"
+    assert listed_media.updated_at
   end
 
   test "cancel_chat aborts an in-flight chat turn" do
@@ -520,7 +581,9 @@ defmodule BDS.AITest do
                  url: "https://api.example.test/v1",
                  api_key: "online-secret",
                  model: "gpt-4o-mini"
-               }, secret_backend: FakeSecretBackend)
+               },
+               secret_backend: FakeSecretBackend
+             )
 
     assert {:ok, conversation} = BDS.AI.start_chat(%{model: "gpt-4o-mini"})
 

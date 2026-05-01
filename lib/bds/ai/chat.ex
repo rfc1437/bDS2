@@ -515,9 +515,28 @@ defmodule BDS.AI.Chat do
     base = get_setting("ai.system_prompt") || @default_system_prompt
 
     case project_stats_summary(project_id) do
-      nil -> base
-      summary -> base <> "\n\nCurrent blog statistics:\n" <> summary
+      nil ->
+        base
+
+      summary ->
+        base <> "\n\nCurrent blog statistics:\n" <> summary <> "\n\n" <> blog_tool_guidance()
     end
+  end
+
+  defp blog_tool_guidance do
+    Enum.join(
+      [
+        "Available blog data tools:",
+        "- Use blog_stats for aggregate counts of posts, media, tags, and categories.",
+        "- Use search_posts for full-text blog search and filtered post lookup by category, tag, language, year, month, or status.",
+        "- Use read_post_by_slug to read full post content and metadata when a slug is known.",
+        "- Use list_posts when asked for post titles, slugs, URLs, statuses, backlinks, or recent/top/latest post lists. This is allowed project data access.",
+        "- Use list_media when asked for media titles, filenames, MIME types, or recent media lists. This is allowed project data access.",
+        "- Use list_tags, list_categories, and count_posts for taxonomy and grouped analytics questions.",
+        "If a requested blog fact is available through these tools, call the tool instead of saying you cannot access the data."
+      ],
+      "\n"
+    )
   end
 
   defp project_stats_summary(nil), do: nil

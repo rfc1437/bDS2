@@ -21,9 +21,8 @@ defmodule BDS.MCPTest do
   end
 
   test "list_tools follows the old app tool surface for implemented backend features" do
-    tool_names =
-      BDS.MCP.list_tools()
-      |> Enum.map(& &1.name)
+    tools = BDS.MCP.list_tools()
+    tool_names = Enum.map(tools, & &1.name)
 
     assert "check_term" in tool_names
     assert "search_posts" in tool_names
@@ -39,6 +38,20 @@ defmodule BDS.MCPTest do
     assert "propose_post_metadata" in tool_names
     assert "accept_proposal" in tool_names
     assert "discard_proposal" in tool_names
+
+    search_posts = Enum.find(tools, &(&1.name == "search_posts"))
+    assert search_posts.title == "Search Posts"
+    assert search_posts.description =~ "paginated envelope"
+    assert search_posts.description =~ "backlinks"
+    assert get_in(search_posts.inputSchema, ["properties", "query", "description"]) =~ "Full-text"
+    assert get_in(search_posts.inputSchema, ["properties", "tags", "items", "type"]) == "string"
+    assert search_posts.annotations["readOnlyHint"] == true
+    assert search_posts.annotations["openWorldHint"] == false
+
+    draft_post = Enum.find(tools, &(&1.name == "draft_post"))
+    assert draft_post.description =~ "draft blog post"
+    assert draft_post.inputSchema["required"] == ["title", "content"]
+    assert draft_post.annotations["readOnlyHint"] == false
   end
 
   test "check_term, search_posts, count_posts, and read_post_by_slug expose current blog data", %{

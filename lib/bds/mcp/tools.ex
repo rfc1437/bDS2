@@ -18,7 +18,13 @@ defmodule BDS.MCP.Tools do
   @proposal_ttl_app_ms 30 * 60 * 1000
 
   @typedoc "Tool descriptor returned by `list/0`."
-  @type descriptor :: %{name: String.t(), annotations: map()}
+  @type descriptor :: %{
+          name: String.t(),
+          title: String.t(),
+          description: String.t(),
+          inputSchema: map(),
+          annotations: map()
+        }
 
   @spec list() :: [descriptor()]
   def list do
@@ -75,11 +81,268 @@ defmodule BDS.MCP.Tools do
   end
 
   defp tool(name, read_only) do
+    metadata = tool_metadata(name)
+
     %{
       name: name,
-      annotations: %{"readOnlyHint" => read_only, "destructiveHint" => false}
+      title: metadata.title,
+      description: metadata.description,
+      inputSchema: metadata.input_schema,
+      annotations: %{
+        "readOnlyHint" => read_only,
+        "destructiveHint" => false,
+        "openWorldHint" => false
+      }
     }
   end
+
+  defp tool_metadata("check_term") do
+    %{
+      title: "Check Term",
+      description:
+        "Check whether a term exists as a category, tag, or both. Returns post counts for each. Use before search_posts or count_posts when unsure whether a term is a category or tag.",
+      input_schema: object_schema(%{"term" => string_schema("The term to look up")}, ["term"])
+    }
+  end
+
+  defp tool_metadata("search_posts") do
+    %{
+      title: "Search Posts",
+      description:
+        "Search blog posts by query, category, tags, language, translation coverage, date, or status. Returns a paginated envelope with total, offset, limit, hasMore, and posts. Each post includes title, slug, tags, categories, backlinks, and linksTo. When hasMore is true, increase offset by limit. Use check_term first if unsure whether a term is a category or tag.",
+      input_schema: post_query_schema(false)
+    }
+  end
+
+  defp tool_metadata("count_posts") do
+    %{
+      title: "Count Posts",
+      description:
+        "Count posts grouped by year, month, tag, category, or status. Returns aggregated counts without full post data, useful for analytics, distributions, and heat maps. Example: groupBy=[\"month\",\"tag\"] with year=2004.",
+      input_schema:
+        object_schema(
+          Map.merge(group_filter_properties(), %{
+            "groupBy" => %{
+              "type" => "array",
+              "items" => enum_schema(["year", "month", "tag", "category", "status"]),
+              "description" => "Dimensions to group by; one to three dimensions is usually best"
+            }
+          }),
+          ["groupBy"]
+        )
+    }
+  end
+
+  defp tool_metadata("read_post_by_slug") do
+    %{
+      title: "Read Post By Slug",
+      description:
+        "Read full content and metadata for a specific blog post by slug. Includes title, excerpt, content, status, tags, categories, backlinks, linksTo, and available languages. Optionally request a translation by language.",
+      input_schema:
+        object_schema(
+          %{
+            "slug" => string_schema("The slug of the post to read"),
+            "language" => string_schema("Optional language code for a translation")
+          },
+          ["slug"]
+        )
+    }
+  end
+
+  defp tool_metadata("get_post_translations") do
+    %{
+      title: "Get Post Translations",
+      description:
+        "List all translations available for a blog post, including language, title, excerpt, content, and status.",
+      input_schema: object_schema(%{"postId" => string_schema("The post ID")}, ["postId"])
+    }
+  end
+
+  defp tool_metadata("get_media_translations") do
+    %{
+      title: "Get Media Translations",
+      description:
+        "List all available translations for media metadata, including language, title, alt text, and captions.",
+      input_schema: object_schema(%{"mediaId" => string_schema("The media ID")}, ["mediaId"])
+    }
+  end
+
+  defp tool_metadata("upsert_media_translation") do
+    %{
+      title: "Upsert Media Translation",
+      description: "Create or update translated media metadata for a specific language.",
+      input_schema:
+        object_schema(
+          %{
+            "mediaId" => string_schema("The media ID"),
+            "language" => string_schema("Language code to update"),
+            "title" => string_schema("Translated title"),
+            "alt" => string_schema("Translated alt text"),
+            "caption" => string_schema("Translated caption")
+          },
+          ["mediaId", "language"]
+        )
+    }
+  end
+
+  defp tool_metadata("draft_post") do
+    %{
+      title: "Draft Post",
+      description: "Create a new draft blog post for review before publishing.",
+      input_schema:
+        object_schema(
+          %{
+            "title" => string_schema("Post title"),
+            "content" => string_schema("Post content in Markdown"),
+            "excerpt" => string_schema("Short excerpt or summary"),
+            "tags" => string_array_schema("Tags for the post"),
+            "categories" => string_array_schema("Categories for the post"),
+            "author" => string_schema("Post author name")
+          },
+          ["title", "content"]
+        )
+    }
+  end
+
+  defp tool_metadata("propose_script") do
+    %{
+      title: "Propose Script",
+      description: "Propose a new Python script, macro, utility, or transform for review.",
+      input_schema:
+        object_schema(
+          %{
+            "title" => string_schema("Script title"),
+            "kind" => enum_schema(["macro", "utility", "transform"]),
+            "content" => string_schema("Python source code"),
+            "entrypoint" => string_schema("Entry point function name")
+          },
+          ["title", "kind", "content"]
+        )
+    }
+  end
+
+  defp tool_metadata("propose_template") do
+    %{
+      title: "Propose Template",
+      description: "Propose a new Liquid template for review.",
+      input_schema:
+        object_schema(
+          %{
+            "title" => string_schema("Template title"),
+            "kind" => enum_schema(["post", "list", "not-found", "partial"]),
+            "content" => string_schema("Liquid template content")
+          },
+          ["title", "kind", "content"]
+        )
+    }
+  end
+
+  defp tool_metadata("propose_media_metadata") do
+    %{
+      title: "Propose Media Metadata",
+      description:
+        "Propose changes to media metadata such as title, alt text, caption, and tags.",
+      input_schema:
+        object_schema(
+          %{
+            "mediaId" => string_schema("The media ID"),
+            "title" => string_schema("New title"),
+            "alt" => string_schema("New alt text"),
+            "caption" => string_schema("New caption"),
+            "tags" => string_array_schema("New tags")
+          },
+          ["mediaId"]
+        )
+    }
+  end
+
+  defp tool_metadata("propose_post_metadata") do
+    %{
+      title: "Propose Post Metadata",
+      description:
+        "Propose changes to post metadata such as title, excerpt, tags, and categories.",
+      input_schema:
+        object_schema(
+          %{
+            "postId" => string_schema("The post ID"),
+            "title" => string_schema("New title"),
+            "excerpt" => string_schema("New excerpt"),
+            "tags" => string_array_schema("New tags"),
+            "categories" => string_array_schema("New categories")
+          },
+          ["postId"]
+        )
+    }
+  end
+
+  defp tool_metadata("accept_proposal") do
+    %{
+      title: "Accept Proposal",
+      description: "Accept a pending proposal and apply or publish its changes.",
+      input_schema:
+        object_schema(%{"proposalId" => string_schema("The proposal ID")}, ["proposalId"])
+    }
+  end
+
+  defp tool_metadata("discard_proposal") do
+    %{
+      title: "Discard Proposal",
+      description: "Discard a pending proposal and remove any temporary draft artifacts.",
+      input_schema:
+        object_schema(%{"proposalId" => string_schema("The proposal ID")}, ["proposalId"])
+    }
+  end
+
+  defp post_query_schema(query_required) do
+    required = if query_required, do: ["query"], else: []
+
+    object_schema(
+      Map.merge(group_filter_properties(), %{
+        "query" => string_schema("Full-text search query"),
+        "language" => string_schema("Require posts available in this language"),
+        "missingTranslationLanguage" =>
+          string_schema("Require posts missing this translation language"),
+        "offset" => %{"type" => "integer", "minimum" => 0, "description" => "Pagination offset"},
+        "limit" => %{
+          "type" => "integer",
+          "minimum" => 1,
+          "maximum" => 50,
+          "description" => "Maximum results to return"
+        }
+      }),
+      required
+    )
+  end
+
+  defp group_filter_properties do
+    %{
+      "year" => %{"type" => "integer", "description" => "Filter to posts in this year"},
+      "month" => %{
+        "type" => "integer",
+        "minimum" => 1,
+        "maximum" => 12,
+        "description" => "Filter to posts in this month; requires year"
+      },
+      "status" => enum_schema(["draft", "published", "archived"]),
+      "category" => string_schema("Filter by category"),
+      "tags" => string_array_schema("Filter by tags; all must match")
+    }
+  end
+
+  defp object_schema(properties, required) do
+    %{"type" => "object", "properties" => properties}
+    |> maybe_schema_required(required)
+  end
+
+  defp maybe_schema_required(schema, []), do: schema
+  defp maybe_schema_required(schema, required), do: Map.put(schema, "required", required)
+
+  defp string_schema(description), do: %{"type" => "string", "description" => description}
+
+  defp string_array_schema(description),
+    do: %{"type" => "array", "items" => %{"type" => "string"}, "description" => description}
+
+  defp enum_schema(values), do: %{"type" => "string", "enum" => values}
 
   defp check_term(%{"term" => term}), do: check_term(%{term: term})
 
