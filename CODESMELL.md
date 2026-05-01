@@ -464,7 +464,19 @@ Total: 2245 lines now live in focused submodules; the remaining 647 in `BDS.Gene
   | `Translations` | 279 | `publish_post_translation/2`, `list_post_translations/1`, `upsert_post_translation/3`, `delete_post_translation/1`, `sync_post_translation_from_file/1`, `rewrite_published_post_translation/1`, `publish_translation/2`, `publish_post_translations/1`, `normalize_translation_updates`, `maybe_reopen_source_post_for_manual_translation` |
 
   Public API on `BDS.Posts` preserved via `defdelegate` for: `slug_available/3`, `unique_slug_for_title/3`, `validate_translations/2`, `fix_invalid_translations/1`, `rebuild_posts_from_files/2`, `import_orphan_post_file/2`, `import_orphan_post_translation_file/2`, `publish_post_translation/2`, `list_post_translations/1`, `upsert_post_translation/3`, `delete_post_translation/1`, `sync_post_translation_from_file/1`, `rewrite_published_post_translation/1`. Remaining clusters in posts.ex are core CRUD (`create_post`, `update_post`, `publish_post`, `delete_post`, `archive_post`, `discard_post_changes`, `sync_post_from_file`, `rewrite_published_post`, `editor_body`), small stats (`dashboard_stats`, `post_counts_by_year_month`, ~40 lines extractable), and `rebuild_post_links` (~22 lines). Stats could be split next, but ~569 lines is a reasonable steady state.
-- ⏳ `BDS.AI` (1711).
+- ⏳ `BDS.AI` (1711 → 168, **90% reduction**). Submodules extracted under `lib/bds/ai/`:
+
+  | Module | Lines | Responsibility |
+  |---|---|---|
+  | `Chat` | 597 | Public chat API (`start_chat`, `list_chat_conversations`, `available_chat_models`, `set_conversation_model`, `list_chat_messages`, `send_chat_message`, `cancel_chat`) + chat round/tool-call orchestration, request building, message truncation, system prompt + project stats summary, conversation/message persistence, `count_distinct_string_list/3`, `normalize_usage/1` |
+  | `OneShot` | 382 | One-shot operations (`detect_language`, `analyze_taxonomy`, `analyze_import_taxonomy`, `analyze_post`, `translate_post`, `analyze_image`, `translate_media`) + per-op system/user prompt builders, JSON response extraction, post/media input normalization, taxonomy mapping filtering |
+  | `Catalog` | 306 | Model catalog API (`list_endpoint_models`, `refresh_model_catalog`, `list_catalog_providers`, `get_catalog_model`, `catalog_meta`, `put_model_capabilities`, `format_model`, `model_capabilities`, `decode_nullable_json`) + models.dev fetch, persistence, modality parsing |
+  | `ChatTools` | 271 | Chat tool dispatch (`execute/3`) for blog_stats, list_posts, list_media, render_table/chart/form/card/metric/list/tabs/mindmap; tool spec generation (`available_specs/2`) |
+  | `Runtime` | 100 | `model_preference_keys/0`, `resolve_target/2`, `validate_target/3`, `endpoint_with_model/2`, per-operation airplane/online resolution |
+  | `SettingsStore` | 78 | Setting/secret/catalog-meta storage helpers (`get_setting`, `put_setting`, `delete_setting`, `put_secret`, `get_secret`, `encrypted_key`, `secret_backend`, catalog meta) |
+
+  Public `BDS.AI` API preserved via `defdelegate` for all extracted operations. Remaining 168 lines hold endpoint storage (`put_endpoint`, `get_endpoint`, `delete_endpoint`), airplane mode (`set_airplane_mode`, `airplane_mode?`), model preferences (`put_model_preference`, `get_model_preference`), and the defdelegate facade.
+
 - ⏳ `BDS.MCP` (677).
 
 ---
