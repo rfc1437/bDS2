@@ -33,7 +33,7 @@ Goal: align bDS2 with old bDS behavior. Use the Allium specs as the contract onl
 - Spec: missing the old resources.
 - Action: add these resources to `specs/mcp.allium`, implement them, and test JSON/blob/error responses.
 
-## P1: MCP Agent Config Surface
+## P1: MCP Agent Config Surface (done)
 
 - Old bDS: agent config install/remove is a settings UI / IPC action, not an MCP tool.
 - bDS2 now: implemented as settings UI action.

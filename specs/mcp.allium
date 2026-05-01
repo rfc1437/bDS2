@@ -93,8 +93,6 @@ surface McpAutomationSurface {
         McpToolInvoked("propose_post_metadata", params)
         AcceptProposalRequested(proposal)
         DiscardProposalRequested(proposal)
-        InstallAgentConfigRequested(agent_kind)
-        UninstallAgentConfigRequested(agent_kind)
 }
 
 invariant LocalhostOnlyHttp {
@@ -442,14 +440,25 @@ surface McpAgentKindSurface {
         agent_kind.kind
 }
 
+surface McpSettingsSurface {
+    provides:
+        SettingsMCPAgentToggled(agent_kind)
+
+    @guidance
+        -- Agent configuration install/remove is exposed by the settings UI,
+        -- not by the MCP automation surface.
+}
+
 rule InstallAgentConfig {
-    when: InstallAgentConfigRequested(agent_kind)
+    when: SettingsMCPAgentToggled(agent_kind)
+    requires: not AgentConfigInstalled(agent_kind)
     -- Writes stdio MCP server config into the agent's config file
     ensures: AgentConfigInstalled(agent_kind)
 }
 
 rule UninstallAgentConfig {
-    when: UninstallAgentConfigRequested(agent_kind)
+    when: SettingsMCPAgentToggled(agent_kind)
+    requires: AgentConfigInstalled(agent_kind)
     ensures: AgentConfigRemoved(agent_kind)
 }
 

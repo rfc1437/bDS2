@@ -4,6 +4,7 @@
         "allium": true,
         "command": true,
         "printf": true,
-        "git ls-tree": true
+        "git ls-tree": true,
+        "/opt/homebrew/bin/allium": true
     }
 }
