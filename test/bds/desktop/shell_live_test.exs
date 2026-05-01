@@ -2280,6 +2280,77 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute dismissed_html =~ ~s(data-testid="chat-inline-surface")
   end
 
+  test "chat editor keeps every non-dismissed A2UI surface expanded" do
+    assert {:ok, conversation} = AI.start_chat(%{title: "Surface Chat", model: "gpt-4.1"})
+
+    now = Persistence.now_ms()
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :user,
+        content: "Show two updates",
+        created_at: now
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :assistant,
+        content: "Here are the updates.",
+        tool_calls:
+          Jason.encode!([
+            %{
+              "id" => "call-card-old",
+              "name" => "render_card",
+              "arguments" => %{
+                "title" => "Earlier Missing Data",
+                "body" => "The first data request needs review."
+              }
+            },
+            %{
+              "id" => "call-card-new",
+              "name" => "render_card",
+              "arguments" => %{
+                "title" => "Latest Missing Data",
+                "body" => "The second data request needs review."
+              }
+            }
+          ]),
+        created_at: now + 1
+      })
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert length(:binary.matches(html, ~s(data-testid="chat-inline-surface"))) == 2
+    assert length(:binary.matches(html, "data-expanded")) == 2
+    assert html =~ "Earlier Missing Data"
+    assert html =~ "The first data request needs review."
+    assert html =~ "Latest Missing Data"
+    assert html =~ "The second data request needs review."
+  end
+
+  test "chat editor hook reopens server-expanded A2UI surfaces after patches" do
+    live_js = File.read!(Path.expand("../../../priv/ui/live.js", __DIR__))
+    chat_editor = File.read!(Path.expand("../../../lib/bds/desktop/shell_live/chat_editor.ex", __DIR__))
+
+    assert chat_editor =~ "data-expanded={Map.get(@surface, :expanded?, false)}"
+    assert live_js =~ "this.syncExpandedSurfaces = () =>"
+    assert live_js =~ "querySelectorAll(\".chat-inline-surface[data-expanded='true']\")"
+    assert live_js =~ "surface.open = true;"
+    assert live_js =~ "this.syncExpandedSurfaces();"
+  end
+
   test "chat editor folds tool-only assistant steps into the final assistant answer" do
     assert {:ok, conversation} = AI.start_chat(%{title: "Tool Chat", model: "gpt-4.1"})
 

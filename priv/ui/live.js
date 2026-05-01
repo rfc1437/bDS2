@@ -780,6 +780,14 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         };
 
+        this.syncExpandedSurfaces = () => {
+          this.el
+            .querySelectorAll(".chat-inline-surface[data-expanded='true']")
+            .forEach((surface) => {
+              surface.open = true;
+            });
+        };
+
         this.handleScroll = () => {
           if (!this.scrollContainer) {
             this.stickToBottom = true;
@@ -823,12 +831,14 @@ document.addEventListener("DOMContentLoaded", () => {
         this.el.addEventListener("keydown", this.handleKeyDown);
 
         this.syncScrollContainer();
+        this.syncExpandedSurfaces();
         this.autoResize();
         window.requestAnimationFrame(() => this.scrollToBottom(true));
       },
 
       updated() {
         this.syncScrollContainer();
+        this.syncExpandedSurfaces();
         this.autoResize();
         window.requestAnimationFrame(() => this.scrollToBottom());
       },

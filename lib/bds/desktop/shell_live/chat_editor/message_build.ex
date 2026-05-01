@@ -100,7 +100,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
       tool_markers: tool_markers,
       inline_surfaces:
         ToolSurfaces.build_render_surfaces(tool_markers, message.id, assigns)
-        |> mark_latest_surface_expanded(assigns),
+        |> mark_surfaces_expanded(assigns),
       tool_surfaces: []
     }
   end
@@ -125,15 +125,14 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
     }
   end
 
-  defp mark_latest_surface_expanded([], _assigns), do: []
+  defp mark_surfaces_expanded([], _assigns), do: []
 
-  defp mark_latest_surface_expanded(surfaces, assigns) do
+  defp mark_surfaces_expanded(surfaces, assigns) do
     dismissed = Map.get(assigns, :chat_editor_dismissed_surfaces, MapSet.new())
 
     surfaces
     |> Enum.reject(&MapSet.member?(dismissed, &1.id))
-    |> Enum.with_index()
-    |> Enum.map(fn {surface, index} -> Map.put(surface, :expanded?, index == length(surfaces) - 1) end)
+    |> Enum.map(&Map.put(&1, :expanded?, true))
   end
 
   defp pending_user_message(_messages, nil), do: nil
@@ -157,7 +156,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
     request
     |> ToolTracking.tool_markers_from_events()
     |> ToolSurfaces.build_render_surfaces("streaming-#{conversation_id}", assigns)
-    |> mark_latest_surface_expanded(assigns)
+    |> mark_surfaces_expanded(assigns)
   end
 
   defp translated(text, bindings \\ %{}),
