@@ -602,6 +602,17 @@ defmodule BDS.AITest do
     assert get_in(render_chart_schema, ["series", "items", "properties", "segments"]) != nil
 
     assert Enum.any?(second_request.messages, fn message -> message["role"] == "tool" end)
+
+    assert Enum.any?(second_request.messages, fn message ->
+             message["role"] == "assistant" and
+               message["tool_calls"] == [
+                 %{
+                   "id" => "call-blog-stats",
+                   "type" => "function",
+                   "function" => %{"name" => "blog_stats", "arguments" => "{}"}
+                 }
+               ]
+           end)
   end
 
   test "chat does not prompt models to emit textual tool calls when tools are unavailable" do

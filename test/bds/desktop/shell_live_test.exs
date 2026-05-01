@@ -2216,6 +2216,73 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Posts"
   end
 
+  test "chat editor folds tool-only assistant steps into the final assistant answer" do
+    assert {:ok, conversation} = AI.start_chat(%{title: "Tool Chat", model: "gpt-4.1"})
+
+    now = Persistence.now_ms()
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :user,
+        content: "Show posts per month",
+        created_at: now
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :assistant,
+        content: nil,
+        tool_calls:
+          Jason.encode!([
+            %{
+              "id" => "call-count-posts",
+              "name" => "count_posts",
+              "arguments" => %{"groupBy" => ["month"], "year" => 2026}
+            }
+          ]),
+        created_at: now + 1
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :tool,
+        tool_call_id: "call-count-posts",
+        content: Jason.encode!([%{"month" => 5, "count" => 3}]),
+        created_at: now + 2
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :assistant,
+        content: "Here is the chart.",
+        created_at: now + 3
+      })
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert html =~ "count_posts"
+    assert html =~ "Here is the chart."
+    assert html =~ ~s(<span class="chat-message-role">Assistant</span>)
+
+    assert length(:binary.matches(html, ~s(<span class="chat-message-role">Assistant</span>))) == 1
+  end
+
   test "chat editor marks user message text as compact" do
     assert {:ok, conversation} = AI.start_chat(%{title: "Compact Chat", model: "gpt-4.1"})
 

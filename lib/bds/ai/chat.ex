@@ -479,9 +479,43 @@ defmodule BDS.AI.Chat do
 
     case Catalog.decode_nullable_json(message.tool_calls) do
       nil -> base
-      tool_calls -> Map.put(base, "tool_calls", tool_calls)
+      tool_calls -> Map.put(base, "tool_calls", tool_calls_for_runtime(tool_calls))
     end
   end
+
+  defp tool_calls_for_runtime(tool_calls) when is_list(tool_calls) do
+    Enum.map(tool_calls, &tool_call_for_runtime/1)
+  end
+
+  defp tool_calls_for_runtime(tool_calls), do: tool_calls
+
+  defp tool_call_for_runtime(%{"type" => "function", "function" => %{} = _function} = tool_call) do
+    tool_call
+  end
+
+  defp tool_call_for_runtime(%{"id" => id, "name" => name} = tool_call) do
+    %{
+      "id" => id,
+      "type" => "function",
+      "function" => %{
+        "name" => name,
+        "arguments" => Jason.encode!(tool_call["arguments"] || %{})
+      }
+    }
+  end
+
+  defp tool_call_for_runtime(%{id: id, name: name} = tool_call) do
+    %{
+      "id" => id,
+      "type" => "function",
+      "function" => %{
+        "name" => name,
+        "arguments" => Jason.encode!(Map.get(tool_call, :arguments) || %{})
+      }
+    }
+  end
+
+  defp tool_call_for_runtime(tool_call), do: tool_call
 
   defp truncate_chat_messages(messages, model, tools) do
     context_window = model_context_window(model)

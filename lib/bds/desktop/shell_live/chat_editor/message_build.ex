@@ -62,6 +62,16 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
             next_turn_index = turn_index + 1
             {entries, start_entry(message, next_turn_index, assigns), next_turn_index}
 
+          :assistant ->
+            next_entry = start_entry(message, turn_index, assigns)
+
+            if tool_only_assistant_entry?(current_entry) do
+              {entries, merge_tool_only_entry(current_entry, next_entry), turn_index}
+            else
+              entries = finalize_entry(entries, current_entry)
+              {entries, next_entry, turn_index}
+            end
+
           _other ->
             entries = finalize_entry(entries, current_entry)
             {entries, start_entry(message, turn_index, assigns), turn_index}
@@ -97,6 +107,22 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
       nil -> entry
       surface -> update_in(entry.tool_surfaces, &(&1 ++ [surface]))
     end
+  end
+
+  defp tool_only_assistant_entry?(%{role: :assistant, content: content} = entry) do
+    String.trim(content || "") == "" and
+      (entry.tool_markers != [] or entry.inline_surfaces != [] or entry.tool_surfaces != [])
+  end
+
+  defp tool_only_assistant_entry?(_entry), do: false
+
+  defp merge_tool_only_entry(tool_entry, assistant_entry) do
+    %{
+      assistant_entry
+      | tool_markers: tool_entry.tool_markers ++ assistant_entry.tool_markers,
+        inline_surfaces: tool_entry.inline_surfaces ++ assistant_entry.inline_surfaces,
+        tool_surfaces: tool_entry.tool_surfaces ++ assistant_entry.tool_surfaces
+    }
   end
 
   defp pending_user_message(_messages, nil), do: nil
