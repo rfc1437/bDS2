@@ -22,8 +22,7 @@ defmodule BDS.MCP.Util do
   def normalize_term(value), do: value |> to_string() |> String.downcase()
 
   @spec maybe_put(map(), term(), term()) :: map()
-  def maybe_put(map, _key, nil), do: map
-  def maybe_put(map, key, value), do: Map.put(map, key, value)
+  def maybe_put(map, key, value), do: BDS.MapUtils.maybe_put(map, key, value)
 
   @spec map_get(map(), atom(), term()) :: term()
   def map_get(map, key, default \\ nil) do

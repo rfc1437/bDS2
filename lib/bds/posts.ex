@@ -2,6 +2,7 @@ defmodule BDS.Posts do
   @moduledoc false
 
   import Ecto.Query
+  import BDS.MapUtils, only: [attr: 2, maybe_put: 3]
 
   alias BDS.Embeddings
   alias BDS.Media
@@ -193,7 +194,8 @@ defmodule BDS.Posts do
     end
   end
 
-  @spec rebuild_posts_from_files(String.t(), rebuild_opts()) :: {:ok, [Post.t()]} | {:error, term()}
+  @spec rebuild_posts_from_files(String.t(), rebuild_opts()) ::
+          {:ok, [Post.t()]} | {:error, term()}
   defdelegate rebuild_posts_from_files(project_id, opts \\ []), to: RebuildFromFiles
 
   @spec discard_post_changes(String.t()) ::
@@ -211,12 +213,13 @@ defmodule BDS.Posts do
         full_path = Path.join(Projects.project_data_dir(project), post.file_path)
 
         if File.exists?(full_path) do
-            with {:ok, restored_post} <- RebuildFromFiles.upsert_post_from_file(post.project_id, project, full_path) do
-              :ok = PostLinks.sync_post_links(restored_post)
-              {:ok, restored_post}
-            else
-              {:error, reason} -> {:error, reason}
-            end
+          with {:ok, restored_post} <-
+                 RebuildFromFiles.upsert_post_from_file(post.project_id, project, full_path) do
+            :ok = PostLinks.sync_post_links(restored_post)
+            {:ok, restored_post}
+          else
+            {:error, reason} -> {:error, reason}
+          end
         else
           {:error, :not_found}
         end
@@ -262,12 +265,13 @@ defmodule BDS.Posts do
         full_path = Path.join(Projects.project_data_dir(project), post.file_path)
 
         if File.exists?(full_path) do
-            with {:ok, repaired_post} <- RebuildFromFiles.upsert_post_from_file(post.project_id, project, full_path) do
-              :ok = PostLinks.sync_post_links(repaired_post)
-              {:ok, repaired_post}
-            else
-              {:error, reason} -> {:error, reason}
-            end
+          with {:ok, repaired_post} <-
+                 RebuildFromFiles.upsert_post_from_file(post.project_id, project, full_path) do
+            :ok = PostLinks.sync_post_links(repaired_post)
+            {:ok, repaired_post}
+          else
+            {:error, reason} -> {:error, reason}
+          end
         else
           {:error, :not_found}
         end
@@ -405,7 +409,9 @@ defmodule BDS.Posts do
 
   @spec rebuild_post_links(String.t(), rebuild_opts()) :: :ok
   def rebuild_post_links(project_id, opts \\ []) do
-    post_ids = Repo.all(from(post in Post, where: post.project_id == ^project_id, select: post.id))
+    post_ids =
+      Repo.all(from(post in Post, where: post.project_id == ^project_id, select: post.id))
+
     on_progress = RebuildFromFiles.progress_callback(opts)
 
     Repo.delete_all(
@@ -414,7 +420,14 @@ defmodule BDS.Posts do
       )
     )
 
-    posts = Repo.all(from(post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at]))
+    posts =
+      Repo.all(
+        from(post in Post,
+          where: post.project_id == ^project_id,
+          order_by: [asc: post.created_at]
+        )
+      )
+
     total_posts = length(posts)
     :ok = RebuildFromFiles.report_rebuild_started(on_progress, total_posts, "post links")
 
@@ -422,7 +435,9 @@ defmodule BDS.Posts do
     |> Enum.with_index(1)
     |> Enum.each(fn {post, index} ->
       PostLinks.sync_post_links(post)
-      :ok = RebuildFromFiles.report_rebuild_progress(on_progress, index, total_posts, "post links")
+
+      :ok =
+        RebuildFromFiles.report_rebuild_progress(on_progress, index, total_posts, "post links")
     end)
 
     :ok
@@ -438,8 +453,11 @@ defmodule BDS.Posts do
   @spec delete_post_translation(String.t()) :: {:ok, :deleted} | {:error, :not_found}
   defdelegate delete_post_translation(translation_id), to: Translations
 
-  @spec validate_translations(String.t(), rebuild_opts()) :: {:ok, translation_validation_report()}
-  defdelegate validate_translations(project_id, opts \\ []), to: TranslationValidation, as: :validate
+  @spec validate_translations(String.t(), rebuild_opts()) ::
+          {:ok, translation_validation_report()}
+  defdelegate validate_translations(project_id, opts \\ []),
+    to: TranslationValidation,
+    as: :validate
 
   @spec fix_invalid_translations(map()) ::
           {:ok,
@@ -458,6 +476,7 @@ defmodule BDS.Posts do
       project = Projects.get_project!(post.project_id)
       full_path = Path.join(Projects.project_data_dir(project), post.file_path)
       body = published_post_body(post, full_path)
+
       :ok =
         Persistence.atomic_write(
           full_path,
@@ -544,9 +563,6 @@ defmodule BDS.Posts do
     )
   end
 
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
-
   defp normalize_title(nil), do: ""
   defp normalize_title(title), do: title
 
@@ -563,13 +579,5 @@ defmodule BDS.Posts do
 
   defp has_attr?(attrs, key) do
     Map.has_key?(attrs, key) or Map.has_key?(attrs, Atom.to_string(key))
-  end
-
-  defp attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
   end
 end

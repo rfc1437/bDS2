@@ -2,6 +2,7 @@ defmodule BDS.Posts.Translations do
   @moduledoc false
 
   import Ecto.Query
+  import BDS.MapUtils, only: [attr: 2, maybe_put: 3]
 
   alias BDS.Persistence
   alias BDS.Posts
@@ -264,16 +265,5 @@ defmodule BDS.Posts.Translations do
     |> String.downcase()
     |> String.split("-", parts: 2)
     |> hd()
-  end
-
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
-
-  defp attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
   end
 end

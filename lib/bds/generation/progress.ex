@@ -9,12 +9,7 @@ defmodule BDS.Generation.Progress do
 
   @doc "Extract the `:on_progress` callback from a keyword list of options."
   @spec callback(keyword()) :: callback()
-  def callback(opts) do
-    case Keyword.get(opts, :on_progress) do
-      cb when is_function(cb, 2) -> cb
-      _other -> nil
-    end
-  end
+  def callback(opts), do: BDS.ProgressReporter.callback(opts)
 
   @spec report_generation_started(callback(), non_neg_integer(), String.t()) :: :ok
   def report_generation_started(nil, _total, _label), do: :ok
@@ -29,7 +24,8 @@ defmodule BDS.Generation.Progress do
     :ok
   end
 
-  @spec report_generation_progress(callback(), non_neg_integer(), non_neg_integer(), String.t()) :: :ok
+  @spec report_generation_progress(callback(), non_neg_integer(), non_neg_integer(), String.t()) ::
+          :ok
   def report_generation_progress(nil, _current, _total, _label), do: :ok
   def report_generation_progress(_callback, _current, 0, _label), do: :ok
 
@@ -46,7 +42,8 @@ defmodule BDS.Generation.Progress do
     :ok
   end
 
-  @spec report_validation_snapshot_progress(callback(), atom(), non_neg_integer(), integer()) :: :ok
+  @spec report_validation_snapshot_progress(callback(), atom(), non_neg_integer(), integer()) ::
+          :ok
   def report_validation_snapshot_progress(nil, _stage, _current, _total), do: :ok
 
   def report_validation_snapshot_progress(_callback, _stage, _current, total)
@@ -75,7 +72,8 @@ defmodule BDS.Generation.Progress do
     :ok
   end
 
-  @spec report_snapshot_stage_progress(stage_callback(), atom(), non_neg_integer(), integer()) :: :ok
+  @spec report_snapshot_stage_progress(stage_callback(), atom(), non_neg_integer(), integer()) ::
+          :ok
   def report_snapshot_stage_progress(nil, _stage, _current, _total), do: :ok
   def report_snapshot_stage_progress(_callback, _stage, _current, total) when total <= 0, do: :ok
 

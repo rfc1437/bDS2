@@ -2,28 +2,12 @@ defmodule BDS.Media.FileOps do
   @moduledoc false
 
   alias BDS.Persistence
+  alias BDS.ProgressReporter
   alias BDS.Projects
 
-  @typedoc "An attribute map that may use atom or string keys."
-  @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
-
-  @spec attr(attrs(), atom()) :: term()
-  def attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
-  end
-
-  @spec maybe_put(map(), atom(), term()) :: map()
-  def maybe_put(map, _key, nil), do: map
-  def maybe_put(map, key, value), do: Map.put(map, key, value)
-
-  @spec blank_to_nil(term()) :: term()
-  def blank_to_nil(nil), do: nil
-  def blank_to_nil(""), do: nil
-  def blank_to_nil(value), do: value
+  defdelegate attr(attrs, key), to: BDS.MapUtils
+  defdelegate maybe_put(map, key, value), to: BDS.MapUtils
+  defdelegate blank_to_nil(value), to: BDS.MapUtils
 
   @spec atomic_write(Path.t(), iodata()) :: :ok | {:error, term()}
   def atomic_write(path, contents), do: Persistence.atomic_write(path, contents)
@@ -95,36 +79,20 @@ defmodule BDS.Media.FileOps do
   def image_mime?(mime_type), do: String.starts_with?(mime_type || "", "image/")
 
   @spec progress_callback(keyword()) :: (float(), String.t() -> any()) | nil
-  def progress_callback(opts) do
-    case Keyword.get(opts, :on_progress) do
-      callback when is_function(callback, 2) -> callback
-      _other -> nil
-    end
-  end
+  def progress_callback(opts), do: ProgressReporter.callback(opts)
 
   @spec scaled_progress_reporter((float(), String.t() -> any()) | nil, float(), float()) ::
           (float(), String.t() -> any()) | nil
-  def scaled_progress_reporter(nil, _start_value, _end_value), do: nil
+  def scaled_progress_reporter(report, start_value, end_value),
+    do: ProgressReporter.scaled(report, start_value, end_value)
 
-  def scaled_progress_reporter(report, start_value, end_value) when is_function(report, 2) do
-    fn value, message ->
-      scaled_value = start_value + (end_value - start_value) * value
-      report.(scaled_value, message)
-    end
-  end
-
-  @spec report_rebuild_started((float(), String.t() -> any()) | nil, non_neg_integer(), String.t()) :: :ok
-  def report_rebuild_started(nil, _total, _label), do: :ok
-
-  def report_rebuild_started(callback, 0, label) do
-    callback.(1.0, "No #{label} found")
-    :ok
-  end
-
-  def report_rebuild_started(callback, total, label) do
-    callback.(0.05, "Rebuilding #{label} (0/#{total})")
-    :ok
-  end
+  @spec report_rebuild_started(
+          (float(), String.t() -> any()) | nil,
+          non_neg_integer(),
+          String.t()
+        ) :: :ok
+  def report_rebuild_started(callback, total, label),
+    do: ProgressReporter.report_rebuild_started(callback, total, label)
 
   @spec report_rebuild_progress(
           (float(), String.t() -> any()) | nil,
@@ -132,19 +100,10 @@ defmodule BDS.Media.FileOps do
           non_neg_integer(),
           String.t()
         ) :: :ok
-  def report_rebuild_progress(nil, _current, _total, _label), do: :ok
-  def report_rebuild_progress(_callback, _current, 0, _label), do: :ok
-
-  def report_rebuild_progress(callback, current, total, label) do
-    callback.(0.05 + 0.95 * (current / total), "Rebuilding #{label} (#{current}/#{total})")
-    :ok
-  end
+  def report_rebuild_progress(callback, current, total, label),
+    do: ProgressReporter.report_rebuild_progress(callback, current, total, label)
 
   @spec report_rebuild_phase((float(), String.t() -> any()) | nil, float(), String.t()) :: :ok
-  def report_rebuild_phase(nil, _progress, _message), do: :ok
-
-  def report_rebuild_phase(callback, progress, message) do
-    callback.(progress, message)
-    :ok
-  end
+  def report_rebuild_phase(callback, progress, message),
+    do: ProgressReporter.report_phase(callback, progress, message)
 end

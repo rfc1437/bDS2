@@ -2,11 +2,13 @@ defmodule BDS.Search do
   @moduledoc false
 
   import Ecto.Query
+  import BDS.MapUtils, only: [attr: 2]
 
   alias BDS.Media.Media
   alias BDS.Media.Translation, as: MediaTranslation
   alias BDS.Persistence
   alias BDS.Posts.Post
+  alias BDS.ProgressReporter
   alias BDS.Projects
   alias BDS.Repo
 
@@ -244,12 +246,7 @@ defmodule BDS.Search do
     :ok
   end
 
-  defp progress_callback(opts) do
-    case Keyword.get(opts, :on_progress) do
-      callback when is_function(callback, 2) -> callback
-      _other -> nil
-    end
-  end
+  defp progress_callback(opts), do: ProgressReporter.callback(opts)
 
   defp report_reindex_started(nil, _total, _label), do: :ok
 
@@ -665,7 +662,9 @@ defmodule BDS.Search do
   defp normalize_non_negative_integer(value, default), do: normalize_integer(value) || default
 
   defp normalize_timestamp(nil, _position), do: nil
-  defp normalize_timestamp(value, _position) when is_integer(value), do: Persistence.normalize_unix_timestamp(value)
+
+  defp normalize_timestamp(value, _position) when is_integer(value),
+    do: Persistence.normalize_unix_timestamp(value)
 
   defp normalize_timestamp(value, position) when is_binary(value) do
     case Date.from_iso8601(value) do
@@ -680,12 +679,4 @@ defmodule BDS.Search do
   end
 
   defp blank_query?(query), do: query in [nil, ""] or String.trim(to_string(query)) == ""
-
-  defp attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
-  end
 end

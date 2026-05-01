@@ -2,10 +2,12 @@ defmodule BDS.Templates do
   @moduledoc false
 
   import Ecto.Query
+  import BDS.MapUtils, only: [attr: 2, maybe_put: 3]
 
   alias BDS.DocumentFields
   alias BDS.Frontmatter
   alias BDS.Persistence
+  alias BDS.ProgressReporter
   alias BDS.Posts
   alias BDS.Projects
   alias BDS.Repo
@@ -522,45 +524,15 @@ defmodule BDS.Templates do
     end
   end
 
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
-
   defp has_attr?(attrs, key) do
     Map.has_key?(attrs, key) or Map.has_key?(attrs, Atom.to_string(key))
   end
 
-  defp attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
-  end
+  defp progress_callback(opts), do: ProgressReporter.callback(opts)
 
-  defp progress_callback(opts) do
-    case Keyword.get(opts, :on_progress) do
-      callback when is_function(callback, 2) -> callback
-      _other -> nil
-    end
-  end
+  defp report_rebuild_started(callback, total, label),
+    do: ProgressReporter.report_rebuild_started(callback, total, label)
 
-  defp report_rebuild_started(nil, _total, _label), do: :ok
-
-  defp report_rebuild_started(callback, 0, label) do
-    callback.(1.0, "No #{label} found")
-    :ok
-  end
-
-  defp report_rebuild_started(callback, total, label) do
-    callback.(0.05, "Rebuilding #{label} (0/#{total})")
-    :ok
-  end
-
-  defp report_rebuild_progress(nil, _current, _total, _label), do: :ok
-  defp report_rebuild_progress(_callback, _current, 0, _label), do: :ok
-
-  defp report_rebuild_progress(callback, current, total, label) do
-    callback.(0.05 + 0.95 * (current / total), "Rebuilding #{label} (#{current}/#{total})")
-    :ok
-  end
+  defp report_rebuild_progress(callback, current, total, label),
+    do: ProgressReporter.report_rebuild_progress(callback, current, total, label)
 end

@@ -3,6 +3,8 @@ defmodule BDS.Publishing do
 
   use GenServer
 
+  import BDS.MapUtils, only: [attr: 2]
+
   alias BDS.Persistence
   alias BDS.Publishing.PublishJob
   alias BDS.Projects
@@ -44,7 +46,9 @@ defmodule BDS.Publishing do
   def handle_call({:update_job, job_id, attrs}, _from, state) do
     reply =
       case Repo.get(PublishJob, job_id) do
-        nil -> :ok
+        nil ->
+          :ok
+
         job ->
           attrs = Map.put(attrs, :updated_at, Persistence.now_ms())
           job |> PublishJob.changeset(attrs) |> Repo.update!()
@@ -335,12 +339,4 @@ defmodule BDS.Publishing do
   defp normalize_ssh_mode(mode) when mode in [:scp, :rsync], do: mode
   defp normalize_ssh_mode("rsync"), do: :rsync
   defp normalize_ssh_mode(_mode), do: :scp
-
-  defp attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
-  end
 end

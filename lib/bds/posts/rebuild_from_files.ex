@@ -5,6 +5,7 @@ defmodule BDS.Posts.RebuildFromFiles do
   alias BDS.Embeddings
   alias BDS.Frontmatter
   alias BDS.Persistence
+  alias BDS.ProgressReporter
   alias BDS.Posts.Post
   alias BDS.Posts.Slugs
   alias BDS.Posts.Translation
@@ -113,7 +114,9 @@ defmodule BDS.Posts.RebuildFromFiles do
       with {:ok, rebuild_file} <- parse_rebuild_file(project, full_path) do
         if TranslationValidation.translation_rebuild_file?(rebuild_file) do
           source_post_id = Map.fetch!(rebuild_file.fields, "translationFor")
-          language = TranslationValidation.normalize_language(Map.fetch!(rebuild_file.fields, "language"))
+
+          language =
+            TranslationValidation.normalize_language(Map.fetch!(rebuild_file.fields, "language"))
 
           case Repo.get(Post, source_post_id) do
             nil ->
@@ -133,7 +136,7 @@ defmodule BDS.Posts.RebuildFromFiles do
                    sync_search: true
                  )}
               end
-            end
+          end
         else
           {:error, :unsupported_file}
         end
@@ -267,50 +270,21 @@ defmodule BDS.Posts.RebuildFromFiles do
   def parse_translation_status(status), do: String.to_existing_atom(status)
 
   @doc false
-  def progress_callback(opts) do
-    case Keyword.get(opts, :on_progress) do
-      callback when is_function(callback, 2) -> callback
-      _other -> nil
-    end
-  end
+  def progress_callback(opts), do: ProgressReporter.callback(opts)
 
   @doc false
-  def report_rebuild_started(nil, _total, _label), do: :ok
-
-  def report_rebuild_started(callback, 0, label) do
-    callback.(1.0, "No #{label} found")
-    :ok
-  end
-
-  def report_rebuild_started(callback, total, label) do
-    callback.(0.05, "Rebuilding #{label} (0/#{total})")
-    :ok
-  end
+  def report_rebuild_started(callback, total, label),
+    do: ProgressReporter.report_rebuild_started(callback, total, label)
 
   @doc false
-  def report_rebuild_progress(nil, _current, _total, _label), do: :ok
-  def report_rebuild_progress(_callback, _current, 0, _label), do: :ok
+  def report_rebuild_progress(callback, current, total, label),
+    do: ProgressReporter.report_rebuild_progress(callback, current, total, label)
 
-  def report_rebuild_progress(callback, current, total, label) do
-    callback.(0.05 + 0.95 * (current / total), "Rebuilding #{label} (#{current}/#{total})")
-    :ok
-  end
+  defp scaled_progress_reporter(report, start_value, end_value),
+    do: ProgressReporter.scaled(report, start_value, end_value)
 
-  defp scaled_progress_reporter(nil, _start_value, _end_value), do: nil
-
-  defp scaled_progress_reporter(report, start_value, end_value) when is_function(report, 2) do
-    fn value, message ->
-      scaled_value = start_value + (end_value - start_value) * value
-      report.(scaled_value, message)
-    end
-  end
-
-  defp report_rebuild_phase(nil, _progress, _message), do: :ok
-
-  defp report_rebuild_phase(callback, progress, message) do
-    callback.(progress, message)
-    :ok
-  end
+  defp report_rebuild_phase(callback, progress, message),
+    do: ProgressReporter.report_phase(callback, progress, message)
 
   defp unique_post_id(nil), do: Ecto.UUID.generate()
 
