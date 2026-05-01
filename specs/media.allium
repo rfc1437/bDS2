@@ -9,7 +9,7 @@ surface MediaControlSurface {
     facing _: MediaOperator
 
     provides:
-        ImportMediaRequested(project, source_file)
+        ImportMediaRequested(source_path, project, metadata)
         UpdateMediaRequested(media, changes)
         DeleteMediaRequested(media)
         UpsertMediaTranslationRequested(media, language, title, alt, caption)
@@ -121,22 +121,29 @@ invariant DateBasedMediaLayout {
 }
 
 rule ImportMedia {
-    when: ImportMediaRequested(project, source_file)
-    let uuid_name = generate_uuid() + extension(source_file)
+    when: ImportMediaRequested(source_path, project, metadata)
+    -- metadata is optional import context: title, alt, caption, author,
+    -- language, and tags may be supplied by the caller.
+    let uuid_name = generate_uuid() + extension(source_path)
     let dest = format("media/{yyyy}/{mm}/{uuid_name}",
         yyyy: now.year, mm: now.month_padded)
     ensures: Media.created(
         project: project,
         filename: uuid_name,
-        original_name: source_file.name,
-        mime_type: detect_mime(source_file),
-        size: source_file.size,
-        width: detect_width(source_file),
-        height: detect_height(source_file),
+        original_name: basename(source_path),
+        mime_type: detect_mime(source_path),
+        size: file_size(source_path),
+        width: detect_width(source_path),
+        height: detect_height(source_path),
+        title: metadata.title,
+        alt: metadata.alt,
+        caption: metadata.caption,
+        author: metadata.author,
+        language: metadata.language,
         file_path: dest,
-        tags: {}
+        tags: metadata.tags
     )
-    ensures: FileCopied(source_file, dest)
+    ensures: FileCopied(source_path, dest)
     ensures: SidecarWritten(media)
     ensures: ThumbnailsGenerated(media)
     ensures: SearchIndexUpdated(media)

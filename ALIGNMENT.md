@@ -54,7 +54,7 @@ Goal: align bDS2 with old bDS behavior. Use the Allium specs as the contract onl
 - Spec: now specifies WebP quality 80 and AI JPEG quality 85.
 - Action: tend `specs/media_processing.allium` to specify WebP quality 80 and AI JPEG quality 85.
 
-## P2: Media Import Event Shape
+## P2: Media Import Event Shape (done)
 
 - Old bDS: imports by source path plus optional metadata in project context.
 - bDS2 now: imports with attrs including `source_path` and `project_id`.

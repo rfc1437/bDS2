@@ -14,7 +14,7 @@ surface MediaProcessingControlSurface {
     facing _: MediaProcessingOperator
 
     provides:
-        ImportMediaRequested(source_path, project)
+        ImportMediaRequested(source_path, project, metadata)
         TagMediaRequested(media, tags)
         DeleteMediaRequested(media)
         ValidateMediaRequested(project)
@@ -239,11 +239,13 @@ invariant MediaTranslationFileLayout {
 -- ============================================================================
 
 rule ImportMedia {
-    when: ImportMediaRequested(source_path, project)
+    when: ImportMediaRequested(source_path, project, metadata)
+    -- metadata is optional import context: title, alt, caption, author,
+    -- language, and tags may be supplied by the caller.
     -- 1. Validate file type (must be supported image)
     -- 2. Generate UUID v4 filename
     -- 3. Copy to media/{YYYY}/{MM}/{uuid}.{ext}
-    -- 4. Write sidecar {binary_path}.meta
+    -- 4. Apply optional metadata and write sidecar {binary_path}.meta
     -- 5. Generate four thumbnail sizes
     -- 6. Index for search (FTS5)
     ensures: media/Media.created(
@@ -253,6 +255,12 @@ rule ImportMedia {
         size: file_size(source_path),
         width: extract_width_from_header(source_path),
         height: extract_height_from_header(source_path),
+        title: metadata.title,
+        alt: metadata.alt,
+        caption: metadata.caption,
+        author: metadata.author,
+        language: metadata.language,
+        tags: metadata.tags,
         file_path: format("media/{yyyy}/{mm}/{uuid}.{ext}"),
         sidecar_path: format("media/{yyyy}/{mm}/{uuid}.{ext}.meta"),
         checksum: sha256(source_path)
