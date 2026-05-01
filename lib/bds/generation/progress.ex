@@ -12,64 +12,54 @@ defmodule BDS.Generation.Progress do
   def callback(opts), do: BDS.ProgressReporter.callback(opts)
 
   @spec report_generation_started(callback(), non_neg_integer(), String.t()) :: :ok
-  def report_generation_started(nil, _total, _label), do: :ok
-
-  def report_generation_started(callback, 0, label) do
-    callback.(1.0, "No #{label} to process")
-    :ok
-  end
-
   def report_generation_started(callback, total, label) do
-    callback.(0.0, "Processing 0/#{total} #{label}")
-    :ok
+    BDS.ProgressReporter.report_count_started(callback, total, label,
+      verb: "Processing",
+      start_progress: 0.0,
+      empty_suffix: "to process",
+      message_style: :prefix_count
+    )
   end
 
   @spec report_generation_progress(callback(), non_neg_integer(), non_neg_integer(), String.t()) ::
           :ok
-  def report_generation_progress(nil, _current, _total, _label), do: :ok
-  def report_generation_progress(_callback, _current, 0, _label), do: :ok
-
   def report_generation_progress(callback, current, total, label) do
-    callback.(current / total, "Processing #{current}/#{total} #{label}")
-    :ok
+    BDS.ProgressReporter.report_count_progress(callback, current, total, label,
+      verb: "Processing",
+      start_progress: 0.0,
+      message_style: :prefix_count
+    )
   end
 
   @spec report_validation_progress(callback(), float(), String.t()) :: :ok
-  def report_validation_progress(nil, _progress, _message), do: :ok
-
-  def report_validation_progress(callback, progress, message) do
-    callback.(progress, message)
-    :ok
-  end
+  def report_validation_progress(callback, progress, message),
+    do: BDS.ProgressReporter.report_phase(callback, progress, message)
 
   @spec report_validation_snapshot_progress(callback(), atom(), non_neg_integer(), integer()) ::
           :ok
-  def report_validation_snapshot_progress(nil, _stage, _current, _total), do: :ok
-
-  def report_validation_snapshot_progress(_callback, _stage, _current, total)
-      when total <= 0,
-      do: :ok
-
   def report_validation_snapshot_progress(callback, :posts, current, total) do
-    progress = min(0.18, current / total * 0.18)
-    callback.(progress, "Collecting sitemap URLs... #{current}/#{total}")
-    :ok
+    BDS.ProgressReporter.report_count_progress(callback, current, total, "sitemap URLs...",
+      verb: "Collecting",
+      range: {0.0, 0.18},
+      message_style: :verb_label_count
+    )
   end
 
   def report_validation_snapshot_progress(callback, :translations, current, total) do
-    progress = 0.18 + min(0.12, current / total * 0.12)
-    callback.(progress, "Collecting sitemap URLs... #{current}/#{total}")
-    :ok
+    BDS.ProgressReporter.report_count_progress(callback, current, total, "sitemap URLs...",
+      verb: "Collecting",
+      range: {0.18, 0.30},
+      message_style: :verb_label_count
+    )
   end
 
   @spec report_validation_collection_progress(callback(), non_neg_integer(), integer()) :: :ok
-  def report_validation_collection_progress(nil, _current, _total), do: :ok
-  def report_validation_collection_progress(_callback, _current, total) when total <= 0, do: :ok
-
   def report_validation_collection_progress(callback, current, total) do
-    progress = min(0.49, 0.30 + current / total * 0.19)
-    callback.(progress, "Collecting sitemap URLs... #{current}/#{total}")
-    :ok
+    BDS.ProgressReporter.report_count_progress(callback, current, total, "sitemap URLs...",
+      verb: "Collecting",
+      range: {0.30, 0.49},
+      message_style: :verb_label_count
+    )
   end
 
   @spec report_snapshot_stage_progress(stage_callback(), atom(), non_neg_integer(), integer()) ::
@@ -83,12 +73,15 @@ defmodule BDS.Generation.Progress do
   end
 
   @spec report_validation_compare_progress(callback(), non_neg_integer(), integer()) :: :ok
-  def report_validation_compare_progress(nil, _current, _total), do: :ok
-  def report_validation_compare_progress(_callback, _current, total) when total <= 0, do: :ok
-
   def report_validation_compare_progress(callback, current, total) do
-    progress = min(0.99, 0.5 + current / total * 0.49)
-    callback.(progress, "Comparing sitemap to html pages... #{current}/#{total}")
-    :ok
+    BDS.ProgressReporter.report_count_progress(
+      callback,
+      current,
+      total,
+      "sitemap to html pages...",
+      verb: "Comparing",
+      range: {0.5, 0.99},
+      message_style: :verb_label_count
+    )
   end
 end

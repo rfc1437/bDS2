@@ -6,6 +6,7 @@ defmodule BDS.Embeddings.Index do
   alias BDS.Persistence
   alias BDS.Embeddings.Key
   alias BDS.Projects
+  alias BDS.ProgressReporter
   alias BDS.Repo
 
   @neighbor_limit 21
@@ -206,30 +207,22 @@ defmodule BDS.Embeddings.Index do
   defp sort_pair(post_id_a, post_id_b) when post_id_a <= post_id_b, do: {post_id_a, post_id_b}
   defp sort_pair(post_id_a, post_id_b), do: {post_id_b, post_id_a}
 
-  defp progress_callback(opts) do
-    case Keyword.get(opts, :on_progress) do
-      callback when is_function(callback, 2) -> callback
-      _other -> nil
-    end
-  end
-
-  defp report_scan_started(nil, _total, _label), do: :ok
-
-  defp report_scan_started(callback, 0, label) do
-    callback.(1.0, "No #{label} to scan")
-    :ok
-  end
+  defp progress_callback(opts), do: ProgressReporter.callback(opts)
 
   defp report_scan_started(callback, total, label) do
-    callback.(0.0, "Scanning 0/#{total} #{label}")
-    :ok
+    ProgressReporter.report_count_started(callback, total, label,
+      verb: "Scanning",
+      start_progress: 0.0,
+      empty_suffix: "to scan",
+      message_style: :prefix_count
+    )
   end
 
-  defp report_scan_progress(nil, _current, _total, _label), do: :ok
-  defp report_scan_progress(_callback, _current, 0, _label), do: :ok
-
   defp report_scan_progress(callback, current, total, label) do
-    callback.(current / total, "Scanning #{current}/#{total} #{label}")
-    :ok
+    ProgressReporter.report_count_progress(callback, current, total, label,
+      verb: "Scanning",
+      start_progress: 0.0,
+      message_style: :prefix_count
+    )
   end
 end

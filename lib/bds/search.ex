@@ -248,24 +248,21 @@ defmodule BDS.Search do
 
   defp progress_callback(opts), do: ProgressReporter.callback(opts)
 
-  defp report_reindex_started(nil, _total, _label), do: :ok
-
-  defp report_reindex_started(callback, 0, label) do
-    callback.(1.0, "No #{label} to reindex")
-    :ok
-  end
-
   defp report_reindex_started(callback, total, label) do
-    callback.(0.0, "Reindexing 0/#{total} #{label}")
-    :ok
+    ProgressReporter.report_count_started(callback, total, label,
+      verb: "Reindexing",
+      start_progress: 0.0,
+      empty_suffix: "to reindex",
+      message_style: :prefix_count
+    )
   end
-
-  defp report_reindex_progress(nil, _current, _total, _label), do: :ok
-  defp report_reindex_progress(_callback, _current, 0, _label), do: :ok
 
   defp report_reindex_progress(callback, current, total, label) do
-    callback.(current / total, "Reindexing #{current}/#{total} #{label}")
-    :ok
+    ProgressReporter.report_count_progress(callback, current, total, label,
+      verb: "Reindexing",
+      start_progress: 0.0,
+      message_style: :prefix_count
+    )
   end
 
   defp insert_post_index(%Post{} = post) do

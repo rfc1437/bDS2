@@ -9,6 +9,7 @@ defmodule BDS.Embeddings do
   alias BDS.Embeddings.Key
   alias BDS.Metadata
   alias BDS.Posts.Post
+  alias BDS.ProgressReporter
   alias BDS.Projects
   alias BDS.Repo
 
@@ -87,7 +88,11 @@ defmodule BDS.Embeddings do
       on_progress = progress_callback(opts)
 
       posts =
-        Repo.all(from post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at, asc: post.slug])
+        Repo.all(
+          from post in Post,
+            where: post.project_id == ^project_id,
+            order_by: [asc: post.created_at, asc: post.slug]
+        )
 
       post_ids = Enum.map(posts, & &1.id)
       total_posts = length(posts)
@@ -162,7 +167,8 @@ defmodule BDS.Embeddings do
 
     case Repo.get_by(Key, post_id: post.id, project_id: post.project_id) do
       %Key{content_hash: ^content_hash} ->
-        if Keyword.get(opts, :refresh_index, true) and snapshot_content_hash(post.project_id, post.id) != content_hash do
+        if Keyword.get(opts, :refresh_index, true) and
+             snapshot_content_hash(post.project_id, post.id) != content_hash do
           :ok = rebuild_snapshot(post.project_id)
         end
 
@@ -193,11 +199,14 @@ defmodule BDS.Embeddings do
   def remove_post(post_id) when is_binary(post_id) do
     project_id =
       case Repo.get_by(Key, post_id: post_id) do
-        %Key{project_id: project_id} -> project_id
-        nil -> case Repo.get(Post, post_id) do
-          %Post{project_id: project_id} -> project_id
-          nil -> nil
-        end
+        %Key{project_id: project_id} ->
+          project_id
+
+        nil ->
+          case Repo.get(Post, post_id) do
+            %Post{project_id: project_id} -> project_id
+            nil -> nil
+          end
       end
 
     Repo.delete_all(from key in Key, where: key.post_id == ^post_id)
@@ -212,26 +221,33 @@ defmodule BDS.Embeddings do
   def index_unindexed(project_id) when is_binary(project_id) do
     if enabled_for_project?(project_id) do
       posts =
-        Repo.all(from post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at, asc: post.slug])
+        Repo.all(
+          from post in Post,
+            where: post.project_id == ^project_id,
+            order_by: [asc: post.created_at, asc: post.slug]
+        )
 
       Enum.each(posts, fn post ->
-          body = resolve_post_body(post)
-          content_hash = hash_text(compose_embedding_source(post.title, body))
+        body = resolve_post_body(post)
+        content_hash = hash_text(compose_embedding_source(post.title, body))
 
-          case Repo.get_by(Key, post_id: post.id, project_id: project_id) do
-            %Key{content_hash: ^content_hash} -> :ok
-            _other ->
-              :ok =
-                sync_post_if_enabled(
-                  %{post | content: if(post.content in [nil, ""], do: body, else: post.content)},
-                  refresh_index: false
-                )
-          end
-        end)
+        case Repo.get_by(Key, post_id: post.id, project_id: project_id) do
+          %Key{content_hash: ^content_hash} ->
+            :ok
+
+          _other ->
+            :ok =
+              sync_post_if_enabled(
+                %{post | content: if(post.content in [nil, ""], do: body, else: post.content)},
+                refresh_index: false
+              )
+        end
+      end)
 
       :ok = rebuild_snapshot(project_id)
 
-      indexed = Repo.all(from key in Key, where: key.project_id == ^project_id, select: key.post_id)
+      indexed =
+        Repo.all(from key in Key, where: key.project_id == ^project_id, select: key.post_id)
 
       {:ok, indexed}
     else
@@ -241,15 +257,29 @@ defmodule BDS.Embeddings do
 
   def find_similar(post_id, limit \\ 5) when is_binary(post_id) and is_integer(limit) do
     case source_post_and_vector(post_id) do
-      {:disabled, _project_id} -> {:ok, []}
-      {:error, :not_found} -> {:ok, []}
+      {:disabled, _project_id} ->
+        {:ok, []}
+
+      {:error, :not_found} ->
+        {:ok, []}
+
       {:ok, post, source_vector} ->
         similar =
           case Index.neighbors(post.project_id, post.id, limit) do
-            {:ok, neighbors} -> neighbors
+            {:ok, neighbors} ->
+              neighbors
+
             {:error, :missing} ->
-              Repo.all(from key in Key, where: key.project_id == ^post.project_id and key.post_id != ^post.id)
-              |> Enum.map(fn key -> %{post_id: key.post_id, score: cosine_similarity(source_vector, decode_vector(key.vector))} end)
+              Repo.all(
+                from key in Key,
+                  where: key.project_id == ^post.project_id and key.post_id != ^post.id
+              )
+              |> Enum.map(fn key ->
+                %{
+                  post_id: key.post_id,
+                  score: cosine_similarity(source_vector, decode_vector(key.vector))
+                }
+              end)
               |> Enum.sort_by(& &1.score, :desc)
               |> Enum.take(max(limit, 0))
           end
@@ -261,18 +291,29 @@ defmodule BDS.Embeddings do
   def compute_similarities(source_post_id, target_post_ids)
       when is_binary(source_post_id) and is_list(target_post_ids) do
     case source_post_and_vector(source_post_id) do
-      {:disabled, _project_id} -> {:ok, %{}}
-      {:error, :not_found} -> {:ok, %{}}
+      {:disabled, _project_id} ->
+        {:ok, %{}}
+
+      {:error, :not_found} ->
+        {:ok, %{}}
+
       {:ok, post, source_vector} ->
         target_ids = Enum.uniq(target_post_ids)
 
         scores =
-          Repo.all(from key in Key, where: key.project_id == ^post.project_id and key.post_id in ^target_ids)
+          Repo.all(
+            from key in Key,
+              where: key.project_id == ^post.project_id and key.post_id in ^target_ids
+          )
           |> Enum.reduce(%{}, fn key, acc ->
             if key.post_id == source_post_id do
               acc
             else
-              Map.put(acc, key.post_id, cosine_similarity(source_vector, decode_vector(key.vector)))
+              Map.put(
+                acc,
+                key.post_id,
+                cosine_similarity(source_vector, decode_vector(key.vector))
+              )
             end
           end)
 
@@ -289,7 +330,9 @@ defmodule BDS.Embeddings do
         |> then(fn posts_by_id ->
           Enum.reduce(similar, %{}, fn %{post_id: similar_post_id, score: score}, acc ->
             case Map.get(posts_by_id, similar_post_id) do
-              nil -> acc
+              nil ->
+                acc
+
               similar_post ->
                 Enum.reduce(similar_post.tags || [], acc, fn tag, tag_acc ->
                   Map.update(tag_acc, tag, score, &(&1 + score))
@@ -320,7 +363,13 @@ defmodule BDS.Embeddings do
             |> enrich_duplicate_pairs(project_id)
 
           {:error, :missing} ->
-            keys = Repo.all(from key in Key, where: key.project_id == ^project_id, order_by: [asc: key.post_id])
+            keys =
+              Repo.all(
+                from key in Key,
+                  where: key.project_id == ^project_id,
+                  order_by: [asc: key.post_id]
+              )
+
             total_keys = length(keys)
 
             :ok = report_rebuild_started(on_progress, total_keys, "embedding entries")
@@ -333,7 +382,8 @@ defmodule BDS.Embeddings do
               for right <- keys,
                   left.post_id < right.post_id,
                   pair_key(left.post_id, right.post_id) not in dismissed,
-                  similarity = cosine_similarity(decode_vector(left.vector), decode_vector(right.vector)),
+                  similarity =
+                    cosine_similarity(decode_vector(left.vector), decode_vector(right.vector)),
                   similarity >= @duplicate_threshold do
                 %{
                   post_id_a: left.post_id,
@@ -438,7 +488,9 @@ defmodule BDS.Embeddings do
       |> Enum.flat_map(&[&1.post_id_a, &1.post_id_b])
       |> Enum.uniq()
       |> then(fn post_ids ->
-        Repo.all(from post in Post, where: post.project_id == ^project_id and post.id in ^post_ids)
+        Repo.all(
+          from post in Post, where: post.project_id == ^project_id and post.id in ^post_ids
+        )
         |> Map.new(&{&1.id, &1})
       end)
 
@@ -454,7 +506,9 @@ defmodule BDS.Embeddings do
       |> Map.put(:similarity, pair.score)
       |> Map.put(:exact_match, exact_match)
     end)
-    |> Enum.sort_by(fn pair -> {not pair.exact_match, -pair.score, pair.post_id_a, pair.post_id_b} end)
+    |> Enum.sort_by(fn pair ->
+      {not pair.exact_match, -pair.score, pair.post_id_a, pair.post_id_b}
+    end)
   end
 
   defp exact_duplicate_match?(score, %Post{} = post_a, %Post{} = post_b) do
@@ -485,7 +539,8 @@ defmodule BDS.Embeddings do
     end
   end
 
-  defp resolve_post_body(%Post{content: content}) when is_binary(content) and content != "", do: content
+  defp resolve_post_body(%Post{content: content}) when is_binary(content) and content != "",
+    do: content
 
   defp resolve_post_body(%Post{project_id: project_id, file_path: file_path}) do
     if file_path in [nil, ""] do
@@ -507,7 +562,8 @@ defmodule BDS.Embeddings do
     end
   end
 
-  defp compose_embedding_source(title, content), do: string_or_empty(title) <> "\n\n" <> string_or_empty(content)
+  defp compose_embedding_source(title, content),
+    do: string_or_empty(title) <> "\n\n" <> string_or_empty(content)
 
   defp string_or_empty(nil), do: ""
   defp string_or_empty(value) when is_binary(value), do: value
@@ -525,39 +581,27 @@ defmodule BDS.Embeddings do
     Index.rebuild(project_id, model_id: model_id(), dimensions: dimensions())
   end
 
-  defp progress_callback(opts) do
-    case Keyword.get(opts, :on_progress) do
-      callback when is_function(callback, 2) -> callback
-      _other -> nil
-    end
-  end
-
-  defp report_rebuild_started(nil, _total, _label), do: :ok
-
-  defp report_rebuild_started(callback, 0, label) do
-    callback.(1.0, "No #{label} to rebuild")
-    :ok
-  end
+  defp progress_callback(opts), do: ProgressReporter.callback(opts)
 
   defp report_rebuild_started(callback, total, label) do
-    callback.(0.0, "Rebuilding 0/#{total} #{label}")
-    :ok
+    ProgressReporter.report_count_started(callback, total, label,
+      verb: "Rebuilding",
+      start_progress: 0.0,
+      empty_suffix: "to rebuild",
+      message_style: :prefix_count
+    )
   end
-
-  defp report_rebuild_progress(nil, _current, _total, _label), do: :ok
-  defp report_rebuild_progress(_callback, _current, 0, _label), do: :ok
 
   defp report_rebuild_progress(callback, current, total, label) do
-    callback.(current / total, "Rebuilding #{current}/#{total} #{label}")
-    :ok
+    ProgressReporter.report_count_progress(callback, current, total, label,
+      verb: "Rebuilding",
+      start_progress: 0.0,
+      message_style: :prefix_count
+    )
   end
 
-  defp report_rebuild_phase(nil, _value, _label), do: :ok
-
-  defp report_rebuild_phase(callback, value, label) do
-    callback.(value, label)
-    :ok
-  end
+  defp report_rebuild_phase(callback, value, label),
+    do: ProgressReporter.report_phase(callback, value, label)
 
   defp snapshot_content_hash(project_id, post_id) do
     case Index.read(project_id) do
