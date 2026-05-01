@@ -452,7 +452,7 @@ defmodule BDS.AI.Chat do
   end
 
   defp build_chat_request(conversation, messages, model, project_id, tools) do
-    system_message = %{"role" => "system", "content" => chat_system_prompt(project_id)}
+    system_message = %{"role" => "system", "content" => chat_system_prompt(project_id, tools)}
 
     %{
       operation: :chat,
@@ -511,15 +511,14 @@ defmodule BDS.AI.Chat do
     ChatTools.available_specs(project_id, Catalog.model_capabilities(model))
   end
 
-  defp chat_system_prompt(project_id) do
+  defp chat_system_prompt(project_id, tools) do
     base = get_setting("ai.system_prompt") || @default_system_prompt
 
-    case project_stats_summary(project_id) do
-      nil ->
-        base
-
-      summary ->
-        base <> "\n\nCurrent blog statistics:\n" <> summary <> "\n\n" <> blog_tool_guidance()
+    with true <- tools != [],
+         summary when is_binary(summary) <- project_stats_summary(project_id) do
+      base <> "\n\nCurrent blog statistics:\n" <> summary <> "\n\n" <> blog_tool_guidance()
+    else
+      _other -> base
     end
   end
 

@@ -604,6 +604,42 @@ defmodule BDS.AITest do
     assert Enum.any?(second_request.messages, fn message -> message["role"] == "tool" end)
   end
 
+  test "chat does not prompt models to emit textual tool calls when tools are unavailable" do
+    {:ok, project} = create_project_fixture("No Tool Chat")
+    _fixtures = seed_project_content(project.id)
+
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{
+                 url: "http://localhost:11434/v1",
+                 api_key: nil,
+                 model: "llama-plain"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(true)
+    assert :ok = BDS.AI.put_model_preference(:airplane_chat, "llama-plain")
+    assert {:ok, conversation} = BDS.AI.start_chat(%{model: "llama-plain"})
+
+    assert {:ok, _reply} =
+             BDS.AI.send_chat_message(conversation.id, "Show posts per month",
+               runtime: FakeRuntime,
+               test_pid: self(),
+               project_id: project.id,
+               secret_backend: FakeSecretBackend
+             )
+
+    assert_received {:runtime_request, _endpoint, first_request}
+    assert first_request.tools == []
+
+    refute Enum.any?(first_request.messages, fn message ->
+             message["role"] == "system" and
+               String.contains?(message["content"], "Available blog data tools")
+           end)
+  end
+
   test "non-stat chat tools expose concrete project data" do
     {:ok, project} = create_project_fixture("Concrete Tools")
     %{post: post, media: media} = seed_project_content(project.id)

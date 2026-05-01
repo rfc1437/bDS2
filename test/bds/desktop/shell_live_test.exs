@@ -770,11 +770,13 @@ defmodule BDS.Desktop.ShellLiveTest do
           "online_url" => "https://api.example.test/v1",
           "online_api_key" => "online-secret",
           "online_chat_model" => "gpt-4.1",
+          "online_chat_tools" => "true",
           "online_title_model" => "gpt-4.1-mini",
           "online_image_analysis_model" => "gpt-4.1-vision",
           "offline_url" => "http://localhost:11434/v1",
           "offline_api_key" => "",
           "offline_chat_model" => "llama3.3",
+          "offline_chat_tools" => "true",
           "offline_title_model" => "llama3.2",
           "offline_image_analysis_model" => "llava:latest",
           "offline_mode" => "true",
@@ -802,6 +804,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert {:ok, "llama3.3"} = AI.get_model_preference(:airplane_chat)
     assert {:ok, "llama3.2"} = AI.get_model_preference(:airplane_title)
     assert {:ok, "llava:latest"} = AI.get_model_preference(:airplane_image_analysis)
+
+    assert %{supports_tool_calls: true} = BDS.AI.Catalog.model_capabilities("gpt-4.1")
+    assert %{supports_tool_calls: true} = BDS.AI.Catalog.model_capabilities("llama3.3")
   end
 
   test "ai settings refresh models from the configured endpoints" do

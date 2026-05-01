@@ -17,6 +17,10 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
       "online_api_key" => Map.get(online_endpoint || %{}, :api_key, ""),
       "online_chat_model" =>
         get_model_preference(:chat) || Map.get(online_endpoint || %{}, :model, ""),
+      "online_chat_tools" =>
+        model_supports_tool_calls?(
+          get_model_preference(:chat) || Map.get(online_endpoint || %{}, :model, "")
+        ),
       "online_title_model" => get_model_preference(:title),
       "online_image_analysis_model" => get_model_preference(:image_analysis),
       "offline_url" => Map.get(airplane_endpoint || %{}, :url, ""),
@@ -25,6 +29,10 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
       "offline_chat_model" =>
         get_model_preference(:airplane_chat) ||
           Map.get(airplane_endpoint || %{}, :model, ""),
+      "offline_chat_tools" =>
+        model_supports_tool_calls?(
+          get_model_preference(:airplane_chat) || Map.get(airplane_endpoint || %{}, :model, "")
+        ),
       "offline_title_model" => get_model_preference(:airplane_title),
       "offline_image_analysis_model" => get_model_preference(:airplane_image_analysis),
       "system_prompt" => EditorSettings.get_global_setting("ai.system_prompt") || ""
@@ -90,9 +98,13 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
          :ok <- AI.delete_endpoint(:mistral),
          :ok <- AI.set_airplane_mode(attrs.offline_mode),
          :ok <- maybe_put_model_preference(:chat, attrs.online_chat_model),
+         :ok <-
+           maybe_put_chat_model_capabilities(attrs.online_chat_model, attrs.online_chat_tools),
          :ok <- maybe_put_model_preference(:title, attrs.online_title_model),
          :ok <- maybe_put_model_preference(:image_analysis, attrs.online_image_analysis_model),
          :ok <- maybe_put_model_preference(:airplane_chat, attrs.offline_chat_model),
+         :ok <-
+           maybe_put_chat_model_capabilities(attrs.offline_chat_model, attrs.offline_chat_tools),
          :ok <- maybe_put_model_preference(:airplane_title, attrs.offline_title_model),
          :ok <-
            maybe_put_model_preference(
@@ -134,12 +146,14 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
       online_url: blank_to_nil(Map.get(draft, "online_url")),
       online_api_key: blank_to_nil(Map.get(draft, "online_api_key")),
       online_chat_model: blank_to_nil(Map.get(draft, "online_chat_model")),
+      online_chat_tools: truthy?(Map.get(draft, "online_chat_tools")),
       online_title_model: blank_to_nil(Map.get(draft, "online_title_model")),
       online_image_analysis_model: blank_to_nil(Map.get(draft, "online_image_analysis_model")),
       offline_url: blank_to_nil(Map.get(draft, "offline_url")),
       offline_api_key: blank_to_nil(Map.get(draft, "offline_api_key")),
       offline_mode: truthy?(Map.get(draft, "offline_mode")),
       offline_chat_model: blank_to_nil(Map.get(draft, "offline_chat_model")),
+      offline_chat_tools: truthy?(Map.get(draft, "offline_chat_tools")),
       offline_title_model: blank_to_nil(Map.get(draft, "offline_title_model")),
       offline_image_analysis_model: blank_to_nil(Map.get(draft, "offline_image_analysis_model")),
       system_prompt: Map.get(draft, "system_prompt", "")
@@ -151,12 +165,14 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
       "online_url" => Map.get(params, "online_url", ""),
       "online_api_key" => Map.get(params, "online_api_key", ""),
       "online_chat_model" => Map.get(params, "online_chat_model", ""),
+      "online_chat_tools" => truthy?(Map.get(params, "online_chat_tools")),
       "online_title_model" => Map.get(params, "online_title_model", ""),
       "online_image_analysis_model" => Map.get(params, "online_image_analysis_model", ""),
       "offline_url" => Map.get(params, "offline_url", ""),
       "offline_api_key" => Map.get(params, "offline_api_key", ""),
       "offline_mode" => truthy?(Map.get(params, "offline_mode")),
       "offline_chat_model" => Map.get(params, "offline_chat_model", ""),
+      "offline_chat_tools" => truthy?(Map.get(params, "offline_chat_tools")),
       "offline_title_model" => Map.get(params, "offline_title_model", ""),
       "offline_image_analysis_model" => Map.get(params, "offline_image_analysis_model", ""),
       "system_prompt" => Map.get(params, "system_prompt", "")
@@ -173,6 +189,24 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
   defp maybe_put_model_preference(_key, nil), do: :ok
   defp maybe_put_model_preference(_key, ""), do: :ok
   defp maybe_put_model_preference(key, value), do: AI.put_model_preference(key, value)
+
+  defp maybe_put_chat_model_capabilities(nil, _supports_tool_calls), do: :ok
+  defp maybe_put_chat_model_capabilities("", _supports_tool_calls), do: :ok
+
+  defp maybe_put_chat_model_capabilities(model, supports_tool_calls) do
+    existing = BDS.AI.Catalog.model_capabilities(model)
+
+    AI.put_model_capabilities(model, %{
+      supports_attachment: existing.supports_attachment,
+      supports_tool_calls: supports_tool_calls
+    })
+  end
+
+  defp model_supports_tool_calls?(nil), do: false
+  defp model_supports_tool_calls?(""), do: false
+
+  defp model_supports_tool_calls?(model),
+    do: BDS.AI.Catalog.model_capabilities(model).supports_tool_calls
 
   defp put_endpoint_preferences(kind, url, api_key, primary_model) do
     if Enum.all?([url, api_key, primary_model], &(blank_to_nil(&1) == nil)) do
