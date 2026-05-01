@@ -2,7 +2,7 @@
 
 Living document. Each section lists **status**, then **open work in priority order**, then a brief notes block. Completed work is listed compactly at the bottom (`## Changelog`).
 
-Last refreshed: 2026-05-04.
+Last refreshed: 2026-05-05.
 
 ---
 
@@ -14,7 +14,6 @@ Last refreshed: 2026-05-04.
 
 | # | Module | Current lines | Target | Strategy |
 |---|---|---|---|---|
-| 5 | `BDS.Desktop.ShellLive.MenuEditor` | 871 | ≤ 350 | Extract `TreeOps` (~280), `TreePredicates` (~60), `DraftManagement` (~140), `PageCategory` (~120), `State` (~80). |
 | 6 | `BDS.Desktop.ShellLive.PostEditor` | 963 | ≤ 400 | Extract `DraftManagement` (~180), `ListValues` (~160), `Persistence` (~140), `PostMetadata` (~150). |
 | 7 | `BDS.Desktop.ShellLive.SettingsEditor` | 872 | ≤ 350 | Extract `ProjectSettings` (~140), `AISettings` (~150), `PublishingSettings` (~80), `ManagedCategories` (~140), `StyleEditor` (~80), `MCPConfig` (~60). |
 | 8 | `BDS.Desktop.ShellLive.ChatEditor` | 972 | ≤ 400 | Extract `ToolSurfaces` (~280), `ToolTracking` (~140), `MessageBuild` (~160), `ModelSelection` (~100). Defer — highest internal coupling. |
@@ -33,6 +32,7 @@ Last refreshed: 2026-05-04.
 - `BDS.Media` 993 → 324 (67 %)
 - `BDS.Desktop.ShellLive.ImportEditor` 1436 → 776 (46 %)
 - `BDS.Rendering` 838 → 33 (96 %)
+- `BDS.Desktop.ShellLive.MenuEditor` 871 → 335 (62 %)
 
 ---
 
@@ -165,6 +165,11 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ---
 
 ## Changelog
+
+### 2026-05-05
+
+- **God modules**:
+  - `BDS.Desktop.ShellLive.MenuEditor` 871 → 335 (62 %). Submodules under `lib/bds/desktop/shell_live/menu_editor/`: `TreeOps` (296, home_item/home_item_id + ui_item + persisted_item + first_item_id + insert_target + path_prefix? + find_path + item_at_path + items_at_path + replace_items_at_path + update_item + insert_item + remove_item + remove_item_with_value + append_child + move_selected + indent_selected + unindent_selected + delete_selected + drop_selected + insert_dropped_item), `TreePredicates` (55, can_move_up?/can_move_down?/can_indent?/can_unindent?/can_delete? + draft_item?), `DraftManagement` (132, current_draft + start_page_draft + start_category_draft + finalize_submenu_draft + assign_page_to_draft + assign_category_to_draft + cancel_draft + confirm_category_draft), `PageCategory` (58, page_posts + page_post + filter_page_posts + category_options + filter_categories + blank_to_nil), `State` (85, ensure_state + update_state + build + save + load_state). Coordinator keeps the 11 public event handlers (assign_socket, select_item, change_entry, submit_entry, cancel_entry, select_page, select_category, toolbar_action, drop_item, handle_keydown), the 3 HEEx components (menu_editor, menu_tree_level, kind_icon), and the render-time helpers (translated, row_label, kind_label, editing_title/hint/placeholder); `draft_item?/2` is exposed via `defdelegate` so HEEx call sites stay unchanged. Cross-submodule deps are linear: State → PageCategory + TreeOps + TreePredicates; DraftManagement → PageCategory + TreeOps; TreePredicates → TreeOps; PageCategory and TreeOps are leaves. `confirm_category_draft/2` takes the State.update_state function as an argument to avoid a cycle. Validates clean: `mix compile --warnings-as-errors`, `mix dialyzer --format short` (0 errors), `mix test` (342 tests, 0 failures, 4 skipped).
 
 ### 2026-05-04
 

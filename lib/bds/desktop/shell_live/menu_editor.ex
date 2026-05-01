@@ -3,21 +3,22 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
   use Phoenix.Component
 
-  import Ecto.Query
-
   alias BDS.Desktop.ShellData
-  alias BDS.{Menu, Metadata, Repo}
-  alias BDS.Posts.Post
+  alias BDS.Desktop.ShellLive.MenuEditor.{
+    DraftManagement,
+    PageCategory,
+    State,
+    TreeOps,
+    TreePredicates
+  }
 
   embed_templates "menu_editor_html/*"
-
-  @home_item_id "menu-home"
 
   def assign_socket(socket) do
     case socket.assigns[:current_tab] do
       %{type: :menu_editor, id: tab_id} ->
-        state = ensure_state(socket.assigns)
-        menu_editor = build(socket.assigns, state)
+        state = State.ensure_state(socket.assigns)
+        menu_editor = State.build(socket.assigns, state)
 
         socket
         |> assign(:menu_editor_state, state)
@@ -37,7 +38,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
   def select_item(socket, item_id, reload) do
     socket
-    |> update_state(fn state -> %{state | selected_id: item_id} end)
+    |> State.update_state(fn state -> %{state | selected_id: item_id} end)
     |> reload.(socket.assigns.workbench)
   end
 
@@ -45,20 +46,20 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     query = Map.get(params, "query", "")
 
     socket
-    |> update_state(fn state -> put_in(state, [:draft, :query], query) end)
+    |> State.update_state(fn state -> put_in(state, [:draft, :query], query) end)
     |> reload.(socket.assigns.workbench)
   end
 
   def submit_entry(socket, reload) do
-    case current_draft(socket.assigns) do
+    case DraftManagement.current_draft(socket.assigns) do
       %{type: :page} ->
         socket
-        |> update_state(&finalize_submenu_draft/1)
+        |> State.update_state(&DraftManagement.finalize_submenu_draft/1)
         |> reload.(socket.assigns.workbench)
 
       %{type: :category} ->
         socket
-        |> confirm_category_draft()
+        |> DraftManagement.confirm_category_draft(&State.update_state/2)
         |> reload.(socket.assigns.workbench)
 
       _other ->
@@ -68,17 +69,18 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
   def cancel_entry(socket, reload) do
     socket
-    |> update_state(&cancel_draft/1)
+    |> State.update_state(&DraftManagement.cancel_draft/1)
     |> reload.(socket.assigns.workbench)
   end
 
   def select_page(socket, post_id, reload) do
-    case page_post(socket.assigns.projects.active_project_id, post_id) do
-      nil -> reload.(socket, socket.assigns.workbench)
+    case PageCategory.page_post(socket.assigns.projects.active_project_id, post_id) do
+      nil ->
+        reload.(socket, socket.assigns.workbench)
 
       post ->
         socket
-        |> update_state(&assign_page_to_draft(&1, post))
+        |> State.update_state(&DraftManagement.assign_page_to_draft(&1, post))
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -86,12 +88,13 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
   def select_category(socket, name, reload) do
     project_id = socket.assigns.projects.active_project_id
 
-    case Enum.find(category_options(project_id), &(&1.name == name)) do
-      nil -> reload.(socket, socket.assigns.workbench)
+    case Enum.find(PageCategory.category_options(project_id), &(&1.name == name)) do
+      nil ->
+        reload.(socket, socket.assigns.workbench)
 
       category ->
         socket
-        |> update_state(&assign_category_to_draft(&1, category))
+        |> State.update_state(&DraftManagement.assign_category_to_draft(&1, category))
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -100,40 +103,40 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     case action do
       "add-entry" ->
         socket
-        |> update_state(&start_page_draft/1)
+        |> State.update_state(&DraftManagement.start_page_draft/1)
         |> reload.(socket.assigns.workbench)
 
       "add-category-archive" ->
         socket
-        |> update_state(&start_category_draft/1)
+        |> State.update_state(&DraftManagement.start_category_draft/1)
         |> reload.(socket.assigns.workbench)
 
       "save" ->
-        save(socket, reload, append_output)
+        State.save(socket, reload, append_output)
 
       "move-up" ->
         socket
-        |> update_state(&move_selected(&1, :up))
+        |> State.update_state(&TreeOps.move_selected(&1, :up))
         |> reload.(socket.assigns.workbench)
 
       "move-down" ->
         socket
-        |> update_state(&move_selected(&1, :down))
+        |> State.update_state(&TreeOps.move_selected(&1, :down))
         |> reload.(socket.assigns.workbench)
 
       "indent" ->
         socket
-        |> update_state(&indent_selected/1)
+        |> State.update_state(&TreeOps.indent_selected/1)
         |> reload.(socket.assigns.workbench)
 
       "unindent" ->
         socket
-        |> update_state(&unindent_selected/1)
+        |> State.update_state(&TreeOps.unindent_selected/1)
         |> reload.(socket.assigns.workbench)
 
       "delete" ->
         socket
-        |> update_state(&delete_selected/1)
+        |> State.update_state(&TreeOps.delete_selected/1)
         |> reload.(socket.assigns.workbench)
 
       _other ->
@@ -143,7 +146,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
   def drop_item(socket, drag_item_id, target_item_id, position, reload) do
     socket
-    |> update_state(&drop_selected(&1, drag_item_id, target_item_id, position))
+    |> State.update_state(&TreeOps.drop_selected(&1, drag_item_id, target_item_id, position))
     |> reload.(socket.assigns.workbench)
   end
 
@@ -303,7 +306,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     """
   end
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  def translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
 
   def row_label(item, category_titles) do
     if item.kind == :category_archive do
@@ -318,9 +322,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
   def kind_label(:category_archive), do: translated("menuEditor.type.categoryArchive")
   def kind_label(:submenu), do: translated("menuEditor.type.submenu")
 
-  def draft_item?(menu_editor, item_id) do
-    match?(%{item_id: ^item_id}, menu_editor.draft)
-  end
+  defdelegate draft_item?(menu_editor, item_id), to: TreePredicates
 
   def editing_title(%{draft: %{type: :category}}), do: translated("menuEditor.addCategoryArchive")
   def editing_title(_menu_editor), do: translated("menuEditor.pagePicker.title")
@@ -330,542 +332,4 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
   def editing_placeholder(%{draft: %{type: :category}}), do: translated("menuEditor.newCategoryPlaceholder")
   def editing_placeholder(_menu_editor), do: translated("menuEditor.newEntryPlaceholder")
-
-  defp ensure_state(assigns) do
-    project_id = assigns.projects.active_project_id
-
-    case assigns[:menu_editor_state] do
-      %{project_id: ^project_id} = state -> state
-      _other -> load_state(project_id)
-    end
-  end
-
-  defp load_state(nil) do
-    %{project_id: nil, items: [home_item()], selected_id: @home_item_id, draft: nil}
-  end
-
-  defp load_state(project_id) do
-    {:ok, %{items: items}} = Menu.get_menu(project_id)
-    items = Enum.map(items, &ui_item/1)
-
-    %{
-      project_id: project_id,
-      items: items,
-      selected_id: first_item_id(items),
-      draft: nil
-    }
-  end
-
-  defp build(_assigns, state) do
-    categories = category_options(state.project_id)
-    draft = state.draft
-    draft_query = Map.get(draft || %{}, :query, "")
-
-    %{
-      title: translated("menuEditor.title"),
-      description: translated("menuEditor.description"),
-      items: state.items,
-      selected_id: state.selected_id,
-      draft: draft,
-      draft_query: draft_query,
-      filtered_pages:
-        if(match?(%{type: :page}, draft),
-          do: filter_page_posts(page_posts(state.project_id), draft_query),
-          else: []
-        ),
-      filtered_categories:
-        if(match?(%{type: :category}, draft),
-          do: filter_categories(categories, draft_query),
-          else: []
-        ),
-      category_titles: Map.new(categories, &{&1.name, &1.title}),
-      can_move_up?: can_move_up?(state.items, state.selected_id),
-      can_move_down?: can_move_down?(state.items, state.selected_id),
-      can_indent?: can_indent?(state.items, state.selected_id),
-      can_unindent?: can_unindent?(state.items, state.selected_id),
-      can_delete?: can_delete?(state.selected_id),
-      has_items?: state.items != []
-    }
-  end
-
-  defp save(socket, reload, append_output) do
-    state = socket.assigns.menu_editor_state
-
-    {:ok, _menu} = Menu.update_menu(state.project_id, Enum.map(state.items, &persisted_item/1))
-
-    socket
-    |> append_output.(translated("menuEditor.tabTitle"), translated("menuEditor.saved"), nil, "info")
-    |> reload.(socket.assigns.workbench)
-  end
-
-  defp confirm_category_draft(socket) do
-    project_id = socket.assigns.projects.active_project_id
-    draft = current_draft(socket.assigns)
-    normalized = String.trim(Map.get(draft || %{}, :query, ""))
-
-    category =
-      Enum.find(category_options(project_id), fn option ->
-        String.downcase(option.name) == String.downcase(normalized) or
-          String.downcase(option.title) == String.downcase(normalized)
-      end)
-
-    category =
-      cond do
-        category != nil -> category
-        normalized == "" -> %{name: "", title: ""}
-        true ->
-          {:ok, _metadata} = Metadata.add_category(project_id, normalized)
-          %{name: normalized, title: normalized}
-      end
-
-    update_state(socket, &assign_category_to_draft(&1, category))
-  end
-
-  defp update_state(socket, updater) do
-    state = ensure_state(socket.assigns)
-    assign(socket, :menu_editor_state, updater.(state))
-  end
-
-  defp start_page_draft(state) do
-    item = %{item_id: Ecto.UUID.generate(), kind: :page, label: translated("menuEditor.newPage"), slug: nil, children: [], is_home: false}
-    {parent_path, index} = insert_target(state.items, state.selected_id)
-    items = insert_item(state.items, parent_path, index, item)
-    %{state | items: items, selected_id: item.item_id, draft: %{item_id: item.item_id, type: :page, query: ""}}
-  end
-
-  defp start_category_draft(state) do
-    item = %{item_id: Ecto.UUID.generate(), kind: :category_archive, label: "", slug: nil, children: [], is_home: false}
-    {parent_path, index} = insert_target(state.items, state.selected_id)
-    items = insert_item(state.items, parent_path, index, item)
-    %{state | items: items, selected_id: item.item_id, draft: %{item_id: item.item_id, type: :category, query: ""}}
-  end
-
-  defp finalize_submenu_draft(%{draft: %{item_id: item_id, query: query}} = state) do
-    label = if(String.trim(query) == "", do: translated("menuEditor.newSubmenu"), else: String.trim(query))
-
-    %{state | items: update_item(state.items, item_id, fn item -> %{item | kind: :submenu, label: label, slug: nil, children: item.children || []} end), draft: nil}
-  end
-
-  defp finalize_submenu_draft(state), do: state
-
-  defp assign_page_to_draft(%{draft: %{item_id: item_id}} = state, post) do
-    %{
-      state
-      | items:
-          update_item(state.items, item_id, fn item ->
-            %{item | kind: :page, label: post.title, slug: blank_to_nil(post.slug), children: []}
-          end),
-        draft: nil
-    }
-  end
-
-  defp assign_page_to_draft(state, _post), do: state
-
-  defp assign_category_to_draft(%{draft: %{item_id: item_id}} = state, category) do
-    label = blank_to_nil(category.title) || category.name
-
-    %{
-      state
-      | items:
-          update_item(state.items, item_id, fn item ->
-            %{item | kind: :category_archive, label: label, slug: category.name, children: []}
-          end),
-        draft: nil
-    }
-  end
-
-  defp assign_category_to_draft(state, _category), do: state
-
-  defp cancel_draft(%{draft: %{item_id: item_id}} = state) do
-    items = remove_item(state.items, item_id)
-    %{state | items: items, selected_id: first_item_id(items), draft: nil}
-  end
-
-  defp cancel_draft(state), do: state
-
-  defp move_selected(%{selected_id: selected_id} = state, direction) when direction in [:up, :down] do
-    case find_path(state.items, selected_id) do
-      nil -> state
-      [] -> state
-      path ->
-        parent_path = Enum.drop(path, -1)
-        index = List.last(path)
-        siblings = items_at_path(state.items, parent_path)
-        delta = if(direction == :up, do: -1, else: 1)
-        target_index = index + delta
-
-        if target_index < 0 or target_index >= length(siblings) do
-          state
-        else
-          reordered =
-            List.pop_at(siblings, index)
-            |> then(fn {item, rest} -> List.insert_at(rest, target_index, item) end)
-
-          %{state | items: replace_items_at_path(state.items, parent_path, reordered)}
-        end
-    end
-  end
-
-  defp indent_selected(%{selected_id: selected_id} = state) do
-    case find_path(state.items, selected_id) do
-      nil -> state
-      [] -> state
-      path ->
-        parent_path = Enum.drop(path, -1)
-        index = List.last(path)
-
-        cond do
-          index <= 0 ->
-            state
-
-          true ->
-            previous_sibling_path = parent_path ++ [index - 1]
-
-            case item_at_path(state.items, previous_sibling_path) do
-              %{kind: :submenu, item_id: sibling_id} ->
-                case remove_item_with_value(state.items, selected_id) do
-                  {_next_items, nil} -> state
-                  {next_items, removed_item} ->
-                    %{
-                      state
-                      | items: append_child(next_items, sibling_id, removed_item)
-                    }
-                end
-
-              _other ->
-                state
-            end
-        end
-    end
-  end
-
-  defp unindent_selected(%{selected_id: selected_id} = state) do
-    case find_path(state.items, selected_id) do
-      nil -> state
-      [] -> state
-      [_root_index] -> state
-      path ->
-        parent_path = Enum.drop(path, -1)
-        parent_index = List.last(parent_path)
-        grand_parent_path = Enum.drop(parent_path, -1)
-
-        case remove_item_with_value(state.items, selected_id) do
-          {_next_items, nil} -> state
-          {next_items, removed_item} ->
-            %{
-              state
-              | items: insert_item(next_items, grand_parent_path, parent_index + 1, removed_item)
-            }
-        end
-    end
-  end
-
-  defp delete_selected(%{selected_id: @home_item_id} = state), do: state
-
-  defp delete_selected(%{selected_id: selected_id} = state) do
-    items = remove_item(state.items, selected_id)
-    %{state | items: items, selected_id: first_item_id(items), draft: nil}
-  end
-
-  defp drop_selected(state, drag_item_id, target_item_id, _position)
-       when drag_item_id in [nil, ""] or target_item_id in [nil, ""] do
-    state
-  end
-
-  defp drop_selected(state, drag_item_id, target_item_id, _position) when drag_item_id == target_item_id,
-    do: state
-
-  defp drop_selected(state, drag_item_id, target_item_id, position) do
-    drag_path = find_path(state.items, drag_item_id)
-    target_path = find_path(state.items, target_item_id)
-
-    cond do
-      is_nil(drag_path) or is_nil(target_path) ->
-        state
-
-      path_prefix?(drag_path, target_path) ->
-        state
-
-      true ->
-        case remove_item_with_value(state.items, drag_item_id) do
-          {_next_items, nil} ->
-            state
-
-          {next_items, dragged_item} ->
-            case find_path(next_items, target_item_id) do
-              nil ->
-                state
-
-              next_target_path ->
-                insert_dropped_item(state, next_items, dragged_item, next_target_path, position)
-            end
-        end
-    end
-  end
-
-  defp insert_dropped_item(state, next_items, dragged_item, target_path, "inside") do
-    case item_at_path(next_items, target_path) do
-      %{kind: :submenu} ->
-        %{state | items: insert_item(next_items, target_path, 0, dragged_item), selected_id: dragged_item.item_id}
-
-      _other ->
-        state
-    end
-  end
-
-  defp insert_dropped_item(state, next_items, dragged_item, target_path, "before") do
-    parent_path = Enum.drop(target_path, -1)
-    index = List.last(target_path)
-    %{state | items: insert_item(next_items, parent_path, index, dragged_item), selected_id: dragged_item.item_id}
-  end
-
-  defp insert_dropped_item(state, next_items, dragged_item, target_path, _position) do
-    parent_path = Enum.drop(target_path, -1)
-    index = List.last(target_path) + 1
-    %{state | items: insert_item(next_items, parent_path, index, dragged_item), selected_id: dragged_item.item_id}
-  end
-
-  defp current_draft(assigns), do: Map.get(assigns.menu_editor_state || %{}, :draft)
-
-  defp page_posts(nil), do: []
-
-  defp page_posts(project_id) do
-    Repo.all(from post in Post, where: post.project_id == ^project_id, order_by: [asc: post.title, asc: post.slug])
-    |> Enum.filter(&("page" in (&1.categories || [])))
-  end
-
-  defp page_post(nil, _post_id), do: nil
-
-  defp page_post(project_id, post_id) do
-    Enum.find(page_posts(project_id), &(&1.id == post_id))
-  end
-
-  defp filter_page_posts(posts, query) do
-    normalized = query |> to_string() |> String.trim() |> String.downcase()
-
-    Enum.filter(posts, fn post ->
-      normalized == "" or
-        String.contains?(String.downcase(post.title || ""), normalized) or
-        String.contains?(String.downcase(post.slug || ""), normalized)
-    end)
-  end
-
-  defp category_options(nil), do: []
-
-  defp category_options(project_id) do
-    {:ok, metadata} = Metadata.get_project_metadata(project_id)
-
-    Enum.map(metadata.categories || [], fn name ->
-      title = get_in(metadata.category_settings || %{}, [name, "title"])
-      %{name: name, title: blank_to_nil(title) || name}
-    end)
-  end
-
-  defp filter_categories(categories, query) do
-    normalized = query |> to_string() |> String.trim() |> String.downcase()
-
-    Enum.filter(categories, fn category ->
-      normalized == "" or
-        String.contains?(String.downcase(category.name), normalized) or
-        String.contains?(String.downcase(category.title), normalized)
-    end)
-  end
-
-  defp can_move_up?(items, selected_id) do
-    case find_path(items, selected_id) do
-      [_parent, index] -> index > 0
-      [index] -> index > 0
-      path when is_list(path) -> List.last(path) > 0
-      _other -> false
-    end
-  end
-
-  defp can_move_down?(items, selected_id) do
-    case find_path(items, selected_id) do
-      nil -> false
-      path ->
-        parent_path = Enum.drop(path, -1)
-        index = List.last(path)
-        index < length(items_at_path(items, parent_path)) - 1
-    end
-  end
-
-  defp can_indent?(items, selected_id) do
-    case find_path(items, selected_id) do
-      nil -> false
-      [] -> false
-      [_index] = path ->
-        index = List.last(path)
-        index > 0 and match?(%{kind: :submenu}, item_at_path(items, [index - 1]))
-
-      path ->
-        index = List.last(path)
-
-        index > 0 and
-          match?(%{kind: :submenu}, item_at_path(items, Enum.drop(path, -1) ++ [index - 1]))
-    end
-  end
-
-  defp can_unindent?(items, selected_id) do
-    case find_path(items, selected_id) do
-      [_index] -> false
-      path when is_list(path) -> length(path) > 1
-      _other -> false
-    end
-  end
-
-  defp can_delete?(selected_id), do: is_binary(selected_id) and selected_id != @home_item_id
-
-  defp home_item do
-    %{item_id: @home_item_id, kind: :home, label: "Home", slug: nil, children: [], is_home: true}
-  end
-
-  defp ui_item(%{kind: :home}), do: home_item()
-
-  defp ui_item(item) do
-    kind = Map.get(item, :kind, :page)
-
-    %{
-      item_id: Ecto.UUID.generate(),
-      kind: kind,
-      label: Map.get(item, :label, ""),
-      slug: Map.get(item, :slug),
-      children: Enum.map(Map.get(item, :children, []), &ui_item/1),
-      is_home: false
-    }
-  end
-
-  defp persisted_item(%{kind: :home}), do: %{kind: :home, label: "Home", slug: nil}
-
-  defp persisted_item(%{kind: :submenu} = item) do
-    %{kind: :submenu, label: item.label, slug: nil, children: Enum.map(item.children || [], &persisted_item/1)}
-  end
-
-  defp persisted_item(item) do
-    %{kind: item.kind, label: item.label, slug: item.slug}
-  end
-
-  defp insert_target(items, nil), do: {[], length(items)}
-
-  defp insert_target(items, selected_id) do
-    case find_path(items, selected_id) do
-      nil -> {[], length(items)}
-      [] -> {[], length(items)}
-      path ->
-        case item_at_path(items, path) do
-          %{kind: :submenu} -> {path, 0}
-          _other -> {Enum.drop(path, -1), List.last(path) + 1}
-        end
-    end
-  end
-
-  defp first_item_id([item | _rest]), do: item.item_id
-  defp first_item_id([]), do: nil
-
-  defp blank_to_nil(nil), do: nil
-  defp blank_to_nil(value) do
-    trimmed = String.trim(to_string(value))
-    if trimmed == "", do: nil, else: trimmed
-  end
-
-  defp path_prefix?(prefix, path) when length(prefix) > length(path), do: false
-  defp path_prefix?(prefix, path), do: Enum.take(path, length(prefix)) == prefix
-
-  defp find_path(items, item_id, path \\ []) do
-    Enum.find_value(Enum.with_index(items), fn {item, index} ->
-      next_path = path ++ [index]
-
-      cond do
-        item.item_id == item_id ->
-          next_path
-
-        item.children != [] ->
-          find_path(item.children, item_id, next_path)
-
-        true ->
-          nil
-      end
-    end)
-  end
-
-  defp item_at_path(_items, []), do: nil
-
-  defp item_at_path(items, [index]) do
-    Enum.at(items, index)
-  end
-
-  defp item_at_path(items, [index | rest]) do
-    case Enum.at(items, index) do
-      nil -> nil
-      item -> item_at_path(item.children || [], rest)
-    end
-  end
-
-  defp items_at_path(items, []), do: items
-
-  defp items_at_path(items, [index | rest]) do
-    case Enum.at(items, index) do
-      nil -> []
-      item -> items_at_path(item.children || [], rest)
-    end
-  end
-
-  defp replace_items_at_path(_items, [], replacement), do: replacement
-
-  defp replace_items_at_path(items, [index | rest], replacement) do
-    List.update_at(items, index, fn item ->
-      %{item | children: replace_items_at_path(item.children || [], rest, replacement)}
-    end)
-  end
-
-  defp update_item(items, item_id, updater) do
-    Enum.map(items, fn item ->
-      cond do
-        item.item_id == item_id -> updater.(item)
-        item.children != [] -> %{item | children: update_item(item.children, item_id, updater)}
-        true -> item
-      end
-    end)
-  end
-
-  defp insert_item(items, [], index, item) do
-    List.insert_at(items, index, item)
-  end
-
-  defp insert_item(items, [head | tail], index, item) do
-    List.update_at(items, head, fn current ->
-      %{current | children: insert_item(current.children || [], tail, index, item)}
-    end)
-  end
-
-  defp remove_item(items, item_id) do
-    remove_item_with_value(items, item_id) |> elem(0)
-  end
-
-  defp remove_item_with_value(items, item_id) do
-    Enum.reduce_while(Enum.with_index(items), {items, nil}, fn {item, index}, _acc ->
-      cond do
-        item.item_id == item_id ->
-          {:halt, {List.delete_at(items, index), item}}
-
-        item.children != [] ->
-          {next_children, removed_item} = remove_item_with_value(item.children, item_id)
-
-          if removed_item do
-            {:halt, {List.replace_at(items, index, %{item | children: next_children}), removed_item}}
-          else
-            {:cont, {items, nil}}
-          end
-
-        true ->
-          {:cont, {items, nil}}
-      end
-    end)
-  end
-
-  defp append_child(items, parent_item_id, child) do
-    update_item(items, parent_item_id, fn item ->
-      %{item | children: (item.children || []) ++ [child]}
-    end)
-  end
 end
