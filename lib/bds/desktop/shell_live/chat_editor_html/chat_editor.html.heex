@@ -99,15 +99,14 @@
 
             <%= if message.role == :assistant do %>
               <div class="chat-message-text"><%= markdown_html(message.content || "") %></div>
+              <%= for surface <- message.inline_surfaces do %>
+                <.chat_surface surface={surface} />
+              <% end %>
             <% else %>
               <div class="chat-message-text chat-user-message-text" data-testid="chat-user-message-text"><%= message.content || "" %></div>
             <% end %>
           </div>
         </div>
-
-        <%= for surface <- message.inline_surfaces do %>
-          <.chat_surface surface={surface} />
-        <% end %>
 
       <% end %>
 
@@ -124,12 +123,11 @@
             <%= if @chat_editor.streaming_content != "" do %>
               <div class="chat-message-text"><%= markdown_html(@chat_editor.streaming_content) %></div>
             <% end %>
+            <%= for surface <- @chat_editor.streaming_inline_surfaces do %>
+              <.chat_surface surface={surface} />
+            <% end %>
           </div>
         </div>
-
-        <%= for surface <- @chat_editor.streaming_inline_surfaces do %>
-          <.chat_surface surface={surface} />
-        <% end %>
       <% end %>
 
       <%= if @chat_editor.is_streaming and @chat_editor.streaming_content == "" and @chat_editor.streaming_tool_markers == [] do %>

@@ -2271,6 +2271,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Blog Stats"
     assert html =~ "Metric"
     assert html =~ "Posts"
+    assert html =~ ~r/chat-message-content.*data-testid="chat-inline-surface"/s
 
     dismissed_html =
       render_click(view, "dismiss_chat_surface", %{
@@ -2333,21 +2334,113 @@ defmodule BDS.Desktop.ShellLiveTest do
       })
 
     assert length(:binary.matches(html, ~s(data-testid="chat-inline-surface"))) == 2
-    assert length(:binary.matches(html, "data-expanded")) == 2
+    assert length(:binary.matches(html, ~s(data-expanded="true"))) == 2
+    assert length(:binary.matches(html, ~s(open=""))) == 2
     assert html =~ "Earlier Missing Data"
     assert html =~ "The first data request needs review."
     assert html =~ "Latest Missing Data"
     assert html =~ "The second data request needs review."
+    assert html =~ ~r/chat-message-content.*Earlier Missing Data.*Latest Missing Data/s
+  end
+
+  test "chat editor keeps previous surfaces visible while a new update surface streams" do
+    assert :ok = AI.set_airplane_mode(false)
+
+    server =
+      start_supervised!({Bandit, plug: DelayedChatServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "online-secret",
+               model: "gpt-4.1"
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "Update Surfaces", model: "gpt-4.1"})
+
+    now = Persistence.now_ms()
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :assistant,
+        content: "Earlier missing data.",
+        tool_calls:
+          Jason.encode!([
+            %{
+              "id" => "call-card-old",
+              "name" => "render_card",
+              "arguments" => %{
+                "title" => "Earlier Missing Data",
+                "body" => "The first data request needs review."
+              }
+            }
+          ]),
+        created_at: now
+      })
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    _html = render_change(view, "change_chat_editor_input", %{"message" => "Update missing data"})
+
+    _html =
+      view
+      |> element("[data-testid='chat-send-button']")
+      |> render_click()
+
+    send(view.pid, {
+      :chat_tool_call,
+      conversation.id,
+      %{
+        id: "call-card-new",
+        name: "render_card",
+        arguments: %{
+          "title" => "Latest Missing Data",
+          "body" => "The second data request needs review."
+        }
+      }
+    })
+
+    html = render(view)
+
+    assert length(:binary.matches(html, ~s(data-testid="chat-inline-surface"))) == 2
+    assert length(:binary.matches(html, ~s(data-expanded="true"))) == 2
+    assert length(:binary.matches(html, ~s(open=""))) == 2
+    assert html =~ "Earlier Missing Data"
+    assert html =~ "The first data request needs review."
+    assert html =~ "Latest Missing Data"
+    assert html =~ "The second data request needs review."
+    assert html =~ ~r/chat-message-content.*Earlier Missing Data.*Latest Missing Data/s
+
+    _html =
+      view
+      |> element("[data-testid='chat-abort-button']")
+      |> render_click()
+
+    Process.sleep(350)
   end
 
   test "chat editor hook reopens server-expanded A2UI surfaces after patches" do
     live_js = File.read!(Path.expand("../../../priv/ui/live.js", __DIR__))
     chat_editor = File.read!(Path.expand("../../../lib/bds/desktop/shell_live/chat_editor.ex", __DIR__))
 
-    assert chat_editor =~ "data-expanded={Map.get(@surface, :expanded?, false)}"
+    assert chat_editor =~ "data-expanded={surface_expanded_attr(@surface)}"
     assert live_js =~ "this.syncExpandedSurfaces = () =>"
     assert live_js =~ "querySelectorAll(\".chat-inline-surface[data-expanded='true']\")"
     assert live_js =~ "surface.open = true;"
+    assert live_js =~ "this.surfaceObserver = new MutationObserver"
+    assert live_js =~ "this.surfaceObserver.disconnect();"
     assert live_js =~ "this.syncExpandedSurfaces();"
   end
 

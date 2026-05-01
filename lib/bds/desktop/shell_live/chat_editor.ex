@@ -352,7 +352,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   @spec chat_surface(term()) :: term()
   def chat_surface(assigns) do
     ~H"""
-    <details id={@surface.id} class={["chat-inline-surface", "chat-inline-surface-#{@surface.type}"]} data-testid="chat-inline-surface" data-expanded={Map.get(@surface, :expanded?, false)} open={Map.get(@surface, :expanded?, false)}>
+    <details id={@surface.id} class={["chat-inline-surface", "chat-inline-surface-#{@surface.type}"]} data-testid="chat-inline-surface" data-expanded={surface_expanded_attr(@surface)} open={Map.get(@surface, :expanded?, false)}>
       <summary class="chat-inline-surface-header">
         <span class="chat-inline-surface-icon"><%= surface_icon(@surface.type) %></span>
         <span class="chat-inline-surface-title"><%= surface_title(@surface) %></span>
@@ -565,6 +565,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   defp surface_icon("list"), do: "☰"
   defp surface_icon("tabs"), do: "▧"
   defp surface_icon(_type), do: "■"
+
+  defp surface_expanded_attr(surface) do
+    if Map.get(surface, :expanded?, false), do: "true", else: "false"
+  end
 
   defp surface_title(surface) do
     cond do

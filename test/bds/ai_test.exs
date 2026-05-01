@@ -107,6 +107,27 @@ defmodule BDS.AITest do
     end
   end
 
+  defmodule RecordingCompletionServer do
+    use Plug.Router
+
+    plug(:match)
+    plug(:dispatch)
+
+    post "/v1/chat/completions" do
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      send(Application.fetch_env!(:bds, :test_pid), {:completion_payload, Jason.decode!(body)})
+
+      response = %{
+        "choices" => [%{"message" => %{"content" => "Short Title"}}],
+        "usage" => %{"prompt_tokens" => 4, "completion_tokens" => 2}
+      }
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, Jason.encode!(response))
+    end
+  end
+
   defmodule FakeRuntime do
     def generate(endpoint, request, opts) do
       test_pid = Keyword.fetch!(opts, :test_pid)
@@ -311,6 +332,33 @@ defmodule BDS.AITest do
                },
                []
              )
+  end
+
+  test "openai-compatible generation accepts title requests without tools" do
+    Application.put_env(:bds, :test_pid, self())
+
+    server =
+      start_supervised!({Bandit, plug: RecordingCompletionServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert {:ok, %{content: "Short Title"}} =
+             BDS.AI.OpenAICompatibleRuntime.generate(
+               %{url: "http://127.0.0.1:#{port}/v1", api_key: nil},
+               %{
+                 operation: :chat_title,
+                 model: "qwen3.5-122b",
+                 messages: [%{"role" => "user", "content" => "Topic: posts per month"}],
+                 max_output_tokens: 20
+               },
+               []
+             )
+
+    assert_received {:completion_payload, payload}
+    assert payload["model"] == "qwen3.5-122b"
+    assert payload["max_tokens"] == 20
+    refute Map.has_key?(payload, "tools")
+    refute Map.has_key?(payload, "tool_choice")
   end
 
   test "airplane mode routes title tasks to airplane endpoint and offline title model" do

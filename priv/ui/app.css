@@ -5620,6 +5620,8 @@ button svg * {
 }
 
 .chat-inline-surface {
+  width: 100%;
+  margin: 12px 0 0;
   overflow: hidden;
 }
 

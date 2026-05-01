@@ -788,6 +788,10 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         };
 
+        this.surfaceObserver = new MutationObserver(() => {
+          this.syncExpandedSurfaces();
+        });
+
         this.handleScroll = () => {
           if (!this.scrollContainer) {
             this.stickToBottom = true;
@@ -832,6 +836,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         this.syncScrollContainer();
         this.syncExpandedSurfaces();
+        this.surfaceObserver.observe(this.el, { childList: true, subtree: true });
         this.autoResize();
         window.requestAnimationFrame(() => this.scrollToBottom(true));
       },
@@ -844,6 +849,7 @@ document.addEventListener("DOMContentLoaded", () => {
       },
 
       destroyed() {
+        this.surfaceObserver.disconnect();
         this.el.removeEventListener("input", this.handleInput);
         this.el.removeEventListener("keydown", this.handleKeyDown);
 

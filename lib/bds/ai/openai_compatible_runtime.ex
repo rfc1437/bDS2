@@ -36,7 +36,7 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
         "messages" => request.messages,
         "max_tokens" => request.max_output_tokens
       }
-      |> maybe_put_tools(request.tools)
+      |> maybe_put_tools(Map.get(request, :tools, []))
 
     with {:ok, response} <- HttpClient.post(url, headers, Jason.encode!(payload)),
          200 <- response.status do
