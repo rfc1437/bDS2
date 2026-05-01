@@ -29,6 +29,9 @@ defmodule BDS.MCPTest do
     assert "search_posts" in tool_names
     assert "count_posts" in tool_names
     assert "read_post_by_slug" in tool_names
+    assert "get_post_translations" in tool_names
+    assert "get_media_translations" in tool_names
+    assert "upsert_media_translation" in tool_names
     assert "draft_post" in tool_names
     assert "propose_script" in tool_names
     assert "propose_template" in tool_names
@@ -70,6 +73,70 @@ defmodule BDS.MCPTest do
     assert {:ok, read_result} = BDS.MCP.call_tool("read_post_by_slug", %{slug: "travel-notes"})
     assert read_result["post"]["title"] == "Travel Notes"
     assert read_result["post"]["slug"] == "travel-notes"
+  end
+
+  test "translation tools expose post and media translations and upsert media metadata", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Translatable Post",
+               content: "Source body",
+               language: "en"
+             })
+
+    assert {:ok, _post_translation} =
+             BDS.Posts.upsert_post_translation(post.id, "de", %{
+               title: "Ubersetzter Beitrag",
+               excerpt: "Kurzfassung",
+               content: "Ubersetzter Inhalt"
+             })
+
+    source_path = Path.join(temp_dir, "translation-media.txt")
+    File.write!(source_path, "media body")
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Source Media",
+               alt: "Source Alt",
+               caption: "Source Caption",
+               language: "en"
+             })
+
+    assert {:ok, post_result} =
+             BDS.MCP.call_tool("get_post_translations", %{postId: post.id})
+
+    assert [post_translation] = post_result["translations"]
+    assert post_translation["language"] == "de"
+    assert post_translation["title"] == "Ubersetzter Beitrag"
+    assert post_translation["excerpt"] == "Kurzfassung"
+    assert post_translation["content"] == "Ubersetzter Inhalt"
+    assert post_translation["status"] == "draft"
+
+    assert {:ok, upsert_result} =
+             BDS.MCP.call_tool("upsert_media_translation", %{
+               mediaId: media.id,
+               language: "de",
+               title: "Medientitel",
+               alt: "Medien Alt",
+               caption: "Medien Beschriftung"
+             })
+
+    assert upsert_result["translation"]["language"] == "de"
+    assert upsert_result["translation"]["title"] == "Medientitel"
+
+    assert {:ok, media_result} =
+             BDS.MCP.call_tool("get_media_translations", %{mediaId: media.id})
+
+    assert [media_translation] = media_result["translations"]
+    assert media_translation["language"] == "de"
+    assert media_translation["title"] == "Medientitel"
+    assert media_translation["alt"] == "Medien Alt"
+    assert media_translation["caption"] == "Medien Beschriftung"
   end
 
   test "proposal-backed write tools follow the old app lifecycle for scripts, templates, and metadata",

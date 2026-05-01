@@ -19,7 +19,7 @@ Goal: align bDS2 with old bDS behavior. Use the Allium specs as the contract onl
 - Spec: matches old bDS cursor behavior.
 - Action: implement cursor parsing/templates for posts and media resources and add tests for first page, next cursor, invalid cursor, and final page.
 
-## P0: MCP Translation Tools
+## P0: MCP Translation Tools (done)
 
 - Old bDS: exposes `get_post_translations`, `get_media_translations`, and app-gated `upsert_media_translation`.
 - bDS2 now: domain translation functions exist, but MCP tools are missing.

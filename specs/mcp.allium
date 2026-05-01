@@ -83,6 +83,9 @@ surface McpAutomationSurface {
         McpToolInvoked("search_posts", params)
         McpToolInvoked("count_posts", params)
         McpToolInvoked("read_post_by_slug", slug, language)
+        McpToolInvoked("get_post_translations", post_id)
+        McpToolInvoked("get_media_translations", media_id)
+        McpToolInvoked("upsert_media_translation", params)
         McpToolInvoked("draft_post", params)
         McpToolInvoked("propose_script", params)
         McpToolInvoked("propose_template", params)
@@ -202,6 +205,30 @@ rule ReadPostBySlug {
     -- Full post content by slug
     -- Optional language parameter for translation view
     ensures: FullPostContent(post)
+}
+
+rule GetPostTranslations {
+    when: McpToolInvoked("get_post_translations", post_id)
+    -- Lists all available translations for a post.
+    ensures: PostTranslations(post_id)
+}
+
+rule GetMediaTranslations {
+    when: McpToolInvoked("get_media_translations", media_id)
+    -- Lists all available translated metadata for a media item.
+    ensures: MediaTranslations(media_id)
+}
+
+rule UpsertMediaTranslation {
+    when: McpToolInvoked("upsert_media_translation", params)
+    -- Creates or updates translated media metadata for a language.
+    ensures: media/UpsertMediaTranslationRequested(
+        params.media_id,
+        params.language,
+        params.title,
+        params.alt,
+        params.caption
+    )
 }
 
 -- Write tools (proposal-based)

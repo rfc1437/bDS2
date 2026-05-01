@@ -27,6 +27,9 @@ defmodule BDS.MCP.Tools do
       tool("search_posts", true),
       tool("count_posts", true),
       tool("read_post_by_slug", true),
+      tool("get_post_translations", true),
+      tool("get_media_translations", true),
+      tool("upsert_media_translation", false),
       tool("draft_post", false),
       tool("propose_script", false),
       tool("propose_template", false),
@@ -46,6 +49,9 @@ defmodule BDS.MCP.Tools do
       "search_posts" -> {:ok, search_posts(params)}
       "count_posts" -> {:ok, count_posts(params)}
       "read_post_by_slug" -> read_post_by_slug(params)
+      "get_post_translations" -> get_post_translations(params)
+      "get_media_translations" -> get_media_translations(params)
+      "upsert_media_translation" -> upsert_media_translation(params)
       "draft_post" -> draft_post(params)
       "propose_script" -> propose_script(params)
       "propose_template" -> propose_template(params)
@@ -162,6 +168,47 @@ defmodule BDS.MCP.Tools do
           end
 
         {:ok, %{"post" => payload}}
+    end
+  end
+
+  defp get_post_translations(params) do
+    post_id = map_get(params, :postId, nil)
+
+    case Posts.get_post(post_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Post{} ->
+        with {:ok, translations} <- Posts.list_post_translations(post_id) do
+          {:ok, %{"translations" => sanitize(translations)}}
+        end
+    end
+  end
+
+  defp get_media_translations(params) do
+    media_id = map_get(params, :mediaId, nil)
+
+    case Media.get_media(media_id) do
+      nil ->
+        {:error, :not_found}
+
+      %MediaAsset{} ->
+        {:ok, %{"translations" => sanitize(Media.list_media_translations(media_id))}}
+    end
+  end
+
+  defp upsert_media_translation(params) do
+    media_id = map_get(params, :mediaId, nil)
+    language = params |> map_get(:language, "") |> normalize_term()
+
+    attrs = %{
+      title: map_get(params, :title, nil),
+      alt: map_get(params, :alt, nil),
+      caption: map_get(params, :caption, nil)
+    }
+
+    with {:ok, translation} <- Media.upsert_media_translation(media_id, language, attrs) do
+      {:ok, %{"translation" => sanitize(translation)}}
     end
   end
 
