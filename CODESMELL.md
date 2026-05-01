@@ -99,11 +99,9 @@ _None._ All modules previously on the queue have been split; refresh the queue i
 
 ## 9. `Jason.decode!/1` on External HTTP Responses
 
-**Status:** open.
+**Status:** ✅ done (2026-05-01). The 2 scoped HTTP response decodes in `BDS.AI.OpenAICompatibleRuntime` now use `Jason.decode/1` and return `{:error, %{kind: :invalid_json_response, reason: reason}}` for malformed model-list or chat-completion response bodies. The error shape propagates through endpoint model listing, chat, and one-shot orchestration via the existing `with` chains. Remaining `Jason.decode!/1` sites in `BDS.AI.Catalog` decode model-catalog HTTP/cache payloads or trusted on-disk JSON and are out of scope for this section.
 
-**Scope:** only the 2 sites in `BDS.AI` / `BDS.AI.OpenAICompatibleRuntime` that decode HTTP response bodies. The remaining 12 `Jason.decode!/1` sites decode our own on-disk files (metadata, embeddings index, generation hashes) and are not in scope.
-
-**Plan:** switch to `Jason.decode/1` and propagate `{:error, reason}` from the runtime through to the chat / one-shot orchestration layer in `BDS.AI.Chat` and `BDS.AI.OneShot`.
+**Rule:** OpenAI-compatible runtime HTTP responses must not be decoded with bang functions; malformed provider JSON is a recoverable runtime error.
 
 ---
 
@@ -160,6 +158,10 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ---
 
 ## Changelog
+
+### 2026-05-01
+
+- **`Jason.decode!/1` on external HTTP responses**: replaced the 2 scoped OpenAI-compatible runtime response decodes with `Jason.decode/1` and tagged `{:error, %{kind: :invalid_json_response, reason: reason}}` propagation for malformed `/models` and `/chat/completions` bodies. Added regressions covering endpoint model listing through a fake HTTP client and generation through a local Bandit server. Section 9 is closed.
 
 ### 2026-05-10
 

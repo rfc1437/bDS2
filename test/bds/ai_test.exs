@@ -88,6 +88,25 @@ defmodule BDS.AITest do
     def get(_url, _headers), do: {:error, :not_found}
   end
 
+  defmodule BadJsonEndpointHttpClient do
+    def get("https://api.example.test/v1/models", _headers) do
+      {:ok, %{status: 200, headers: %{}, body: "not json"}}
+    end
+  end
+
+  defmodule BadJsonCompletionServer do
+    use Plug.Router
+
+    plug(:match)
+    plug(:dispatch)
+
+    post "/v1/chat/completions" do
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, "not json")
+    end
+  end
+
   defmodule FakeRuntime do
     def generate(endpoint, request, opts) do
       test_pid = Keyword.fetch!(opts, :test_pid)
@@ -254,6 +273,32 @@ defmodule BDS.AITest do
              )
 
     assert [%{id: "gpt-4.1", label: "gpt-4.1"}, %{id: "gpt-4.1-mini", label: "gpt-4.1-mini"}] = models
+  end
+
+  test "list_endpoint_models returns an error for malformed endpoint JSON" do
+    assert {:error, %{kind: :invalid_json_response, reason: %Jason.DecodeError{}}} =
+             BDS.AI.list_endpoint_models(%{url: "https://api.example.test/v1", api_key: "online-secret"},
+               http_client: BadJsonEndpointHttpClient
+             )
+  end
+
+  test "openai-compatible generation returns an error for malformed completion JSON" do
+    server =
+      start_supervised!({Bandit, plug: BadJsonCompletionServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert {:error, %{kind: :invalid_json_response, reason: %Jason.DecodeError{}}} =
+             BDS.AI.OpenAICompatibleRuntime.generate(
+               %{url: "http://127.0.0.1:#{port}/v1", api_key: nil},
+               %{
+                 model: "gpt-test",
+                 messages: [%{"role" => "user", "content" => "Hello"}],
+                 max_output_tokens: 128,
+                 tools: []
+               },
+               []
+             )
   end
 
   test "airplane mode routes title tasks to airplane endpoint and offline title model" do

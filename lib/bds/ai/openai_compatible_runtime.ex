@@ -47,23 +47,24 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
   end
 
   defp normalize_response(body) do
-    payload = Jason.decode!(body)
-    message = get_in(payload, ["choices", Access.at(0), "message"]) || %{}
-    content = normalize_content(message["content"])
-    tool_calls = normalize_tool_calls(message["tool_calls"] || [])
-    usage = normalize_usage(payload["usage"] || %{})
+    with {:ok, payload} <- decode_json_body(body) do
+      message = get_in(payload, ["choices", Access.at(0), "message"]) || %{}
+      content = normalize_content(message["content"])
+      tool_calls = normalize_tool_calls(message["tool_calls"] || [])
+      usage = normalize_usage(payload["usage"] || %{})
 
-    json =
-      case content do
-        nil -> nil
-        value when is_binary(value) ->
-          case Jason.decode(value) do
-            {:ok, decoded} when is_map(decoded) -> decoded
-            _other -> nil
-          end
-      end
+      json =
+        case content do
+          nil -> nil
+          value when is_binary(value) ->
+            case Jason.decode(value) do
+              {:ok, decoded} when is_map(decoded) -> decoded
+              _other -> nil
+            end
+        end
 
-    {:ok, %{content: content, json: json, tool_calls: tool_calls, usage: usage}}
+      {:ok, %{content: content, json: json, tool_calls: tool_calls, usage: usage}}
+    end
   end
 
   defp completions_url(url) do
@@ -84,24 +85,31 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
   end
 
   defp normalize_models_response(body) do
-    payload = Jason.decode!(body)
+    with {:ok, payload} <- decode_json_body(body) do
+      models =
+        payload
+        |> Map.get("data", [])
+        |> Enum.map(fn entry ->
+          id = entry["id"] || entry[:id]
 
-    models =
-      payload
-      |> Map.get("data", [])
-      |> Enum.map(fn entry ->
-        id = entry["id"] || entry[:id]
+          %{
+            id: id,
+            label: id
+          }
+        end)
+        |> Enum.reject(&is_nil(&1.id))
+        |> Enum.uniq_by(& &1.id)
+        |> Enum.sort_by(&String.downcase(&1.id))
 
-        %{
-          id: id,
-          label: id
-        }
-      end)
-      |> Enum.reject(&is_nil(&1.id))
-      |> Enum.uniq_by(& &1.id)
-      |> Enum.sort_by(&String.downcase(&1.id))
+      {:ok, models}
+    end
+  end
 
-    {:ok, models}
+  defp decode_json_body(body) do
+    case Jason.decode(body) do
+      {:ok, payload} -> {:ok, payload}
+      {:error, reason} -> {:error, %{kind: :invalid_json_response, reason: reason}}
+    end
   end
 
   defp maybe_put_auth(headers, nil), do: headers
