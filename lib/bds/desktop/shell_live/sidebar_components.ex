@@ -4,10 +4,11 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
   use Phoenix.Component
 
   alias BDS.Desktop.ShellData
+  alias BDS.Desktop.UILocale
   alias BDS.UI.Registry
 
   def sidebar_content(assigns) do
-    Process.put(:bds_ui_locale, assigns.page_language)
+    UILocale.put(assigns.page_language)
     assigns = prepare_filter_assigns(assigns)
 
     ~H"""
@@ -462,7 +463,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
     """
   end
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   defp template_sidebar?(sidebar_data), do: Map.get(sidebar_data, :title) == "Templates"
 

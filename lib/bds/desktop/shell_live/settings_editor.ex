@@ -143,7 +143,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
   end
 
   def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   defp current_settings_section(assigns) do
     meta = current_tab_meta(assigns)

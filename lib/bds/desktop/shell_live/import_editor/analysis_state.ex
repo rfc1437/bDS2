@@ -243,6 +243,6 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
 
   def translate_phase(other), do: other
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
   defp present?(value), do: value not in [nil, ""]
 end

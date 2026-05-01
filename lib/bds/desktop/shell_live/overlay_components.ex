@@ -59,7 +59,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
 
   def markdown_link(text, url), do: "[#{text}](#{url})"
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   def project_metadata(nil), do: %{main_language: "en", blog_languages: []}
 

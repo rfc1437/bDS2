@@ -187,7 +187,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
 
   def build(_assigns), do: nil
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   def tag_font_size(count, counts) do
     max_count = Enum.max([1 | Enum.map(counts, & &1.count)])

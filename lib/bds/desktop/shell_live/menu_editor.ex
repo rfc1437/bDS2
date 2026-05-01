@@ -307,7 +307,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
   end
 
   def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   def row_label(item, category_titles) do
     if item.kind == :category_archive do

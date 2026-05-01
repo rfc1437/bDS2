@@ -95,5 +95,5 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     end
   end
 
-  defp translated(text), do: ShellData.translate(text, %{}, Process.get(:bds_ui_locale))
+  defp translated(text), do: ShellData.translate(text, %{}, BDS.Desktop.UILocale.current())
 end

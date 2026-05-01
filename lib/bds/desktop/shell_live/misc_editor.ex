@@ -214,7 +214,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   def build(_assigns), do: nil
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   def misc_class(:site_validation), do: "site-validation-view"
   def misc_class(:metadata_diff), do: "metadata-diff-view"

@@ -37,11 +37,15 @@ _None._ All modules previously on the queue have been split; refresh the queue i
 
 ## 2. Process Dictionary for i18n State
 
-**Status:** open. `Process.put(:bds_ui_locale, …)` + `Process.get(:bds_ui_locale)` in `render/1` of `BDS.Desktop.ShellLive` and every `*_editor.ex` (15 sites total).
+**Status:** ✅ encapsulated (2026-05-10). Raw `Process.put(:bds_ui_locale, _)` / `Process.get(:bds_ui_locale)` no longer appears outside `BDS.Desktop.UILocale`. The two render boundaries (`BDS.Desktop.ShellLive.render/1` and `BDS.Desktop.ShellLive.SidebarComponents.sidebar_content/1`) now call `UILocale.put/1`; the ~30 helper read sites call `BDS.Desktop.UILocale.current/0`. The full thread-locale-through-assigns rewrite (~733 HEEx call sites) was rejected as too invasive for the marginal benefit; the encapsulation removes the implicit-global smell while keeping the LiveView lazy-render path intact.
 
-**Why it matters:** implicit global state; complicates per-process isolation in tests and risks leaks between concurrent operations in the same process.
+**Why the helper does not restore on render exit:** Phoenix's `~H` returns a `Phoenix.LiveView.Rendered` whose `dynamic` function is invoked lazily by LiveView *after* `render/1` returns. A `try/after Process.delete` wrapper around `render/1` would clear the binding before child components materialize, so render boundaries use `UILocale.put/1` (set-only). `UILocale.with_locale/2` is provided for short-lived non-LiveView contexts (background tasks, scripts) that consume the binding eagerly inside the closure.
 
-**Plan:** thread `locale` through `assigns`/render args; replace `translated/1,2` with a 3-arity helper that takes the locale explicitly; ban `Process.put` via Credo afterwards.
+**Module rules:**
+
+- Only `lib/bds/desktop/ui_locale.ex` may touch the `:bds_ui_locale` process key.
+- New code that needs the active UI locale must call `BDS.Desktop.UILocale.current/0` (or take it as an argument).
+- New render entry points that change the locale must call `BDS.Desktop.UILocale.put/1` at the top of `render/1`.
 
 ---
 
@@ -164,6 +168,10 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ---
 
 ## Changelog
+
+### 2026-05-10
+
+- **Process dictionary for i18n state (Section 2)**: encapsulated behind `BDS.Desktop.UILocale` (`lib/bds/desktop/ui_locale.ex`, ~50 lines). Public surface: `put/1` (set without restore, for LV render boundaries that return lazy `Rendered`), `with_locale/2` (set + try/after restore, for short-lived eager contexts), `current/0` (read, returns `nil` when unset). The two raw `Process.put(:bds_ui_locale, _)` sites (`BDS.Desktop.ShellLive.render/1` and `BDS.Desktop.ShellLive.SidebarComponents.sidebar_content/1`) now call `UILocale.put/1`; the ~30 raw `Process.get(:bds_ui_locale)` reads (every editor `translated/1,2` helper plus `BDS.Desktop.ShellData.effective_ui_language/1`) now call `BDS.Desktop.UILocale.current/0`. The full thread-locale-through-assigns rewrite (~733 HEEx call sites) was deliberately rejected as too invasive; the encapsulation removes the implicit-global smell while preserving Phoenix's lazy `Rendered` evaluation. The render path uses `put/1` (not `with_locale/2`) because Phoenix `~H` returns a `Rendered` whose `dynamic` is invoked by LiveView *after* `render/1` returns; a `try/after Process.delete` would clear the binding before child components materialize. Only `BDS.Desktop.UILocale` is allowed to touch the `:bds_ui_locale` process key. Validates clean: `mix compile --warnings-as-errors`, `mix dialyzer --format short` (Total errors: 0), `mix test` (342 tests, 0 failures, 4 skipped, three consecutive runs).
 
 ### 2026-05-09
 

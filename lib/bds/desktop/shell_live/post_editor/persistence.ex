@@ -101,5 +101,5 @@ defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
   end
 
   defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

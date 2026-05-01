@@ -127,5 +127,5 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
   def action(:import), do: %{kind: "import", label: "sidebar.import.newDefinition"}
   def action(_view), do: nil
 
-  defp translated(text), do: ShellData.translate(text, %{}, Process.get(:bds_ui_locale))
+  defp translated(text), do: ShellData.translate(text, %{}, BDS.Desktop.UILocale.current())
 end

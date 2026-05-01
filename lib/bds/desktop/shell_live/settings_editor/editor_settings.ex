@@ -89,5 +89,5 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.EditorSettings do
   defp boolean_string(false), do: "false"
 
   defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

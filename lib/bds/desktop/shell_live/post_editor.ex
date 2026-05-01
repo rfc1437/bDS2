@@ -500,7 +500,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   def post_editor_mode_label(:preview), do: translated("Preview")
 
   def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   defp assigned_project_metadata(assigns), do: Map.get(assigns, :project_metadata, %{})
 end

@@ -229,5 +229,5 @@ defmodule BDS.Desktop.ShellLive.ChatSurface do
     end
   end
 
-  defp translated(text), do: ShellData.translate(text, %{}, Process.get(:bds_ui_locale))
+  defp translated(text), do: ShellData.translate(text, %{}, BDS.Desktop.UILocale.current())
 end

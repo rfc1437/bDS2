@@ -199,7 +199,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
   def maybe_put_option(opts, _key, nil), do: opts
   def maybe_put_option(opts, key, value), do: Keyword.put(opts, key, value)
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
   defp present?(value), do: value not in [nil, ""]
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value

@@ -190,7 +190,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
 
   def build_template(_assigns), do: nil
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   def format_timestamp(nil), do: ""
   def format_timestamp(timestamp), do: BDS.Persistence.timestamp_to_iso8601(timestamp)

@@ -96,5 +96,5 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
   end
 
   defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

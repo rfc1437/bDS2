@@ -286,5 +286,5 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
 
   defp present?(value), do: value not in [nil, ""]
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

@@ -7,7 +7,7 @@ defmodule BDS.Desktop.ShellLive do
 
   alias BDS.AI
   alias BDS.CliSync.Watcher
-  alias BDS.Desktop.{FolderPicker, Overlay, ShellData}
+  alias BDS.Desktop.{FolderPicker, Overlay, ShellData, UILocale}
   alias BDS.Desktop.ShellLive.{ChatEditor, CodeEntityEditor, ImportEditor, MediaEditor, MenuEditor, MiscEditor, SettingsEditor, TagsEditor}
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
   alias BDS.Desktop.ShellLive.PostEditor
@@ -1285,7 +1285,7 @@ defmodule BDS.Desktop.ShellLive do
 
   @impl true
   def render(assigns) do
-    Process.put(:bds_ui_locale, assigns.page_language)
+    UILocale.put(assigns.page_language)
     index(assigns)
   end
 
@@ -1346,7 +1346,7 @@ defmodule BDS.Desktop.ShellLive do
     |> assign_misc_editor()
   end
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, UILocale.current())
 
   defp encoded_shortcuts(shortcuts), do: Jason.encode!(shortcuts)
 

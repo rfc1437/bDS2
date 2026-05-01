@@ -242,5 +242,5 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
 
   def translate_execution_phase(other), do: other
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

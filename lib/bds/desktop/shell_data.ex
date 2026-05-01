@@ -249,7 +249,7 @@ defmodule BDS.Desktop.ShellData do
   end
 
   defp effective_ui_language(nil) do
-    Process.get(:bds_ui_locale) || ui_language()
+    BDS.Desktop.UILocale.current() || ui_language()
   end
 
   defp effective_ui_language(locale), do: locale

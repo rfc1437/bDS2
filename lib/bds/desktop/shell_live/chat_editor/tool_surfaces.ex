@@ -270,5 +270,5 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
   defp truthy?(_value), do: false
 
   defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

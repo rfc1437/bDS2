@@ -415,7 +415,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
   def build(_assigns), do: nil
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   def media_editor_save_state_label(:dirty), do: translated("Unsaved")
   def media_editor_save_state_label(:saved), do: translated("Saved")

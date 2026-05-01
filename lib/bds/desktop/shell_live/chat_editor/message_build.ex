@@ -114,5 +114,5 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
   defp streaming_content(_request), do: ""
 
   defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, Process.get(:bds_ui_locale))
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end
