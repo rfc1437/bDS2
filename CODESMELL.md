@@ -2,7 +2,7 @@
 
 Living document. Each section lists **status**, then **open work in priority order**, then a brief notes block. Completed work is listed compactly at the bottom (`## Changelog`).
 
-Last refreshed: 2026-05-03.
+Last refreshed: 2026-05-04.
 
 ---
 
@@ -14,7 +14,6 @@ Last refreshed: 2026-05-03.
 
 | # | Module | Current lines | Target | Strategy |
 |---|---|---|---|---|
-| 4 | `BDS.Rendering` | 838 | ≤ 200 | Extract `TemplateSelection` (~120), `PostRendering` (~180), `ListArchive` (~150), `Metadata` (~140), `LinksAndLanguages` (~100). Main keeps the 3 public renders. |
 | 5 | `BDS.Desktop.ShellLive.MenuEditor` | 871 | ≤ 350 | Extract `TreeOps` (~280), `TreePredicates` (~60), `DraftManagement` (~140), `PageCategory` (~120), `State` (~80). |
 | 6 | `BDS.Desktop.ShellLive.PostEditor` | 963 | ≤ 400 | Extract `DraftManagement` (~180), `ListValues` (~160), `Persistence` (~140), `PostMetadata` (~150). |
 | 7 | `BDS.Desktop.ShellLive.SettingsEditor` | 872 | ≤ 350 | Extract `ProjectSettings` (~140), `AISettings` (~150), `PublishingSettings` (~80), `ManagedCategories` (~140), `StyleEditor` (~80), `MCPConfig` (~60). |
@@ -33,6 +32,7 @@ Last refreshed: 2026-05-03.
 - `BDS.Maintenance` 810 → 141 (83 %)
 - `BDS.Media` 993 → 324 (67 %)
 - `BDS.Desktop.ShellLive.ImportEditor` 1436 → 776 (46 %)
+- `BDS.Rendering` 838 → 33 (96 %)
 
 ---
 
@@ -165,6 +165,11 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ---
 
 ## Changelog
+
+### 2026-05-04
+
+- **God modules**:
+  - `BDS.Rendering` 838 → 33 (96 %). Submodules under `lib/bds/rendering/`: `LinksAndLanguages` (131, canonical_post_path_by_slug + canonical_media_path_by_source_path + post_path/2,3 + link_contexts/4 + link_context + language_prefix + normalize_language), `TemplateSelection` (153, load_template_source + select_template + published_template_body + render_template + load_bundled_template_source + maybe_load_bundled_template_source + bundled_template_slug + template_render_context), `Metadata` (113, project_metadata + menu_items + to_template_menu_item + menu_item_href + blog_languages + tag_color_by_name + alternate_links + backlinks + default_pico_stylesheet_href + href_for_language + calendar_initial_year + calendar_initial_month), `PostRendering` (167, post_assigns + load_post_record + canonical_post_record + canonical_post_id + post_data_json + post_data_json_value + build_post_context + render_post_content), `ListArchive` (295, list_assigns + not_found_assigns + normalize_list_posts + normalize_pagination + normalize_archive_context + build_day_blocks + min_date + max_date + show_archive_range_heading? + calendar_initial_year_from_posts + calendar_initial_month_from_posts). Coordinator now contains only the 3 public renders (`render_post_page/3`, `render_list_page/2`, `render_not_found_page/1,2`) which delegate to `TemplateSelection.load_template_source`, `TemplateSelection.render_template`, and the appropriate assigns builder (`PostRendering.post_assigns`, `ListArchive.list_assigns`, `ListArchive.not_found_assigns`). Cross-submodule deps are linear: ListArchive → PostRendering + Metadata + TemplateSelection + LinksAndLanguages; PostRendering → Metadata + TemplateSelection + LinksAndLanguages; Metadata → LinksAndLanguages; TemplateSelection + LinksAndLanguages have no internal deps.
 
 ### 2026-05-03
 
