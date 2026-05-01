@@ -40,7 +40,7 @@ Goal: align bDS2 with old bDS behavior. Use the Allium specs as the contract onl
 - Spec: incorrectly lists install/uninstall in the MCP automation surface.
 - Action: tend `specs/mcp.allium` to move agent config out of MCP automation and describe it as settings UI behavior.
 
-## P1: MCP CLI Proposal TTL
+## P1: MCP CLI Proposal TTL (done)
 
 - Old bDS: one proposal TTL, 30 minutes.
 - bDS2 now: one proposal TTL, 30 minutes.
