@@ -2,7 +2,7 @@
 
 Living document. Each section lists **status**, then **open work in priority order**, then a brief notes block. Completed work is listed compactly at the bottom (`## Changelog`).
 
-Last refreshed: 2026-05-06.
+Last refreshed: 2026-05-07.
 
 ---
 
@@ -14,7 +14,6 @@ Last refreshed: 2026-05-06.
 
 | # | Module | Current lines | Target | Strategy |
 |---|---|---|---|---|
-| 7 | `BDS.Desktop.ShellLive.SettingsEditor` | 872 | ≤ 350 | Extract `ProjectSettings` (~140), `AISettings` (~150), `PublishingSettings` (~80), `ManagedCategories` (~140), `StyleEditor` (~80), `MCPConfig` (~60). |
 | 8 | `BDS.Desktop.ShellLive.ChatEditor` | 972 | ≤ 400 | Extract `ToolSurfaces` (~280), `ToolTracking` (~140), `MessageBuild` (~160), `ModelSelection` (~100). Defer — highest internal coupling. |
 | 9 | `BDS.MCP` | 677 | ≤ 350 | Split tools / resources / proposals / serialization clusters. (Carried over from original priority list.) |
 
@@ -33,6 +32,7 @@ Last refreshed: 2026-05-06.
 - `BDS.Rendering` 838 → 33 (96 %)
 - `BDS.Desktop.ShellLive.MenuEditor` 871 → 335 (62 %)
 - `BDS.Desktop.ShellLive.PostEditor` 963 → 506 (47 %)
+- `BDS.Desktop.ShellLive.SettingsEditor` 872 → 226 (74 %)
 
 ---
 
@@ -165,6 +165,11 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ---
 
 ## Changelog
+
+### 2026-05-07
+
+- **God modules**:
+  - `BDS.Desktop.ShellLive.SettingsEditor` 872 → 226 (74 %). Submodules under `lib/bds/desktop/shell_live/settings_editor/`: `StyleEditor` (103, build_style + select_style_theme + change_style_preview_mode + apply_style_theme + theme_display_name + current_theme + style_theme + @themes), `MCPConfig` (100, mcp_rows + toggle_mcp_agent + find_mcp_agent + mcp_configured? + mcp_config_path + mcp_server_present? + @mcp_agents), `PublishingSettings` (89, publishing_form + update_publishing_draft + save_publishing + clear_publishing + publishing_attrs + normalize_publishing_params), `EditorSettings` (93, editor_form + update_editor_draft + save_editor + get_global_setting + put_global_setting + editor_attrs + normalize_editor_params + boolean_string), `ProjectSettings` (112, project_metadata + project_form + technology_form + update_project_draft + save_project + project_attrs + normalize_project_params), `ManagedCategories` (194, protected_categories + protected_category? + category_rows + update_new_category + add_category + reset_categories + save_category + remove_category + ensure_default_categories + reset_default_category_settings + @protected_categories + @default_category_settings), `AISettings` (203, ai_form + endpoint_model_options + update_ai_draft + refresh_ai_models + save_ai + reset_ai_prompt + ai_attrs + normalize_ai_params + get_model_preference + maybe_put_model_preference + put_endpoint_preferences + endpoint_refresh_attrs + normalize_endpoint_result). Coordinator keeps `embed_templates "settings_editor_html/*"` (HEEx components `settings_editor` + `style_editor`), `assign_socket/1`, `update_search/3`, the `build_settings/1` aggregator, the `current_settings_section`/`current_tab_meta`/`visible_settings_sections`/`section_matches?`/`template_options` helpers, the `translated/1,2` HEEx render-time helper, and `defdelegate` entries for the 21 public event handlers + the HEEx-callable `theme_display_name/1` (delegated to `StyleEditor`) and `protected_category?/1` (delegated to `ManagedCategories`). Cross-submodule deps: `AISettings` calls `EditorSettings.{get_global_setting/1, put_global_setting/2}` (the only intra-submodule dependency); all other submodules are leaves. Each submodule duplicates the small `translated/2`, `truthy?/1`, `blank_to_nil/1`, `parse_integer/2`, `boolean_string/1` helpers locally per the established convention. Submodules use `Phoenix.Component.assign/3` directly via `use Phoenix.Component`. Validates clean: `mix compile --warnings-as-errors`, `mix dialyzer --format short` (Total errors: 0), `mix test` (342 tests, 0 failures, 4 skipped).
 
 ### 2026-05-06
 
