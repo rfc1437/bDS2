@@ -1,0 +1,329 @@
+defmodule BDS.Media.Sidecars do
+  @moduledoc false
+
+  import BDS.Media.FileOps,
+    only: [
+      atomic_write: 2,
+      blank_to_nil: 1,
+      detect_mime: 1
+    ]
+
+  alias BDS.DocumentFields
+  alias BDS.Media.Linking
+  alias BDS.Media.Media
+  alias BDS.Media.Translation
+  alias BDS.Persistence
+  alias BDS.Projects
+  alias BDS.Repo
+  alias BDS.Search
+  alias BDS.Sidecar
+
+  @spec write_sidecar(BDS.Projects.Project.t(), Media.t()) :: :ok
+  def write_sidecar(project, media) do
+    path = Path.join(Projects.project_data_dir(project), media.sidecar_path)
+    :ok = File.mkdir_p(Path.dirname(path))
+
+    atomic_write(
+      path,
+      Sidecar.serialize_document([
+        {"id", media.id},
+        {"originalName", media.original_name},
+        {"mimeType", media.mime_type},
+        {"size", media.size},
+        {"width", media.width},
+        {"height", media.height},
+        {"title", media.title},
+        {"alt", media.alt},
+        {"caption", media.caption},
+        {"author", media.author},
+        {"language", media.language},
+        {"createdAt", media.created_at},
+        {"updatedAt", media.updated_at},
+        {"linkedPostIds", Linking.linked_post_ids(media.id)},
+        {"tags", media.tags || []}
+      ])
+    )
+  end
+
+  @spec write_translation_sidecar(BDS.Projects.Project.t(), Media.t(), Translation.t()) :: :ok
+  def write_translation_sidecar(project, media, translation) do
+    path =
+      Path.join(
+        Projects.project_data_dir(project),
+        translation_sidecar_path(media, translation.language)
+      )
+
+    :ok = File.mkdir_p(Path.dirname(path))
+
+    atomic_write(
+      path,
+      Sidecar.serialize_document([
+        {"translationFor", media.id},
+        {"language", translation.language},
+        {"title", translation.title},
+        {"alt", translation.alt},
+        {"caption", translation.caption}
+      ])
+    )
+  end
+
+  @spec parse_canonical_sidecar(BDS.Projects.Project.t(), Path.t()) :: map()
+  def parse_canonical_sidecar(project, sidecar_path) do
+    {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
+    relative_sidecar_path = Path.relative_to(sidecar_path, Projects.project_data_dir(project))
+    relative_file_path = String.trim_trailing(relative_sidecar_path, ".meta")
+
+    %{
+      fields: fields,
+      relative_sidecar_path: relative_sidecar_path,
+      relative_file_path: relative_file_path,
+      filename: Path.basename(relative_file_path)
+    }
+  end
+
+  @spec parse_translation_sidecar(Path.t()) :: map()
+  def parse_translation_sidecar(sidecar_path) do
+    {:ok, fields} = sidecar_path |> File.read!() |> Sidecar.parse_document()
+
+    %{
+      fields: fields,
+      binary_path: binary_path_for_translation_sidecar(sidecar_path)
+    }
+  end
+
+  @spec upsert_media_from_sidecar(BDS.Projects.Project.t(), map(), keyword()) :: Media.t()
+  def upsert_media_from_sidecar(project, sidecar, opts) do
+    now = Persistence.now_ms()
+
+    attrs = %{
+      id: DocumentFields.get(sidecar.fields, "id") || Ecto.UUID.generate(),
+      project_id: project.id,
+      filename: sidecar.filename,
+      original_name: DocumentFields.get(sidecar.fields, "originalName") || sidecar.filename,
+      mime_type: DocumentFields.get(sidecar.fields, "mimeType") || detect_mime(sidecar.filename),
+      size: DocumentFields.get(sidecar.fields, "size", 0),
+      width: blank_to_nil(DocumentFields.get(sidecar.fields, "width")),
+      height: blank_to_nil(DocumentFields.get(sidecar.fields, "height")),
+      title: DocumentFields.get(sidecar.fields, "title"),
+      alt: DocumentFields.get(sidecar.fields, "alt"),
+      caption: DocumentFields.get(sidecar.fields, "caption"),
+      author: DocumentFields.get(sidecar.fields, "author"),
+      language: DocumentFields.get(sidecar.fields, "language"),
+      file_path: sidecar.relative_file_path,
+      sidecar_path: sidecar.relative_sidecar_path,
+      checksum: nil,
+      tags: DocumentFields.get(sidecar.fields, "tags", []),
+      created_at: DocumentFields.get(sidecar.fields, "createdAt", now),
+      updated_at: DocumentFields.get(sidecar.fields, "updatedAt", now)
+    }
+
+    media =
+      Repo.get(Media, attrs.id) ||
+        Repo.get_by(Media, project_id: project.id, file_path: sidecar.relative_file_path) ||
+        %Media{}
+
+    media =
+      media
+      |> Media.changeset(attrs)
+      |> Repo.insert_or_update!()
+
+    if Keyword.get(opts, :sync_search, true) do
+      :ok = Search.sync_media(media)
+    end
+
+    media
+  end
+
+  @spec upsert_translation_from_sidecar(BDS.Projects.Project.t(), %{required(Path.t()) => Media.t()}, map(), keyword()) ::
+          Translation.t() | :skip | :ok
+  def upsert_translation_from_sidecar(project, canonical_media_by_binary_path, sidecar, opts) do
+    case Map.get(canonical_media_by_binary_path, sidecar.binary_path) do
+      nil ->
+        :skip
+
+      media ->
+        now = Persistence.now_ms()
+        language = DocumentFields.fetch!(sidecar.fields, "language")
+
+        translation =
+          Repo.get_by(Translation, translation_for: media.id, language: language) ||
+            %Translation{id: Ecto.UUID.generate(), created_at: now}
+
+        translation
+        |> Translation.changeset(%{
+          id: translation.id,
+          project_id: project.id,
+          translation_for: media.id,
+          language: language,
+          title: DocumentFields.get(sidecar.fields, "title"),
+          alt: DocumentFields.get(sidecar.fields, "alt"),
+          caption: DocumentFields.get(sidecar.fields, "caption"),
+          created_at: translation.created_at || now,
+          updated_at: now
+        })
+        |> Repo.insert_or_update!()
+
+        if Keyword.get(opts, :sync_search, true) do
+          :ok = Search.sync_media(media.id)
+        end
+    end
+  end
+
+  @spec sync_media_sidecar(String.t()) :: :ok | {:error, :not_found | term()}
+  def sync_media_sidecar(media_id) do
+    case Repo.get(Media, media_id) do
+      nil ->
+        {:error, :not_found}
+
+      media ->
+        project = Projects.get_project!(media.project_id)
+        :ok = write_sidecar(project, media)
+        :ok
+    end
+  end
+
+  @spec sync_media_from_sidecar(String.t()) :: {:ok, Media.t()} | {:error, :not_found | term()}
+  def sync_media_from_sidecar(media_id) do
+    case Repo.get(Media, media_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Media{} = media ->
+        project = Projects.get_project!(media.project_id)
+        sidecar_path = Path.join(Projects.project_data_dir(project), media.sidecar_path)
+
+        if File.exists?(sidecar_path) do
+          {:ok, upsert_media_from_sidecar(project, parse_canonical_sidecar(project, sidecar_path), sync_search: true)}
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
+  @spec sync_media_translation_sidecar(String.t()) ::
+          {:ok, Translation.t()} | {:error, :not_found | term()}
+  def sync_media_translation_sidecar(translation_id) do
+    case Repo.get(Translation, translation_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Translation{} = translation ->
+        media = Repo.get!(Media, translation.translation_for)
+        project = Projects.get_project!(media.project_id)
+        :ok = write_translation_sidecar(project, media, translation)
+        {:ok, translation}
+    end
+  end
+
+  @spec sync_media_translation_from_sidecar(String.t()) ::
+          {:ok, Translation.t()} | {:error, :not_found | term()}
+  def sync_media_translation_from_sidecar(translation_id) do
+    case Repo.get(Translation, translation_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Translation{} = translation ->
+        media = Repo.get!(Media, translation.translation_for)
+        project = Projects.get_project!(media.project_id)
+
+        sidecar_path =
+          Path.join(
+            Projects.project_data_dir(project),
+            translation_sidecar_path(media, translation.language)
+          )
+
+        if File.exists?(sidecar_path) do
+          sidecar = parse_translation_sidecar(sidecar_path)
+
+          case BDS.Media.upsert_media_translation(
+                 media.id,
+                 DocumentFields.fetch!(sidecar.fields, "language"),
+                 %{
+                   title: DocumentFields.get(sidecar.fields, "title"),
+                   alt: DocumentFields.get(sidecar.fields, "alt"),
+                   caption: DocumentFields.get(sidecar.fields, "caption")
+                 }
+               ) do
+            {:ok, updated_translation} -> {:ok, updated_translation}
+            error -> error
+          end
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
+  @spec import_orphan_media_sidecar(String.t(), String.t()) ::
+          {:ok, Media.t()} | {:error, term()}
+  def import_orphan_media_sidecar(project_id, relative_path) do
+    project = Projects.get_project!(project_id)
+    sidecar_path = Path.join(Projects.project_data_dir(project), relative_path)
+
+    if File.exists?(sidecar_path) do
+      {:ok, upsert_media_from_sidecar(project, parse_canonical_sidecar(project, sidecar_path), sync_search: true)}
+    else
+      {:error, :not_found}
+    end
+  end
+
+  @spec import_orphan_media_translation_sidecar(String.t(), String.t()) ::
+          {:ok, Translation.t()} | {:error, term()}
+  def import_orphan_media_translation_sidecar(project_id, relative_path) do
+    project = Projects.get_project!(project_id)
+    sidecar_path = Path.join(Projects.project_data_dir(project), relative_path)
+
+    if File.exists?(sidecar_path) do
+      sidecar = parse_translation_sidecar(sidecar_path)
+
+      case Repo.get(Media, DocumentFields.get(sidecar.fields, "translationFor")) do
+        nil ->
+          {:error, :not_found}
+
+        media ->
+          case Repo.get_by(Translation,
+                 translation_for: media.id,
+                 language: DocumentFields.fetch!(sidecar.fields, "language")
+               ) do
+            nil ->
+              BDS.Media.upsert_media_translation(
+                media.id,
+                DocumentFields.fetch!(sidecar.fields, "language"),
+                %{
+                  title: DocumentFields.get(sidecar.fields, "title"),
+                  alt: DocumentFields.get(sidecar.fields, "alt"),
+                  caption: DocumentFields.get(sidecar.fields, "caption")
+                }
+              )
+
+            _translation ->
+              {:error, :conflict}
+          end
+      end
+    else
+      {:error, :not_found}
+    end
+  end
+
+  @spec translation_sidecar_path(Media.t(), String.t()) :: String.t()
+  def translation_sidecar_path(media, language), do: "#{media.file_path}.#{language}.meta"
+
+  @spec canonical_sidecar?(Path.t()) :: boolean()
+  def canonical_sidecar?(sidecar_path), do: not translation_sidecar?(sidecar_path)
+
+  @spec translation_sidecar?(Path.t()) :: boolean()
+  def translation_sidecar?(sidecar_path) do
+    Regex.match?(~r/\.[a-z]{2}\.meta$/i, sidecar_path)
+  end
+
+  @spec binary_path_for_translation_sidecar(Path.t()) :: Path.t()
+  def binary_path_for_translation_sidecar(sidecar_path) do
+    Regex.replace(~r/\.[a-z]{2}\.meta$/i, sidecar_path, "")
+  end
+
+  @spec binary_exists_for_sidecar?(Path.t()) :: boolean()
+  def binary_exists_for_sidecar?(sidecar_path) do
+    sidecar_path
+    |> String.trim_trailing(".meta")
+    |> File.exists?()
+  end
+end

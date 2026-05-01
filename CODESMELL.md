@@ -2,7 +2,7 @@
 
 Living document. Each section lists **status**, then **open work in priority order**, then a brief notes block. Completed work is listed compactly at the bottom (`## Changelog`).
 
-Last refreshed: 2026-05-01.
+Last refreshed: 2026-05-02.
 
 ---
 
@@ -14,7 +14,6 @@ Last refreshed: 2026-05-01.
 
 | # | Module | Current lines | Target | Strategy |
 |---|---|---|---|---|
-| 1 | `BDS.Media` | 993 | ≤ 250 | Extract `Thumbnails` (~140), `Sidecars` (~150), `FileOps` (~180), `Rebuild` (~130), `Linking` (~80). Main keeps CRUD + translation API. |
 | 3 | `BDS.Desktop.ShellLive.ImportEditor` | 1436 | ≤ 600 | Extract `ConflictResolution` (~150), `TaxonomyEditing` (~120), `AnalysisState` (~150), `ProgressTracking` (~120). Components stay in main file. |
 | 4 | `BDS.Rendering` | 838 | ≤ 200 | Extract `TemplateSelection` (~120), `PostRendering` (~180), `ListArchive` (~150), `Metadata` (~140), `LinksAndLanguages` (~100). Main keeps the 3 public renders. |
 | 5 | `BDS.Desktop.ShellLive.MenuEditor` | 871 | ≤ 350 | Extract `TreeOps` (~280), `TreePredicates` (~60), `DraftManagement` (~140), `PageCategory` (~120), `State` (~80). |
@@ -33,6 +32,7 @@ Last refreshed: 2026-05-01.
 - `BDS.Posts` 1781 → 569 (68 %)
 - `BDS.Desktop.ShellLive` 2607 → 1545 (41 %)
 - `BDS.Maintenance` 810 → 141 (83 %)
+- `BDS.Media` 993 → 324 (67 %)
 
 ---
 
@@ -165,6 +165,13 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ---
 
 ## Changelog
+
+### 2026-05-02
+
+### 2026-05-02
+
+- **God modules**:
+  - `BDS.Media` 993 → 324 (67 %). Submodules under `lib/bds/media/`: `FileOps` (150, attr/maybe_put/blank_to_nil/atomic_write/delete_file_if_present/list_matching_files/media_file_path/detect_mime/image_dimensions/image_mime?/progress callbacks), `Thumbnails` (165, thumbnail_paths/regenerate_thumbnails/regenerate_missing_thumbnails/ensure_thumbnails/delete_thumbnail_files + private render/write helpers), `Sidecars` (329, write_sidecar/write_translation_sidecar/parse_canonical_sidecar/parse_translation_sidecar/upsert_media_from_sidecar/upsert_translation_from_sidecar + sync/import-orphan public API + translation_sidecar_path/canonical_sidecar?/translation_sidecar?/binary_path_for_translation_sidecar/binary_exists_for_sidecar?), `Linking` (125, list_linked_posts/link_media_to_post/unlink_media_from_post/linked_post_ids), `Rebuilder` (82, rebuild_media_from_files/2). Public API preserved via `defdelegate`; coordinator keeps import_media/update_media/delete_media/upsert_media_translation/delete_media_translation/replace_media_file/list_media_translations and uses `import only:` for shared helpers.
 
 ### 2026-05-01
 
