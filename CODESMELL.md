@@ -129,11 +129,7 @@ _None._ All modules previously on the queue have been split; refresh the queue i
 
 ## 13. `BDS.Tasks` Memory Growth
 
-**Status:** open, bounded in practice.
-
-**Risk:** the `tasks` map grows for the lifetime of the BEAM unless the UI calls `clear_completed`/`clear_finished`. Long-running desktop sessions could accumulate thousands of finished tasks.
-
-**Plan:** TTL eviction in the `BDS.Tasks` GenServer (e.g., drop `:completed`/`:failed`/`:cancelled` older than 1 h); already partially mitigated by `recent_finished_limit` in `build_status_snapshot/1`.
+**Status:** ✅ done (2026-05-01). `BDS.Tasks` now evicts terminal tasks (`:completed`/`:failed`/`:cancelled`) after a configurable TTL (`:finished_task_ttl_ms`, default 1 h). Eviction is triggered by the GenServer after a task finishes and also pruned on read calls (`get_task`, `status_snapshot`, `list_tasks`, `list_running_tasks`), while pending/running tasks remain retained. The UI snapshot still separately limits recently finished entries with `recent_finished_limit`.
 
 ---
 
@@ -158,6 +154,8 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
 ## Changelog
 
 ### 2026-05-01
+
+- **`BDS.Tasks` memory growth**: added configurable TTL eviction for terminal tasks in the `BDS.Tasks` GenServer (`:finished_task_ttl_ms`, default 1 h). Finished tasks are pruned by delayed GenServer cleanup and on task read calls; active tasks are preserved. Added regression coverage that completes a task with a tiny TTL and verifies it disappears without `clear_finished/0` while a running task remains. Section 13 is closed.
 
 - **Atom/string key duality**: added `BDS.MapUtils.attr/3` and a regression test that scans `lib/**/*.ex` and `lib/**/*.heex` for same-name atom/string `Map.get` fallback reads. Replaced same-name atom/string boundary reads across AI attrs, rendering assigns, pagination/archive contexts, UI command/filter params, metadata category settings, metadata-diff repair payloads, CLI sync payloads, chat tool call normalization, and misc editor duplicate/metadata-diff payload rendering. Remaining mixed-key scan hits are intentionally different-key fallbacks (for example camelCase/snake_case JSON compatibility) or atom-only/string-only boundaries. Section 12 is closed.
 

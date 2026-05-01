@@ -143,7 +143,10 @@ defmodule BDS.TasksTest do
     assert snapshot.running_task_overflow == 1
     assert snapshot.running_task_message == "preview build: halfway"
 
-    assert [%{id: first_id, status: :running, progress: 0.5, group_name: "Generation"}, %{id: second_id, status: :running}] =
+    assert [
+             %{id: first_id, status: :running, progress: 0.5, group_name: "Generation"},
+             %{id: second_id, status: :running}
+           ] =
              snapshot.tasks
 
     assert first_id == first.id
@@ -161,7 +164,8 @@ defmodule BDS.TasksTest do
                %{group_id: "maintenance", group_name: "Maintenance"}
              )
 
-    completed = wait_for_task(task.id, &(&1.status == :completed and &1.result == %{counts: %{posts: 2}}))
+    completed =
+      wait_for_task(task.id, &(&1.status == :completed and &1.result == %{counts: %{posts: 2}}))
 
     snapshot = BDS.Tasks.status_snapshot()
 
@@ -171,8 +175,32 @@ defmodule BDS.TasksTest do
     assert snapshot.running_task_message == nil
 
     assert Enum.any?(snapshot.tasks, fn item ->
-             item.id == completed.id and item.status == :completed and item.result == %{counts: %{posts: 2}}
+             item.id == completed.id and item.status == :completed and
+               item.result == %{counts: %{posts: 2}}
            end)
+  end
+
+  test "finished tasks are evicted after the configured TTL" do
+    Application.put_env(:bds, :tasks,
+      max_concurrent: 3,
+      progress_throttle_ms: 250,
+      finished_task_ttl_ms: 1
+    )
+
+    assert {:ok, task} = BDS.Tasks.register_external_task("short lived")
+    assert {:ok, running} = BDS.Tasks.register_external_task("still running")
+
+    on_exit(fn -> _ = BDS.Tasks.complete_task(running.id) end)
+
+    assert :ok = BDS.Tasks.complete_task(task.id)
+    assert wait_for_task(task.id, &(&1.status == :completed)).status == :completed
+
+    Process.sleep(20)
+
+    task_ids = BDS.Tasks.list_tasks() |> Enum.map(& &1.id)
+
+    refute task.id in task_ids
+    assert running.id in task_ids
   end
 
   defp receive_started do

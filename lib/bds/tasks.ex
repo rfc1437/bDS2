@@ -6,6 +6,7 @@ defmodule BDS.Tasks do
   @default_max_concurrent 3
   @default_progress_throttle_ms 250
   @default_recent_finished_limit 10
+  @default_finished_task_ttl_ms :timer.hours(1)
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -85,18 +86,22 @@ defmodule BDS.Tasks do
   end
 
   def handle_call({:get_task, task_id}, _from, state) do
+    state = prune_expired_finished_tasks(state)
     {:reply, state.tasks[task_id] && public_task(state.tasks[task_id]), state}
   end
 
   def handle_call(:status_snapshot, _from, state) do
+    state = prune_expired_finished_tasks(state)
     {:reply, build_status_snapshot(state), state}
   end
 
   def handle_call(:list_tasks, _from, state) do
+    state = prune_expired_finished_tasks(state)
     {:reply, all_tasks(state) |> Enum.map(&public_task/1), state}
   end
 
   def handle_call(:list_running_tasks, _from, state) do
+    state = prune_expired_finished_tasks(state)
     {:reply, running_tasks(state) |> Enum.map(&public_task/1), state}
   end
 
@@ -129,6 +134,7 @@ defmodule BDS.Tasks do
           |> update_task(task_id, %{status: :cancelled, finished_at: DateTime.utc_now()})
           |> remove_running(task_id, ref)
           |> start_queued_tasks()
+          |> schedule_finished_task_eviction()
 
         {:reply, :ok, next_state}
 
@@ -140,6 +146,7 @@ defmodule BDS.Tasks do
             Enum.reject(queue, fn {queued_id, _work} -> queued_id == task_id end)
           end)
           |> start_queued_tasks()
+          |> schedule_finished_task_eviction()
 
         {:reply, :ok, next_state}
 
@@ -170,6 +177,7 @@ defmodule BDS.Tasks do
         finished_at: DateTime.utc_now()
       })
       |> start_queued_tasks()
+      |> schedule_finished_task_eviction()
 
     {:reply, :ok, next_state}
   end
@@ -183,6 +191,7 @@ defmodule BDS.Tasks do
         finished_at: DateTime.utc_now()
       })
       |> start_queued_tasks()
+      |> schedule_finished_task_eviction()
 
     {:reply, :ok, next_state}
   end
@@ -190,6 +199,10 @@ defmodule BDS.Tasks do
   @impl true
   def handle_info({:task_progress, task_id, value, message}, state) do
     {:noreply, maybe_report_progress(state, task_id, value, message)}
+  end
+
+  def handle_info(:evict_finished_tasks, state) do
+    {:noreply, prune_expired_finished_tasks(state)}
   end
 
   def handle_info({ref, result}, state) do
@@ -225,6 +238,7 @@ defmodule BDS.Tasks do
           end
           |> remove_running(task_id, ref)
           |> start_queued_tasks()
+          |> schedule_finished_task_eviction()
 
         {:noreply, next_state}
     end
@@ -255,6 +269,7 @@ defmodule BDS.Tasks do
           end
           |> remove_running(task_id, ref)
           |> start_queued_tasks()
+          |> schedule_finished_task_eviction()
 
         {:noreply, next_state}
     end
@@ -346,6 +361,29 @@ defmodule BDS.Tasks do
       task -> Map.merge(task, attrs)
     end)
   end
+
+  defp schedule_finished_task_eviction(state) do
+    Process.send_after(self(), :evict_finished_tasks, finished_task_ttl_ms())
+    state
+  end
+
+  defp prune_expired_finished_tasks(state) do
+    now = DateTime.utc_now()
+
+    tasks =
+      Map.reject(state.tasks, fn {_task_id, task} ->
+        expired_finished_task?(task, now)
+      end)
+
+    %{state | tasks: tasks}
+  end
+
+  defp expired_finished_task?(%{status: status, finished_at: %DateTime{} = finished_at}, now)
+       when status in [:completed, :failed, :cancelled] do
+    DateTime.diff(now, finished_at, :millisecond) >= finished_task_ttl_ms()
+  end
+
+  defp expired_finished_task?(_task, _now), do: false
 
   defp public_task(nil), do: nil
 
@@ -458,6 +496,11 @@ defmodule BDS.Tasks do
   defp recent_finished_limit do
     Application.get_env(:bds, :tasks, [])
     |> Keyword.get(:recent_finished_limit, @default_recent_finished_limit)
+  end
+
+  defp finished_task_ttl_ms do
+    Application.get_env(:bds, :tasks, [])
+    |> Keyword.get(:finished_task_ttl_ms, @default_finished_task_ttl_ms)
   end
 
   defp attr(attrs, key) do
