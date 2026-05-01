@@ -304,6 +304,66 @@ defmodule BDS.MCPTest do
     assert post_resource["slug"] == "resource-post"
   end
 
+  test "missing old app MCP resources expose stats, post media, and media image blobs", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Media Resource Post",
+               content: "Body",
+               language: "en",
+               tags: ["resources"],
+               categories: ["article"]
+             })
+
+    assert {:ok, _published} = BDS.Posts.publish_post(post.id)
+    assert {:ok, _tags} = BDS.Tags.sync_tags_from_posts(project.id)
+
+    source_path = Path.join(temp_dir, "resource-image.png")
+    image_bytes = <<137, 80, 78, 71, 13, 10, 26, 10, "not-a-real-png-but-served-as-bytes">>
+    File.write!(source_path, image_bytes)
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Resource Image",
+               alt: "Resource alt"
+             })
+
+    assert {:ok, :linked} = BDS.Media.link_media_to_post(media.id, post.id)
+
+    resource_uris = BDS.MCP.list_resources() |> Enum.map(& &1.uri)
+    assert "bds://stats" in resource_uris
+
+    template_uris = BDS.MCP.list_resource_templates() |> Enum.map(& &1.uriTemplate)
+    assert "bds://posts/{id}/media" in template_uris
+    assert "bds://media/{id}/image" in template_uris
+
+    assert {:ok, stats} = BDS.MCP.read_resource("bds://stats")
+    assert stats["posts"] == 1
+    assert stats["media"] == 1
+    assert stats["tags"] == 1
+    assert {:ok, categories} = BDS.MCP.read_resource("bds://categories")
+    assert stats["categories"] == length(categories["items"])
+
+    assert {:ok, post_media} = BDS.MCP.read_resource("bds://posts/#{post.id}/media")
+
+    assert [%{"id" => media_id, "title" => "Resource Image", "alt" => "Resource alt"}] =
+             post_media["items"]
+
+    assert media_id == media.id
+
+    assert {:ok, image_resource} = BDS.MCP.read_resource("bds://media/#{media.id}/image")
+    assert image_resource["mimeType"] == "image/png"
+    assert Base.decode64!(image_resource["blob"]) == image_bytes
+
+    assert {:error, :not_found} = BDS.MCP.read_resource("bds://posts/missing/media")
+    assert {:error, :not_found} = BDS.MCP.read_resource("bds://media/missing/image")
+  end
+
   test "post resources use base64url cursors with 50 item pages", %{project: project} do
     for index <- 1..51 do
       assert {:ok, _post} =

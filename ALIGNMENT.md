@@ -26,7 +26,7 @@ Goal: align bDS2 with old bDS behavior. Use the Allium specs as the contract onl
 - Spec: missing these tools.
 - Action: add the tools to `specs/mcp.allium`, implement them in MCP, and test tool listing and call behavior.
 
-## P1: Missing MCP Resources
+## P1: Missing MCP Resources (done)
 
 - Old bDS: also exposes `bds://stats`, `bds://posts/{id}/media`, and `bds://media/{id}/image`.
 - bDS2 now: only posts, media, tags, and categories are exposed.

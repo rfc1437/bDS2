@@ -167,6 +167,46 @@ surface CategoriesResource {
         -- bds://categories
 }
 
+surface StatsResource {
+    facing viewer: McpClient
+    context blog: Blog
+    exposes:
+        blog.post_count
+        blog.media_count
+        blog.tag_count
+        blog.category_count
+    @guidance
+        -- bds://stats
+}
+
+surface PostMediaResource {
+    facing viewer: McpClient
+    context post: post/Post
+    exposes:
+        for m in post.media:
+            m.id
+            m.filename
+            m.title
+            m.alt
+            m.caption
+            m.tags
+    @guidance
+        -- bds://posts/{id}/media
+        -- Unknown post ids return not_found.
+}
+
+surface MediaImageResource {
+    facing viewer: McpClient
+    context media_item: media/Media
+    exposes:
+        media_item.mime_type
+        media_item.file_bytes
+    @guidance
+        -- bds://media/{id}/image
+        -- Returns blob content using the media MIME type.
+        -- Unknown media ids or missing files return not_found.
+}
+
 -- Read-only tools
 
 rule CheckTerm {

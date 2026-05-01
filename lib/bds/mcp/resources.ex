@@ -1,12 +1,16 @@
 defmodule BDS.MCP.Resources do
   @moduledoc false
 
+  import Ecto.Query
+
   alias BDS.MCP.ProposalStore
   alias BDS.MCP.Queries
   alias BDS.MCP.Util
   alias BDS.Media.Media, as: MediaAsset
   alias BDS.Metadata
+  alias BDS.Posts.PostMedia
   alias BDS.Posts.Post
+  alias BDS.Projects
   alias BDS.Repo
   alias BDS.Search
   alias BDS.Tags
@@ -23,7 +27,8 @@ defmodule BDS.MCP.Resources do
       %{name: "posts", uri: "bds://posts"},
       %{name: "media", uri: "bds://media"},
       %{name: "tags", uri: "bds://tags"},
-      %{name: "categories", uri: "bds://categories"}
+      %{name: "categories", uri: "bds://categories"},
+      %{name: "stats", uri: "bds://stats"}
     ]
   end
 
@@ -31,7 +36,9 @@ defmodule BDS.MCP.Resources do
   def templates do
     [
       %{name: "posts", uriTemplate: "bds://posts{?cursor}"},
-      %{name: "media", uriTemplate: "bds://media{?cursor}"}
+      %{name: "media", uriTemplate: "bds://media{?cursor}"},
+      %{name: "post media", uriTemplate: "bds://posts/{id}/media"},
+      %{name: "media image", uriTemplate: "bds://media/{id}/image"}
     ]
   end
 
@@ -44,8 +51,9 @@ defmodule BDS.MCP.Resources do
       %URI{scheme: "bds", host: "media", path: nil, query: query} -> media_resource(query)
       %URI{scheme: "bds", host: "tags", path: nil} -> {:ok, tags_resource()}
       %URI{scheme: "bds", host: "categories", path: nil} -> {:ok, categories_resource()}
-      %URI{scheme: "bds", host: "posts", path: "/" <> id} -> read_post_resource(id)
-      %URI{scheme: "bds", host: "media", path: "/" <> id} -> read_media_resource(id)
+      %URI{scheme: "bds", host: "stats", path: nil} -> {:ok, stats_resource()}
+      %URI{scheme: "bds", host: "posts", path: path} -> read_posts_path(path)
+      %URI{scheme: "bds", host: "media", path: path} -> read_media_path(path)
       _other -> {:error, :not_found}
     end
   end
@@ -155,6 +163,40 @@ defmodule BDS.MCP.Resources do
     }
   end
 
+  defp stats_resource do
+    project = Queries.active_project!()
+    {:ok, posts} = Search.search_posts(project.id, "", %{offset: 0, limit: 1})
+    {:ok, media} = Search.search_media(project.id, "", %{offset: 0, limit: 1})
+    {:ok, metadata} = Metadata.get_project_metadata(project.id)
+
+    %{
+      "posts" => posts.total,
+      "media" => media.total,
+      "tags" => length(Tags.list_tags(project.id)),
+      "categories" => length(metadata.categories)
+    }
+  end
+
+  defp read_posts_path("/" <> path) do
+    case String.split(path, "/", trim: true) do
+      [id] -> read_post_resource(id)
+      [id, "media"] -> read_post_media_resource(id)
+      _parts -> {:error, :not_found}
+    end
+  end
+
+  defp read_posts_path(_path), do: {:error, :not_found}
+
+  defp read_media_path("/" <> path) do
+    case String.split(path, "/", trim: true) do
+      [id] -> read_media_resource(id)
+      [id, "image"] -> read_media_image_resource(id)
+      _parts -> {:error, :not_found}
+    end
+  end
+
+  defp read_media_path(_path), do: {:error, :not_found}
+
   defp read_post_resource(id) do
     case Repo.get(Post, id) do
       %Post{} = post -> {:ok, Queries.post_detail(post)}
@@ -166,6 +208,49 @@ defmodule BDS.MCP.Resources do
     case Repo.get(MediaAsset, id) do
       %MediaAsset{} = media -> {:ok, Util.sanitize(media)}
       nil -> {:error, :not_found}
+    end
+  end
+
+  defp read_post_media_resource(post_id) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Post{} ->
+        items =
+          Repo.all(
+            from media in MediaAsset,
+              join: post_media in PostMedia,
+              on: post_media.media_id == media.id,
+              where: post_media.post_id == ^post_id,
+              order_by: [asc: post_media.sort_order, asc: media.updated_at],
+              select: media
+          )
+
+        {:ok, %{"items" => Enum.map(items, &Util.sanitize/1)}}
+    end
+  end
+
+  defp read_media_image_resource(id) do
+    case Repo.get(MediaAsset, id) do
+      nil ->
+        {:error, :not_found}
+
+      %MediaAsset{} = media ->
+        project = Projects.get_project!(media.project_id)
+        full_path = Path.join(Projects.project_data_dir(project), media.file_path || "")
+
+        case File.read(full_path) do
+          {:ok, bytes} ->
+            {:ok,
+             %{
+               "mimeType" => media.mime_type || "application/octet-stream",
+               "blob" => Base.encode64(bytes)
+             }}
+
+          {:error, _reason} ->
+            {:error, :not_found}
+        end
     end
   end
 end

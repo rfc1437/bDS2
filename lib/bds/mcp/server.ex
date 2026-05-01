@@ -189,8 +189,7 @@ defmodule BDS.MCP.Server do
         {:ok, success_response(id, %{"resources" => BDS.MCP.list_resources()})}
 
       "resources/templates/list" ->
-        {:ok,
-         success_response(id, %{"resourceTemplates" => BDS.MCP.list_resource_templates()})}
+        {:ok, success_response(id, %{"resourceTemplates" => BDS.MCP.list_resource_templates()})}
 
       "resources/read" ->
         read_resource(id, params)
@@ -227,9 +226,7 @@ defmodule BDS.MCP.Server do
       {:ok, result} ->
         {:ok,
          success_response(id, %{
-           "contents" => [
-             %{"uri" => uri, "mimeType" => "application/json", "text" => Jason.encode!(result)}
-           ]
+           "contents" => [resource_content(uri, result)]
          })}
 
       {:error, :not_found} ->
@@ -241,6 +238,15 @@ defmodule BDS.MCP.Server do
   end
 
   defp read_resource(id, _params), do: {:error, error_response(id, -32602, "Invalid params")}
+
+  defp resource_content(uri, %{"blob" => blob, "mimeType" => mime_type})
+       when is_binary(blob) and is_binary(mime_type) do
+    %{"uri" => uri, "mimeType" => mime_type, "blob" => blob}
+  end
+
+  defp resource_content(uri, result) do
+    %{"uri" => uri, "mimeType" => "application/json", "text" => Jason.encode!(result)}
+  end
 
   defp success_response(id, result), do: %{"jsonrpc" => "2.0", "id" => id, "result" => result}
 
