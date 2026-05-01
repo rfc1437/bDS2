@@ -69,8 +69,8 @@ defmodule BDS.MCP.ProposalStore do
     Enum.map(expired, &Repo.get(Proposal, &1.id))
   end
 
-  def mark_accepted(id) when is_binary(id), do: mark_status(id, :accepted)
-  def mark_discarded(id) when is_binary(id), do: mark_status(id, :discarded)
+  def mark_accepted(id) when is_binary(id), do: remove(id)
+  def mark_discarded(id) when is_binary(id), do: remove(id)
 
   defp mark_status(id, status) do
     case Repo.get(Proposal, id) do

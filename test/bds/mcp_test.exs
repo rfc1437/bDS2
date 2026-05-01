@@ -180,7 +180,7 @@ defmodule BDS.MCPTest do
     assert_raise Ecto.NoResultsError, fn -> BDS.Posts.get_post!(draft_post_id) end
   end
 
-  test "proposal lifecycle is persisted with pending, accepted, discarded, and expired statuses" do
+  test "proposal lifecycle removes accepted and discarded proposals" do
     assert {:ok, accepted_result} =
              BDS.MCP.call_tool("draft_post", %{title: "Accept Me", content: "Body"})
 
@@ -188,19 +188,14 @@ defmodule BDS.MCPTest do
     assert ProposalStore.get(accepted_id).status == :pending
 
     assert {:ok, _accepted} = BDS.MCP.call_tool("accept_proposal", %{proposalId: accepted_id})
-
-    accepted_proposal = ProposalStore.get(accepted_id)
-    assert accepted_proposal.status == :accepted
-    assert accepted_proposal.entity_id == accepted_result["post"]["id"]
+    assert ProposalStore.get(accepted_id) == nil
 
     assert {:ok, discarded_result} =
              BDS.MCP.call_tool("draft_post", %{title: "Discard Me Later", content: "Body"})
 
     discarded_id = discarded_result["proposal_id"]
     assert {:ok, _discarded} = BDS.MCP.call_tool("discard_proposal", %{proposalId: discarded_id})
-
-    discarded_proposal = ProposalStore.get(discarded_id)
-    assert discarded_proposal.status == :discarded
+    assert ProposalStore.get(discarded_id) == nil
 
     expired =
       ProposalStore.create("draft_post", %{"post_id" => "expired-post"},

@@ -1,13 +1,16 @@
 # Alignment Tasks
 
+Allium CLI: `/opt/homebrew/bin/allium`. Use `allium check specs/<file>.allium` only when tending a spec; no Allium command is needed for code-only alignment tasks.
+
 Goal: align bDS2 with old bDS behavior. Use the Allium specs as the contract only where they match old bDS. If old bDS and bDS2 agree but the spec differs, tend the spec.
 
-## P0: MCP Proposal Lifecycle
+## P0: MCP Proposal Lifecycle (done)
 
 - Old bDS: proposals are in-memory and removed after `accept_proposal` or `discard_proposal`.
 - bDS2 now: proposals are persisted and marked `accepted` / `discarded`.
 - Spec: matches old bDS; accepted/discarded proposals should no longer exist.
 - Action: change bDS2 to remove accepted/discarded proposals, update tests, and remove/adjust terminal-status expectations.
+- Status: done.
 
 ## P0: MCP Cursor Resources
 

@@ -10,8 +10,6 @@ use "./template.allium" as template
 
 enum ProposalStatus {
     pending
-    accepted
-    discarded
     expired
 }
 
@@ -49,8 +47,6 @@ entity Proposal {
     is_expired: expires_at <= now
 
     transitions status {
-        pending -> accepted
-        pending -> discarded
         pending -> expired
     }
 }
@@ -342,7 +338,6 @@ rule AcceptProposal {
             media/UpdateMediaRequested(proposal.target_media, deserialize_media_changes(proposal.data))
         if proposal.kind = propose_post_metadata:
             post/UpdatePostRequested(proposal.target_post, deserialize_post_changes(proposal.data))
-        proposal.status = accepted
         not exists proposal
 }
 
@@ -355,7 +350,6 @@ rule DiscardProposal {
             script/DeleteScriptRequested(proposal.proposed_script)
         if proposal.kind = propose_template:
             template/DeleteTemplateRequested(proposal.proposed_template)
-        proposal.status = discarded
         not exists proposal
 }
 
