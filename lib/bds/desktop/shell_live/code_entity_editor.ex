@@ -8,7 +8,7 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   alias BDS.Scripts.Script
   alias BDS.Templates.Template
 
-  embed_templates "code_entity_editor_html/*"
+  embed_templates("code_entity_editor_html/*")
 
   def assign_socket(socket) do
     socket
@@ -20,7 +20,10 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     %{id: script_id} = socket.assigns.current_tab
 
     socket
-    |> assign(:script_editor_drafts, Map.put(socket.assigns.script_editor_drafts, script_id, normalize_script_params(params)))
+    |> assign(
+      :script_editor_drafts,
+      Map.put(socket.assigns.script_editor_drafts, script_id, normalize_script_params(params))
+    )
     |> reload.(socket.assigns.workbench)
   end
 
@@ -28,7 +31,9 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     %{id: script_id} = socket.assigns.current_tab
 
     case Scripts.get_script(script_id) do
-      nil -> reload.(socket, socket.assigns.workbench)
+      nil ->
+        reload.(socket, socket.assigns.workbench)
+
       %Script{} = script ->
         draft = current_script_draft(socket.assigns, script)
 
@@ -37,7 +42,10 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
             case Scripts.update_script(script.id, script_attrs(draft)) do
               {:ok, _updated} ->
                 socket
-                |> assign(:script_editor_drafts, Map.delete(socket.assigns.script_editor_drafts, script.id))
+                |> assign(
+                  :script_editor_drafts,
+                  Map.delete(socket.assigns.script_editor_drafts, script.id)
+                )
                 |> reload.(socket.assigns.workbench)
 
               {:error, reason} ->
@@ -58,11 +66,18 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     %{id: script_id} = socket.assigns.current_tab
 
     case Scripts.get_script(script_id) do
-      nil -> reload.(socket, socket.assigns.workbench)
+      nil ->
+        reload.(socket, socket.assigns.workbench)
+
       %Script{} = script ->
         case Scripting.validate(current_script_draft(socket.assigns, script)["content"] || "") do
-          :ok -> append_output.(socket, translated("Scripts"), translated("Syntax is valid")) |> reload.(socket.assigns.workbench)
-          {:error, reason} -> append_output.(socket, translated("Scripts"), inspect(reason), nil, "error") |> reload.(socket.assigns.workbench)
+          :ok ->
+            append_output.(socket, translated("Scripts"), translated("Syntax is valid"))
+            |> reload.(socket.assigns.workbench)
+
+          {:error, reason} ->
+            append_output.(socket, translated("Scripts"), inspect(reason), nil, "error")
+            |> reload.(socket.assigns.workbench)
         end
     end
   end
@@ -71,11 +86,18 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     %{id: script_id} = socket.assigns.current_tab
 
     case Scripts.get_script(script_id) do
-      nil -> reload.(socket, socket.assigns.workbench)
+      nil ->
+        reload.(socket, socket.assigns.workbench)
+
       %Script{} = script ->
         draft = current_script_draft(socket.assigns, script)
 
-        case Scripting.execute_project_script(script.project_id, draft["content"] || "", draft["entrypoint"] || "main", []) do
+        case Scripting.execute_project_script(
+               script.project_id,
+               draft["content"] || "",
+               draft["entrypoint"] || "main",
+               []
+             ) do
           {:ok, result} ->
             socket
             |> append_output.(translated("Scripts"), inspect(result))
@@ -93,8 +115,12 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     %{id: script_id} = socket.assigns.current_tab
 
     case Scripts.delete_script(script_id) do
-      {:ok, _deleted} -> reload.(socket, BDS.UI.Workbench.close_tab(socket.assigns.workbench, :scripts, script_id))
-      {:error, reason} -> append_output.(socket, translated("Scripts"), inspect(reason), nil, "error") |> reload.(socket.assigns.workbench)
+      {:ok, _deleted} ->
+        reload.(socket, BDS.UI.Workbench.close_tab(socket.assigns.workbench, :scripts, script_id))
+
+      {:error, reason} ->
+        append_output.(socket, translated("Scripts"), inspect(reason), nil, "error")
+        |> reload.(socket.assigns.workbench)
     end
   end
 
@@ -102,7 +128,14 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     %{id: template_id} = socket.assigns.current_tab
 
     socket
-    |> assign(:template_editor_drafts, Map.put(socket.assigns.template_editor_drafts, template_id, normalize_template_params(params)))
+    |> assign(
+      :template_editor_drafts,
+      Map.put(
+        socket.assigns.template_editor_drafts,
+        template_id,
+        normalize_template_params(params)
+      )
+    )
     |> reload.(socket.assigns.workbench)
   end
 
@@ -110,18 +143,28 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     %{id: template_id} = socket.assigns.current_tab
 
     case Templates.get_template(template_id) do
-      nil -> reload.(socket, socket.assigns.workbench)
+      nil ->
+        reload.(socket, socket.assigns.workbench)
+
       %Template{} = template ->
         draft = current_template_draft(socket.assigns, template)
 
         with {:ok, %{valid: true}} <- MCP.validate_template(draft["content"] || ""),
              {:ok, _updated} <- Templates.update_template(template.id, template_attrs(draft)) do
           socket
-          |> assign(:template_editor_drafts, Map.delete(socket.assigns.template_editor_drafts, template.id))
+          |> assign(
+            :template_editor_drafts,
+            Map.delete(socket.assigns.template_editor_drafts, template.id)
+          )
           |> reload.(socket.assigns.workbench)
         else
-          {:ok, %{valid: false, errors: errors}} -> append_output.(socket, translated("Templates"), Enum.join(errors, "; "), nil, "error") |> reload.(socket.assigns.workbench)
-          {:error, reason} -> append_output.(socket, translated("Templates"), inspect(reason), nil, "error") |> reload.(socket.assigns.workbench)
+          {:ok, %{valid: false, errors: errors}} ->
+            append_output.(socket, translated("Templates"), Enum.join(errors, "; "), nil, "error")
+            |> reload.(socket.assigns.workbench)
+
+          {:error, reason} ->
+            append_output.(socket, translated("Templates"), inspect(reason), nil, "error")
+            |> reload.(socket.assigns.workbench)
         end
     end
   end
@@ -130,11 +173,24 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     %{id: template_id} = socket.assigns.current_tab
 
     case Templates.get_template(template_id) do
-      nil -> reload.(socket, socket.assigns.workbench)
+      nil ->
+        reload.(socket, socket.assigns.workbench)
+
       %Template{} = template ->
-        case MCP.validate_template(current_template_draft(socket.assigns, template)["content"] || "") do
-          {:ok, %{valid: true}} -> append_output.(socket, translated("Templates"), translated("Template syntax is valid")) |> reload.(socket.assigns.workbench)
-          {:ok, %{valid: false, errors: errors}} -> append_output.(socket, translated("Templates"), Enum.join(errors, "; "), nil, "error") |> reload.(socket.assigns.workbench)
+        case MCP.validate_template(
+               current_template_draft(socket.assigns, template)["content"] || ""
+             ) do
+          {:ok, %{valid: true}} ->
+            append_output.(
+              socket,
+              translated("Templates"),
+              translated("Template syntax is valid")
+            )
+            |> reload.(socket.assigns.workbench)
+
+          {:ok, %{valid: false, errors: errors}} ->
+            append_output.(socket, translated("Templates"), Enum.join(errors, "; "), nil, "error")
+            |> reload.(socket.assigns.workbench)
         end
     end
   end
@@ -143,16 +199,26 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     %{id: template_id} = socket.assigns.current_tab
 
     case Templates.delete_template(template_id, force: true) do
-      {:ok, _deleted} -> reload.(socket, BDS.UI.Workbench.close_tab(socket.assigns.workbench, :templates, template_id))
-      {:error, reason} -> append_output.(socket, translated("Templates"), inspect(reason), nil, "error") |> reload.(socket.assigns.workbench)
+      {:ok, _deleted} ->
+        reload.(
+          socket,
+          BDS.UI.Workbench.close_tab(socket.assigns.workbench, :templates, template_id)
+        )
+
+      {:error, reason} ->
+        append_output.(socket, translated("Templates"), inspect(reason), nil, "error")
+        |> reload.(socket.assigns.workbench)
     end
   end
 
   def build_script(%{current_tab: %{type: :scripts, id: script_id}} = assigns) do
     case Scripts.get_script(script_id) do
-      nil -> nil
+      nil ->
+        nil
+
       %Script{} = script ->
         draft = current_script_draft(assigns, script)
+
         %{
           id: script.id,
           title: draft["title"],
@@ -172,9 +238,12 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
 
   def build_template(%{current_tab: %{type: :templates, id: template_id}} = assigns) do
     case Templates.get_template(template_id) do
-      nil -> nil
+      nil ->
+        nil
+
       %Template{} = template ->
         draft = current_template_draft(assigns, template)
+
         %{
           id: template.id,
           title: draft["title"],
@@ -190,7 +259,8 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
 
   def build_template(_assigns), do: nil
 
-  def translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  def translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   def format_timestamp(nil), do: ""
   def format_timestamp(timestamp), do: BDS.Persistence.timestamp_to_iso8601(timestamp)
@@ -241,17 +311,21 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
     %{
       title: draft["title"],
       slug: draft["slug"],
-      kind: String.to_existing_atom(draft["kind"]),
+      kind: BDS.BoundedAtoms.script_kind(draft["kind"], :utility),
       entrypoint: draft["entrypoint"],
       enabled: draft["enabled"],
       content: draft["content"]
     }
-  rescue
-    _error -> %{title: draft["title"], slug: draft["slug"], kind: :utility, entrypoint: draft["entrypoint"], enabled: draft["enabled"], content: draft["content"]}
   end
 
   defp template_attrs(draft) do
-    %{title: draft["title"], slug: draft["slug"], kind: normalize_template_kind(draft["kind"]), enabled: draft["enabled"], content: draft["content"]}
+    %{
+      title: draft["title"],
+      slug: draft["slug"],
+      kind: normalize_template_kind(draft["kind"]),
+      enabled: draft["enabled"],
+      content: draft["content"]
+    }
   end
 
   defp normalize_template_kind("post"), do: :post
@@ -261,8 +335,13 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   defp normalize_template_kind(_kind), do: :post
 
   defp discover_entrypoints(content) do
-    ["main" | Regex.scan(~r/function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/, content || "", capture: :all_but_first)
-    |> List.flatten()
-    |> Enum.reject(&(&1 == "main"))]
+    [
+      "main"
+      | Regex.scan(~r/function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/, content || "",
+          capture: :all_but_first
+        )
+        |> List.flatten()
+        |> Enum.reject(&(&1 == "main"))
+    ]
   end
 end

@@ -62,26 +62,30 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
   end
 
   defp find_mcp_agent(agent) do
-    normalized =
-      agent
-      |> to_string()
-      |> String.to_existing_atom()
+    normalized = BDS.BoundedAtoms.mcp_agent(agent)
 
     Enum.find(@mcp_agents, &(&1.id == normalized))
-  rescue
-    _error -> nil
   end
 
   defp format_config_error({:read_config, path, reason}) do
-    translated("Could not read MCP config %{path}: %{reason}", path: path, reason: inspect(reason))
+    translated("Could not read MCP config %{path}: %{reason}",
+      path: path,
+      reason: inspect(reason)
+    )
   end
 
   defp format_config_error({:write_config, path, reason}) do
-    translated("Could not write MCP config %{path}: %{reason}", path: path, reason: inspect(reason))
+    translated("Could not write MCP config %{path}: %{reason}",
+      path: path,
+      reason: inspect(reason)
+    )
   end
 
   defp format_config_error({:create_config_dir, path, reason}) do
-    translated("Could not create MCP config folder %{path}: %{reason}", path: path, reason: inspect(reason))
+    translated("Could not create MCP config folder %{path}: %{reason}",
+      path: path,
+      reason: inspect(reason)
+    )
   end
 
   defp format_config_error({:decode_config, path, _reason}) do
@@ -103,7 +107,9 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
   end
 
   defp mcp_config_path(%{supported?: false}), do: nil
-  defp mcp_config_path(%{id: agent_id}), do: AgentConfig.config_path(agent_id, System.user_home!())
+
+  defp mcp_config_path(%{id: agent_id}),
+    do: AgentConfig.config_path(agent_id, System.user_home!())
 
   defp mcp_server_present?(config, :github_copilot) do
     config

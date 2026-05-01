@@ -4,7 +4,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
   alias BDS.{AI, ImportDefinitions, Metadata, Tags}
   alias BDS.Desktop.ShellData
 
-  def start_taxonomy_edit(socket, %{"type" => type, "name" => name, "mapped_to" => mapped_to}, reload) do
+  def start_taxonomy_edit(
+        socket,
+        %{"type" => type, "name" => name, "mapped_to" => mapped_to},
+        reload
+      ) do
     with %{id: definition_id} <- socket.assigns.current_tab do
       socket
       |> Phoenix.Component.assign(
@@ -24,22 +28,40 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
   def cancel_taxonomy_edit(socket, reload) do
     with %{id: definition_id} <- socket.assigns.current_tab do
       socket
-      |> Phoenix.Component.assign(:import_editor_taxonomy_edits, Map.delete(socket.assigns.import_editor_taxonomy_edits, definition_id))
+      |> Phoenix.Component.assign(
+        :import_editor_taxonomy_edits,
+        Map.delete(socket.assigns.import_editor_taxonomy_edits, definition_id)
+      )
       |> reload.(socket.assigns.workbench)
     else
       _other -> reload.(socket, socket.assigns.workbench)
     end
   end
 
-  def save_taxonomy_edit(socket, %{"type" => type, "name" => name, "mapped_to" => mapped_to}, reload) do
+  def save_taxonomy_edit(
+        socket,
+        %{"type" => type, "name" => name, "mapped_to" => mapped_to},
+        reload
+      ) do
     with %{id: definition_id} <- socket.assigns.current_tab,
          %{} = definition <- ImportDefinitions.get_definition(definition_id),
          %{} = report <- ImportDefinitions.decode_analysis_result(definition),
-         normalized_value <- normalize_taxonomy_mapping_value(socket.assigns.projects.active_project_id, type, mapped_to),
+         normalized_value <-
+           normalize_taxonomy_mapping_value(
+             socket.assigns.projects.active_project_id,
+             type,
+             mapped_to
+           ),
          updated_report <- update_taxonomy_mapping(report, type, name, normalized_value),
-         {:ok, _definition} <- ImportDefinitions.update_definition(definition_id, %{last_analysis_result: updated_report}) do
+         {:ok, _definition} <-
+           ImportDefinitions.update_definition(definition_id, %{
+             last_analysis_result: updated_report
+           }) do
       socket
-      |> Phoenix.Component.assign(:import_editor_taxonomy_edits, Map.delete(socket.assigns.import_editor_taxonomy_edits, definition_id))
+      |> Phoenix.Component.assign(
+        :import_editor_taxonomy_edits,
+        Map.delete(socket.assigns.import_editor_taxonomy_edits, definition_id)
+      )
       |> reload.(socket.assigns.workbench)
     else
       _other -> reload.(socket, socket.assigns.workbench)
@@ -57,7 +79,16 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
       cond do
         socket.assigns.offline_mode ->
           socket
-          |> append_output.(translated("activity.import"), ShellData.translate("Automatic AI actions stay gated by airplane mode.", %{}, socket.assigns.page_language), nil, "info")
+          |> append_output.(
+            translated("activity.import"),
+            ShellData.translate(
+              "Automatic AI actions stay gated by airplane mode.",
+              %{},
+              socket.assigns.page_language
+            ),
+            nil,
+            "info"
+          )
           |> reload.(socket.assigns.workbench)
 
         true ->
@@ -68,21 +99,41 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
             tags: Enum.map(Map.get(report.items, :tags, []), & &1.name)
           }
 
-          opts = maybe_put_option([], :model, Map.get(socket.assigns.import_editor_selected_models, definition_id))
+          opts =
+            maybe_put_option(
+              [],
+              :model,
+              Map.get(socket.assigns.import_editor_selected_models, definition_id)
+            )
 
           case AI.analyze_import_taxonomy(import_terms, taxonomy_terms, opts) do
             {:ok, analysis} ->
               updated_report = apply_taxonomy_mappings(report, analysis)
-              {:ok, _definition} = ImportDefinitions.update_definition(definition_id, %{last_analysis_result: updated_report})
+
+              {:ok, _definition} =
+                ImportDefinitions.update_definition(definition_id, %{
+                  last_analysis_result: updated_report
+                })
+
               mapped_count = auto_mapped_count(report, updated_report)
 
               socket
-              |> append_output.(translated("activity.import"), translated("importAnalysis.mappedCount", %{count: mapped_count}), Map.get(socket.assigns.import_editor_selected_models, definition_id), "info")
+              |> append_output.(
+                translated("activity.import"),
+                translated("importAnalysis.mappedCount", %{count: mapped_count}),
+                Map.get(socket.assigns.import_editor_selected_models, definition_id),
+                "info"
+              )
               |> reload.(socket.assigns.workbench)
 
             {:error, reason} ->
               socket
-              |> append_output.(translated("activity.import"), inspect(reason), Map.get(socket.assigns.import_editor_selected_models, definition_id), "error")
+              |> append_output.(
+                translated("activity.import"),
+                inspect(reason),
+                Map.get(socket.assigns.import_editor_selected_models, definition_id),
+                "error"
+              )
               |> reload.(socket.assigns.workbench)
           end
       end
@@ -106,7 +157,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
         end)
       end)
 
-    Map.put(updated_report, stat_key(bucket_key), rebuild_taxonomy_stats(get_in(updated_report, [:items, bucket_key]) || []))
+    Map.put(
+      updated_report,
+      stat_key(bucket_key),
+      rebuild_taxonomy_stats(get_in(updated_report, [:items, bucket_key]) || [])
+    )
   end
 
   def rebuild_taxonomy_stats(items) do
@@ -122,12 +177,24 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
 
   def apply_taxonomy_mappings(report, analysis) do
     report
-    |> update_in([:items, :categories], &apply_taxonomy_mapping_bucket(&1, Map.get(analysis, :category_mappings, %{})))
-    |> update_in([:items, :tags], &apply_taxonomy_mapping_bucket(&1, Map.get(analysis, :tag_mappings, %{})))
+    |> update_in(
+      [:items, :categories],
+      &apply_taxonomy_mapping_bucket(&1, Map.get(analysis, :category_mappings, %{}))
+    )
+    |> update_in(
+      [:items, :tags],
+      &apply_taxonomy_mapping_bucket(&1, Map.get(analysis, :tag_mappings, %{}))
+    )
     |> then(fn updated_report ->
       updated_report
-      |> Map.put(:category_stats, rebuild_taxonomy_stats(get_in(updated_report, [:items, :categories]) || []))
-      |> Map.put(:tag_stats, rebuild_taxonomy_stats(get_in(updated_report, [:items, :tags]) || []))
+      |> Map.put(
+        :category_stats,
+        rebuild_taxonomy_stats(get_in(updated_report, [:items, :categories]) || [])
+      )
+      |> Map.put(
+        :tag_stats,
+        rebuild_taxonomy_stats(get_in(updated_report, [:items, :tags]) || [])
+      )
     end)
   end
 
@@ -159,14 +226,15 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
       value ->
         project_id
         |> existing_taxonomy_terms()
-        |> Map.get(String.to_existing_atom(type), [])
+        |> Map.get(BDS.BoundedAtoms.taxonomy_type(type), [])
         |> Enum.find(fn term -> String.downcase(term) == String.downcase(value) end)
     end
   end
 
   def auto_mapped_count(previous_report, next_report) do
     previous_count =
-      (Map.get(previous_report.items, :categories, []) ++ Map.get(previous_report.items, :tags, []))
+      (Map.get(previous_report.items, :categories, []) ++
+         Map.get(previous_report.items, :tags, []))
       |> Enum.count(&present?(&1.mapped_to))
 
     next_count =
@@ -199,7 +267,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
   def maybe_put_option(opts, _key, nil), do: opts
   def maybe_put_option(opts, key, value), do: Keyword.put(opts, key, value)
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  defp translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+
   defp present?(value), do: value not in [nil, ""]
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value

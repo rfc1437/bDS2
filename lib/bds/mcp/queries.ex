@@ -72,7 +72,10 @@ defmodule BDS.MCP.Queries do
     |> Util.maybe_put(:category, Util.map_get(params, :category))
     |> Util.maybe_put(:tags, Util.map_get(params, :tags))
     |> Util.maybe_put(:language, Util.map_get(params, :language))
-    |> Util.maybe_put(:missing_translation_language, Util.map_get(params, :missingTranslationLanguage))
+    |> Util.maybe_put(
+      :missing_translation_language,
+      Util.map_get(params, :missingTranslationLanguage)
+    )
     |> Util.maybe_put(:year, Util.map_get(params, :year))
     |> Util.maybe_put(:month, Util.map_get(params, :month))
     |> Util.maybe_put(:status, parse_status(Util.map_get(params, :status)))
@@ -82,8 +85,7 @@ defmodule BDS.MCP.Queries do
 
   @spec parse_status(term()) :: atom() | nil
   def parse_status(nil), do: nil
-  def parse_status(status) when is_atom(status), do: status
-  def parse_status(status) when is_binary(status), do: String.to_existing_atom(status)
+  def parse_status(status), do: BDS.BoundedAtoms.post_status(status)
 
   @spec group_rows(Post.t(), [String.t()]) :: [map()]
   def group_rows(_post, []), do: [%{}]

@@ -3,6 +3,7 @@ defmodule BDS.Desktop.ShellLive.ShellCommandRunner do
 
   import Phoenix.Component, only: [assign: 3]
 
+  alias BDS.BoundedAtoms
   alias BDS.Desktop.ShellCommands
   alias BDS.Desktop.ShellLive.{TabHelpers, TaskLocalization}
   alias BDS.UI.Workbench
@@ -20,18 +21,34 @@ defmodule BDS.Desktop.ShellLive.ShellCommandRunner do
         apply_result(socket, result, callbacks)
 
       {:error, %{message: message}} ->
-        callbacks.append_output.(socket, TaskLocalization.command_title(action), message, nil, "error")
+        callbacks.append_output.(
+          socket,
+          TaskLocalization.command_title(action),
+          message,
+          nil,
+          "error"
+        )
 
       {:error, reason} ->
-        callbacks.append_output.(socket, TaskLocalization.command_title(action), inspect(reason), nil, "error")
+        callbacks.append_output.(
+          socket,
+          TaskLocalization.command_title(action),
+          inspect(reason),
+          nil,
+          "error"
+        )
     end
   end
 
-  def apply_result(socket, %{kind: "task_queued", title: title, message: message, panel_tab: panel_tab}, callbacks) do
+  def apply_result(
+        socket,
+        %{kind: "task_queued", title: title, message: message, panel_tab: panel_tab},
+        callbacks
+      ) do
     workbench =
       socket.assigns.workbench
       |> Workbench.set_panel_visible(true)
-      |> Workbench.set_panel_tab(String.to_existing_atom(panel_tab))
+      |> Workbench.set_panel_tab(BoundedAtoms.panel_tab(panel_tab, :tasks))
 
     socket
     |> callbacks.append_output.(
@@ -53,7 +70,11 @@ defmodule BDS.Desktop.ShellLive.ShellCommandRunner do
     )
   end
 
-  def apply_result(socket, %{kind: "open_url", title: title, message: message, url: url}, callbacks) do
+  def apply_result(
+        socket,
+        %{kind: "open_url", title: title, message: message, url: url},
+        callbacks
+      ) do
     callbacks.append_output.(
       socket,
       TaskLocalization.translate_for_socket(socket, title),
@@ -63,8 +84,12 @@ defmodule BDS.Desktop.ShellLive.ShellCommandRunner do
     )
   end
 
-  def apply_result(socket, %{kind: "open_editor", route: route, title: title, subtitle: subtitle} = result, callbacks) do
-    route_atom = String.to_existing_atom(route)
+  def apply_result(
+        socket,
+        %{kind: "open_editor", route: route, title: title, subtitle: subtitle} = result,
+        callbacks
+      ) do
+    route_atom = BoundedAtoms.editor_route(route, :dashboard)
     tab_id = TabHelpers.tab_id_for_route(route_atom, route)
     workbench = Workbench.open_tab(socket.assigns.workbench, route_atom, tab_id, :pin)
 
@@ -75,7 +100,11 @@ defmodule BDS.Desktop.ShellLive.ShellCommandRunner do
         action: Map.get(result, :action),
         payload: Map.get(result, :payload),
         project_id: Map.get(result, :project_id),
-        editor_meta: TaskLocalization.translate_editor_meta(Map.get(result, :editorMeta, []), socket.assigns.page_language)
+        editor_meta:
+          TaskLocalization.translate_editor_meta(
+            Map.get(result, :editorMeta, []),
+            socket.assigns.page_language
+          )
       })
 
     socket
@@ -85,11 +114,5 @@ defmodule BDS.Desktop.ShellLive.ShellCommandRunner do
 
   def apply_result(socket, _result, _callbacks), do: socket
 
-  def safe_existing_atom(action) when is_binary(action) do
-    String.to_existing_atom(action)
-  rescue
-    ArgumentError -> nil
-  end
-
-  def safe_existing_atom(_), do: nil
+  def shell_command_atom(action), do: BoundedAtoms.shell_command(action)
 end

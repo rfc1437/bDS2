@@ -91,9 +91,9 @@ _None._ All modules previously on the queue have been split; refresh the queue i
 
 ## 8. `String.to_existing_atom/1` + `rescue ArgumentError`
 
-**Status:** open, low priority.
+**Status:** ✅ done (2026-05-01). `String.to_existing_atom/1` call sites were replaced with explicit string→atom whitelists in `BDS.BoundedAtoms`. Session restore, LiveView view/tab/route parsing, panel tab parsing, shell command parsing, import sections, taxonomy types, AI endpoints, MCP agents, menu kinds, script kinds, and post/translation status parsing now all use bounded parsers with explicit fallbacks.
 
-**Plan:** introduce explicit string→atom whitelists for the half-dozen call sites (`safe_existing_atom`, view-id parsing, panel-tab parsing) so the rescue clause becomes dead code, then delete it.
+**Rule:** user/client/file-provided strings must not be converted with `String.to_existing_atom/1` plus rescue; add a bounded parser for the relevant enum instead.
 
 ---
 
@@ -215,6 +215,8 @@ Most tests share the SQLite repo and named GenServers (`BDS.Tasks`, `BDS.Search`
   - `BDS.Media` 993 → 324 (67 %). Submodules under `lib/bds/media/`: `FileOps` (150, attr/maybe_put/blank_to_nil/atomic_write/delete_file_if_present/list_matching_files/media_file_path/detect_mime/image_dimensions/image_mime?/progress callbacks), `Thumbnails` (165, thumbnail_paths/regenerate_thumbnails/regenerate_missing_thumbnails/ensure_thumbnails/delete_thumbnail_files + private render/write helpers), `Sidecars` (329, write_sidecar/write_translation_sidecar/parse_canonical_sidecar/parse_translation_sidecar/upsert_media_from_sidecar/upsert_translation_from_sidecar + sync/import-orphan public API + translation_sidecar_path/canonical_sidecar?/translation_sidecar?/binary_path_for_translation_sidecar/binary_exists_for_sidecar?), `Linking` (125, list_linked_posts/link_media_to_post/unlink_media_from_post/linked_post_ids), `Rebuilder` (82, rebuild_media_from_files/2). Public API preserved via `defdelegate`; coordinator keeps import_media/update_media/delete_media/upsert_media_translation/delete_media_translation/replace_media_file/list_media_translations and uses `import only:` for shared helpers.
 
 ### 2026-05-01
+
+- **`String.to_existing_atom/1` + rescue**: added `BDS.BoundedAtoms` as the shared bounded string→atom parser for sidebar views, editor routes, panel tabs, post statuses, translation statuses, script/template/menu kinds, import sections, taxonomy types, AI endpoints, MCP agents, and shell commands. Replaced every `String.to_existing_atom/1` call site and removed the `safe_existing_atom` rescue helpers. Added regression coverage that scans `lib/**/*.ex` to prevent reintroducing `String.to_existing_atom/1` outside the bounded parser module. Section 8 is closed.
 
 - **Direct `Repo.get` in `BDS.Desktop.ShellLive`**: added context helpers for primary-key reads (`Posts.get_post/1`, `Media.get_media/1`, `Templates.get_template/1`, `Scripts.get_script/1`, `AI.get_chat_conversation/1`) and introduced `BDS.Settings` for global editor settings. Replaced all ShellLive `Repo.get/2` and `Repo.get!/2` calls across the main shell, tab helpers, CLI sync, panel renderer, chat message build, code entity editor, post editor, media editor, overlay components, post metadata, and settings editor. Added a ShellLive regression test that scans source files to keep direct `Repo.get` calls out. Section 7 is closed.
 

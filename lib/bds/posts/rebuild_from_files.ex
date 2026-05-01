@@ -262,12 +262,10 @@ defmodule BDS.Posts.RebuildFromFiles do
   end
 
   @doc false
-  def parse_post_status(status) when is_atom(status), do: status
-  def parse_post_status(status), do: String.to_existing_atom(status)
+  def parse_post_status(status), do: BDS.BoundedAtoms.post_status(status, :draft)
 
   @doc false
-  def parse_translation_status(status) when is_atom(status), do: status
-  def parse_translation_status(status), do: String.to_existing_atom(status)
+  def parse_translation_status(status), do: BDS.BoundedAtoms.translation_status(status, :draft)
 
   @doc false
   def progress_callback(opts), do: ProgressReporter.callback(opts)

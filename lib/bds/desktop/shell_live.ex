@@ -5,20 +5,44 @@ defmodule BDS.Desktop.ShellLive do
 
   import Phoenix.HTML
 
-  alias BDS.AI
+  alias BDS.{AI, BoundedAtoms}
   alias BDS.CliSync.Watcher
   alias BDS.Desktop.{FolderPicker, Overlay, ShellData, UILocale}
-  alias BDS.Desktop.ShellLive.{ChatEditor, CodeEntityEditor, ImportEditor, MediaEditor, MenuEditor, MiscEditor, SettingsEditor, TagsEditor}
+
+  alias BDS.Desktop.ShellLive.{
+    ChatEditor,
+    CodeEntityEditor,
+    ImportEditor,
+    MediaEditor,
+    MenuEditor,
+    MiscEditor,
+    SettingsEditor,
+    TagsEditor
+  }
+
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
   alias BDS.Desktop.ShellLive.PostEditor
   alias BDS.Desktop.ShellLive.SidebarComponents, as: ShellSidebarComponents
   alias BDS.Desktop.ShellLive.SidebarState, as: ShellSidebarState
-  alias BDS.Desktop.ShellLive.{ChatSurface, CliSync, Layout, SessionUtil, ShellCommandRunner, SidebarCreate, TabHelpers, TaskLocalization, TitlebarMenu}
+
+  alias BDS.Desktop.ShellLive.{
+    ChatSurface,
+    CliSync,
+    Layout,
+    SessionUtil,
+    ShellCommandRunner,
+    SidebarCreate,
+    TabHelpers,
+    TaskLocalization,
+    TitlebarMenu
+  }
+
   import TaskLocalization,
     only: [
       localize_task_status: 2,
       translate_for_socket: 2
     ]
+
   import TabHelpers,
     only: [
       tab_title: 2,
@@ -28,6 +52,7 @@ defmodule BDS.Desktop.ShellLive do
       sidebar_route_atom: 1,
       parse_integer: 1
     ]
+
   alias BDS.Projects
   alias BDS.Templates
   alias BDS.UI.{Commands, MenuBar, Session, Workbench}
@@ -35,19 +60,19 @@ defmodule BDS.Desktop.ShellLive do
   @refresh_interval 1_500
   @output_entry_limit 20
   @local_menu_actions MapSet.new([
-                       :toggle_sidebar,
-                       :toggle_panel,
-                       :toggle_assistant_sidebar,
-                       :view_posts,
-                       :view_media,
-                       :edit_preferences,
-                       :edit_menu,
-                       :documentation,
-                       :api_documentation,
-                       :close_tab
-                     ])
+                        :toggle_sidebar,
+                        :toggle_panel,
+                        :toggle_assistant_sidebar,
+                        :view_posts,
+                        :view_media,
+                        :edit_preferences,
+                        :edit_menu,
+                        :documentation,
+                        :api_documentation,
+                        :close_tab
+                      ])
 
-  embed_templates "shell_live/*"
+  embed_templates("shell_live/*")
 
   @impl true
   def mount(_params, _session, socket) do
@@ -64,67 +89,67 @@ defmodule BDS.Desktop.ShellLive do
      socket
      |> assign(:page_title, ShellData.title())
      |> assign(:page_language, ShellData.ui_language())
-      |> assign(:client_shortcuts, Commands.client_shortcuts())
-    |> assign(:offline_mode, if(connected, do: AI.airplane_mode?(true), else: true))
-      |> assign(:handled_task_results, SessionUtil.initial_handled_task_results())
-      |> assign(:assistant_prompt, "")
-      |> assign(:assistant_messages, [])
-    |> assign(:is_mac_ui, mac_ui?())
-    |> assign(:menu_groups, TitlebarMenu.groups())
-    |> assign(:titlebar_menu_group, nil)
-      |> assign(:titlebar_menu_item_index, nil)
+     |> assign(:client_shortcuts, Commands.client_shortcuts())
+     |> assign(:offline_mode, if(connected, do: AI.airplane_mode?(true), else: true))
+     |> assign(:handled_task_results, SessionUtil.initial_handled_task_results())
+     |> assign(:assistant_prompt, "")
+     |> assign(:assistant_messages, [])
+     |> assign(:is_mac_ui, mac_ui?())
+     |> assign(:menu_groups, TitlebarMenu.groups())
+     |> assign(:titlebar_menu_group, nil)
+     |> assign(:titlebar_menu_item_index, nil)
      |> assign(:tab_meta, %{})
-      |> assign(:project_menu_open, false)
-      |> assign(:sidebar_filters_by_view, %{})
-      |> assign(:sidebar_filter_panels, %{})
-        |> assign(:post_editor_drafts, %{})
-        |> assign(:post_editor_active_languages, %{})
-        |> assign(:post_editor_tag_queries, %{})
-        |> assign(:post_editor_category_queries, %{})
-        |> assign(:post_editor_quick_actions_open, %{})
-        |> assign(:post_editor_modes, %{})
-        |> assign(:post_editor_expanded, %{})
-        |> assign(:post_editor_save_states, %{})
-        |> assign(:media_editor_drafts, %{})
-        |> assign(:media_editor_quick_actions_open, %{})
-        |> assign(:media_editor_post_pickers_open, %{})
-        |> assign(:media_editor_post_picker_queries, %{})
-        |> assign(:media_editor_save_states, %{})
-        |> assign(:media_editor_translation_forms, %{})
-        |> assign(:settings_editor_search, "")
-        |> assign(:settings_editor_project_draft, %{})
-          |> assign(:settings_editor_endpoint_models, %{})
-        |> assign(:settings_editor_publishing_draft, %{})
-        |> assign(:settings_editor_new_category, "")
-        |> assign(:style_editor_theme, nil)
-        |> assign(:style_editor_preview_mode, "auto")
-        |> assign(:tags_editor_selected, [])
-        |> assign(:tags_editor_new_tag, %{"name" => "", "color" => ""})
-        |> assign(:tags_editor_edit_draft, %{})
-        |> assign(:tags_editor_merge_target, "")
-        |> assign(:script_editor_drafts, %{})
-        |> assign(:template_editor_drafts, %{})
-        |> assign(:chat_editor_inputs, %{})
-        |> assign(:chat_model_selectors_open, %{})
-        |> assign(:chat_editor_requests, %{})
-        |> assign(:chat_editor_request_refs, %{})
-        |> assign(:chat_editor_surface_data, %{})
-        |> assign(:chat_editor_surface_tabs, %{})
-        |> assign(:chat_editor_action_errors, %{})
-        |> assign(:import_editor_analysis_states, %{})
-        |> assign(:import_editor_analysis_task_refs, %{})
-        |> assign(:import_editor_execution_states, %{})
-        |> assign(:import_editor_execution_task_refs, %{})
-        |> assign(:import_editor_sections, %{})
-        |> assign(:import_editor_taxonomy_edits, %{})
-        |> assign(:import_editor_model_selectors_open, %{})
-        |> assign(:import_editor_selected_models, %{})
-        |> assign(:misc_editor_selected_pairs, %{})
-        |> assign(:misc_editor_git_selected_files, %{})
-        |> assign(:metadata_diff_active_tabs, %{})
-        |> assign(:metadata_diff_field_filters, %{})
-        |> assign(:shell_overlay, nil)
-      |> assign(:output_entries, [])
+     |> assign(:project_menu_open, false)
+     |> assign(:sidebar_filters_by_view, %{})
+     |> assign(:sidebar_filter_panels, %{})
+     |> assign(:post_editor_drafts, %{})
+     |> assign(:post_editor_active_languages, %{})
+     |> assign(:post_editor_tag_queries, %{})
+     |> assign(:post_editor_category_queries, %{})
+     |> assign(:post_editor_quick_actions_open, %{})
+     |> assign(:post_editor_modes, %{})
+     |> assign(:post_editor_expanded, %{})
+     |> assign(:post_editor_save_states, %{})
+     |> assign(:media_editor_drafts, %{})
+     |> assign(:media_editor_quick_actions_open, %{})
+     |> assign(:media_editor_post_pickers_open, %{})
+     |> assign(:media_editor_post_picker_queries, %{})
+     |> assign(:media_editor_save_states, %{})
+     |> assign(:media_editor_translation_forms, %{})
+     |> assign(:settings_editor_search, "")
+     |> assign(:settings_editor_project_draft, %{})
+     |> assign(:settings_editor_endpoint_models, %{})
+     |> assign(:settings_editor_publishing_draft, %{})
+     |> assign(:settings_editor_new_category, "")
+     |> assign(:style_editor_theme, nil)
+     |> assign(:style_editor_preview_mode, "auto")
+     |> assign(:tags_editor_selected, [])
+     |> assign(:tags_editor_new_tag, %{"name" => "", "color" => ""})
+     |> assign(:tags_editor_edit_draft, %{})
+     |> assign(:tags_editor_merge_target, "")
+     |> assign(:script_editor_drafts, %{})
+     |> assign(:template_editor_drafts, %{})
+     |> assign(:chat_editor_inputs, %{})
+     |> assign(:chat_model_selectors_open, %{})
+     |> assign(:chat_editor_requests, %{})
+     |> assign(:chat_editor_request_refs, %{})
+     |> assign(:chat_editor_surface_data, %{})
+     |> assign(:chat_editor_surface_tabs, %{})
+     |> assign(:chat_editor_action_errors, %{})
+     |> assign(:import_editor_analysis_states, %{})
+     |> assign(:import_editor_analysis_task_refs, %{})
+     |> assign(:import_editor_execution_states, %{})
+     |> assign(:import_editor_execution_task_refs, %{})
+     |> assign(:import_editor_sections, %{})
+     |> assign(:import_editor_taxonomy_edits, %{})
+     |> assign(:import_editor_model_selectors_open, %{})
+     |> assign(:import_editor_selected_models, %{})
+     |> assign(:misc_editor_selected_pairs, %{})
+     |> assign(:misc_editor_git_selected_files, %{})
+     |> assign(:metadata_diff_active_tabs, %{})
+     |> assign(:metadata_diff_field_filters, %{})
+     |> assign(:shell_overlay, nil)
+     |> assign(:output_entries, [])
      |> reload_shell(workbench)}
   end
 
@@ -142,7 +167,12 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("select_view", %{"view" => view_id}, socket) do
-    workbench = Workbench.click_activity(socket.assigns.workbench, String.to_existing_atom(view_id))
+    workbench =
+      Workbench.click_activity(
+        socket.assigns.workbench,
+        BoundedAtoms.sidebar_view(view_id, :posts)
+      )
+
     {:noreply, reload_shell(socket, workbench)}
   end
 
@@ -150,7 +180,7 @@ defmodule BDS.Desktop.ShellLive do
     workbench =
       socket.assigns.workbench
       |> Workbench.set_panel_visible(true)
-      |> Workbench.set_panel_tab(String.to_existing_atom(tab))
+      |> Workbench.set_panel_tab(BoundedAtoms.panel_tab(tab, :tasks))
 
     {:noreply, reload_shell(socket, workbench)}
   end
@@ -177,7 +207,13 @@ defmodule BDS.Desktop.ShellLive do
         if state.visible do
           %{state | visible: false}
         else
-          %{visible: true, archive_collapsed: true, tags_collapsed: true, categories_collapsed: true, expanded_year: nil}
+          %{
+            visible: true,
+            archive_collapsed: true,
+            tags_collapsed: true,
+            categories_collapsed: true,
+            expanded_year: nil
+          }
         end
       end)
 
@@ -189,63 +225,79 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("toggle_sidebar_archive", _params, socket) do
     {:noreply,
      socket
-      |> ShellSidebarState.put_filter_panel_state(fn state -> %{state | archive_collapsed: not state.archive_collapsed} end)
+     |> ShellSidebarState.put_filter_panel_state(fn state ->
+       %{state | archive_collapsed: not state.archive_collapsed}
+     end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("toggle_sidebar_tags", _params, socket) do
     {:noreply,
      socket
-      |> ShellSidebarState.put_filter_panel_state(fn state -> %{state | tags_collapsed: not state.tags_collapsed} end)
+     |> ShellSidebarState.put_filter_panel_state(fn state ->
+       %{state | tags_collapsed: not state.tags_collapsed}
+     end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("toggle_sidebar_categories", _params, socket) do
     {:noreply,
      socket
-      |> ShellSidebarState.put_filter_panel_state(fn state -> %{state | categories_collapsed: not state.categories_collapsed} end)
+     |> ShellSidebarState.put_filter_panel_state(fn state ->
+       %{state | categories_collapsed: not state.categories_collapsed}
+     end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("update_sidebar_search", %{"sidebar_filters" => params}, socket) do
     {:noreply,
      socket
-      |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :search, ShellSidebarState.normalize_filter_string(Map.get(params, "search"))) end)
+     |> ShellSidebarState.put_filters(fn filters ->
+       Map.put(
+         filters,
+         :search,
+         ShellSidebarState.normalize_filter_string(Map.get(params, "search"))
+       )
+     end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("clear_sidebar_search", _params, socket) do
     {:noreply,
      socket
-      |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :search, nil) end)
+     |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :search, nil) end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("clear_sidebar_tags", _params, socket) do
     {:noreply,
      socket
-      |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :tags, []) end)
+     |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :tags, []) end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("clear_sidebar_categories", _params, socket) do
     {:noreply,
      socket
-      |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :categories, []) end)
+     |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :categories, []) end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("toggle_sidebar_tag", %{"tag" => tag}, socket) do
     {:noreply,
      socket
-      |> ShellSidebarState.put_filters(fn filters -> ShellSidebarState.toggle_filter_value(filters, :tags, tag) end)
+     |> ShellSidebarState.put_filters(fn filters ->
+       ShellSidebarState.toggle_filter_value(filters, :tags, tag)
+     end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_event("toggle_sidebar_category", %{"category" => category}, socket) do
     {:noreply,
      socket
-     |> ShellSidebarState.put_filters(fn filters -> ShellSidebarState.toggle_filter_value(filters, :categories, category) end)
+     |> ShellSidebarState.put_filters(fn filters ->
+       ShellSidebarState.toggle_filter_value(filters, :categories, category)
+     end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
@@ -255,9 +307,10 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply,
      socket
      |> ShellSidebarState.put_filter_panel_state(fn state ->
-       %{state |
-         archive_collapsed: false,
-         expanded_year: if(state.expanded_year == parsed_year, do: nil, else: parsed_year)
+       %{
+         state
+         | archive_collapsed: false,
+           expanded_year: if(state.expanded_year == parsed_year, do: nil, else: parsed_year)
        }
      end)
      |> ShellSidebarState.put_filters(fn filters ->
@@ -272,7 +325,11 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply,
      socket
      |> ShellSidebarState.put_filter_panel_state(fn state ->
-       %{state | archive_collapsed: false, expanded_year: ShellSidebarState.parse_optional_integer(year)}
+       %{
+         state
+         | archive_collapsed: false,
+           expanded_year: ShellSidebarState.parse_optional_integer(year)
+       }
      end)
      |> ShellSidebarState.put_filters(fn filters ->
        filters
@@ -285,8 +342,12 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("clear_sidebar_month", _params, socket) do
     {:noreply,
      socket
-      |> ShellSidebarState.put_filter_panel_state(fn state -> %{state | archive_collapsed: false} end)
-      |> ShellSidebarState.put_filters(fn filters -> filters |> Map.put(:year, nil) |> Map.put(:month, nil) end)
+     |> ShellSidebarState.put_filter_panel_state(fn state ->
+       %{state | archive_collapsed: false}
+     end)
+     |> ShellSidebarState.put_filters(fn filters ->
+       filters |> Map.put(:year, nil) |> Map.put(:month, nil)
+     end)
      |> reload_shell(socket.assigns.workbench)}
   end
 
@@ -300,7 +361,10 @@ defmodule BDS.Desktop.ShellLive do
        |> Map.put(:month, nil)
        |> Map.put(:tags, [])
        |> Map.put(:categories, [])
-       |> Map.put(:display_limit, ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data))
+       |> Map.put(
+         :display_limit,
+         ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data)
+       )
      end)
      |> reload_shell(socket.assigns.workbench)}
   end
@@ -309,7 +373,12 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply,
      socket
      |> ShellSidebarState.put_filters(fn filters ->
-       Map.update(filters, :display_limit, ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data), &(&1 + ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data)))
+       Map.update(
+         filters,
+         :display_limit,
+         ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data),
+         &(&1 + ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data))
+       )
      end)
      |> reload_shell(socket.assigns.workbench)}
   end
@@ -328,13 +397,18 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("select_tab", %{"type" => type, "id" => id}, socket) do
     workbench =
-      Workbench.open_tab(socket.assigns.workbench, String.to_existing_atom(type), id, :preview)
+      Workbench.open_tab(
+        socket.assigns.workbench,
+        BoundedAtoms.editor_route(type, :post),
+        id,
+        :preview
+      )
 
     {:noreply, reload_shell(socket, workbench)}
   end
 
   def handle_event("close_tab", %{"type" => type, "id" => id}, socket) do
-    type_atom = String.to_existing_atom(type)
+    type_atom = BoundedAtoms.editor_route(type, :post)
     workbench = Workbench.close_tab(socket.assigns.workbench, type_atom, id)
     tab_meta = Map.delete(socket.assigns.tab_meta, {type_atom, id})
 
@@ -346,7 +420,8 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("delete_sidebar_template", %{"id" => template_id}, socket) do
     case Templates.get_template(template_id) do
-      %Templates.Template{project_id: project_id} when project_id == socket.assigns.projects.active_project_id ->
+      %Templates.Template{project_id: project_id}
+      when project_id == socket.assigns.projects.active_project_id ->
         case Templates.delete_template(template_id) do
           {:ok, :deleted} ->
             workbench = Workbench.close_tab(socket.assigns.workbench, :templates, template_id)
@@ -360,14 +435,24 @@ defmodule BDS.Desktop.ShellLive do
           {:error, reason} ->
             {:noreply,
              socket
-             |> append_output_entry(translated("Delete") <> " " <> translated("Template"), inspect(reason), nil, "error")
+             |> append_output_entry(
+               translated("Delete") <> " " <> translated("Template"),
+               inspect(reason),
+               nil,
+               "error"
+             )
              |> reload_shell(socket.assigns.workbench)}
         end
 
       _other ->
         {:noreply,
          socket
-         |> append_output_entry(translated("Delete") <> " " <> translated("Template"), inspect(:not_found), nil, "error")
+         |> append_output_entry(
+           translated("Delete") <> " " <> translated("Template"),
+           inspect(:not_found),
+           nil,
+           "error"
+         )
          |> reload_shell(socket.assigns.workbench)}
     end
   end
@@ -394,7 +479,10 @@ defmodule BDS.Desktop.ShellLive do
       else
         socket
         |> assign(:assistant_prompt, "")
-        |> assign(:assistant_messages, socket.assigns.assistant_messages ++ ChatSurface.assistant_turn(prompt, socket))
+        |> assign(
+          :assistant_messages,
+          socket.assigns.assistant_messages ++ ChatSurface.assistant_turn(prompt, socket)
+        )
       end
 
     {:noreply, socket}
@@ -414,15 +502,18 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("save_post_editor", %{"id" => post_id}, socket) do
-    {:noreply, PostEditor.persist_socket(socket, post_id, :save, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     PostEditor.persist_socket(socket, post_id, :save, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("publish_post_editor", %{"id" => post_id}, socket) do
-    {:noreply, PostEditor.persist_socket(socket, post_id, :publish, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     PostEditor.persist_socket(socket, post_id, :publish, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("discard_post_editor", %{"id" => post_id}, socket) do
-    {:noreply, PostEditor.discard_socket(socket, post_id, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     PostEditor.discard_socket(socket, post_id, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("delete_post_editor", %{"id" => post_id}, socket) do
@@ -441,7 +532,11 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, PostEditor.toggle_section(socket, post_id, :excerpt, &reload_shell/2)}
   end
 
-  def handle_event("select_post_editor_language", %{"id" => post_id, "language" => language}, socket) do
+  def handle_event(
+        "select_post_editor_language",
+        %{"id" => post_id, "language" => language},
+        socket
+      ) do
     {:noreply, PostEditor.select_language(socket, post_id, language, &reload_shell/2)}
   end
 
@@ -450,7 +545,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("detect_post_editor_language", %{"id" => post_id}, socket) do
-    {:noreply, PostEditor.detect_language(socket, post_id, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     PostEditor.detect_language(socket, post_id, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("add_post_editor_tag", %{"id" => post_id, "tag" => tag}, socket) do
@@ -465,8 +561,13 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, PostEditor.add_list_value(socket, post_id, :categories, category, &reload_shell/2)}
   end
 
-  def handle_event("remove_post_editor_category", %{"id" => post_id, "category" => category}, socket) do
-    {:noreply, PostEditor.remove_list_value(socket, post_id, :categories, category, &reload_shell/2)}
+  def handle_event(
+        "remove_post_editor_category",
+        %{"id" => post_id, "category" => category},
+        socket
+      ) do
+    {:noreply,
+     PostEditor.remove_list_value(socket, post_id, :categories, category, &reload_shell/2)}
   end
 
   def handle_event("change_media_editor", %{"media_editor" => params}, socket) do
@@ -474,7 +575,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("save_media_editor", %{"id" => media_id}, socket) do
-    {:noreply, MediaEditor.persist_socket(socket, media_id, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     MediaEditor.persist_socket(socket, media_id, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("toggle_media_editor_quick_actions", %{"id" => media_id}, socket) do
@@ -482,27 +584,35 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("replace_media_editor_file", %{"id" => media_id}, socket) do
-    {:noreply, MediaEditor.replace_file(socket, media_id, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     MediaEditor.replace_file(socket, media_id, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("detect_media_editor_language", %{"id" => media_id}, socket) do
-    {:noreply, MediaEditor.detect_language(socket, media_id, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     MediaEditor.detect_language(socket, media_id, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("toggle_media_post_picker", %{"id" => media_id}, socket) do
     {:noreply, MediaEditor.toggle_post_picker(socket, media_id, &reload_shell/2)}
   end
 
-  def handle_event("change_media_post_picker", %{"id" => media_id, "media_post_picker" => %{"query" => query}}, socket) do
+  def handle_event(
+        "change_media_post_picker",
+        %{"id" => media_id, "media_post_picker" => %{"query" => query}},
+        socket
+      ) do
     {:noreply, MediaEditor.set_post_picker_query(socket, media_id, query, &reload_shell/2)}
   end
 
   def handle_event("link_media_to_post", %{"id" => media_id, "post-id" => post_id}, socket) do
-    {:noreply, MediaEditor.link_post(socket, media_id, post_id, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     MediaEditor.link_post(socket, media_id, post_id, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("unlink_media_from_post", %{"id" => media_id, "post-id" => post_id}, socket) do
-    {:noreply, MediaEditor.unlink_post(socket, media_id, post_id, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     MediaEditor.unlink_post(socket, media_id, post_id, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("edit_media_translation", %{"id" => media_id, "language" => language}, socket) do
@@ -511,21 +621,47 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("change_media_translation", %{"media_translation" => params}, socket) do
     case socket.assigns.current_tab do
-      %{type: :media, id: media_id} -> {:noreply, MediaEditor.update_translation(socket, media_id, params, &reload_shell/2)}
-      _other -> {:noreply, socket}
+      %{type: :media, id: media_id} ->
+        {:noreply, MediaEditor.update_translation(socket, media_id, params, &reload_shell/2)}
+
+      _other ->
+        {:noreply, socket}
     end
   end
 
   def handle_event("save_media_translation", %{"id" => media_id}, socket) do
-    {:noreply, MediaEditor.save_translation(socket, media_id, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     MediaEditor.save_translation(socket, media_id, &reload_shell/2, &append_output_entry/5)}
   end
 
-  def handle_event("refresh_media_translation", %{"id" => media_id, "language" => language}, socket) do
-    {:noreply, MediaEditor.refresh_translation(socket, media_id, language, &reload_shell/2, &append_output_entry/5)}
+  def handle_event(
+        "refresh_media_translation",
+        %{"id" => media_id, "language" => language},
+        socket
+      ) do
+    {:noreply,
+     MediaEditor.refresh_translation(
+       socket,
+       media_id,
+       language,
+       &reload_shell/2,
+       &append_output_entry/5
+     )}
   end
 
-  def handle_event("delete_media_translation", %{"id" => media_id, "language" => language}, socket) do
-    {:noreply, MediaEditor.delete_translation(socket, media_id, language, &reload_shell/2, &append_output_entry/5)}
+  def handle_event(
+        "delete_media_translation",
+        %{"id" => media_id, "language" => language},
+        socket
+      ) do
+    {:noreply,
+     MediaEditor.delete_translation(
+       socket,
+       media_id,
+       language,
+       &reload_shell/2,
+       &append_output_entry/5
+     )}
   end
 
   def handle_event("close_media_translation_editor", _params, socket) do
@@ -533,7 +669,10 @@ defmodule BDS.Desktop.ShellLive do
       %{type: :media, id: media_id} ->
         {:noreply,
          socket
-         |> assign(:media_editor_translation_forms, Map.delete(socket.assigns.media_editor_translation_forms, media_id))
+         |> assign(
+           :media_editor_translation_forms,
+           Map.delete(socket.assigns.media_editor_translation_forms, media_id)
+         )
          |> reload_shell(socket.assigns.workbench)}
 
       _other ->
@@ -570,8 +709,19 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("refresh_settings_ai_models", %{"endpoint" => endpoint}, socket) do
-    endpoint_key = String.to_existing_atom(endpoint)
-    {:noreply, SettingsEditor.refresh_ai_models(socket, endpoint_key, &reload_shell/2, &append_output_entry/5)}
+    case BoundedAtoms.ai_endpoint(endpoint) do
+      nil ->
+        {:noreply, reload_shell(socket, socket.assigns.workbench)}
+
+      endpoint_key ->
+        {:noreply,
+         SettingsEditor.refresh_ai_models(
+           socket,
+           endpoint_key,
+           &reload_shell/2,
+           &append_output_entry/5
+         )}
+    end
   end
 
   def handle_event("save_settings_ai", _params, socket) do
@@ -603,11 +753,13 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("save_settings_category", %{"category_settings" => params}, socket) do
-    {:noreply, SettingsEditor.save_category(socket, params, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     SettingsEditor.save_category(socket, params, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("remove_settings_category", %{"category" => category}, socket) do
-    {:noreply, SettingsEditor.remove_category(socket, category, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     SettingsEditor.remove_category(socket, category, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("settings_shell_command", %{"action" => action}, socket) do
@@ -615,7 +767,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("toggle_settings_mcp_agent", %{"agent" => agent}, socket) do
-    {:noreply, SettingsEditor.toggle_mcp_agent(socket, agent, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     SettingsEditor.toggle_mcp_agent(socket, agent, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("select_style_theme", %{"theme" => theme}, socket) do
@@ -660,10 +813,15 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event(
         "menu_editor_drop_item",
-        %{"drag_item_id" => drag_item_id, "target_item_id" => target_item_id, "position" => position},
+        %{
+          "drag_item_id" => drag_item_id,
+          "target_item_id" => target_item_id,
+          "position" => position
+        },
         socket
       ) do
-    {:noreply, MenuEditor.drop_item(socket, drag_item_id, target_item_id, position, &reload_shell/2)}
+    {:noreply,
+     MenuEditor.drop_item(socket, drag_item_id, target_item_id, position, &reload_shell/2)}
   end
 
   def handle_event("menu_editor_keydown", %{"key" => key}, socket) do
@@ -735,7 +893,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("validate_template_editor", _params, socket) do
-    {:noreply, CodeEntityEditor.validate_template(socket, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     CodeEntityEditor.validate_template(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("delete_template_editor", _params, socket) do
@@ -766,15 +925,27 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply,
      socket
      |> ChatSurface.clear_action_error()
-     |> open_sidebar_item(%{"route" => "settings", "id" => "settings-ai", "title" => "Settings", "subtitle" => "AI"}, :pin)}
+     |> open_sidebar_item(
+       %{"route" => "settings", "id" => "settings-ai", "title" => "Settings", "subtitle" => "AI"},
+       :pin
+     )}
   end
 
-  def handle_event("change_chat_surface_form", %{"surface" => %{"id" => surface_id, "fields" => fields}}, socket) do
+  def handle_event(
+        "change_chat_surface_form",
+        %{"surface" => %{"id" => surface_id, "fields" => fields}},
+        socket
+      ) do
     {:noreply, ChatEditor.update_surface_form(socket, surface_id, fields, &reload_shell/2)}
   end
 
-  def handle_event("select_chat_surface_tab", %{"surface-id" => surface_id, "index" => index}, socket) do
-    {:noreply, ChatEditor.select_surface_tab(socket, surface_id, parse_integer(index), &reload_shell/2)}
+  def handle_event(
+        "select_chat_surface_tab",
+        %{"surface-id" => surface_id, "index" => index},
+        socket
+      ) do
+    {:noreply,
+     ChatEditor.select_surface_tab(socket, surface_id, parse_integer(index), &reload_shell/2)}
   end
 
   def handle_event("chat_surface_action", params, socket) do
@@ -790,7 +961,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("select_import_uploads_folder", _params, socket) do
-    {:noreply, ImportEditor.select_uploads_folder(socket, &reload_shell/2, &append_output_entry/5)}
+    {:noreply,
+     ImportEditor.select_uploads_folder(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("select_import_wxr_file", _params, socket) do
@@ -853,8 +1025,11 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("fix_translation_validation", _params, socket) do
     case MiscEditor.fix_translation_validation(socket, &append_output_entry/5) do
-      {:rerun, next_socket} -> {:noreply, apply_shell_command(next_socket, "validate_translations")}
-      {:socket, next_socket} -> {:noreply, next_socket}
+      {:rerun, next_socket} ->
+        {:noreply, apply_shell_command(next_socket, "validate_translations")}
+
+      {:socket, next_socket} ->
+        {:noreply, next_socket}
     end
   end
 
@@ -866,8 +1041,19 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, MiscEditor.toggle_duplicate(socket, pair_id, &reload_shell/2)}
   end
 
-  def handle_event("dismiss_duplicate_pair", %{"post-id-a" => post_id_a, "post-id-b" => post_id_b}, socket) do
-    {:noreply, MiscEditor.dismiss_duplicate(socket, post_id_a, post_id_b, &reload_shell/2, &append_output_entry/5)}
+  def handle_event(
+        "dismiss_duplicate_pair",
+        %{"post-id-a" => post_id_a, "post-id-b" => post_id_b},
+        socket
+      ) do
+    {:noreply,
+     MiscEditor.dismiss_duplicate(
+       socket,
+       post_id_a,
+       post_id_b,
+       &reload_shell/2,
+       &append_output_entry/5
+     )}
   end
 
   def handle_event("dismiss_selected_duplicates", _params, socket) do
@@ -876,15 +1062,35 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("repair_metadata_diff", %{"field" => field, "direction" => direction}, socket) do
     case MiscEditor.metadata_diff_repair_request(socket, field, direction) do
-      {:ok, params} -> {:noreply, apply_shell_command(socket, "repair_metadata_diff", params)}
-      {:error, message} -> {:noreply, append_output_entry(socket, translate_for_socket(socket, "Metadata Diff"), message, nil, "error")}
+      {:ok, params} ->
+        {:noreply, apply_shell_command(socket, "repair_metadata_diff", params)}
+
+      {:error, message} ->
+        {:noreply,
+         append_output_entry(
+           socket,
+           translate_for_socket(socket, "Metadata Diff"),
+           message,
+           nil,
+           "error"
+         )}
     end
   end
 
   def handle_event("import_metadata_diff_orphans", _params, socket) do
     case MiscEditor.metadata_diff_orphan_import_request(socket) do
-      {:ok, params} -> {:noreply, apply_shell_command(socket, "import_metadata_diff_orphans", params)}
-      {:error, message} -> {:noreply, append_output_entry(socket, translate_for_socket(socket, "Metadata Diff"), message, nil, "error")}
+      {:ok, params} ->
+        {:noreply, apply_shell_command(socket, "import_metadata_diff_orphans", params)}
+
+      {:error, message} ->
+        {:noreply,
+         append_output_entry(
+           socket,
+           translate_for_socket(socket, "Metadata Diff"),
+           message,
+           nil,
+           "error"
+         )}
     end
   end
 
@@ -893,8 +1099,14 @@ defmodule BDS.Desktop.ShellLive do
 
     socket =
       socket
-      |> assign(:metadata_diff_active_tabs, Map.put(socket.assigns.metadata_diff_active_tabs, tab_id, tab))
-      |> assign(:metadata_diff_field_filters, Map.delete(socket.assigns.metadata_diff_field_filters, tab_id))
+      |> assign(
+        :metadata_diff_active_tabs,
+        Map.put(socket.assigns.metadata_diff_active_tabs, tab_id, tab)
+      )
+      |> assign(
+        :metadata_diff_field_filters,
+        Map.delete(socket.assigns.metadata_diff_field_filters, tab_id)
+      )
       |> assign_misc_editor()
 
     {:noreply, socket}
@@ -911,21 +1123,36 @@ defmodule BDS.Desktop.ShellLive do
         Map.put(socket.assigns.metadata_diff_field_filters, tab_id, field)
       end
 
-    {:noreply, socket |> assign(:metadata_diff_field_filters, next_filters) |> assign_misc_editor()}
+    {:noreply,
+     socket |> assign(:metadata_diff_field_filters, next_filters) |> assign_misc_editor()}
   end
 
   def handle_event("open_duplicate_post", %{"id" => id, "title" => title}, socket) do
-    {:noreply, open_sidebar_item(socket, %{"route" => "post", "id" => id, "title" => title, "subtitle" => "draft"}, :preview)}
+    {:noreply,
+     open_sidebar_item(
+       socket,
+       %{"route" => "post", "id" => id, "title" => title, "subtitle" => "draft"},
+       :preview
+     )}
   end
 
   def handle_event("open_overlay", %{"kind" => kind}, socket) do
     socket =
       case socket.assigns[:current_tab] do
         %{type: :post, id: post_id} when kind in ["ai_suggestions", "language_picker"] ->
-          assign(socket, :post_editor_quick_actions_open, Map.put(socket.assigns.post_editor_quick_actions_open, post_id, false))
+          assign(
+            socket,
+            :post_editor_quick_actions_open,
+            Map.put(socket.assigns.post_editor_quick_actions_open, post_id, false)
+          )
 
-        %{type: :media, id: media_id} when kind in ["ai_suggestions", "language_picker", "confirm_delete"] ->
-          assign(socket, :media_editor_quick_actions_open, Map.put(socket.assigns.media_editor_quick_actions_open, media_id, false))
+        %{type: :media, id: media_id}
+        when kind in ["ai_suggestions", "language_picker", "confirm_delete"] ->
+          assign(
+            socket,
+            :media_editor_quick_actions_open,
+            Map.put(socket.assigns.media_editor_quick_actions_open, media_id, false)
+          )
 
         _other ->
           socket
@@ -937,7 +1164,12 @@ defmodule BDS.Desktop.ShellLive do
         tab = socket.assigns.current_tab
         title = tab_title(tab, socket.assigns.tab_meta)
         subtitle = tab_subtitle(tab, socket.assigns.tab_meta)
-        Overlay.open(route, overlay_kind, ShellOverlayComponents.context(socket.assigns, title, subtitle))
+
+        Overlay.open(
+          route,
+          overlay_kind,
+          ShellOverlayComponents.context(socket.assigns, title, subtitle)
+        )
       end
 
     {:noreply, assign(socket, :shell_overlay, overlay)}
@@ -950,11 +1182,20 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("overlay_keydown", %{"key" => key}, socket) do
     socket =
       case {socket.assigns[:shell_overlay], key} do
-        {nil, _other} -> socket
-        {_overlay, "Escape"} -> assign(socket, :shell_overlay, nil)
-        {%{kind: :gallery} = overlay, "ArrowLeft"} -> assign(socket, :shell_overlay, Overlay.lightbox_previous(overlay))
-        {%{kind: :gallery} = overlay, "ArrowRight"} -> assign(socket, :shell_overlay, Overlay.lightbox_next(overlay))
-        _other -> socket
+        {nil, _other} ->
+          socket
+
+        {_overlay, "Escape"} ->
+          assign(socket, :shell_overlay, nil)
+
+        {%{kind: :gallery} = overlay, "ArrowLeft"} ->
+          assign(socket, :shell_overlay, Overlay.lightbox_previous(overlay))
+
+        {%{kind: :gallery} = overlay, "ArrowRight"} ->
+          assign(socket, :shell_overlay, Overlay.lightbox_next(overlay))
+
+        _other ->
+          socket
       end
 
     {:noreply, socket}
@@ -969,14 +1210,19 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("overlay_set_tab", %{"tab" => tab}, socket) do
-    {:noreply, update_shell_overlay(socket, &Overlay.set_active_tab(&1, ShellOverlayComponents.tab(tab)))}
+    {:noreply,
+     update_shell_overlay(socket, &Overlay.set_active_tab(&1, ShellOverlayComponents.tab(tab)))}
   end
 
   def handle_event("overlay_update_form", %{"overlay" => params}, socket) do
     socket =
       socket
-      |> update_shell_overlay(&Overlay.update_form_value(&1, :external_url, Map.get(params, "url", "")))
-      |> update_shell_overlay(&Overlay.update_form_value(&1, :external_text, Map.get(params, "text", "")))
+      |> update_shell_overlay(
+        &Overlay.update_form_value(&1, :external_url, Map.get(params, "url", ""))
+      )
+      |> update_shell_overlay(
+        &Overlay.update_form_value(&1, :external_text, Map.get(params, "text", ""))
+      )
 
     {:noreply, socket}
   end
@@ -989,13 +1235,23 @@ defmodule BDS.Desktop.ShellLive do
       case {overlay, current_tab} do
         {%{kind: :insert_link}, %{type: :post, id: post_id}} ->
           case Overlay.insert_link_result(overlay, id) do
-            nil -> socket
-            result -> PostEditor.insert_content(socket, post_id, ShellOverlayComponents.markdown_link(result.title, result.canonical_url), &reload_shell/2)
+            nil ->
+              socket
+
+            result ->
+              PostEditor.insert_content(
+                socket,
+                post_id,
+                ShellOverlayComponents.markdown_link(result.title, result.canonical_url),
+                &reload_shell/2
+              )
           end
 
         {%{kind: :insert_media}, %{type: :post, id: post_id}} ->
           case Overlay.insert_media_result(overlay, id) do
-            nil -> socket
+            nil ->
+              socket
+
             result ->
               syntax =
                 if result.is_image do
@@ -1051,7 +1307,8 @@ defmodule BDS.Desktop.ShellLive do
         {%{kind: :language_picker}, %{type: :media, id: media_id}} ->
           MediaEditor.translate(socket, media_id, code, &reload_shell/2, &append_output_entry/5)
 
-        _other -> socket
+        _other ->
+          socket
       end
 
     {:noreply, socket}
@@ -1121,7 +1378,10 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("select_project", %{"project_id" => project_id}, socket) do
-    {:noreply, activate_project(socket, project_id, "Select Project", fn project -> "Activated #{project.name}" end)}
+    {:noreply,
+     activate_project(socket, project_id, "Select Project", fn project ->
+       "Activated #{project.name}"
+     end)}
   end
 
   def handle_event("create_project", _params, socket) do
@@ -1129,8 +1389,13 @@ defmodule BDS.Desktop.ShellLive do
 
     socket =
       case Projects.create_project(attrs) do
-        {:ok, project} -> activate_project(socket, project.id, "New Project", fn created -> "Activated #{created.name}" end)
-        {:error, reason} -> append_output_entry(socket, "New Project", inspect(reason), nil, "error")
+        {:ok, project} ->
+          activate_project(socket, project.id, "New Project", fn created ->
+            "Activated #{created.name}"
+          end)
+
+        {:error, reason} ->
+          append_output_entry(socket, "New Project", inspect(reason), nil, "error")
       end
 
     {:noreply, socket}
@@ -1140,18 +1405,30 @@ defmodule BDS.Desktop.ShellLive do
     socket =
       case FolderPicker.choose_directory("Open Existing Blog") do
         {:ok, path} ->
-          name = path |> Path.basename() |> String.trim() |> case do
-            "" -> "Imported Blog"
-            value -> value
-          end
+          name =
+            path
+            |> Path.basename()
+            |> String.trim()
+            |> case do
+              "" -> "Imported Blog"
+              value -> value
+            end
 
           case Projects.create_project(%{name: name, data_path: path}) do
-            {:ok, project} -> activate_project(socket, project.id, "Open Existing Blog", fn imported -> "Activated #{imported.name}" end)
-            {:error, reason} -> append_output_entry(socket, "Open Existing Blog", inspect(reason), nil, "error")
+            {:ok, project} ->
+              activate_project(socket, project.id, "Open Existing Blog", fn imported ->
+                "Activated #{imported.name}"
+              end)
+
+            {:error, reason} ->
+              append_output_entry(socket, "Open Existing Blog", inspect(reason), nil, "error")
           end
 
-        :cancel -> assign(socket, :project_menu_open, false)
-        {:error, %{message: message}} -> append_output_entry(socket, "Open Existing Blog", message, nil, "error")
+        :cancel ->
+          assign(socket, :project_menu_open, false)
+
+        {:error, %{message: message}} ->
+          append_output_entry(socket, "Open Existing Blog", message, nil, "error")
       end
 
     {:noreply, socket}
@@ -1165,7 +1442,8 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, set_page_language(socket, language)}
   end
 
-  def handle_event("restore_workbench_session", %{"session" => session_payload}, socket) when is_map(session_payload) do
+  def handle_event("restore_workbench_session", %{"session" => session_payload}, socket)
+      when is_map(session_payload) do
     {:noreply, reload_shell(socket, SessionUtil.restore_workbench_session(session_payload))}
   end
 
@@ -1202,13 +1480,28 @@ defmodule BDS.Desktop.ShellLive do
 
     cond do
       Map.has_key?(socket.assigns.import_editor_analysis_task_refs, ref) ->
-        {:noreply, ImportEditor.finish_analysis(socket, ref, result, &reload_shell/2, &append_output_entry/5)}
+        {:noreply,
+         ImportEditor.finish_analysis(
+           socket,
+           ref,
+           result,
+           &reload_shell/2,
+           &append_output_entry/5
+         )}
 
       Map.has_key?(socket.assigns.import_editor_execution_task_refs, ref) ->
-        {:noreply, ImportEditor.finish_execution(socket, ref, result, &reload_shell/2, &append_output_entry/5)}
+        {:noreply,
+         ImportEditor.finish_execution(
+           socket,
+           ref,
+           result,
+           &reload_shell/2,
+           &append_output_entry/5
+         )}
 
       true ->
-        {:noreply, ChatEditor.finish_request(socket, ref, result, &reload_shell/2, &append_output_entry/5)}
+        {:noreply,
+         ChatEditor.finish_request(socket, ref, result, &reload_shell/2, &append_output_entry/5)}
     end
   end
 
@@ -1216,15 +1509,38 @@ defmodule BDS.Desktop.ShellLive do
     next_socket =
       cond do
         Map.has_key?(socket.assigns.import_editor_analysis_task_refs, ref) ->
-          ImportEditor.handle_task_down(socket, :analysis, ref, reason, &reload_shell/2, &append_output_entry/5)
+          ImportEditor.handle_task_down(
+            socket,
+            :analysis,
+            ref,
+            reason,
+            &reload_shell/2,
+            &append_output_entry/5
+          )
 
         Map.has_key?(socket.assigns.import_editor_execution_task_refs, ref) ->
-          ImportEditor.handle_task_down(socket, :execution, ref, reason, &reload_shell/2, &append_output_entry/5)
+          ImportEditor.handle_task_down(
+            socket,
+            :execution,
+            ref,
+            reason,
+            &reload_shell/2,
+            &append_output_entry/5
+          )
 
         true ->
           case reason do
-            :normal -> socket
-            _other -> ChatEditor.finish_request(socket, ref, {:error, :cancelled}, &reload_shell/2, &append_output_entry/5)
+            :normal ->
+              socket
+
+            _other ->
+              ChatEditor.finish_request(
+                socket,
+                ref,
+                {:error, :cancelled},
+                &reload_shell/2,
+                &append_output_entry/5
+              )
           end
       end
 
@@ -1232,11 +1548,24 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_info({:import_analysis_progress, definition_id, step, detail}, socket) do
-    {:noreply, ImportEditor.note_analysis_progress(socket, definition_id, step, detail, &reload_shell/2)}
+    {:noreply,
+     ImportEditor.note_analysis_progress(socket, definition_id, step, detail, &reload_shell/2)}
   end
 
-  def handle_info({:import_execution_progress, definition_id, phase, current, total, detail}, socket) do
-    {:noreply, ImportEditor.note_execution_progress(socket, definition_id, phase, current, total, detail, &reload_shell/2)}
+  def handle_info(
+        {:import_execution_progress, definition_id, phase, current, total, detail},
+        socket
+      ) do
+    {:noreply,
+     ImportEditor.note_execution_progress(
+       socket,
+       definition_id,
+       phase,
+       current,
+       total,
+       detail,
+       &reload_shell/2
+     )}
   end
 
   def handle_info({:chat_tool_call, conversation_id, tool_call}, socket) do
@@ -1248,7 +1577,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_info({:chat_streaming_content, conversation_id, content}, socket) do
-    {:noreply, ChatEditor.note_streaming_content(socket, conversation_id, content, &reload_shell/2)}
+    {:noreply,
+     ChatEditor.note_streaming_content(socket, conversation_id, content, &reload_shell/2)}
   end
 
   def handle_info({:entity_changed, payload}, socket) when is_map(payload) do
@@ -1293,11 +1623,19 @@ defmodule BDS.Desktop.ShellLive do
     dashboard = ShellData.dashboard(projects.active_project_id)
     git_badge_count = ShellData.git_badge_count(projects.active_project_id)
     active_view_id = Atom.to_string(workbench.active_view)
-    sidebar_data = ShellData.sidebar_view(projects.active_project_id, active_view_id, ShellSidebarState.current_filters(socket, active_view_id))
+
+    sidebar_data =
+      ShellData.sidebar_view(
+        projects.active_project_id,
+        active_view_id,
+        ShellSidebarState.current_filters(socket, active_view_id)
+      )
+
     sidebar_data = ShellSidebarState.merge_ui_state(socket, active_view_id, sidebar_data)
     raw_task_status = BDS.Tasks.status_snapshot()
     activity_buttons = Workbench.activity_buttons(workbench, git_badge_count)
     page_language = socket.assigns[:page_language] || ShellData.ui_language()
+
     offline_mode =
       if connected?(socket) do
         Map.get(socket.assigns, :offline_mode, AI.airplane_mode?(true))
@@ -1315,9 +1653,15 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:dashboard_timeline_entries, Map.get(dashboard, :timeline_entries, []))
     |> assign(:dashboard_category_counts, Map.get(dashboard, :category_counts, []))
     |> assign(:dashboard_recent_posts, Map.get(dashboard, :recent_posts, []))
-    |> assign(:dashboard_tag_cloud_items, ShellData.dashboard_tag_cloud_items(Map.get(dashboard, :tag_cloud_items, [])))
+    |> assign(
+      :dashboard_tag_cloud_items,
+      ShellData.dashboard_tag_cloud_items(Map.get(dashboard, :tag_cloud_items, []))
+    )
     |> assign(:sidebar_data, sidebar_data)
-    |> assign(:sidebar_header, active_sidebar_label(activity_buttons, workbench.active_view, sidebar_data))
+    |> assign(
+      :sidebar_header,
+      active_sidebar_label(activity_buttons, workbench.active_view, sidebar_data)
+    )
     |> assign(:assistant_cards, ShellData.assistant_cards())
     |> assign(:editor_meta, ShellData.editor_meta(task_status))
     |> assign(:task_status, task_status)
@@ -1345,7 +1689,8 @@ defmodule BDS.Desktop.ShellLive do
     |> assign_misc_editor()
   end
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, UILocale.current())
+  defp translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, UILocale.current())
 
   defp encoded_shortcuts(shortcuts), do: Jason.encode!(shortcuts)
 
@@ -1374,7 +1719,7 @@ defmodule BDS.Desktop.ShellLive do
       |> Enum.map(&(&1.count || 0))
       |> Enum.max(fn -> 1 end)
 
-    max(4, ((entry.count || 0) / max_count) * 100)
+    max(4, (entry.count || 0) / max_count * 100)
   end
 
   defp current_tab(%{active_tab: nil}), do: nil
@@ -1419,7 +1764,6 @@ defmodule BDS.Desktop.ShellLive do
     MiscEditor.assign_socket(socket)
   end
 
-
   defp create_sidebar_item(socket, kind),
     do: SidebarCreate.create(socket, kind, sidebar_create_callbacks())
 
@@ -1436,7 +1780,12 @@ defmodule BDS.Desktop.ShellLive do
     tab_id = tab_id_for_route(route_atom, Map.fetch!(params, "id"))
 
     workbench =
-      Workbench.open_tab(socket.assigns.workbench, route_atom, tab_id, tab_intent(route_atom, intent))
+      Workbench.open_tab(
+        socket.assigns.workbench,
+        route_atom,
+        tab_id,
+        tab_intent(route_atom, intent)
+      )
 
     tab_meta =
       Map.put(socket.assigns.tab_meta, {route_atom, tab_id}, %{
@@ -1453,7 +1802,11 @@ defmodule BDS.Desktop.ShellLive do
   defp sidebar_create_action(view), do: SidebarCreate.action(view)
 
   defp set_page_language(socket, language) do
-    codes = Enum.map(socket.assigns[:supported_ui_languages] || ShellData.supported_ui_languages(), & &1.code)
+    codes =
+      Enum.map(
+        socket.assigns[:supported_ui_languages] || ShellData.supported_ui_languages(),
+        & &1.code
+      )
 
     normalized =
       language
@@ -1474,7 +1827,9 @@ defmodule BDS.Desktop.ShellLive do
 
   defp activate_project(socket, project_id, title, message_fun) do
     cond do
-      project_id == socket.assigns.projects.active_project_id -> assign(socket, :project_menu_open, false)
+      project_id == socket.assigns.projects.active_project_id ->
+        assign(socket, :project_menu_open, false)
+
       true ->
         case Projects.set_active_project(project_id) do
           {:ok, project} ->
@@ -1499,7 +1854,7 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp handle_native_menu_action(socket, action) do
-    with action_atom when not is_nil(action_atom) <- safe_existing_atom(action) do
+    with action_atom when not is_nil(action_atom) <- shell_command_atom(action) do
       if MapSet.member?(@local_menu_actions, action_atom) do
         reload_shell(socket, MenuBar.execute(socket.assigns.workbench, action_atom))
       else
@@ -1523,7 +1878,7 @@ defmodule BDS.Desktop.ShellLive do
     }
   end
 
-  defp safe_existing_atom(action), do: ShellCommandRunner.safe_existing_atom(action)
+  defp shell_command_atom(action), do: ShellCommandRunner.shell_command_atom(action)
 
   defp mac_ui? do
     case Application.get_env(:bds, :shell_platform) do
@@ -1540,5 +1895,4 @@ defmodule BDS.Desktop.ShellLive do
     |> append_output_entry(title, translated("Command completed"), details)
     |> assign(:shell_overlay, nil)
   end
-
 end

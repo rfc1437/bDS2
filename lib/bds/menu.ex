@@ -174,7 +174,9 @@ defmodule BDS.Menu do
 
   defp outline_kind(element), do: xml_attr(element, :type) || xml_attr(element, :kind)
 
-  defp outline_slug(element, :category_archive), do: xml_attr(element, :categoryName) || xml_attr(element, :slug)
+  defp outline_slug(element, :category_archive),
+    do: xml_attr(element, :categoryName) || xml_attr(element, :slug)
+
   defp outline_slug(element, :home), do: xml_attr(element, :pageSlug) || xml_attr(element, :slug)
   defp outline_slug(element, _kind), do: xml_attr(element, :pageSlug) || xml_attr(element, :slug)
 
@@ -203,15 +205,7 @@ defmodule BDS.Menu do
   defp normalize_kind(nil), do: :page
 
   defp normalize_kind(kind) when is_binary(kind) do
-    case kind do
-      "category-archive" -> :category_archive
-      other ->
-        other
-        |> String.to_existing_atom()
-        |> normalize_kind()
-    end
-  rescue
-    _error -> :page
+    BDS.BoundedAtoms.menu_kind(kind, :page)
   end
 
   defp normalize_optional_string(nil), do: nil

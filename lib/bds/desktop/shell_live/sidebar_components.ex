@@ -463,7 +463,8 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
     """
   end
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  defp translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   defp template_sidebar?(sidebar_data), do: Map.get(sidebar_data, :title) == "Templates"
 
@@ -474,10 +475,10 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
       %{
         year: year,
         count: Enum.reduce(months, 0, fn entry, acc -> acc + (entry.count || 0) end),
-        months: Enum.sort_by(months, &-&1.month)
+        months: Enum.sort_by(months, &(-&1.month))
       }
     end)
-    |> Enum.sort_by(&-&1.year)
+    |> Enum.sort_by(&(-&1.year))
   end
 
   defp sidebar_filter_tag_color(filters_config, tag) do
@@ -489,8 +490,11 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
 
   defp sidebar_filter_chip_style(filters_config, tag) do
     case sidebar_filter_tag_color(filters_config, tag) do
-      nil -> nil
-      color -> "background-color: #{color}; color: #{sidebar_filter_contrast_color(color)}; border-color: #{color};"
+      nil ->
+        nil
+
+      color ->
+        "background-color: #{color}; color: #{sidebar_filter_contrast_color(color)}; border-color: #{color};"
     end
   end
 
@@ -544,7 +548,9 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
   end
 
   defp sidebar_route_atom(route) when is_atom(route), do: route
-  defp sidebar_route_atom(route) when is_binary(route), do: String.to_existing_atom(route)
+
+  defp sidebar_route_atom(route) when is_binary(route),
+    do: BDS.BoundedAtoms.editor_route(route, :dashboard)
 
   defp tab_id_for_route(route, id) do
     case Registry.editor_route(route) do

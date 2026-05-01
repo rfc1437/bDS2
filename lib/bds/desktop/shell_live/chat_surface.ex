@@ -3,6 +3,7 @@ defmodule BDS.Desktop.ShellLive.ChatSurface do
 
   import Phoenix.Component, only: [assign: 3]
 
+  alias BDS.BoundedAtoms
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.{ChatEditor, TabHelpers}
   alias BDS.UI.Workbench
@@ -74,7 +75,12 @@ defmodule BDS.Desktop.ShellLive.ChatSurface do
         socket
         |> clear_action_error()
         |> callbacks.open_sidebar.(
-          %{"route" => "settings", "id" => "settings-ai", "title" => "Settings", "subtitle" => "AI"},
+          %{
+            "route" => "settings",
+            "id" => "settings-ai",
+            "title" => "Settings",
+            "subtitle" => "AI"
+          },
           :pin
         )
 
@@ -96,7 +102,7 @@ defmodule BDS.Desktop.ShellLive.ChatSurface do
         )
 
       :switch_view ->
-        case safe_existing_atom(Map.get(payload, "view")) do
+        case BoundedAtoms.sidebar_view(Map.get(payload, "view")) do
           nil ->
             ChatEditor.set_action_error(
               socket,
@@ -160,7 +166,11 @@ defmodule BDS.Desktop.ShellLive.ChatSurface do
   end
 
   def clear_action_error(%{assigns: %{current_tab: %{type: :chat, id: conversation_id}}} = socket) do
-    assign(socket, :chat_editor_action_errors, Map.delete(socket.assigns.chat_editor_action_errors, conversation_id))
+    assign(
+      socket,
+      :chat_editor_action_errors,
+      Map.delete(socket.assigns.chat_editor_action_errors, conversation_id)
+    )
   end
 
   def clear_action_error(socket), do: socket
@@ -177,7 +187,8 @@ defmodule BDS.Desktop.ShellLive.ChatSurface do
 
   defp decode_payload(_payload), do: %{}
 
-  defp maybe_put_form_data(payload, socket, surface_id) when is_binary(surface_id) and surface_id != "" do
+  defp maybe_put_form_data(payload, socket, surface_id)
+       when is_binary(surface_id) and surface_id != "" do
     form_data = ChatEditor.current_surface_data(socket, surface_id)
 
     if form_data == %{} do
@@ -209,17 +220,13 @@ defmodule BDS.Desktop.ShellLive.ChatSurface do
     end
   end
 
-  defp safe_existing_atom(action) when is_binary(action) do
-    String.to_existing_atom(action)
-  rescue
-    ArgumentError -> nil
-  end
-
-  defp safe_existing_atom(_), do: nil
-
   defp assistant_reply(socket) do
     if socket.assigns.offline_mode do
-      ShellData.translate("Automatic AI actions stay gated by airplane mode.", %{}, socket.assigns.page_language)
+      ShellData.translate(
+        "Automatic AI actions stay gated by airplane mode.",
+        %{},
+        socket.assigns.page_language
+      )
     else
       ShellData.translate(
         "The assistant sidebar chat surface is ready, but model execution is not connected yet.",

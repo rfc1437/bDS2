@@ -5,6 +5,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   alias BDS.AI
   alias BDS.Desktop.ShellData
+
   alias BDS.Desktop.ShellLive.ImportEditor.{
     AnalysisState,
     ConflictResolution,
@@ -40,13 +41,28 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   defdelegate change_definition(socket, params, reload), to: AnalysisState
   defdelegate select_uploads_folder(socket, reload, append_output), to: AnalysisState
   defdelegate select_and_analyze(socket, reload, append_output), to: AnalysisState
-  defdelegate note_analysis_progress(socket, definition_id, step, detail, reload), to: AnalysisState
+
+  defdelegate note_analysis_progress(socket, definition_id, step, detail, reload),
+    to: AnalysisState
+
   defdelegate finish_analysis(socket, ref, result, reload, append_output), to: AnalysisState
 
   defdelegate execute_import(socket, reload, append_output), to: ProgressTracking
-  defdelegate note_execution_progress(socket, definition_id, phase, current, total, detail, reload), to: ProgressTracking
+
+  defdelegate note_execution_progress(
+                socket,
+                definition_id,
+                phase,
+                current,
+                total,
+                detail,
+                reload
+              ), to: ProgressTracking
+
   defdelegate finish_execution(socket, ref, result, reload, append_output), to: ProgressTracking
-  defdelegate handle_task_down(socket, kind, ref, reason, reload, append_output), to: ProgressTracking
+
+  defdelegate handle_task_down(socket, kind, ref, reason, reload, append_output),
+    to: ProgressTracking
 
   defdelegate change_conflict_resolution(socket, params, reload), to: ConflictResolution
 
@@ -66,9 +82,24 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           definition ->
             report = ImportDefinitions.decode_analysis_result(definition)
             taxonomy_terms = existing_taxonomy_terms(socket.assigns.projects.active_project_id)
-            analysis_state = Map.get(socket.assigns.import_editor_analysis_states, definition.id, default_analysis_state())
-            execution_state = Map.get(socket.assigns.import_editor_execution_states, definition.id, default_execution_state())
-            sections = Map.get(socket.assigns.import_editor_sections, definition.id, default_sections())
+
+            analysis_state =
+              Map.get(
+                socket.assigns.import_editor_analysis_states,
+                definition.id,
+                default_analysis_state()
+              )
+
+            execution_state =
+              Map.get(
+                socket.assigns.import_editor_execution_states,
+                definition.id,
+                default_execution_state()
+              )
+
+            sections =
+              Map.get(socket.assigns.import_editor_sections, definition.id, default_sections())
+
             selected_model = selected_model(socket.assigns, definition.id)
             available_models = AI.available_chat_models(selected_model)
 
@@ -86,7 +117,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
               sections: sections,
               selected_model: selected_model,
               selected_model_label: selected_model_label(selected_model, available_models),
-              model_selector_open?: Map.get(socket.assigns.import_editor_model_selectors_open, definition.id, false),
+              model_selector_open?:
+                Map.get(socket.assigns.import_editor_model_selectors_open, definition.id, false),
               available_models: available_models,
               offline?: Map.get(socket.assigns, :offline_mode, true),
               is_loading: analysis_state.loading
@@ -110,14 +142,29 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   def toggle_section(socket, section, reload) do
     with %{id: definition_id} <- socket.assigns.current_tab,
-         section_key when section_key in ["post_conflicts", "page_conflicts", "posts", "other", "pages", "media", "taxonomy", "macros"] <- section do
+         section_key
+         when section_key in [
+                "post_conflicts",
+                "page_conflicts",
+                "posts",
+                "other",
+                "pages",
+                "media",
+                "taxonomy",
+                "macros"
+              ] <- section,
+         section_atom when not is_nil(section_atom) <-
+           BDS.BoundedAtoms.import_section(section_key) do
       next_sections =
         socket.assigns.import_editor_sections
         |> Map.get(definition_id, default_sections())
-        |> Map.update!(String.to_existing_atom(section_key), &(!&1))
+        |> Map.update!(section_atom, &(!&1))
 
       socket
-      |> assign(:import_editor_sections, Map.put(socket.assigns.import_editor_sections, definition_id, next_sections))
+      |> assign(
+        :import_editor_sections,
+        Map.put(socket.assigns.import_editor_sections, definition_id, next_sections)
+      )
       |> reload.(socket.assigns.workbench)
     else
       _other -> reload.(socket, socket.assigns.workbench)
@@ -129,7 +176,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       current = Map.get(socket.assigns.import_editor_model_selectors_open, definition_id, false)
 
       socket
-      |> assign(:import_editor_model_selectors_open, Map.put(socket.assigns.import_editor_model_selectors_open, definition_id, not current))
+      |> assign(
+        :import_editor_model_selectors_open,
+        Map.put(socket.assigns.import_editor_model_selectors_open, definition_id, not current)
+      )
       |> reload.(socket.assigns.workbench)
     else
       _other -> reload.(socket, socket.assigns.workbench)
@@ -139,31 +189,73 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   def select_ai_model(socket, model_id, reload) do
     with %{id: definition_id} <- socket.assigns.current_tab do
       socket
-      |> assign(:import_editor_selected_models, Map.put(socket.assigns.import_editor_selected_models, definition_id, model_id))
-      |> assign(:import_editor_model_selectors_open, Map.put(socket.assigns.import_editor_model_selectors_open, definition_id, false))
+      |> assign(
+        :import_editor_selected_models,
+        Map.put(socket.assigns.import_editor_selected_models, definition_id, model_id)
+      )
+      |> assign(
+        :import_editor_model_selectors_open,
+        Map.put(socket.assigns.import_editor_model_selectors_open, definition_id, false)
+      )
       |> reload.(socket.assigns.workbench)
     else
       _other -> reload.(socket, socket.assigns.workbench)
     end
   end
 
-  attr :import_editor, :map, required: true
+  attr(:import_editor, :map, required: true)
 
   def import_editor(assigns) do
     assigns =
       assigns
       |> assign(:report, Map.get(assigns.import_editor, :report))
-      |> assign(:analysis_state, Map.get(assigns.import_editor, :analysis_state, default_analysis_state()))
+      |> assign(
+        :analysis_state,
+        Map.get(assigns.import_editor, :analysis_state, default_analysis_state())
+      )
       |> assign(:execution_state, Map.get(assigns.import_editor, :execution_state))
-      |> assign(:counts, Map.get(assigns.import_editor, :importable_counts, %{total: 0, tags: 0, posts: 0, media: 0, pages: 0}))
+      |> assign(
+        :counts,
+        Map.get(assigns.import_editor, :importable_counts, %{
+          total: 0,
+          tags: 0,
+          posts: 0,
+          media: 0,
+          pages: 0
+        })
+      )
       |> assign(:sections, Map.get(assigns.import_editor, :sections, default_sections()))
       |> assign(:detail_posts, detail_items(Map.get(assigns.import_editor, :report), :posts))
       |> assign(:detail_pages, detail_items(Map.get(assigns.import_editor, :report), :pages))
       |> assign(:detail_media, detail_items(Map.get(assigns.import_editor, :report), :media))
-      |> assign(:post_conflicts, Enum.filter(detail_items(Map.get(assigns.import_editor, :report), :posts), &(&1.status == "conflict")))
-      |> assign(:page_conflicts, Enum.filter(detail_items(Map.get(assigns.import_editor, :report), :pages), &(&1.status == "conflict")))
-      |> assign(:post_items, Enum.filter(detail_items(Map.get(assigns.import_editor, :report), :posts), &(Map.get(&1, :post_type, "post") == "post")))
-      |> assign(:other_items, Enum.reject(detail_items(Map.get(assigns.import_editor, :report), :posts), &(Map.get(&1, :post_type, "post") == "post")))
+      |> assign(
+        :post_conflicts,
+        Enum.filter(
+          detail_items(Map.get(assigns.import_editor, :report), :posts),
+          &(&1.status == "conflict")
+        )
+      )
+      |> assign(
+        :page_conflicts,
+        Enum.filter(
+          detail_items(Map.get(assigns.import_editor, :report), :pages),
+          &(&1.status == "conflict")
+        )
+      )
+      |> assign(
+        :post_items,
+        Enum.filter(
+          detail_items(Map.get(assigns.import_editor, :report), :posts),
+          &(Map.get(&1, :post_type, "post") == "post")
+        )
+      )
+      |> assign(
+        :other_items,
+        Enum.reject(
+          detail_items(Map.get(assigns.import_editor, :report), :posts),
+          &(Map.get(&1, :post_type, "post") == "post")
+        )
+      )
 
     ~H"""
     <div class="import-analysis" data-testid="import-editor">
@@ -450,10 +542,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     """
   end
 
-  attr :title, :string, required: true
-  attr :items, :list, required: true
-  attr :expanded, :boolean, required: true
-  attr :section, :string, required: true
+  attr(:title, :string, required: true)
+  attr(:items, :list, required: true)
+  attr(:expanded, :boolean, required: true)
+  attr(:section, :string, required: true)
 
   def conflict_section(assigns) do
     ~H"""
@@ -499,11 +591,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     """
   end
 
-  attr :title, :string, required: true
-  attr :items, :list, required: true
-  attr :expanded, :boolean, required: true
-  attr :section, :string, required: true
-  attr :show_type, :boolean, default: false
+  attr(:title, :string, required: true)
+  attr(:items, :list, required: true)
+  attr(:expanded, :boolean, required: true)
+  attr(:section, :string, required: true)
+  attr(:show_type, :boolean, default: false)
 
   def post_detail_section(assigns) do
     ~H"""
@@ -549,10 +641,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     """
   end
 
-  attr :title, :string, required: true
-  attr :items, :list, required: true
-  attr :expanded, :boolean, required: true
-  attr :section, :string, required: true
+  attr(:title, :string, required: true)
+  attr(:items, :list, required: true)
+  attr(:expanded, :boolean, required: true)
+  attr(:section, :string, required: true)
 
   def media_detail_section(assigns) do
     ~H"""
@@ -590,8 +682,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     """
   end
 
-  attr :label, :string, required: true
-  attr :stats, :map, required: true
+  attr(:label, :string, required: true)
+  attr(:stats, :map, required: true)
 
   def stat_card(assigns) do
     ~H"""
@@ -608,8 +700,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     """
   end
 
-  attr :label, :string, required: true
-  attr :stats, :map, required: true
+  attr(:label, :string, required: true)
+  attr(:stats, :map, required: true)
 
   def other_stat_card(assigns) do
     ~H"""
@@ -625,8 +717,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     """
   end
 
-  attr :label, :string, required: true
-  attr :stats, :map, required: true
+  attr(:label, :string, required: true)
+  attr(:stats, :map, required: true)
 
   def media_stat_card(assigns) do
     ~H"""
@@ -644,8 +736,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     """
   end
 
-  attr :label, :string, required: true
-  attr :stats, :map, required: true
+  attr(:label, :string, required: true)
+  attr(:stats, :map, required: true)
 
   def taxonomy_stat_card(assigns) do
     ~H"""
@@ -661,11 +753,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     """
   end
 
-  attr :title, :string, required: true
-  attr :items, :list, required: true
-  attr :suggestions, :list, required: true
-  attr :edit, :map, default: nil
-  attr :type, :string, required: true
+  attr(:title, :string, required: true)
+  attr(:items, :list, required: true)
+  attr(:suggestions, :list, required: true)
+  attr(:edit, :map, default: nil)
+  attr(:type, :string, required: true)
 
   def taxonomy_group(assigns) do
     ~H"""
@@ -744,7 +836,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     max(8, value / max(max_value, 1) * 100)
   end
 
-  defp total_stats(stats), do: stats.new_count + stats.update_count + stats.conflict_count + stats.duplicate_count
+  defp total_stats(stats),
+    do: stats.new_count + stats.update_count + stats.conflict_count + stats.duplicate_count
+
   defp total_media_stats(stats), do: total_stats(stats) + stats.missing_count
 
   defp selected_model(assigns, definition_id) do
@@ -770,7 +864,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     end
   end
 
-  defp translated(text, bindings \\ %{}), do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  defp translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+
   defp present?(value), do: value not in [nil, ""]
   defp blank?(value), do: value in [nil, ""]
 end

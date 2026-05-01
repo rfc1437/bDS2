@@ -2,7 +2,7 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   @moduledoc false
 
   alias BDS.Desktop.ShellData
-  alias BDS.{Media, Posts}
+  alias BDS.{BoundedAtoms, Media, Posts}
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Posts.Post
   alias BDS.UI.Registry
@@ -42,7 +42,9 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   def tab_icon_id(%{type: type}), do: Atom.to_string(type)
 
   def sidebar_route_atom(route) when is_atom(route), do: route
-  def sidebar_route_atom(route) when is_binary(route), do: String.to_existing_atom(route)
+
+  def sidebar_route_atom(route) when is_binary(route),
+    do: BoundedAtoms.editor_route(route, :dashboard)
 
   def tab_id_for_route(route, id) do
     case Registry.editor_route(route) do
