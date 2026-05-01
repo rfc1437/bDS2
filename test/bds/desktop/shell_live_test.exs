@@ -1072,7 +1072,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     parent = self()
     :ok = BDS.Tasks.clear_finished()
 
-    {:ok, _task} =
+    {:ok, task} =
       BDS.Tasks.submit_task(
         "Metadata Diff",
         fn report ->
@@ -1149,7 +1149,10 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "35%"
     assert html =~ ~s(task-status-running)
 
+    worker_ref = Process.monitor(worker_pid)
     send(worker_pid, :finish)
+    assert_receive {:DOWN, ^worker_ref, :process, _, _}, 1_000
+    completed_task!(task.id)
     send(view.pid, :refresh_task_status)
 
     html = render(view)

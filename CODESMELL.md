@@ -477,6 +477,20 @@ Total: 2245 lines now live in focused submodules; the remaining 647 in `BDS.Gene
 
   Public `BDS.AI` API preserved via `defdelegate` for all extracted operations. Remaining 168 lines hold endpoint storage (`put_endpoint`, `get_endpoint`, `delete_endpoint`), airplane mode (`set_airplane_mode`, `airplane_mode?`), model preferences (`put_model_preference`, `get_model_preference`), and the defdelegate facade.
 
+- ⏳ `BDS.Scripting.Capabilities` (1715 → 194, **89% reduction**). Submodules extracted under `lib/bds/scripting/capabilities/`:
+
+  | Module | Lines | Responsibility |
+  |---|---|---|
+  | `Util` | 301 | Sanitization, normalization, arity wrappers, optional-key map builders, datetime parsing, project-path lookup, shell-open helpers |
+  | `Posts` | 270 | All `posts.*` capabilities (CRUD, publishing, body/cover/excerpt, search, tags, categories, archive, restore, preview path, names-with-counts) |
+  | `Media` | 254 | All `media.*` capabilities (CRUD, upload, thumbnails, metadata, translations, search) |
+  | `Crud` | 284 | `scripts.*`, `templates.*`, `tags.*`, `tasks.*` CRUD/search/exec |
+  | `Projects` | 204 | Project CRUD, metadata read/write, sync-meta-on-startup, data paths, project-for-folder |
+  | `AppShell` | 134 | Clipboard, bookmarklet, title-bar metrics, renderer-ready, open/select folder, show-in-folder, trigger-menu-action, preview-target, test-mode/env detection |
+  | `Bridges` | 176 | Sync availability, repo state/status/history/fetch/pull/push/commit-all, upload-site, AI detect/analyze/translate (post + media), embeddings progress/find-similar/compute-similarities/suggest-tags/find-duplicates/dismiss-pair/index-unindexed |
+
+  Public `BDS.Scripting.Capabilities.for_project/2` contract preserved unchanged. Main file (194 lines) now holds only the capability-map assembly using `import` of all submodules.
+
 - ⏳ `BDS.MCP` (677).
 
 ---
