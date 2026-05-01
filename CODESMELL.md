@@ -262,11 +262,11 @@ This suggests data isn't normalized at boundaries. Prefer atoms for internal str
 2. **Extract filesystem / Search side effects out of `Repo.transaction` in `BDS.Media`.** ✅ **DONE 2026-04-30.** See "Priority #2 Completion" section below.
 3. **Fix `MCP.atomize_keys`** to use `String.to_existing_atom/1` with a string-fallback. ✅ **DONE 2026-04-30.** See "Priority #3 Completion" section below.
 4. **Introduce `BDS.PostMedia` Ecto schema** and migrate the 6–8 raw `post_media` queries. ✅ **DONE 2026-04-30.** See "Priority #4 Completion" section below.
-5. **Replace `Repo.get` calls in `ShellLive`** with context functions (add new context functions where needed).
-6. **Move locale from `Process.put` into assigns**, then ban `Process.put` via Credo.
-7. **Extract shared helpers** (`attr/2`, `maybe_put/3`, `blank_to_nil/1`, `progress_callback/1`, rebuild progress reporters) into `BDS.MapUtils` / `BDS.ProgressReporter`.
-8. **Wrap external `Jason.decode!` calls** in `BDS.AI.OpenAICompatibleRuntime` and `BDS.AI` with `Jason.decode/1` + `{:error, _}` propagation.
-9. **Module split.** `BDS.Generation` (2624) and `BDS.Desktop.ShellLive` (2607) first; schedule each as its own sprint.
+5. **Module split.** `BDS.Generation` (2624) and `BDS.Desktop.ShellLive` (2607) first, then `BDS.AI` (1700+) and `BDS.Posts`. ✅ **PARTIAL 2026-04-30.** `BDS.Generation` reduced 2651 → 1873 (29%). See "Priority #5 Progress" section below.
+6. **Replace `Repo.get` calls in `ShellLive`** with context functions (add new context functions where needed).
+7. **Move locale from `Process.put` into assigns**, then ban `Process.put` via Credo.
+8. **Extract shared helpers** (`attr/2`, `maybe_put/3`, `blank_to_nil/1`, `progress_callback/1`, rebuild progress reporters) into `BDS.MapUtils` / `BDS.ProgressReporter`.
+9. **Wrap external `Jason.decode!` calls** in `BDS.AI.OpenAICompatibleRuntime` and `BDS.AI` with `Jason.decode/1` + `{:error, _}` propagation.
 
 ### Skipped / downgraded
 
@@ -404,6 +404,36 @@ Introduced [lib/bds/posts/post_media.ex](lib/bds/posts/post_media.ex) — a prop
 - `Repo.query/2` is reserved for the few remaining cases that genuinely need raw SQL (FTS5 virtual tables in `BDS.Search`, which are not Ecto-mappable).
 
 **Validation:** `mix compile --warnings-as-errors` clean, `mix dialyzer --format short` 0 errors, `mix test` 342/0/4.
+
+---
+
+## Priority #5 Progress (2026-04-30)
+
+**Goal:** Split god modules. Started with the worst offender, `BDS.Generation` (2651 lines).
+
+**Result:** `lib/bds/generation.ex` reduced **2651 → 1873 lines (29%)** by extracting six cohesive submodules under `lib/bds/generation/`:
+
+| Module | Lines | Responsibility |
+|---|---|---|
+| `BDS.Generation.Paths` | 262 | URL/route/path helpers, language prefixing, pagination math, archive routing |
+| `BDS.Generation.Sitemap` | 280 | sitemap.xml, RSS/Atom feeds, calendar feed, hreflang link assembly |
+| `BDS.Generation.Renderers` | 227 | Liquid template rendering wrappers (home, post, archive, date, list, 404) |
+| `BDS.Generation.Progress` | 96 | Generation/validation progress callback helpers |
+| `BDS.Generation.Pagefind` | 70 | Pagefind search-index input file emission |
+| `BDS.Generation.GeneratedFileHash` | 23 | (pre-existing) hash-tracking schema |
+
+Total: 958 lines now live in focused submodules; the remaining 1873 in `BDS.Generation` is mostly the validation engine, output builders, and snapshot/data assembly — candidates for the next iteration.
+
+**Refactor pattern used:** `import BDS.Generation.X, only: [...]` (or `except: [...]`) at the head of `BDS.Generation` so the hundreds of internal call sites needed no changes; `defdelegate` for any function that had to remain reachable through the public `BDS.Generation` namespace (e.g. `post_output_path/1,2`).
+
+**Validation after each extraction:** `mix compile --warnings-as-errors` clean, `mix dialyzer --format short` 0 errors, `mix test` 342/0/4.
+
+**Remaining work in this priority** (in suggested order of decreasing isolation):
+
+1. `BDS.Generation.Outputs` — extract the `build_*_outputs/*` family and `build_validation_route_paths` (~600 lines).
+2. `BDS.Generation.Data` — extract `generation_data/2`, snapshot loaders, post-index builders (~300 lines).
+3. `BDS.Generation.Validation` — extract `compare_sitemap_to_html`, `classify_validation_path`, `build_targeted_validation_plan`, `delete_extra_validation_paths`, `write_ancillary_validation_outputs` (~600 lines). Most coupled — do last.
+4. After `BDS.Generation`, repeat the pattern on `BDS.Desktop.ShellLive` (2607), `BDS.Posts` (1781), `BDS.AI` (1711), `BDS.MCP` (677).
 
 ---
 
