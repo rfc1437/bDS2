@@ -6819,6 +6819,11 @@ button svg * {
   flex-direction: column;
 }
 
+.sidebar-item-row {
+  display: flex;
+  align-items: stretch;
+}
+
 .sidebar-item {
   width: 100%;
   display: flex;
@@ -6921,6 +6926,12 @@ button svg * {
   padding: 4px;
 }
 
+.media-item-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
 .media-item {
   display: flex;
   align-items: center;
@@ -7002,6 +7013,12 @@ button svg * {
 .media-item-size {
   font-size: 10px;
   color: var(--vscode-descriptionForeground);
+}
+
+.sidebar-item-row .sidebar-item,
+.media-item-row .media-item {
+  flex: 1;
+  min-width: 0;
 }
 
 .sidebar-actions {
@@ -8197,25 +8214,36 @@ button.import-taxonomy-pill {
   font-size: 12px;
 }
 
-.chat-item-delete {
+.sidebar-delete-button {
   background: transparent;
   border: none;
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
-  padding: 0 4px;
+  padding: 0 6px;
+  flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.15s, color 0.15s;
 }
 
-.chat-list-item:hover .chat-item-delete,
-.chat-list-item.active .chat-item-delete {
+.sidebar-item-row:hover .sidebar-delete-button,
+.sidebar-item-row .sidebar-item.selected ~ .sidebar-delete-button,
+.media-item-row:hover .sidebar-delete-button,
+.media-item-row .media-item.selected ~ .sidebar-delete-button,
+.chat-list-item:hover .sidebar-delete-button,
+.chat-list-item.active .sidebar-delete-button {
   opacity: 1;
 }
 
-.chat-item-delete:hover {
+.sidebar-delete-button:hover {
   color: var(--vscode-errorForeground);
+}
+
+.sidebar-item-row .sidebar-item.selected ~ .sidebar-delete-button,
+.media-item-row .media-item.selected ~ .sidebar-delete-button {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
 }
 
 .settings-nav-list {

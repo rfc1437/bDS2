@@ -271,28 +271,45 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
         </div>
         <div class="sidebar-list">
           <%= for item <- Map.get(section, :items, []) do %>
-            <button
-              class={["sidebar-item", "sidebar-post-item", "post-type-post", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "selected")]}
-              data-testid="sidebar-open-item"
-              data-route={item.route}
-              data-item-id={item.id}
-              data-open-title={item.title}
-              data-open-subtitle={format_sidebar_timestamp(item.meta_timestamp)}
-              type="button"
-              phx-click="open_sidebar_item"
-              phx-value-route={item.route}
-              phx-value-id={item.id}
-              phx-value-title={item.title}
-              phx-value-subtitle={format_sidebar_timestamp(item.meta_timestamp)}
-            >
-              <span class="post-type-icon" title="post">●</span>
-              <span class="sidebar-item-content">
-                <span class="sidebar-item-title-row">
-                  <span class="sidebar-item-title"><%= item.title %></span>
+            <div class="sidebar-item-row" data-item-id={item.id}>
+              <button
+                class={["sidebar-item", "sidebar-post-item", "post-type-post", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "selected")]}
+                data-testid="sidebar-open-item"
+                data-route={item.route}
+                data-item-id={item.id}
+                data-open-title={item.title}
+                data-open-subtitle={format_sidebar_timestamp(item.meta_timestamp)}
+                type="button"
+                phx-click="open_sidebar_item"
+                phx-value-route={item.route}
+                phx-value-id={item.id}
+                phx-value-title={item.title}
+                phx-value-subtitle={format_sidebar_timestamp(item.meta_timestamp)}
+              >
+                <span class="post-type-icon" title="post">●</span>
+                <span class="sidebar-item-content">
+                  <span class="sidebar-item-title-row">
+                    <span class="sidebar-item-title"><%= item.title %></span>
+                  </span>
+                  <span class="sidebar-item-meta"><%= format_sidebar_timestamp(item.meta_timestamp) %></span>
                 </span>
-                <span class="sidebar-item-meta"><%= format_sidebar_timestamp(item.meta_timestamp) %></span>
-              </span>
-            </button>
+              </button>
+              <%= if sidebar_deletable?(item.route) do %>
+                <button
+                  class="sidebar-delete-button"
+                  data-testid={sidebar_delete_testid(item.route)}
+                  data-item-id={item.id}
+                  type="button"
+                  title={sidebar_delete_title(item.route)}
+                  phx-click="confirm_sidebar_delete"
+                  phx-value-route={item.route}
+                  phx-value-id={item.id}
+                  phx-value-title={item.title}
+                >
+                  ×
+                </button>
+              <% end %>
+            </div>
           <% end %>
         </div>
       </section>
@@ -310,34 +327,51 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
     <%= if Enum.any?(Map.get(@sidebar_data, :items, [])) do %>
       <div class="sidebar-list media-grid">
         <%= for item <- Map.get(@sidebar_data, :items, []) do %>
-          <button
-            class={["media-item", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "selected")]}
-            data-testid="sidebar-open-item"
-            data-route={item.route}
-            data-item-id={item.id}
-            data-open-title={item.title}
-            data-open-subtitle={item.meta}
-            type="button"
-            title={item.title}
-            phx-click="open_sidebar_item"
-            phx-value-route={item.route}
-            phx-value-id={item.id}
-            phx-value-title={item.title}
-            phx-value-subtitle={item.meta}
-          >
-            <span class={media_thumbnail_class(item)}>
-              <%= if image_media?(item) do %>
-                <span class="media-thumbnail-fallback"><%= media_thumbnail_glyph(item.mime_type) %></span>
-                <img class="media-thumbnail-image" src={"/media-thumbnail/#{item.id}"} alt="" loading="lazy" decoding="async" />
-              <% else %>
-                <span class="media-thumbnail-fallback"><%= media_thumbnail_glyph(item.mime_type) %></span>
-              <% end %>
-            </span>
-            <span class="media-item-info">
-              <span class="media-item-name"><%= item.title %></span>
-              <span class="media-item-size"><%= item.meta %></span>
-            </span>
-          </button>
+          <div class="media-item-row" data-item-id={item.id}>
+            <button
+              class={["media-item", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "selected")]}
+              data-testid="sidebar-open-item"
+              data-route={item.route}
+              data-item-id={item.id}
+              data-open-title={item.title}
+              data-open-subtitle={item.meta}
+              type="button"
+              title={item.title}
+              phx-click="open_sidebar_item"
+              phx-value-route={item.route}
+              phx-value-id={item.id}
+              phx-value-title={item.title}
+              phx-value-subtitle={item.meta}
+            >
+              <span class={media_thumbnail_class(item)}>
+                <%= if image_media?(item) do %>
+                  <span class="media-thumbnail-fallback"><%= media_thumbnail_glyph(item.mime_type) %></span>
+                  <img class="media-thumbnail-image" src={"/media-thumbnail/#{item.id}"} alt="" loading="lazy" decoding="async" />
+                <% else %>
+                  <span class="media-thumbnail-fallback"><%= media_thumbnail_glyph(item.mime_type) %></span>
+                <% end %>
+              </span>
+              <span class="media-item-info">
+                <span class="media-item-name"><%= item.title %></span>
+                <span class="media-item-size"><%= item.meta %></span>
+              </span>
+            </button>
+            <%= if sidebar_deletable?(item.route) do %>
+              <button
+                class="sidebar-delete-button"
+                data-testid={sidebar_delete_testid(item.route)}
+                data-item-id={item.id}
+                type="button"
+                title={sidebar_delete_title(item.route)}
+                phx-click="confirm_sidebar_delete"
+                phx-value-route={item.route}
+                phx-value-id={item.id}
+                phx-value-title={item.title}
+              >
+                ×
+              </button>
+            <% end %>
+          </div>
         <% end %>
       </div>
     <% else %>
@@ -353,7 +387,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
     <%= if Enum.any?(Map.get(@sidebar_data, :items, [])) do %>
       <div class={if(template_sidebar?(@sidebar_data), do: "chat-list-items", else: "settings-nav-list")}>
         <%= for item <- Map.get(@sidebar_data, :items, []) do %>
-          <%= if item.route in ["templates", "chat"] do %>
+          <%= if sidebar_deletable?(item.route) do %>
             <div
               class={["chat-list-item", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "active")]}
               data-item-id={item.id}
@@ -378,13 +412,15 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
                 </span>
               </button>
               <button
-                class="chat-item-delete"
-                data-testid={if(item.route == "chat", do: "sidebar-delete-chat", else: "sidebar-delete-template")}
+                class="sidebar-delete-button"
+                data-testid={sidebar_delete_testid(item.route)}
                 data-item-id={item.id}
                 type="button"
-                title={if(item.route == "chat", do: translated("sidebar.chat.deleteConversation"), else: translated("Delete") <> " " <> translated("Template"))}
-                phx-click={if(item.route == "chat", do: "delete_sidebar_chat", else: "delete_sidebar_template")}
+                title={sidebar_delete_title(item.route)}
+                phx-click="confirm_sidebar_delete"
+                phx-value-route={item.route}
                 phx-value-id={item.id}
+                phx-value-title={item.title}
               >
                 ×
               </button>
@@ -465,6 +501,24 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
 
   defp translated(text, bindings \\ %{}),
     do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+
+  defp sidebar_deletable?(route), do: route in ["post", "media", "scripts", "templates", "chat", "import"]
+
+  defp sidebar_delete_testid("post"), do: "sidebar-delete-post"
+  defp sidebar_delete_testid("media"), do: "sidebar-delete-media"
+  defp sidebar_delete_testid("scripts"), do: "sidebar-delete-script"
+  defp sidebar_delete_testid("templates"), do: "sidebar-delete-template"
+  defp sidebar_delete_testid("chat"), do: "sidebar-delete-chat"
+  defp sidebar_delete_testid("import"), do: "sidebar-delete-import"
+  defp sidebar_delete_testid(route), do: "sidebar-delete-#{route}"
+
+  defp sidebar_delete_title("chat"), do: translated("sidebar.chat.deleteConversation")
+  defp sidebar_delete_title("post"), do: translated("Delete") <> " " <> translated("Post")
+  defp sidebar_delete_title("media"), do: translated("Delete") <> " " <> translated("Media")
+  defp sidebar_delete_title("scripts"), do: translated("Delete") <> " " <> translated("Script")
+  defp sidebar_delete_title("templates"), do: translated("Delete") <> " " <> translated("Template")
+  defp sidebar_delete_title("import"), do: translated("Delete") <> " " <> translated("Import")
+  defp sidebar_delete_title(_route), do: translated("Delete")
 
   defp template_sidebar?(sidebar_data), do: Map.get(sidebar_data, :title) == "Templates"
 

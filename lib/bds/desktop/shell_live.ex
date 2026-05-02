@@ -5,7 +5,7 @@ defmodule BDS.Desktop.ShellLive do
 
   import Phoenix.HTML
 
-  alias BDS.{AI, BoundedAtoms}
+  alias BDS.{AI, BoundedAtoms, ImportDefinitions, Media, Posts, Scripts}
   alias BDS.CliSync.Watcher
   alias BDS.Desktop.{FolderPicker, Overlay, ShellData, UILocale}
 
@@ -419,67 +419,12 @@ defmodule BDS.Desktop.ShellLive do
      |> reload_shell(workbench)}
   end
 
-  def handle_event("delete_sidebar_template", %{"id" => template_id}, socket) do
-    case Templates.get_template(template_id) do
-      %Templates.Template{project_id: project_id}
-      when project_id == socket.assigns.projects.active_project_id ->
-        case Templates.delete_template(template_id) do
-          {:ok, :deleted} ->
-            workbench = Workbench.close_tab(socket.assigns.workbench, :templates, template_id)
-            tab_meta = Map.delete(socket.assigns.tab_meta, {:templates, template_id})
-
-            {:noreply,
-             socket
-             |> assign(:tab_meta, tab_meta)
-             |> reload_shell(workbench)}
-
-          {:error, reason} ->
-            {:noreply,
-             socket
-             |> append_output_entry(
-               translated("Delete") <> " " <> translated("Template"),
-               inspect(reason),
-               nil,
-               "error"
-             )
-             |> reload_shell(socket.assigns.workbench)}
-        end
-
-      _other ->
-        {:noreply,
-         socket
-         |> append_output_entry(
-           translated("Delete") <> " " <> translated("Template"),
-           inspect(:not_found),
-           nil,
-           "error"
-         )
-         |> reload_shell(socket.assigns.workbench)}
-    end
-  end
-
-  def handle_event("delete_sidebar_chat", %{"id" => conversation_id}, socket) do
-    case AI.delete_chat_conversation(conversation_id) do
-      {:ok, :deleted} ->
-        workbench = Workbench.close_tab(socket.assigns.workbench, :chat, conversation_id)
-        tab_meta = Map.delete(socket.assigns.tab_meta, {:chat, conversation_id})
-
-        {:noreply,
-         socket
-         |> assign(:tab_meta, tab_meta)
-         |> reload_shell(workbench)}
-
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> append_output_entry(
-           translated("sidebar.chat.deleteConversation"),
-           inspect(reason),
-           nil,
-           "error"
-         )
-         |> reload_shell(socket.assigns.workbench)}
-    end
+  def handle_event(
+        "confirm_sidebar_delete",
+        %{"route" => route, "id" => id} = params,
+        socket
+      ) do
+    {:noreply, request_sidebar_delete(socket, route, id, Map.get(params, "title"))}
   end
 
   def handle_event("toggle_offline_mode", _params, socket) do
@@ -1348,6 +1293,9 @@ defmodule BDS.Desktop.ShellLive do
 
     socket =
       case {socket.assigns[:shell_overlay], current_tab} do
+        {%{kind: :confirm_delete, delete_action: %{source: :sidebar, route: route, id: id}}, _tab} ->
+          execute_sidebar_delete(socket, route, id)
+
         {%{kind: :ai_suggestions} = overlay, %{type: :post, id: post_id}} ->
           PostEditor.apply_ai_suggestions(
             socket,
@@ -1926,4 +1874,247 @@ defmodule BDS.Desktop.ShellLive do
     |> append_output_entry(title, translated("Command completed"), details)
     |> assign(:shell_overlay, nil)
   end
+
+  defp request_sidebar_delete(socket, route, id, fallback_title) do
+    case sidebar_delete_target(socket, route, id, fallback_title) do
+      {:ok, entity_name} ->
+        assign(socket, :shell_overlay, %{
+          kind: :confirm_delete,
+          title: sidebar_delete_title(route),
+          entity_name: entity_name,
+          entity_type: route,
+          reference_count: 0,
+          reference_list: [],
+          delete_action: %{source: :sidebar, route: route, id: id}
+        })
+
+      {:error, reason} ->
+        socket
+        |> assign(:shell_overlay, nil)
+        |> append_output_entry(sidebar_delete_title(route), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp execute_sidebar_delete(socket, route, id) do
+    case route do
+      "post" ->
+        socket
+        |> assign(:shell_overlay, nil)
+        |> PostEditor.delete_socket(id, &reload_shell/2, &append_output_entry/5)
+
+      "media" ->
+        socket
+        |> assign(:shell_overlay, nil)
+        |> MediaEditor.delete_socket(id, &reload_shell/2, &append_output_entry/5)
+
+      "scripts" ->
+        delete_sidebar_script(socket, id)
+
+      "templates" ->
+        delete_sidebar_template(socket, id)
+
+      "chat" ->
+        delete_sidebar_chat(socket, id)
+
+      "import" ->
+        delete_sidebar_import(socket, id)
+
+      _other ->
+        socket
+        |> assign(:shell_overlay, nil)
+        |> append_output_entry(translated("Delete"), inspect(:unsupported_route), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp delete_sidebar_script(socket, script_id) do
+    case Scripts.delete_script(script_id) do
+      {:ok, :deleted} ->
+        workbench = Workbench.close_tab(socket.assigns.workbench, :scripts, script_id)
+
+        socket
+        |> assign(:shell_overlay, nil)
+        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:scripts, script_id}))
+        |> assign(:script_editor_drafts, Map.delete(socket.assigns.script_editor_drafts, script_id))
+        |> reload_shell(workbench)
+
+      {:error, reason} ->
+        socket
+        |> assign(:shell_overlay, nil)
+        |> append_output_entry(sidebar_delete_title("scripts"), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp delete_sidebar_template(socket, template_id) do
+    case Templates.delete_template(template_id, force: true) do
+      {:ok, :deleted} ->
+        workbench = Workbench.close_tab(socket.assigns.workbench, :templates, template_id)
+
+        socket
+        |> assign(:shell_overlay, nil)
+        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:templates, template_id}))
+        |> assign(
+          :template_editor_drafts,
+          Map.delete(socket.assigns.template_editor_drafts, template_id)
+        )
+        |> reload_shell(workbench)
+
+      {:error, reason} ->
+        socket
+        |> assign(:shell_overlay, nil)
+        |> append_output_entry(sidebar_delete_title("templates"), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp delete_sidebar_chat(socket, conversation_id) do
+    case AI.delete_chat_conversation(conversation_id) do
+      {:ok, :deleted} ->
+        workbench = Workbench.close_tab(socket.assigns.workbench, :chat, conversation_id)
+
+        socket
+        |> assign(:shell_overlay, nil)
+        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:chat, conversation_id}))
+        |> reload_shell(workbench)
+
+      {:error, reason} ->
+        socket
+        |> assign(:shell_overlay, nil)
+        |> append_output_entry(sidebar_delete_title("chat"), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp delete_sidebar_import(socket, definition_id) do
+    case ImportDefinitions.delete_definition(definition_id) do
+      {:ok, :deleted} ->
+        workbench = Workbench.close_tab(socket.assigns.workbench, :import, definition_id)
+
+        socket
+        |> assign(:shell_overlay, nil)
+        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:import, definition_id}))
+        |> clear_import_editor_state(definition_id)
+        |> reload_shell(workbench)
+
+      {:error, reason} ->
+        socket
+        |> assign(:shell_overlay, nil)
+        |> append_output_entry(sidebar_delete_title("import"), inspect(reason), nil, "error")
+        |> reload_shell(socket.assigns.workbench)
+    end
+  end
+
+  defp clear_import_editor_state(socket, definition_id) do
+    socket
+    |> assign(
+      :import_editor_analysis_states,
+      Map.delete(socket.assigns.import_editor_analysis_states, definition_id)
+    )
+    |> assign(
+      :import_editor_analysis_task_refs,
+      Map.delete(socket.assigns.import_editor_analysis_task_refs, definition_id)
+    )
+    |> assign(
+      :import_editor_execution_states,
+      Map.delete(socket.assigns.import_editor_execution_states, definition_id)
+    )
+    |> assign(
+      :import_editor_execution_task_refs,
+      Map.delete(socket.assigns.import_editor_execution_task_refs, definition_id)
+    )
+    |> assign(:import_editor_sections, Map.delete(socket.assigns.import_editor_sections, definition_id))
+    |> assign(
+      :import_editor_taxonomy_edits,
+      Map.delete(socket.assigns.import_editor_taxonomy_edits, definition_id)
+    )
+    |> assign(
+      :import_editor_model_selectors_open,
+      Map.delete(socket.assigns.import_editor_model_selectors_open, definition_id)
+    )
+    |> assign(
+      :import_editor_selected_models,
+      Map.delete(socket.assigns.import_editor_selected_models, definition_id)
+    )
+  end
+
+  defp sidebar_delete_target(socket, route, id, fallback_title) do
+    active_project_id = socket.assigns.projects.active_project_id
+
+    case route do
+      "post" ->
+        case Posts.get_post(id) do
+          %{project_id: ^active_project_id} = post ->
+            {:ok, present_title(fallback_title) || present_title(post.title) || present_title(post.slug) || id}
+
+          _other ->
+            {:error, :not_found}
+        end
+
+      "media" ->
+        case Media.get_media(id) do
+          %{project_id: ^active_project_id} = media ->
+            {:ok,
+             present_title(fallback_title) || present_title(media.title) ||
+               present_title(media.original_name) || id}
+
+          _other ->
+            {:error, :not_found}
+        end
+
+      "scripts" ->
+        case Scripts.get_script(id) do
+          %{project_id: ^active_project_id} = script ->
+            {:ok, present_title(fallback_title) || present_title(script.title) || id}
+
+          _other ->
+            {:error, :not_found}
+        end
+
+      "templates" ->
+        case Templates.get_template(id) do
+          %{project_id: ^active_project_id} = template ->
+            {:ok, present_title(fallback_title) || present_title(template.title) || id}
+
+          _other ->
+            {:error, :not_found}
+        end
+
+      "chat" ->
+        case AI.get_chat_conversation(id) do
+          %{title: title} -> {:ok, present_title(fallback_title) || present_title(title) || id}
+          _other -> {:error, :not_found}
+        end
+
+      "import" ->
+        case ImportDefinitions.get_definition(id) do
+          %{project_id: ^active_project_id} = definition ->
+            {:ok, present_title(fallback_title) || present_title(definition.name) || id}
+
+          _other ->
+            {:error, :not_found}
+        end
+
+      _other ->
+        {:error, :unsupported_route}
+    end
+  end
+
+  defp sidebar_delete_title("chat"), do: translated("sidebar.chat.deleteConversation")
+  defp sidebar_delete_title("post"), do: translated("Delete") <> " " <> translated("Post")
+  defp sidebar_delete_title("media"), do: translated("Delete") <> " " <> translated("Media")
+  defp sidebar_delete_title("scripts"), do: translated("Delete") <> " " <> translated("Script")
+  defp sidebar_delete_title("templates"), do: translated("Delete") <> " " <> translated("Template")
+  defp sidebar_delete_title("import"), do: translated("Delete") <> " " <> translated("Import")
+  defp sidebar_delete_title(_route), do: translated("Delete")
+
+  defp present_title(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp present_title(_value), do: nil
 end

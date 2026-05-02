@@ -289,6 +289,12 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element("[data-testid='sidebar-delete-chat'][data-item-id='#{created_chat.id}']")
       |> render_click()
 
+    assert Repo.get(BDS.AI.ChatConversation, created_chat.id)
+    assert html =~ "confirm-delete-modal"
+    assert html =~ created_chat.title
+
+    html = render_click(view, "overlay_confirm", %{})
+
     refute Repo.get(BDS.AI.ChatConversation, created_chat.id)
     refute html =~ ~s(data-tab-id="#{created_chat.id}")
 
@@ -322,6 +328,122 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(phx-hook="SettingsSectionScroll")
     assert html =~ ~s(data-selected-settings-section="ai")
     assert html =~ ~s(data-settings-scroll-target="settings-section-ai")
+  end
+
+  test "database-backed sidebar entries require confirmation before deletion", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Sidebar Delete Post",
+               content: "delete me"
+             })
+
+    media_source_path = Path.join(temp_dir, "sidebar-delete-media.txt")
+    File.write!(media_source_path, "media body")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: media_source_path,
+               title: "Sidebar Delete Media"
+             })
+
+    assert {:ok, script} =
+             Scripts.create_script(%{
+               project_id: project.id,
+               title: "Sidebar Delete Script",
+               kind: :utility,
+               content: "print(\"delete\")",
+               entrypoint: "main",
+               enabled: true
+             })
+
+    assert {:ok, template} =
+             Templates.create_template(%{
+               project_id: project.id,
+               title: "Sidebar Delete Template",
+               kind: :post,
+               content: "<article>{{ post.content }}</article>",
+               enabled: true
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "Sidebar Delete Chat"})
+
+    assert {:ok, definition} =
+             ImportDefinitions.create_definition(%{
+               project_id: project.id,
+               name: "Sidebar Delete Import"
+             })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    cases = [
+      %{
+        view: "posts",
+        id: post.id,
+        title: post.title,
+        testid: "sidebar-delete-post",
+        exists?: fn -> Repo.get(Post, post.id) != nil end
+      },
+      %{
+        view: "media",
+        id: media.id,
+        title: media.title,
+        testid: "sidebar-delete-media",
+        exists?: fn -> Repo.get(BDS.Media.Media, media.id) != nil end
+      },
+      %{
+        view: "scripts",
+        id: script.id,
+        title: script.title,
+        testid: "sidebar-delete-script",
+        exists?: fn -> Repo.get(BDS.Scripts.Script, script.id) != nil end
+      },
+      %{
+        view: "templates",
+        id: template.id,
+        title: template.title,
+        testid: "sidebar-delete-template",
+        exists?: fn -> Repo.get(BDS.Templates.Template, template.id) != nil end
+      },
+      %{
+        view: "chat",
+        id: conversation.id,
+        title: conversation.title,
+        testid: "sidebar-delete-chat",
+        exists?: fn -> Repo.get(BDS.AI.ChatConversation, conversation.id) != nil end
+      },
+      %{
+        view: "import",
+        id: definition.id,
+        title: definition.name,
+        testid: "sidebar-delete-import",
+        exists?: fn -> Repo.get(ImportDefinitions.ImportDefinition, definition.id) != nil end
+      }
+    ]
+
+    Enum.each(cases, fn sidebar_case ->
+      html = render_click(view, "select_view", %{"view" => sidebar_case.view})
+
+      assert html =~ ~s(data-testid="#{sidebar_case.testid}")
+
+      html =
+        view
+        |> element("[data-testid='#{sidebar_case.testid}'][data-item-id='#{sidebar_case.id}']")
+        |> render_click()
+
+      assert sidebar_case.exists?.()
+      assert html =~ "confirm-delete-modal"
+      assert html =~ sidebar_case.title
+
+      html = render_click(view, "overlay_confirm", %{})
+
+      refute sidebar_case.exists?.()
+      refute html =~ sidebar_case.title
+    end)
   end
 
   test "shell live refreshes the posts sidebar when the CLI watcher broadcasts an entity change",
@@ -3291,6 +3413,12 @@ defmodule BDS.Desktop.ShellLiveTest do
       view
       |> element("[data-testid='sidebar-delete-template'][data-item-id='#{template.id}']")
       |> render_click()
+
+    assert BDS.Repo.get(BDS.Templates.Template, template.id)
+    assert html =~ "confirm-delete-modal"
+    assert html =~ template.title
+
+    html = render_click(view, "overlay_confirm", %{})
 
     assert BDS.Repo.get(BDS.Templates.Template, template.id) == nil
     refute html =~ "Sidebar Template"
