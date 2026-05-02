@@ -31,38 +31,12 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
 
   @spec save_script(term(), term(), term()) :: term()
   def save_script(socket, reload, append_output) do
-    %{id: script_id} = socket.assigns.current_tab
+    persist_script(socket, :save, reload, append_output)
+  end
 
-    case Scripts.get_script(script_id) do
-      nil ->
-        reload.(socket, socket.assigns.workbench)
-
-      %Script{} = script ->
-        draft = current_script_draft(socket.assigns, script)
-
-        case Scripting.validate(draft["content"] || "") do
-          :ok ->
-            case Scripts.update_script(script.id, script_attrs(draft)) do
-              {:ok, _updated} ->
-                socket
-                |> assign(
-                  :script_editor_drafts,
-                  Map.delete(socket.assigns.script_editor_drafts, script.id)
-                )
-                |> reload.(socket.assigns.workbench)
-
-              {:error, reason} ->
-                socket
-                |> append_output.(translated("Scripts"), inspect(reason), nil, "error")
-                |> reload.(socket.assigns.workbench)
-            end
-
-          {:error, reason} ->
-            socket
-            |> append_output.(translated("Scripts"), inspect(reason), nil, "error")
-            |> reload.(socket.assigns.workbench)
-        end
-    end
+  @spec publish_script(term(), term(), term()) :: term()
+  def publish_script(socket, reload, append_output) do
+    persist_script(socket, :publish, reload, append_output)
   end
 
   @spec check_script(term(), term(), term()) :: term()
@@ -148,33 +122,12 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
 
   @spec save_template(term(), term(), term()) :: term()
   def save_template(socket, reload, append_output) do
-    %{id: template_id} = socket.assigns.current_tab
+    persist_template(socket, :save, reload, append_output)
+  end
 
-    case Templates.get_template(template_id) do
-      nil ->
-        reload.(socket, socket.assigns.workbench)
-
-      %Template{} = template ->
-        draft = current_template_draft(socket.assigns, template)
-
-        with {:ok, %{valid: true}} <- MCP.validate_template(draft["content"] || ""),
-             {:ok, _updated} <- Templates.update_template(template.id, template_attrs(draft)) do
-          socket
-          |> assign(
-            :template_editor_drafts,
-            Map.delete(socket.assigns.template_editor_drafts, template.id)
-          )
-          |> reload.(socket.assigns.workbench)
-        else
-          {:ok, %{valid: false, errors: errors}} ->
-            append_output.(socket, translated("Templates"), Enum.join(errors, "; "), nil, "error")
-            |> reload.(socket.assigns.workbench)
-
-          {:error, reason} ->
-            append_output.(socket, translated("Templates"), inspect(reason), nil, "error")
-            |> reload.(socket.assigns.workbench)
-        end
-    end
+  @spec publish_template(term(), term(), term()) :: term()
+  def publish_template(socket, reload, append_output) do
+    persist_template(socket, :publish, reload, append_output)
   end
 
   @spec validate_template(term(), term(), term()) :: term()
@@ -239,6 +192,8 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
           enabled: draft["enabled"],
           content: draft["content"],
           entrypoints: discover_entrypoints(draft["content"]),
+          status: script.status || :draft,
+          can_publish?: script.status == :draft,
           created_at: script.created_at,
           updated_at: script.updated_at
         }
@@ -263,6 +218,8 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
           kind: draft["kind"],
           enabled: draft["enabled"],
           content: draft["content"],
+          status: template.status || :draft,
+          can_publish?: template.status == :draft,
           created_at: template.created_at,
           updated_at: template.updated_at
         }
@@ -270,6 +227,9 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
   end
 
   def build_template(_assigns), do: nil
+
+  @spec status_label(term()) :: term()
+  def status_label(status), do: ShellData.dashboard_status_label(status)
 
   @spec translated(term(), term()) :: term()
   def translated(text, bindings \\ %{}),
@@ -341,6 +301,82 @@ defmodule BDS.Desktop.ShellLive.CodeEntityEditor do
       content: draft["content"]
     }
   end
+
+  defp persist_script(socket, action, reload, append_output) do
+    %{id: script_id} = socket.assigns.current_tab
+
+    case Scripts.get_script(script_id) do
+      nil ->
+        reload.(socket, socket.assigns.workbench)
+
+      %Script{} = script ->
+        draft = current_script_draft(socket.assigns, script)
+
+        case Scripting.validate(draft["content"] || "") do
+          :ok ->
+            case Scripts.update_script(script.id, script_attrs(draft))
+                 |> maybe_publish_script(script.id, action) do
+              {:ok, _updated} ->
+                socket
+                |> assign(
+                  :script_editor_drafts,
+                  Map.delete(socket.assigns.script_editor_drafts, script.id)
+                )
+                |> reload.(socket.assigns.workbench)
+
+              {:error, reason} ->
+                socket
+                |> append_output.(translated("Scripts"), inspect(reason), nil, "error")
+                |> reload.(socket.assigns.workbench)
+            end
+
+          {:error, reason} ->
+            socket
+            |> append_output.(translated("Scripts"), inspect(reason), nil, "error")
+            |> reload.(socket.assigns.workbench)
+        end
+    end
+  end
+
+  defp persist_template(socket, action, reload, append_output) do
+    %{id: template_id} = socket.assigns.current_tab
+
+    case Templates.get_template(template_id) do
+      nil ->
+        reload.(socket, socket.assigns.workbench)
+
+      %Template{} = template ->
+        draft = current_template_draft(socket.assigns, template)
+
+        with {:ok, %{valid: true}} <- MCP.validate_template(draft["content"] || ""),
+             {:ok, _updated} <-
+               Templates.update_template(template.id, template_attrs(draft))
+               |> maybe_publish_template(template.id, action) do
+          socket
+          |> assign(
+            :template_editor_drafts,
+            Map.delete(socket.assigns.template_editor_drafts, template.id)
+          )
+          |> reload.(socket.assigns.workbench)
+        else
+          {:ok, %{valid: false, errors: errors}} ->
+            append_output.(socket, translated("Templates"), Enum.join(errors, "; "), nil, "error")
+            |> reload.(socket.assigns.workbench)
+
+          {:error, reason} ->
+            append_output.(socket, translated("Templates"), inspect(reason), nil, "error")
+            |> reload.(socket.assigns.workbench)
+        end
+    end
+  end
+
+  defp maybe_publish_script({:ok, _script}, script_id, :publish), do: Scripts.publish_script(script_id)
+  defp maybe_publish_script(result, _script_id, _action), do: result
+
+  defp maybe_publish_template({:ok, _template}, template_id, :publish),
+    do: Templates.publish_template(template_id)
+
+  defp maybe_publish_template(result, _template_id, _action), do: result
 
   defp normalize_template_kind("post"), do: :post
   defp normalize_template_kind("list"), do: :list

@@ -885,6 +885,11 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, CodeEntityEditor.save_script(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
+  def handle_event("publish_script_editor", %{"id" => _script_id}, socket) do
+    {:noreply,
+     CodeEntityEditor.publish_script(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
   def handle_event("run_script_editor", _params, socket) do
     {:noreply, CodeEntityEditor.run_script(socket, &reload_shell/2, &append_output_entry/5)}
   end
@@ -903,6 +908,11 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("save_template_editor", _params, socket) do
     {:noreply, CodeEntityEditor.save_template(socket, &reload_shell/2, &append_output_entry/5)}
+  end
+
+  def handle_event("publish_template_editor", %{"id" => _template_id}, socket) do
+    {:noreply,
+     CodeEntityEditor.publish_template(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("validate_template_editor", _params, socket) do

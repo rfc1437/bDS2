@@ -43,7 +43,12 @@ defmodule BDS.Templates do
   end
 
   @spec get_template(String.t()) :: Template.t() | nil
-  def get_template(template_id), do: Repo.get(Template, template_id)
+  def get_template(template_id) do
+    case Repo.get(Template, template_id) do
+      %Template{} = template -> hydrate_template_content(template)
+      nil -> nil
+    end
+  end
 
   @spec publish_template(String.t()) :: template_result() | {:error, :not_found}
   def publish_template(template_id) do
@@ -97,7 +102,7 @@ defmodule BDS.Templates do
           end
 
         content_changed? =
-          has_attr?(attrs, :content) and attr(attrs, :content) != template.content
+          has_attr?(attrs, :content) and attr(attrs, :content) != effective_template_content(template)
 
         slug_changed? = next_slug != template.slug
         now = Persistence.now_ms()
@@ -455,6 +460,24 @@ defmodule BDS.Templates do
 
       {:error, _reason} ->
         ""
+    end
+  end
+
+  defp effective_template_content(%Template{} = template) do
+    case hydrate_template_content(template) do
+      %Template{content: content} when is_binary(content) -> content
+      _other -> ""
+    end
+  end
+
+  defp hydrate_template_content(%Template{} = template) do
+    case template do
+      %Template{content: content} when is_binary(content) -> template
+      %Template{status: :published, file_path: file_path} when file_path not in [nil, ""] ->
+        %{template | content: published_template_body(template)}
+
+      _other ->
+        template
     end
   end
 

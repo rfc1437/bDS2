@@ -2227,6 +2227,122 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ ~s(phx-value-mode="visual")
   end
 
+  test "script and template editors surface lifecycle state, load published file content, and allow publishing drafts",
+       %{project: project} do
+    {:ok, draft_script} =
+      Scripts.create_script(%{
+        project_id: project.id,
+        title: "Draft Utility",
+        kind: :utility,
+        content: "function main() return 'draft' end"
+      })
+
+    {:ok, published_script_seed} =
+      Scripts.create_script(%{
+        project_id: project.id,
+        title: "Published Utility",
+        kind: :utility,
+        content: "function main() return 'published script' end"
+      })
+
+    assert {:ok, _published_script} = Scripts.publish_script(published_script_seed.id)
+    published_script = Scripts.get_script(published_script_seed.id)
+
+    {:ok, draft_template} =
+      Templates.create_template(%{
+        project_id: project.id,
+        title: "Draft Template",
+        kind: :post,
+        content: "<article>draft template</article>"
+      })
+
+    {:ok, published_template_seed} =
+      Templates.create_template(%{
+        project_id: project.id,
+        title: "Published Template",
+        kind: :post,
+        content: "<article>published template</article>"
+      })
+
+    assert {:ok, _published_template} = Templates.publish_template(published_template_seed.id)
+    published_template = Templates.get_template(published_template_seed.id)
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    published_script_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "scripts",
+        "id" => published_script.id,
+        "title" => published_script.title,
+        "subtitle" => "published"
+      })
+
+    assert published_script_html =~ ~s(class="scripts-view-shell editor")
+    assert published_script_html =~ ~s(data-testid="script-editor")
+    assert published_script_html =~ ~s(data-testid="script-status-badge")
+    assert published_script_html =~ ~s(class="status-badge status-published")
+    assert published_script_html =~ ~s(class="secondary scripts-save-button")
+    assert published_script_html =~ ~s(class="secondary scripts-run-button")
+    assert published_script_html =~ ~s(class="secondary scripts-check-button")
+    assert published_script_html =~ "published"
+
+    assert published_script_html =~ "published script"
+
+    refute published_script_html =~ ~s(data-testid="script-publish-button")
+
+    published_template_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "templates",
+        "id" => published_template.id,
+        "title" => published_template.title,
+        "subtitle" => "published"
+      })
+
+    assert published_template_html =~ ~s(class="templates-view-shell editor")
+    assert published_template_html =~ ~s(data-testid="template-editor")
+    assert published_template_html =~ ~s(data-testid="template-status-badge")
+    assert published_template_html =~ ~s(class="status-badge status-published")
+    assert published_template_html =~ ~s(class="secondary templates-save-button")
+    assert published_template_html =~ ~s(class="secondary templates-validate-button")
+    assert published_template_html =~ "published"
+
+    assert published_template_html =~ "published template"
+
+    refute published_template_html =~ ~s(data-testid="template-publish-button")
+
+    draft_script_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "scripts",
+        "id" => draft_script.id,
+        "title" => draft_script.title,
+        "subtitle" => "draft"
+      })
+
+    assert draft_script_html =~ ~s(data-testid="script-publish-button")
+    assert draft_script_html =~ ~s(class="success")
+    draft_script_html = render_click(view, "publish_script_editor", %{"id" => draft_script.id})
+    assert Scripts.get_script(draft_script.id).status == :published
+    refute draft_script_html =~ ~s(data-testid="script-publish-button")
+    assert draft_script_html =~ ~s(data-testid="script-status-badge")
+    assert draft_script_html =~ "published"
+
+    draft_template_html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "templates",
+        "id" => draft_template.id,
+        "title" => draft_template.title,
+        "subtitle" => "draft"
+      })
+
+    assert draft_template_html =~ ~s(data-testid="template-publish-button")
+    assert draft_template_html =~ ~s(class="success")
+    draft_template_html = render_click(view, "publish_template_editor", %{"id" => draft_template.id})
+    assert Templates.get_template(draft_template.id).status == :published
+    refute draft_template_html =~ ~s(data-testid="template-publish-button")
+    assert draft_template_html =~ ~s(data-testid="template-status-badge")
+    assert draft_template_html =~ "published"
+  end
+
   test "media tabs render a real editor and drive explicit save flows", %{
     project: project,
     temp_dir: temp_dir
@@ -2505,7 +2621,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => script.slug
       })
 
-    assert script_html =~ ~s(class="scripts-view-shell")
+    assert script_html =~ ~s(class="scripts-view-shell editor")
     assert script_html =~ "scripts-monaco"
     assert script_html =~ ~s(data-monaco-language="lua")
     assert script_html =~ ~s(data-monaco-word-wrap="on")
@@ -2520,7 +2636,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => template.slug
       })
 
-    assert template_html =~ ~s(class="templates-view-shell")
+    assert template_html =~ ~s(class="templates-view-shell editor")
     assert template_html =~ "templates-monaco"
     assert template_html =~ ~s(data-monaco-language="liquid")
     assert template_html =~ ~s(data-monaco-word-wrap="on")

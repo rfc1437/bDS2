@@ -1,10 +1,17 @@
-<div class="scripts-view-shell" data-testid="script-editor">
+<div class="scripts-view-shell editor" data-testid="script-editor">
   <div class="editor-header scripts-header">
     <div class="editor-tabs"><div class="editor-tab active"><span class="editor-tab-title"><%= @script_editor.title %></span></div></div>
     <div class="editor-actions">
-      <button class="scripts-save-button" type="button" phx-click="save_script_editor"><%= translated("Save") %></button>
-      <button class="scripts-run-button" type="button" phx-click="run_script_editor"><%= translated("Run") %></button>
-      <button class="scripts-check-button" type="button" phx-click="check_script_editor"><%= translated("Check Syntax") %></button>
+      <span class={[
+        "status-badge",
+        "status-#{@script_editor.status}"
+      ]} data-testid="script-status-badge"><%= status_label(@script_editor.status) %></span>
+      <%= if @script_editor.can_publish? do %>
+        <button class="success" data-testid="script-publish-button" type="button" phx-click="publish_script_editor" phx-value-id={@script_editor.id}><%= translated("Publish") %></button>
+      <% end %>
+      <button class="secondary scripts-save-button" type="button" phx-click="save_script_editor"><%= translated("Save") %></button>
+      <button class="secondary scripts-run-button" type="button" phx-click="run_script_editor"><%= translated("Run") %></button>
+      <button class="secondary scripts-check-button" type="button" phx-click="check_script_editor"><%= translated("Check Syntax") %></button>
       <button class="secondary danger" type="button" phx-click="delete_script_editor"><%= translated("Delete") %></button>
     </div>
   </div>

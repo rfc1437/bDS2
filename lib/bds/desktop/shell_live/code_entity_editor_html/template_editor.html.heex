@@ -1,9 +1,16 @@
-<div class="templates-view-shell" data-testid="template-editor">
+<div class="templates-view-shell editor" data-testid="template-editor">
   <div class="editor-header templates-header">
     <div class="editor-tabs"><div class="editor-tab active"><span class="editor-tab-title"><%= @template_editor.title %></span></div></div>
     <div class="editor-actions">
-      <button class="templates-save-button" type="button" phx-click="save_template_editor"><%= translated("Save") %></button>
-      <button class="templates-validate-button" type="button" phx-click="validate_template_editor"><%= translated("Validate") %></button>
+      <span class={[
+        "status-badge",
+        "status-#{@template_editor.status}"
+      ]} data-testid="template-status-badge"><%= status_label(@template_editor.status) %></span>
+      <%= if @template_editor.can_publish? do %>
+        <button class="success" data-testid="template-publish-button" type="button" phx-click="publish_template_editor" phx-value-id={@template_editor.id}><%= translated("Publish") %></button>
+      <% end %>
+      <button class="secondary templates-save-button" type="button" phx-click="save_template_editor"><%= translated("Save") %></button>
+      <button class="secondary templates-validate-button" type="button" phx-click="validate_template_editor"><%= translated("Validate") %></button>
       <button class="secondary danger" type="button" phx-click="delete_template_editor"><%= translated("Delete") %></button>
     </div>
   </div>

@@ -43,7 +43,12 @@ defmodule BDS.Scripts do
   end
 
   @spec get_script(String.t()) :: Script.t() | nil
-  def get_script(script_id), do: Repo.get(Script, script_id)
+  def get_script(script_id) do
+    case Repo.get(Script, script_id) do
+      %Script{} = script -> hydrate_script_content(script)
+      nil -> nil
+    end
+  end
 
   @spec publish_script(String.t()) :: script_result() | {:error, :not_found}
   def publish_script(script_id) do
@@ -91,7 +96,8 @@ defmodule BDS.Scripts do
             script.slug
           end
 
-        content_changed? = has_attr?(attrs, :content) and attr(attrs, :content) != script.content
+        content_changed? =
+          has_attr?(attrs, :content) and attr(attrs, :content) != effective_script_content(script)
         now = Persistence.now_ms()
 
         updates =
@@ -291,6 +297,24 @@ defmodule BDS.Scripts do
 
       {:error, _reason} ->
         ""
+    end
+  end
+
+  defp effective_script_content(%Script{} = script) do
+    case hydrate_script_content(script) do
+      %Script{content: content} when is_binary(content) -> content
+      _other -> ""
+    end
+  end
+
+  defp hydrate_script_content(%Script{} = script) do
+    case script do
+      %Script{content: content} when is_binary(content) -> script
+      %Script{status: :published, file_path: file_path} when file_path not in [nil, ""] ->
+        %{script | content: published_script_body(script)}
+
+      _other ->
+        script
     end
   end
 
