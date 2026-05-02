@@ -17,6 +17,8 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
         request = Map.get(assigns.chat_editor_requests, conversation.id)
         effective_model = AI.effective_chat_model(conversation)
         available_models = AI.available_chat_models(effective_model)
+        streaming_tool_markers = streaming_tool_markers(messages, request)
+        streaming_content = streaming_content(messages, request)
 
         %{
           id: conversation.id,
@@ -31,9 +33,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
           messages: build_entries(messages, assigns),
           pending_user_message: pending_user_message(messages, request),
           is_streaming: not is_nil(request),
-          streaming_content: streaming_content(request),
-          streaming_tool_markers: ToolTracking.tool_markers_from_events(request),
-          streaming_inline_surfaces: streaming_inline_surfaces(conversation.id, request, assigns),
+          streaming_content: streaming_content,
+          streaming_tool_markers: streaming_tool_markers,
+          streaming_inline_surfaces:
+            streaming_inline_surfaces(conversation.id, streaming_tool_markers, assigns),
           offline?: Map.get(assigns, :offline_mode, true),
           needs_api_key?: ModelSelection.needs_api_key?(Map.get(assigns, :offline_mode, true)),
           action_error: Map.get(assigns.chat_editor_action_errors, conversation.id),
@@ -137,27 +140,134 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
 
   defp pending_user_message(_messages, nil), do: nil
 
-  defp pending_user_message(messages, %{message: message}) when is_binary(message) do
+  defp pending_user_message(messages, %{message: message} = request) when is_binary(message) do
+    cond do
+      persisted_user_message_for_request?(messages, request) ->
+        nil
+
+      true ->
+        legacy_pending_user_message(messages, message)
+    end
+  end
+
+  defp pending_user_message(_messages, _request), do: nil
+
+  defp legacy_pending_user_message(messages, message) do
     case messages |> Enum.reverse() |> Enum.find(&(&1.role not in [:system, :tool])) do
       %{role: :user, content: ^message} -> nil
       _other -> message
     end
   end
 
-  defp pending_user_message(_messages, _request), do: nil
-
   defp streaming_content(nil), do: ""
   defp streaming_content(%{content: content}) when is_binary(content), do: content
   defp streaming_content(_request), do: ""
 
-  defp streaming_inline_surfaces(_conversation_id, nil, _assigns), do: []
+  defp streaming_content(messages, request) do
+    content = streaming_content(request)
 
-  defp streaming_inline_surfaces(conversation_id, request, assigns) do
+    if content != "" and persisted_assistant_content_for_request?(messages, request, content) do
+      ""
+    else
+      content
+    end
+  end
+
+  defp streaming_tool_markers(_messages, nil), do: []
+
+  defp streaming_tool_markers(messages, request) do
     request
     |> ToolTracking.tool_markers_from_events()
+    |> drop_persisted_tool_markers(messages, request)
+  end
+
+  defp streaming_inline_surfaces(_conversation_id, [], _assigns), do: []
+
+  defp streaming_inline_surfaces(conversation_id, tool_markers, assigns) do
+    tool_markers
     |> ToolSurfaces.build_render_surfaces("streaming-#{conversation_id}", assigns)
     |> mark_surfaces_expanded(assigns)
   end
+
+  defp persisted_user_message_for_request?(messages, %{message: message} = request)
+       when is_binary(message) do
+    messages
+    |> persisted_messages_for_request(request)
+    |> Enum.any?(fn persisted_message ->
+      persisted_message.role == :user and persisted_message.content == message
+    end)
+  end
+
+  defp persisted_user_message_for_request?(_messages, _request), do: false
+
+  defp persisted_assistant_content_for_request?(messages, request, content)
+       when is_binary(content) and content != "" do
+    messages
+    |> persisted_messages_for_request(request)
+    |> Enum.any?(fn persisted_message ->
+      persisted_message.role == :assistant and (persisted_message.content || "") == content
+    end)
+  end
+
+  defp persisted_assistant_content_for_request?(_messages, _request, _content), do: false
+
+  defp drop_persisted_tool_markers(tool_markers, messages, request) do
+    persisted_markers = persisted_tool_markers_for_request(messages, request)
+
+    {remaining, _persisted_markers} =
+      Enum.reduce(tool_markers, {[], persisted_markers}, fn marker, {remaining, persisted_markers} ->
+        case pop_matching_tool_marker(persisted_markers, marker) do
+          {nil, persisted_markers} -> {remaining ++ [marker], persisted_markers}
+          {_matched, persisted_markers} -> {remaining, persisted_markers}
+        end
+      end)
+
+    remaining
+  end
+
+  defp persisted_tool_markers_for_request(messages, request) do
+    messages
+    |> persisted_messages_for_request(request)
+    |> Enum.flat_map(fn message ->
+      if message.role == :assistant do
+        ToolTracking.normalize_tool_calls(message.tool_calls)
+      else
+        []
+      end
+    end)
+  end
+
+  defp pop_matching_tool_marker(tool_markers, marker) do
+    case Enum.find_index(tool_markers, &same_tool_marker?(&1, marker)) do
+      nil -> {nil, tool_markers}
+      index -> {Enum.at(tool_markers, index), List.delete_at(tool_markers, index)}
+    end
+  end
+
+  defp same_tool_marker?(left, right) do
+    cond do
+      is_binary(left.id) and is_binary(right.id) ->
+        left.id == right.id
+
+      true ->
+        left.name == right.name and (left.arguments || %{}) == (right.arguments || %{})
+    end
+  end
+
+  defp persisted_messages_for_request(messages, request) do
+    case request_started_at(request) do
+      started_at when is_integer(started_at) ->
+        Enum.filter(messages, fn message ->
+          is_integer(message.created_at) and message.created_at >= started_at
+        end)
+
+      _other ->
+        []
+    end
+  end
+
+  defp request_started_at(%{started_at: started_at}) when is_integer(started_at), do: started_at
+  defp request_started_at(_request), do: nil
 
   defp translated(text, bindings \\ %{}),
     do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())

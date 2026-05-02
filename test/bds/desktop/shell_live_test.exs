@@ -3331,6 +3331,95 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute render(view) =~ "Delayed response"
   end
 
+  test "chat editor does not duplicate persisted turn artifacts while the request is still active" do
+    assert :ok = AI.set_airplane_mode(false)
+
+    server =
+      start_supervised!({Bandit, plug: DelayedChatServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "online-secret",
+               model: "gpt-4.1"
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "Streaming Dedupe", model: "gpt-4.1"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    _html = render_change(view, "change_chat_editor_input", %{"message" => "Newest question"})
+
+    _html =
+      view
+      |> element("[data-testid='chat-send-button']")
+      |> render_click()
+
+    assert Enum.count(AI.list_chat_messages(conversation.id), fn message ->
+             message.role == :user and message.content == "Newest question"
+           end) == 1
+
+    now = Persistence.now_ms()
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :assistant,
+        content: "",
+        tool_calls:
+          Jason.encode!([
+            %{
+              "id" => "call-card-new",
+              "name" => "render_card",
+              "arguments" => %{
+                "title" => "Latest Missing Data",
+                "body" => "The second data request needs review."
+              }
+            }
+          ]),
+        created_at: now + 1
+      })
+    )
+
+    send(view.pid, {
+      :chat_tool_call,
+      conversation.id,
+      %{
+        id: "call-card-new",
+        name: "render_card",
+        arguments: %{
+          "title" => "Latest Missing Data",
+          "body" => "The second data request needs review."
+        }
+      }
+    })
+
+    html = render(view)
+
+    refute html =~ ~s(data-testid="chat-pending-user-message")
+    assert length(:binary.matches(html, ~s(data-testid="chat-user-message-text"))) == 1
+    assert length(:binary.matches(html, ~s(data-testid="chat-inline-surface"))) == 1
+    refute html =~ ~s(data-testid="chat-streaming-message")
+    assert html =~ ~s(data-testid="chat-streaming-thinking")
+
+    _html =
+      view
+      |> element("[data-testid='chat-abort-button']")
+      |> render_click()
+
+    Process.sleep(350)
+  end
+
   test "translation validation route renders dedicated cards and fix controls", %{
     project: project,
     temp_dir: temp_dir

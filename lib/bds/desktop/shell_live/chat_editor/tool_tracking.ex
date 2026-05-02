@@ -8,6 +8,14 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
     BDS.MapUtils.attr(tool_call, :name) || "tool"
   end
 
+  @spec tool_call_id(term()) :: term()
+  def tool_call_id(tool_call) when is_map(tool_call) do
+    BDS.MapUtils.attr(tool_call, :id)
+  end
+
+  @spec tool_call_id(term()) :: term()
+  def tool_call_id(_tool_call), do: nil
+
   @spec tool_call_arguments(term()) :: term()
   def tool_call_arguments(tool_call) when is_map(tool_call) do
     BDS.MapUtils.attr(tool_call, :arguments) || BDS.MapUtils.attr(tool_call, :args) || %{}
@@ -72,7 +80,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolTracking do
           markers ++
             [
               %{
-                id: nil,
+                id: Map.get(event, :id),
                 name: event.name,
                 arguments: event.arguments,
                 args_preview: tool_arguments_preview(event.arguments || %{}),

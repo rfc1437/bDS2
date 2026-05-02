@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   alias BDS.AI
   alias BDS.MapUtils
+  alias BDS.Persistence
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.ChatEditor.{MessageBuild, ModelSelection, ToolTracking}
 
@@ -125,6 +126,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
       true ->
         live_view_pid = self()
+        started_at = Persistence.now_ms()
 
         task =
           Task.Supervisor.async_nolink(BDS.Tasks.TaskSupervisor, fn ->
@@ -146,6 +148,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
           Map.put(socket.assigns.chat_editor_requests, conversation_id, %{
             ref: task.ref,
             pid: task.pid,
+            started_at: started_at,
             message: message,
             content: "",
             tool_events: []
@@ -200,6 +203,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
               [
                 %{
                   type: :call,
+                  id: ToolTracking.tool_call_id(tool_call),
                   name: ToolTracking.tool_call_name(tool_call),
                   arguments: ToolTracking.tool_call_arguments(tool_call)
                 }
