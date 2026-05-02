@@ -707,6 +707,27 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="tab active transient")
   end
 
+  test "workbench session restore rehydrates chat tab titles from stored conversations" do
+    assert {:ok, conversation} = AI.start_chat(%{title: "Editorial Plan"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    session_payload =
+      Workbench.new()
+      |> Workbench.open_tab(:chat, conversation.id, :pin)
+      |> Session.serialize()
+
+    _html = render_hook(view, "restore_workbench_session", %{"session" => session_payload})
+
+    assert has_element?(
+             view,
+             ".tab[data-tab-type='chat'][data-tab-id='#{conversation.id}'] .tab-title",
+             "Editorial Plan"
+           )
+
+    assert has_element?(view, ".chat-panel-title-main", "Editorial Plan")
+  end
+
   test "metadata diff refresh reruns after workbench session restore", %{project: project} do
     :ok = BDS.Tasks.clear_finished()
 

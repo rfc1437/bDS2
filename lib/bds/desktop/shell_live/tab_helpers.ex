@@ -2,7 +2,7 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   @moduledoc false
 
   alias BDS.Desktop.ShellData
-  alias BDS.{BoundedAtoms, Media, Posts}
+  alias BDS.{AI, BoundedAtoms, Media, Posts}
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Posts.Post
   alias BDS.UI.Registry
@@ -21,9 +21,11 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   def tab_subtitle(tab, tab_meta) do
     case Map.get(tab_meta, {tab.type, tab.id}) do
       %{subtitle: subtitle} when is_binary(subtitle) and subtitle != "" -> subtitle
-      _other -> "Desktop workbench content routed through the Elixir shell."
+      _other -> default_tab_subtitle(tab)
     end
   end
+
+  def default_tab_title(%{type: :chat, id: conversation_id}), do: chat_title(conversation_id)
 
   def default_tab_title(%{type: type, id: id}) do
     case Registry.editor_route(type) do
@@ -31,6 +33,9 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
       _other -> id
     end
   end
+
+  defp default_tab_subtitle(%{type: :chat}), do: translated("AI conversations")
+  defp default_tab_subtitle(_tab), do: "Desktop workbench content routed through the Elixir shell."
 
   def tab_route_label(nil), do: translated("Dashboard")
   def tab_route_label(%{type: type}), do: ShellData.route_label(type)
@@ -85,6 +90,14 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     case Media.get_media(media_id) do
       %MediaRecord{} = media -> media.filename || media.mime_type || "media"
       _other -> "media"
+    end
+  end
+
+  def chat_title(conversation_id) do
+    case AI.get_chat_conversation(conversation_id) do
+      %{title: title} when is_binary(title) and title != "" -> title
+      %{id: id} when is_binary(id) and id != "" -> id
+      _other -> "Chat"
     end
   end
 
