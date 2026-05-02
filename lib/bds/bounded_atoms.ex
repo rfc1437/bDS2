@@ -48,6 +48,7 @@ defmodule BDS.BoundedAtoms do
     :metadata_diff,
     :regenerate_calendar,
     :validate_translations,
+    :fill_missing_translations,
     :find_duplicates,
     :generate_sitemap,
     :validate_site,

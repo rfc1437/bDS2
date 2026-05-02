@@ -108,7 +108,7 @@ defmodule BDS.Desktop.ShellLive do
     |> MapSet.union(MapSet.new([:open_in_browser, :open_data_folder]))
     |> MapSet.union(MapSet.new([:preview_post, :rebuild_database, :reindex_text]))
     |> MapSet.union(MapSet.new([:rebuild_embedding_index, :metadata_diff, :regenerate_calendar]))
-    |> MapSet.union(MapSet.new([:validate_translations, :find_duplicates]))
+    |> MapSet.union(MapSet.new([:validate_translations, :fill_missing_translations, :find_duplicates]))
     |> MapSet.union(MapSet.new([:generate_sitemap, :validate_site, :upload_site]))
   end
 

@@ -27,6 +27,7 @@ defmodule BDS.BoundedAtomsTest do
       {"rebuild_embedding_index", :rebuild_embedding_index},
       {"metadata_diff", :metadata_diff},
       {"validate_translations", :validate_translations},
+      {"fill_missing_translations", :fill_missing_translations},
       {"find_duplicates", :find_duplicates},
       {"generate_sitemap", :generate_sitemap},
       {"validate_site", :validate_site},

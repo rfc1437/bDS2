@@ -365,6 +365,33 @@ defmodule BDS.Desktop.ShellCommands do
     )
   end
 
+  defp dispatch("fill_missing_translations", project, _params) do
+    with {:ok, metadata} <- Metadata.get_project_metadata(project.id) do
+      if translation_fill_enabled?(metadata) do
+        queue_task(
+          project,
+          "fill_missing_translations",
+          "Fill Missing Translations",
+          "AI",
+          fn report ->
+            {:ok, result} = Posts.fill_missing_translations(project.id, on_progress: report)
+            Map.put(result, :project_id, project.id)
+          end
+        )
+      else
+        {:ok,
+         %{
+           kind: "output",
+           action: "fill_missing_translations",
+           title: "Fill Missing Translations",
+           message: "All translations are up to date",
+           project_id: project.id,
+           level: "info"
+         }}
+      end
+    end
+  end
+
   defp dispatch("find_duplicates", project, _params) do
     queue_task(project, "find_duplicates", "Find Duplicate Posts", "Embeddings", fn report ->
       {:ok, pairs} = Embeddings.find_duplicates(project.id, on_progress: report)
@@ -419,6 +446,19 @@ defmodule BDS.Desktop.ShellCommands do
       scaled_value = start_value + (end_value - start_value) * value
       report.(scaled_value, message)
     end
+  end
+
+  defp translation_fill_enabled?(metadata) do
+    ([Map.get(metadata, :main_language)] ++ Map.get(metadata, :blog_languages, []))
+    |> Enum.map(fn language ->
+      language
+      |> to_string()
+      |> String.trim()
+      |> String.downcase()
+    end)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+    |> length() > 1
   end
 
   defp rebuild_database_steps(project) do

@@ -1,7 +1,53 @@
 defmodule BDS.Desktop.ShellCommandsTest do
   use ExUnit.Case, async: false
 
+  alias BDS.AI
   alias BDS.Desktop.ShellCommands
+  alias BDS.Media
+  alias BDS.Metadata
+  alias BDS.Posts
+  alias BDS.Repo
+
+  defmodule FakeRuntime do
+    def generate(_endpoint, request, opts) do
+      test_pid = Keyword.fetch!(opts, :test_pid)
+      send(test_pid, {:runtime_request, request.operation})
+
+      case request.operation do
+        :translate_post ->
+          {:ok,
+           %{
+             json: %{
+               "title" => "Hallo Welt",
+               "excerpt" => "Kurze Zusammenfassung",
+               "content" => "# Hallo Welt\n\nUbersetzter Inhalt"
+             },
+             usage: %{
+               input_tokens: 22,
+               output_tokens: 14,
+               cache_read_tokens: 0,
+               cache_write_tokens: 0
+             }
+           }}
+
+        :translate_media ->
+          {:ok,
+           %{
+             json: %{
+               "title" => "Medientitel",
+               "alt" => "Medien Alt",
+               "caption" => "Medien Beschriftung"
+             },
+             usage: %{
+               input_tokens: 12,
+               output_tokens: 10,
+               cache_read_tokens: 0,
+               cache_write_tokens: 0
+             }
+           }}
+      end
+    end
+  end
 
   defmodule SlowEmbeddingBackend do
     @behaviour BDS.Embeddings.Backend
@@ -130,6 +176,137 @@ defmodule BDS.Desktop.ShellCommandsTest do
                "file_path" => ^invalid_file_path
              }
            ] = completed.result.payload.invalid_filesystem_files
+  end
+
+  test "fill_missing_translations queues a tracked AI task and publishes missing post and media translations",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Hello",
+               excerpt: "English summary",
+               content: "World body",
+               language: "en"
+             })
+
+    media_source = Path.join(temp_dir, "source-image.txt")
+    File.write!(media_source, "image bytes")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: media_source,
+               title: "Image title",
+               alt: "Image alt",
+               caption: "Image caption",
+               language: "en"
+             })
+
+    assert {:ok, _link} = Media.link_media_to_post(media.id, post.id)
+    assert {:ok, _published_post} = Posts.publish_post(post.id)
+
+    configure_auto_translation_test_runtime()
+
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en", "de"]
+             })
+
+    assert {:ok, result} = ShellCommands.execute("fill_missing_translations")
+
+    assert result.kind == "task_queued"
+    assert result.action == "fill_missing_translations"
+    assert is_binary(result.task_id)
+
+    completed = wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)), 5_000)
+
+    assert completed.group_name == "AI"
+    assert completed.result.project_id == project.id
+    assert completed.result.translated_posts == 1
+    assert completed.result.translated_media == 1
+    assert completed.result.failed_count == 0
+
+    translation = Repo.get_by!(BDS.Posts.Translation, translation_for: post.id, language: "de")
+    assert translation.status == :published
+    assert translation.content == nil
+    assert is_binary(translation.file_path)
+    assert File.exists?(Path.join(temp_dir, translation.file_path))
+
+    media_translation =
+      Repo.get_by!(BDS.Media.Translation, translation_for: media.id, language: "de")
+
+    assert media_translation.title == "Medientitel"
+    assert media_translation.alt == "Medien Alt"
+    assert media_translation.caption == "Medien Beschriftung"
+    assert File.exists?(Path.join(temp_dir, media.file_path <> ".de.meta"))
+
+    assert_received {:runtime_request, :translate_post}
+    assert_received {:runtime_request, :translate_media}
+  end
+
+  test "fill_missing_translations returns a no-op output when only one language is configured",
+       %{project: project} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, result} = ShellCommands.execute("fill_missing_translations")
+
+    assert result.kind == "output"
+    assert result.action == "fill_missing_translations"
+    assert result.message == "All translations are up to date"
+    assert BDS.Tasks.list_tasks() == []
+  end
+
+  test "fill_missing_translations uses the media canonical language when choosing missing media targets",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Hallo Welt",
+               excerpt: "Deutsche Zusammenfassung",
+               content: "Deutscher Inhalt",
+               language: "de"
+             })
+
+    media_source = Path.join(temp_dir, "english-media.txt")
+    File.write!(media_source, "image bytes")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: media_source,
+               title: "English image",
+               alt: "English alt",
+               caption: "English caption",
+               language: "en"
+             })
+
+    assert {:ok, _link} = Media.link_media_to_post(media.id, post.id)
+    assert {:ok, _published_post} = Posts.publish_post(post.id)
+
+    configure_auto_translation_test_runtime()
+
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "de",
+               blog_languages: ["de", "en"]
+             })
+
+    assert {:ok, result} = ShellCommands.execute("fill_missing_translations")
+    completed = wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)), 5_000)
+
+    assert completed.result.translated_posts == 1
+    assert completed.result.translated_media == 1
+    assert Repo.get_by(BDS.Media.Translation, translation_for: media.id, language: "en") == nil
+
+    media_translation =
+      Repo.get_by!(BDS.Media.Translation, translation_for: media.id, language: "de")
+
+    assert media_translation.title == "Medientitel"
   end
 
   test "validate_site queues a tracked validation task and returns the report as an editor payload" do
@@ -642,5 +819,24 @@ defmodule BDS.Desktop.ShellCommandsTest do
       Process.sleep(20)
       wait_for_named_task(name, matcher, timeout - 20)
     end
+  end
+
+  defp configure_auto_translation_test_runtime do
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "https://api.example.test/v1",
+               api_key: "online-secret",
+               model: "gpt-4o-mini"
+             })
+
+    assert :ok = AI.set_airplane_mode(false)
+    assert :ok = AI.put_model_preference(:title, "gpt-4.1-mini")
+
+    Application.put_env(:bds, :posts,
+      auto_translation_ai_opts: [
+        runtime: FakeRuntime,
+        test_pid: self()
+      ]
+    )
   end
 end

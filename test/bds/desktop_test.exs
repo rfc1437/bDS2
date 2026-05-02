@@ -131,7 +131,7 @@ defmodule BDS.DesktopTest do
     assert menu_item(groups, :metadata_diff).shortcut == nil
   end
 
-  test "prod forwarded menu surface is covered by the shell dispatcher except unresolved filler action" do
+  test "prod forwarded menu surface is covered by the shell dispatcher" do
     forwarded_actions =
       BDS.Desktop.MenuBar.groups(dev_mode?: false)
       |> Enum.flat_map(fn group ->
@@ -146,7 +146,7 @@ defmodule BDS.DesktopTest do
       |> MapSet.difference(BDS.Desktop.ShellLive.supported_menu_actions())
       |> Enum.sort()
 
-    assert unsupported_actions == [:fill_missing_translations]
+    assert unsupported_actions == []
   end
 
   test "native menu quit requests app-owned shutdown" do

@@ -471,6 +471,19 @@ defmodule BDS.Posts do
            }}
   defdelegate fix_invalid_translations(report), to: TranslationValidation, as: :fix_invalid
 
+  @spec fill_missing_translations(String.t(), rebuild_opts()) ::
+          {:ok,
+           %{
+             translated_posts: non_neg_integer(),
+             translated_media: non_neg_integer(),
+             failed_count: non_neg_integer(),
+             warned_count: non_neg_integer(),
+             nothing_to_do: boolean()
+           }}
+  defdelegate fill_missing_translations(project_id, opts \\ []),
+    to: AutoTranslation,
+    as: :fill_missing
+
   @spec rewrite_published_post(String.t()) :: :ok
   def rewrite_published_post(post_id) do
     post = Repo.get!(Post, post_id)
