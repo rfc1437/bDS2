@@ -193,6 +193,13 @@ defmodule BDS.UI.ShellTest do
     assert template =~ "tab-dirty-indicator"
   end
 
+  test "desktop shell keeps sidebar delete buttons visible in the default state" do
+    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+
+    assert Regex.match?(~r/\.sidebar-delete-button\s*\{[^}]*opacity:\s*1;/s, css)
+    refute Regex.match?(~r/\.sidebar-delete-button\s*\{[^}]*opacity:\s*0;/s, css)
+  end
+
   test "desktop shell css keeps the old activity bar active marker contrast" do
     css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
 

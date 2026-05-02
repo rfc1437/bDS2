@@ -8223,7 +8223,7 @@ button.import-taxonomy-pill {
   line-height: 1;
   padding: 0 6px;
   flex-shrink: 0;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.15s, color 0.15s;
 }
 

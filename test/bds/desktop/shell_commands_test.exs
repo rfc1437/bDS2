@@ -64,6 +64,28 @@ defmodule BDS.Desktop.ShellCommandsTest do
     end
   end
 
+  defmodule BlockingEmbeddingBackend do
+    @behaviour BDS.Embeddings.Backend
+
+    @impl true
+    def model_info do
+      %{model_id: "blocking/test", dimensions: 384}
+    end
+
+    @impl true
+    def embed(_text, _opts) do
+      if test_pid = Application.get_env(:bds, :embedding_test_pid) do
+        send(test_pid, {:embedding_started, self()})
+      end
+
+      receive do
+        :release_embedding -> {:ok, List.duplicate(0.0, 384)}
+      after
+        5_000 -> {:ok, List.duplicate(0.0, 384)}
+      end
+    end
+  end
+
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
@@ -413,6 +435,122 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert progressed.group_name == "Maintenance"
     assert String.contains?(progressed.message, "Repairing")
     assert String.contains?(progressed.message, "/")
+
+    assert wait_for_task(result.task_id, &(&1.status == :completed and &1.progress == 1.0), 5_000).status ==
+             :completed
+  end
+
+  test "import_metadata_diff_orphans imports paired post translations before any embedding work can stall the task",
+       %{project: project, temp_dir: temp_dir} do
+    original_embeddings = Application.get_env(:bds, :embeddings)
+    original_tasks = Application.get_env(:bds, :tasks, [])
+    original_test_pid = Application.get_env(:bds, :embedding_test_pid)
+
+    Application.put_env(:bds, :embeddings, backend: BlockingEmbeddingBackend)
+    Application.put_env(:bds, :embedding_test_pid, self())
+    Application.put_env(:bds, :tasks, Keyword.put(original_tasks, :progress_throttle_ms, 0))
+
+    on_exit(fn ->
+      release_blocking_embeddings()
+      Enum.each(BDS.Tasks.list_running_tasks(), &BDS.Tasks.cancel_task(&1.id))
+      _ = BDS.Tasks.clear_finished()
+
+      if original_embeddings == nil do
+        Application.delete_env(:bds, :embeddings)
+      else
+        Application.put_env(:bds, :embeddings, original_embeddings)
+      end
+
+      if original_test_pid == nil do
+        Application.delete_env(:bds, :embedding_test_pid)
+      else
+        Application.put_env(:bds, :embedding_test_pid, original_test_pid)
+      end
+
+      Application.put_env(:bds, :tasks, original_tasks)
+    end)
+
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    post_orphan_path = "posts/2026/04/shell-orphan-post.md"
+    post_translation_orphan_path = "posts/2026/04/shell-orphan-post.es.md"
+
+    File.mkdir_p!(Path.join([temp_dir, "posts", "2026", "04"]))
+
+    File.write!(
+      Path.join(temp_dir, post_orphan_path),
+      [
+        "---",
+        "id: shell-orphan-post",
+        "title: Shell Orphan Post",
+        "slug: shell-orphan-post",
+        "status: published",
+        "createdAt: 1",
+        "updatedAt: 1",
+        "publishedAt: 1",
+        "tags:",
+        "categories:",
+        "---",
+        "Orphan shell body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(
+      Path.join(temp_dir, post_translation_orphan_path),
+      [
+        "---",
+        "id: shell-orphan-post-es",
+        "translationFor: shell-orphan-post",
+        "language: es",
+        "title: Traduccion huerfana",
+        "excerpt: Resumen huerfano",
+        "status: published",
+        "createdAt: 1",
+        "updatedAt: 1",
+        "publishedAt: 1",
+        "---",
+        "Contenido huerfano",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, result} =
+             ShellCommands.execute("import_metadata_diff_orphans", %{
+               "orphans" => [
+                 %{"file_path" => post_orphan_path},
+                 %{"file_path" => post_translation_orphan_path}
+               ]
+             })
+
+    progressed =
+      wait_for_task(
+        result.task_id,
+        fn task ->
+          task.status in [:running, :completed] and is_number(task.progress) and task.progress > 0.2 and
+            Repo.get_by(BDS.Posts.Post, project_id: project.id, file_path: post_orphan_path) != nil and
+            Repo.get_by(BDS.Posts.Translation,
+              project_id: project.id,
+              file_path: post_translation_orphan_path
+            ) != nil
+        end,
+        1_000
+      )
+
+    assert progressed.status in [:running, :completed]
+    assert is_number(progressed.progress)
+    assert progressed.progress > 0.2
+
+    assert Repo.get_by(BDS.Posts.Post, project_id: project.id, file_path: post_orphan_path)
+    assert Repo.get_by(BDS.Posts.Translation,
+             project_id: project.id,
+             file_path: post_translation_orphan_path
+           )
+
+    release_blocking_embeddings()
 
     assert wait_for_task(result.task_id, &(&1.status == :completed and &1.progress == 1.0), 5_000).status ==
              :completed
@@ -818,6 +956,16 @@ defmodule BDS.Desktop.ShellCommandsTest do
     else
       Process.sleep(20)
       wait_for_named_task(name, matcher, timeout - 20)
+    end
+  end
+
+  defp release_blocking_embeddings do
+    receive do
+      {:embedding_started, pid} ->
+        send(pid, :release_embedding)
+        release_blocking_embeddings()
+    after
+      0 -> :ok
     end
   end
 

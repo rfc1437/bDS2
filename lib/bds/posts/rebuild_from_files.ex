@@ -96,7 +96,10 @@ defmodule BDS.Posts.RebuildFromFiles do
               Slugs.unique_for_import(project_id, Map.fetch!(rebuild_file.fields, "slug"))
             )
 
-          {:ok, upsert_post_from_rebuild_file(project_id, %{rebuild_file | fields: fields})}
+          {:ok,
+           upsert_post_from_rebuild_file(project_id, %{rebuild_file | fields: fields},
+             sync_embeddings: false
+           )}
         end
       end
     else
