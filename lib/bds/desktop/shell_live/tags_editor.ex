@@ -13,6 +13,8 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
 
   embed_templates("tags_editor_html/*")
 
+  @tags_sections ~w(cloud manage merge)
+
   @spec assign_socket(term()) :: term()
   def assign_socket(socket) do
     assign(socket, :tags_editor, build(socket.assigns))
@@ -198,9 +200,13 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
 
   @spec sync(term(), term(), term()) :: term()
   def sync(socket, reload, append_output) do
-    _ = append_output
-    :ok = Tags.sync_tags_json(socket.assigns.projects.active_project_id)
-    reload.(socket, socket.assigns.workbench)
+    case Tags.sync_tags_from_posts(socket.assigns.projects.active_project_id) do
+      {:ok, _tags} -> reload.(socket, socket.assigns.workbench)
+      {:error, reason} ->
+        socket
+        |> append_output.(translated("Tags"), inspect(reason), nil, "error")
+        |> reload.(socket.assigns.workbench)
+    end
   end
 
   @spec build(term()) :: term()
@@ -226,6 +232,8 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
           select: %{slug: template.slug, title: template.title}
       )
 
+    selected_section = current_tags_section(assigns)
+
     %{
       tags:
         Enum.map(tags, fn tag ->
@@ -235,7 +243,8 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
       new_tag: Map.get(assigns, :tags_editor_new_tag, %{"name" => "", "color" => ""}),
       edit_draft: edit_draft,
       templates: templates,
-      merge_target: Map.get(assigns, :tags_editor_merge_target, List.first(selected) || "")
+      merge_target: Map.get(assigns, :tags_editor_merge_target, List.first(selected) || ""),
+      selected_section: selected_section
     }
   end
 
@@ -290,6 +299,25 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
       {:ok, tag}
     else
       Tags.rename_tag(tag.id, normalized)
+    end
+  end
+
+  defp current_tags_section(assigns) do
+    assigns
+    |> current_tab_meta()
+    |> Map.get(:sidebar_item_id, "tags-cloud")
+    |> to_string()
+    |> String.replace_prefix("tags-", "")
+    |> case do
+      section when section in @tags_sections -> section
+      _other -> "cloud"
+    end
+  end
+
+  defp current_tab_meta(assigns) do
+    case Map.get(assigns, :current_tab) do
+      %{type: type, id: id} -> Map.get(assigns[:tab_meta] || %{}, {type, id}, %{})
+      _other -> %{}
     end
   end
 

@@ -1,24 +1,38 @@
-<div class="tags-view-shell" data-testid="tags-editor">
+<div
+  id="tags-editor-shell"
+  class="tags-view-shell"
+  data-testid="tags-editor"
+  phx-hook="TagsSectionScroll"
+  data-selected-tags-section={@tags_editor.selected_section}
+  data-tags-scroll-target={"tags-section-#{@tags_editor.selected_section}"}
+>
   <div class="tags-view">
     <div class="tags-view-header">
       <h2><%= translated("Tags") %></h2>
     </div>
 
     <div class="tags-view-content">
-      <div class="tags-section">
+      <div class="tags-section" id="tags-section-cloud">
         <div class="tags-section-header"><h3><%= translated("Tag Cloud") %></h3></div>
         <div class="tags-section-content">
-          <div class="tag-cloud">
-            <%= for tag <- @tags_editor.tags do %>
-              <button class={["tag-cloud-item", if(tag.name in @tags_editor.selected, do: "selected"), if(tag.color, do: "has-color")]} style={tag_style(tag, @tags_editor.tags)} type="button" phx-click="toggle_tag_selection" phx-value-name={tag.name}>
-                <%= tag.name %><span class="tag-count"><%= tag.count %></span>
-              </button>
-            <% end %>
-          </div>
+          <%= if Enum.empty?(@tags_editor.tags) do %>
+            <div class="tags-empty-state">
+              <p><%= translated("No tags found") %></p>
+              <button class="secondary" type="button" phx-click="sync_tags_editor"><%= translated("Discover") %></button>
+            </div>
+          <% else %>
+            <div class="tag-cloud">
+              <%= for tag <- @tags_editor.tags do %>
+                <button class={["tag-cloud-item", if(tag.name in @tags_editor.selected, do: "selected"), if(tag.color, do: "has-color")]} style={tag_style(tag, @tags_editor.tags)} type="button" phx-click="toggle_tag_selection" phx-value-name={tag.name}>
+                  <%= tag.name %><span class="tag-count"><%= tag.count %></span>
+                </button>
+              <% end %>
+            </div>
+          <% end %>
         </div>
       </div>
 
-      <div class="tags-section">
+      <div class="tags-section" id="tags-section-manage">
         <div class="tags-section-header"><h3><%= translated("Create / Edit") %></h3></div>
         <div class="tags-section-content">
           <form class="tag-create-form" phx-change="change_new_tag_editor">
@@ -48,7 +62,7 @@
         </div>
       </div>
 
-      <div class="tags-section">
+      <div class="tags-section" id="tags-section-merge">
         <div class="tags-section-header"><h3><%= translated("Merge Tags") %></h3></div>
         <div class="tags-section-content">
           <div class="merge-form">
@@ -64,7 +78,7 @@
         </div>
       </div>
 
-      <div class="tags-section">
+      <div class="tags-section" id="tags-section-sync">
         <div class="tags-section-header"><h3><%= translated("Sync") %></h3></div>
         <div class="tags-section-content">
           <button class="secondary" type="button" phx-click="sync_tags_editor"><%= translated("Discover") %></button>

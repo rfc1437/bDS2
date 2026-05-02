@@ -330,6 +330,61 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-settings-scroll-target="settings-section-ai")
   end
 
+  test "tags sidebar selections expose a scroll target for the tags editor" do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html = render_click(view, "select_view", %{"view" => "tags"})
+
+    html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='tags-merge']")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="tags-editor")
+    assert html =~ ~s(phx-hook="TagsSectionScroll")
+    assert html =~ ~s(data-selected-tags-section="merge")
+    assert html =~ ~s(data-tags-scroll-target="tags-section-merge")
+  end
+
+  test "tags discover materializes post tags and enables merge from the tags editor", %{
+    project: project
+  } do
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Tagged Post",
+               content: "Body",
+               tags: ["Alpha", "Beta"]
+             })
+
+    assert Tags.list_tags(project.id) == []
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html = render_click(view, "select_view", %{"view" => "tags"})
+
+    _html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='tags-cloud']")
+      |> render_click()
+
+    html = render_click(view, "sync_tags_editor", %{})
+
+    assert Enum.map(Tags.list_tags(project.id), & &1.name) == ["Alpha", "Beta"]
+    assert html =~ "Alpha"
+    assert html =~ "Beta"
+
+    _html = render_click(view, "toggle_tag_selection", %{"name" => "Alpha"})
+    _html = render_click(view, "toggle_tag_selection", %{"name" => "Beta"})
+    _html = render_change(view, "change_merge_target", %{"target" => "Alpha"})
+
+    html = render_click(view, "merge_tags_editor", %{})
+
+    assert Enum.map(Tags.list_tags(project.id), & &1.name) == ["Alpha"]
+    assert Repo.get!(Post, post.id).tags == ["Alpha"]
+    assert html =~ "Alpha"
+  end
+
   test "database-backed sidebar entries require confirmation before deletion", %{
     project: project,
     temp_dir: temp_dir
