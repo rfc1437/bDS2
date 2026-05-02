@@ -1652,6 +1652,7 @@ defmodule BDS.Desktop.ShellLive do
     dashboard = ShellData.dashboard(projects.active_project_id)
     git_badge_count = ShellData.git_badge_count(projects.active_project_id)
     active_view_id = Atom.to_string(workbench.active_view)
+    tab_meta = TabHelpers.sync_tab_meta(workbench, socket.assigns[:tab_meta] || %{})
 
     sidebar_data =
       ShellData.sidebar_view(
@@ -1675,6 +1676,7 @@ defmodule BDS.Desktop.ShellLive do
     task_status = localize_task_status(raw_task_status, page_language)
 
     socket
+  |> assign(:tab_meta, tab_meta)
     |> assign(:workbench, workbench)
     |> assign(:projects, projects)
     |> assign(:current_project, ShellData.current_project(projects))

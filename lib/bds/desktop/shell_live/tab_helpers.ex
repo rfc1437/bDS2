@@ -2,7 +2,7 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   @moduledoc false
 
   alias BDS.Desktop.ShellData
-  alias BDS.{AI, BoundedAtoms, Media, Posts}
+  alias BDS.{AI, BoundedAtoms, ImportDefinitions, Media, Posts, Scripts, Templates}
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Posts.Post
   alias BDS.UI.Registry
@@ -25,7 +25,21 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     end
   end
 
-  def default_tab_title(%{type: :chat, id: conversation_id}), do: chat_title(conversation_id)
+  def sync_tab_meta(%{tabs: tabs}, tab_meta) when is_list(tabs) and is_map(tab_meta) do
+    Enum.reduce(tabs, %{}, fn tab, acc ->
+      key = {tab.type, tab.id}
+      existing_meta = Map.get(tab_meta, key, %{})
+      synced_meta = merge_missing_meta(existing_meta, derived_tab_meta(tab))
+
+      if map_size(synced_meta) == 0 do
+        acc
+      else
+        Map.put(acc, key, synced_meta)
+      end
+    end)
+  end
+
+  def sync_tab_meta(_workbench, tab_meta) when is_map(tab_meta), do: tab_meta
 
   def default_tab_title(%{type: type, id: id}) do
     case Registry.editor_route(type) do
@@ -34,7 +48,6 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     end
   end
 
-  defp default_tab_subtitle(%{type: :chat}), do: translated("AI conversations")
   defp default_tab_subtitle(_tab), do: "Desktop workbench content routed through the Elixir shell."
 
   def tab_route_label(nil), do: translated("Dashboard")
@@ -67,37 +80,29 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
 
   def post_title(post_id) do
     case Posts.get_post(post_id) do
-      %Post{} = post -> post.title || post.slug || post.id
+      %Post{} = post -> post_record_title(post)
       _other -> "Post"
     end
   end
 
   def post_subtitle(post_id) do
     case Posts.get_post(post_id) do
-      %Post{} = post -> post.slug || "draft"
+      %Post{} = post -> post_record_subtitle(post)
       _other -> "draft"
     end
   end
 
   def media_title(media_id) do
     case Media.get_media(media_id) do
-      %MediaRecord{} = media -> media.title || media.filename || media.id
+      %MediaRecord{} = media -> media_record_title(media)
       _other -> "Media"
     end
   end
 
   def media_subtitle(media_id) do
     case Media.get_media(media_id) do
-      %MediaRecord{} = media -> media.filename || media.mime_type || "media"
+      %MediaRecord{} = media -> media_record_subtitle(media)
       _other -> "media"
-    end
-  end
-
-  def chat_title(conversation_id) do
-    case AI.get_chat_conversation(conversation_id) do
-      %{title: title} when is_binary(title) and title != "" -> title
-      %{id: id} when is_binary(id) and id != "" -> id
-      _other -> "Chat"
     end
   end
 
@@ -107,6 +112,119 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     case Integer.parse(to_string(value || "0")) do
       {parsed, _rest} -> parsed
       :error -> 0
+    end
+  end
+
+  defp derived_tab_meta(%{type: :post, id: post_id}) do
+    case Posts.get_post(post_id) do
+      %Post{} = post -> %{title: post_record_title(post), subtitle: post_record_subtitle(post)}
+      _other -> %{}
+    end
+  end
+
+  defp derived_tab_meta(%{type: :media, id: media_id}) do
+    case Media.get_media(media_id) do
+      %MediaRecord{} = media ->
+        %{title: media_record_title(media), subtitle: media_record_subtitle(media)}
+
+      _other ->
+        %{}
+    end
+  end
+
+  defp derived_tab_meta(%{type: :scripts, id: script_id}) do
+    case Scripts.get_script(script_id) do
+      %{title: title, id: id} ->
+        %{title: blank_to_nil(title) || id, subtitle: translated("Automation helpers")}
+
+      _other ->
+        %{}
+    end
+  end
+
+  defp derived_tab_meta(%{type: :templates, id: template_id}) do
+    case Templates.get_template(template_id) do
+      %{title: title, id: id} ->
+        %{title: blank_to_nil(title) || id, subtitle: translated("Site rendering")}
+
+      _other ->
+        %{}
+    end
+  end
+
+  defp derived_tab_meta(%{type: :chat, id: conversation_id}) do
+    case AI.get_chat_conversation(conversation_id) do
+      conversation when is_map(conversation) ->
+        %{title: chat_record_title(conversation), subtitle: translated("AI conversations")}
+
+      _other ->
+        %{}
+    end
+  end
+
+  defp derived_tab_meta(%{type: :import, id: definition_id}) do
+    case ImportDefinitions.get_definition(definition_id) do
+      %{name: name} ->
+        %{
+          title: blank_to_nil(name) || translated("importAnalysis.untitledImport"),
+          subtitle: translated("importAnalysis.headerDescription")
+        }
+
+      _other ->
+        %{}
+    end
+  end
+
+  defp derived_tab_meta(%{type: :git_diff, id: "git-working-tree"}) do
+    %{title: translated("Working tree"), subtitle: translated("Working tree and history")}
+  end
+
+  defp derived_tab_meta(_tab), do: %{}
+
+  defp merge_missing_meta(existing_meta, fresh_meta) do
+    existing_meta
+    |> maybe_put_missing(:title, Map.get(fresh_meta, :title))
+    |> maybe_put_missing(:subtitle, Map.get(fresh_meta, :subtitle))
+  end
+
+  defp maybe_put_missing(meta, key, value) do
+    cond do
+      blank_to_nil(value) == nil ->
+        meta
+
+      existing_value_present?(Map.get(meta, key)) ->
+        meta
+
+      true ->
+        Map.put(meta, key, value)
+    end
+  end
+
+  defp existing_value_present?(value) do
+    if is_binary(value), do: String.trim(value) != "", else: false
+  end
+
+  defp post_record_title(%Post{} = post), do: blank_to_nil(post.title) || blank_to_nil(post.slug) || post.id
+
+  defp post_record_subtitle(%Post{} = post), do: Atom.to_string(post.status)
+
+  defp media_record_title(%MediaRecord{} = media) do
+    blank_to_nil(media.title) || blank_to_nil(media.original_name) || media.id
+  end
+
+  defp media_record_subtitle(%MediaRecord{} = media) do
+    blank_to_nil(media.original_name) || blank_to_nil(media.mime_type) || "media"
+  end
+
+  defp chat_record_title(%{title: title, id: id}), do: blank_to_nil(title) || id
+
+  defp blank_to_nil(value) do
+    value
+    |> to_string()
+    |> String.trim()
+    |> case do
+      "" -> nil
+      trimmed -> trimmed
     end
   end
 

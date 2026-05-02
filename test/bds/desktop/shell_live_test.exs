@@ -728,6 +728,115 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert has_element?(view, ".chat-panel-title-main", "Editorial Plan")
   end
 
+  test "workbench session restore rehydrates entity tab titles from backing records", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, post} = Posts.create_post(%{project_id: project.id, title: "Restored Post"})
+
+    source_path = Path.join(temp_dir, "restored-media.txt")
+    File.write!(source_path, "media body")
+
+    assert {:ok, media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Restored Media"
+             })
+
+    assert {:ok, script} =
+             Scripts.create_script(%{
+               project_id: project.id,
+               title: "Restored Script",
+               kind: :utility,
+               content: "print(\"ok\")",
+               entrypoint: "main",
+               enabled: true
+             })
+
+    assert {:ok, template} =
+             Templates.create_template(%{
+               project_id: project.id,
+               title: "Restored Template",
+               kind: :post,
+               content: "",
+               enabled: true
+             })
+
+    assert {:ok, definition} =
+             ImportDefinitions.create_definition(%{
+               project_id: project.id,
+               name: "Restored Import"
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "Restored Chat"})
+
+    posts_dir = Path.join(temp_dir, "posts")
+    File.mkdir_p!(posts_dir)
+
+    git_file_path = Path.join(posts_dir, "restore.md")
+    File.write!(git_file_path, "Old content\n")
+    init_git_repo!(temp_dir, "initial")
+    File.write!(git_file_path, "New content\n")
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    session_payload =
+      Workbench.new()
+      |> Workbench.open_tab(:post, post.id, :pin)
+      |> Workbench.open_tab(:media, media.id, :pin)
+      |> Workbench.open_tab(:scripts, script.id, :pin)
+      |> Workbench.open_tab(:templates, template.id, :pin)
+      |> Workbench.open_tab(:import, definition.id, :pin)
+      |> Workbench.open_tab(:chat, conversation.id, :pin)
+      |> Workbench.open_tab(:git_diff, "git-working-tree", :pin)
+      |> Session.serialize()
+
+    _html = render_hook(view, "restore_workbench_session", %{"session" => session_payload})
+
+    assert has_element?(
+             view,
+             ".tab[data-tab-type='post'][data-tab-id='#{post.id}'] .tab-title",
+             "Restored Post"
+           )
+
+    assert has_element?(
+             view,
+             ".tab[data-tab-type='media'][data-tab-id='#{media.id}'] .tab-title",
+             "Restored Media"
+           )
+
+    assert has_element?(
+             view,
+             ".tab[data-tab-type='scripts'][data-tab-id='#{script.id}'] .tab-title",
+             "Restored Script"
+           )
+
+    assert has_element?(
+             view,
+             ".tab[data-tab-type='templates'][data-tab-id='#{template.id}'] .tab-title",
+             "Restored Template"
+           )
+
+    assert has_element?(
+             view,
+             ".tab[data-tab-type='import'][data-tab-id='#{definition.id}'] .tab-title",
+             "Restored Import"
+           )
+
+    assert has_element?(
+             view,
+             ".tab[data-tab-type='chat'][data-tab-id='#{conversation.id}'] .tab-title",
+             "Restored Chat"
+           )
+
+    assert has_element?(
+             view,
+             ".tab[data-tab-type='git_diff'][data-tab-id='git-working-tree'] .tab-title",
+             "Working tree"
+           )
+  end
+
   test "metadata diff refresh reruns after workbench session restore", %{project: project} do
     :ok = BDS.Tasks.clear_finished()
 
