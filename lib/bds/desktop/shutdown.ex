@@ -66,13 +66,33 @@ defmodule BDS.Desktop.Shutdown do
   defp start_shutdown_task do
     Task.start(fn ->
       MainWindow.persist_now()
+      maybe_hide_window()
+      Process.sleep(50)
       quit_module().quit()
     end)
 
     :ok
   end
 
+  defp maybe_hide_window do
+    module = window_module()
+
+    if function_exported?(module, :hide, 1) do
+      module.hide(MainWindow.window_id())
+    end
+
+    :ok
+  rescue
+    _error -> :ok
+  catch
+    :exit, _reason -> :ok
+  end
+
   defp quit_module do
     Application.get_env(:bds, :desktop_window_quit_module, Window)
+  end
+
+  defp window_module do
+    Application.get_env(:bds, :desktop_window_module, Window)
   end
 end

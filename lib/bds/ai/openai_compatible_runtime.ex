@@ -1,6 +1,8 @@
 defmodule BDS.AI.OpenAICompatibleRuntime do
   @moduledoc false
 
+  require Logger
+
   alias BDS.AI.HttpClient
 
   def list_models(endpoint, opts \\ []) when is_map(endpoint) and is_list(opts) do
@@ -38,6 +40,10 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
       }
       |> maybe_disable_thinking(request.model)
       |> maybe_put_tools(Map.get(request, :tools, []))
+
+    Logger.debug(
+      "AI OpenAI-compatible request operation=#{inspect(Map.get(request, :operation))} model=#{inspect(request.model)} url=#{url} tools=#{payload |> Map.get("tools", []) |> length()}"
+    )
 
     with {:ok, response} <- HttpClient.post(url, headers, Jason.encode!(payload)),
          200 <- response.status do

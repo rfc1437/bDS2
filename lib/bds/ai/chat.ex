@@ -385,12 +385,19 @@ defmodule BDS.AI.Chat do
 
     cond do
       chat_user_message_count(conversation_id) < 1 ->
+        Logger.debug("Chat title generation skipped reason=:no_user_messages")
         {:ok, reply}
 
       not generated_chat_title?(conversation.title, conversation.model) ->
+        Logger.debug(
+          "Chat title generation skipped reason=:conversation_already_titled title=#{inspect(conversation.title)}"
+        )
+
         {:ok, reply}
 
       true ->
+        Logger.debug("Chat title generation requested conversation_id=#{conversation_id}")
+
         case generate_chat_title(user_content, opts) do
           {:ok, title} when is_binary(title) and title != "" ->
             now = Persistence.now_ms()

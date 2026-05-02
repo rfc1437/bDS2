@@ -23,6 +23,18 @@ defmodule BDS.DesktopTest do
     end
   end
 
+  defmodule FakeWindowLifecycle do
+    def hide(window_id) do
+      send(Application.fetch_env!(:bds, :desktop_shutdown_test_pid), {:window_hide_requested, window_id})
+      :ok
+    end
+
+    def quit do
+      send(Application.fetch_env!(:bds, :desktop_shutdown_test_pid), :window_quit_requested)
+      :ok
+    end
+  end
+
   test "desktop configuration no longer uses a pending adapter" do
     assert Application.get_env(:bds, BDS.Application)[:desktop_adapter] == :desktop
   end
@@ -188,6 +200,30 @@ defmodule BDS.DesktopTest do
     end)
 
     assert :ok = BDS.Desktop.Shutdown.request_quit()
+    assert_receive :window_quit_requested
+  end
+
+  test "app-owned shutdown hides the window before hard quit" do
+    previous_module = Application.get_env(:bds, :desktop_shutdown_module)
+    previous_quit_module = Application.get_env(:bds, :desktop_window_quit_module)
+    previous_window_module = Application.get_env(:bds, :desktop_window_module)
+    previous_pid = Application.get_env(:bds, :desktop_shutdown_test_pid)
+
+    Application.put_env(:bds, :desktop_shutdown_module, BDS.Desktop.Shutdown)
+    Application.put_env(:bds, :desktop_window_quit_module, FakeWindowLifecycle)
+    Application.put_env(:bds, :desktop_window_module, FakeWindowLifecycle)
+    Application.put_env(:bds, :desktop_shutdown_test_pid, self())
+    expected_window_id = BDS.Desktop.MainWindow.window_id()
+
+    on_exit(fn ->
+      restore_env(:desktop_shutdown_module, previous_module)
+      restore_env(:desktop_window_quit_module, previous_quit_module)
+      restore_env(:desktop_window_module, previous_window_module)
+      restore_env(:desktop_shutdown_test_pid, previous_pid)
+    end)
+
+    assert :ok = BDS.Desktop.Shutdown.request_quit()
+    assert_receive {:window_hide_requested, ^expected_window_id}
     assert_receive :window_quit_requested
   end
 

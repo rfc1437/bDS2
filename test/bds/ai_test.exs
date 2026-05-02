@@ -1,7 +1,9 @@
 defmodule BDS.AITest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
   import Ecto.Query
+  require Logger
 
   alias BDS.Media.Media
   alias BDS.Persistence
@@ -342,17 +344,28 @@ defmodule BDS.AITest do
 
     {:ok, {_address, port}} = ThousandIsland.listener_info(server)
 
-    assert {:ok, %{content: "Short Title"}} =
-             BDS.AI.OpenAICompatibleRuntime.generate(
-               %{url: "http://127.0.0.1:#{port}/v1", api_key: nil},
-               %{
-                 operation: :chat_title,
-                 model: "qwen3.5-122b",
-                 messages: [%{"role" => "user", "content" => "Topic: posts per month"}],
-                 max_output_tokens: 20
-               },
-               []
-             )
+    previous_level = Logger.level()
+    Logger.configure(level: :debug)
+
+    log =
+      capture_log(fn ->
+        assert {:ok, %{content: "Short Title"}} =
+                 BDS.AI.OpenAICompatibleRuntime.generate(
+                   %{url: "http://127.0.0.1:#{port}/v1", api_key: nil},
+                   %{
+                     operation: :chat_title,
+                     model: "qwen3.5-122b",
+                     messages: [%{"role" => "user", "content" => "Topic: posts per month"}],
+                     max_output_tokens: 20
+                   },
+                   []
+                 )
+      end)
+
+    Logger.configure(level: previous_level)
+
+    assert log =~ "AI OpenAI-compatible request operation=:chat_title"
+    assert log =~ ~s(model="qwen3.5-122b")
 
     assert_received {:completion_payload, payload}
     assert payload["model"] == "qwen3.5-122b"
