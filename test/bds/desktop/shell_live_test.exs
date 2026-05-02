@@ -733,6 +733,71 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ "Desktop workbench content routed through the Elixir shell."
   end
 
+  test "native metadata diff action queues the maintenance task" do
+    :ok = BDS.Tasks.clear_finished()
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    existing_ids = MapSet.new(Enum.map(BDS.Tasks.list_tasks(), & &1.id))
+
+    _html = render_hook(view, "native_menu_action", %{"action" => "metadata_diff"})
+
+    assert %{} = new_task!(existing_ids, "Metadata Diff")
+  end
+
+  test "native new post action reuses the sidebar create flow" do
+    count_before = Repo.aggregate(Post, :count, :id)
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html = render_hook(view, "native_menu_action", %{"action" => "new_post"})
+
+    assert Repo.aggregate(Post, :count, :id) == count_before + 1
+  end
+
+  test "native save action persists the active post editor", %{project: project} do
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Draft Shell Post",
+        content: "Initial body",
+        excerpt: "Initial excerpt"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => post.id,
+        "title" => post.title,
+        "subtitle" => "draft"
+      })
+
+    _html =
+      view
+      |> form("[data-testid='post-editor-form']", %{
+        post_editor: %{
+          title: "Saved Through Menu",
+          content: "Saved body",
+          excerpt: "Saved excerpt",
+          tags: "",
+          categories: "",
+          author: "",
+          language: "en",
+          do_not_translate: "false"
+        }
+      })
+      |> render_change()
+
+    _html = render_hook(view, "native_menu_action", %{"action" => "save"})
+
+    saved_post = Posts.get_post!(post.id)
+    assert saved_post.title == "Saved Through Menu"
+    assert saved_post.content == "Saved body"
+    assert saved_post.excerpt == "Saved excerpt"
+  end
+
   test "menu editor adds a submenu, nests an entry, and saves the opml", %{
     project: project,
     temp_dir: temp_dir

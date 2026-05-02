@@ -2,6 +2,7 @@ defmodule BDS.BoundedAtoms do
   @moduledoc false
 
   alias BDS.UI.Registry
+  alias BDS.UI.MenuBar
 
   @panel_tabs [:tasks, :output, :post_links, :git_log]
   @post_statuses [:draft, :published, :archived]
@@ -37,11 +38,31 @@ defmodule BDS.BoundedAtoms do
     :view_posts,
     :view_media,
     :edit_preferences,
+    :open_in_browser,
+    :open_data_folder,
+    :preview_post,
     :edit_menu,
+    :rebuild_database,
+    :reindex_text,
+    :rebuild_embedding_index,
+    :metadata_diff,
+    :regenerate_calendar,
+    :validate_translations,
+    :find_duplicates,
+    :generate_sitemap,
+    :validate_site,
+    :upload_site,
     :documentation,
     :api_documentation,
     :close_tab
   ]
+  @menu_actions MenuBar.default_groups(dev_mode?: true)
+                |> Enum.flat_map(fn group ->
+                  Enum.flat_map(group.items, fn
+                    %{separator: true} -> []
+                    %{id: id} -> [id]
+                  end)
+                end)
 
   def atom(value, allowed, fallback \\ nil)
 
@@ -70,6 +91,7 @@ defmodule BDS.BoundedAtoms do
   def ai_endpoint(value, fallback \\ nil), do: atom(value, @ai_endpoints, fallback)
   def mcp_agent(value, fallback \\ nil), do: atom(value, @mcp_agents, fallback)
   def shell_command(value, fallback \\ nil), do: atom(value, @shell_commands, fallback)
+  def menu_action(value, fallback \\ nil), do: atom(value, @menu_actions, fallback)
 
   defp string_atom(value, allowed, fallback) do
     Enum.find(allowed, fallback, &(Atom.to_string(&1) == value))

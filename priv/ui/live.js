@@ -159,6 +159,111 @@ document.addEventListener("DOMContentLoaded", () => {
   let liquidLanguageRegistered = false;
   let markdownWithMacrosRegistered = false;
   let monacoThemeSignature = null;
+  const monacoEditors = new Map();
+
+  const activeMonacoEditor = () => {
+    for (const editor of monacoEditors.values()) {
+      if (typeof editor?.hasTextFocus === "function" && editor.hasTextFocus()) {
+        return editor;
+      }
+    }
+
+    return null;
+  };
+
+  const runMonacoEditorAction = (editor, actionId, triggerId = actionId) => {
+    if (!editor) {
+      return false;
+    }
+
+    const action = typeof editor.getAction === "function" ? editor.getAction(actionId) : null;
+
+    if (action && typeof action.run === "function") {
+      action.run();
+      return true;
+    }
+
+    if (typeof editor.trigger === "function") {
+      editor.trigger("bds-menu", triggerId, null);
+      return true;
+    }
+
+    return false;
+  };
+
+  const runDocumentCommand = (command) => {
+    if (typeof document.execCommand !== "function") {
+      return false;
+    }
+
+    try {
+      return document.execCommand(command);
+    } catch (_error) {
+      return false;
+    }
+  };
+
+  const applyAppZoom = (nextZoom) => {
+    const zoom = clamp(Math.round(nextZoom * 100) / 100, 0.5, 2);
+    window.__bdsAppZoom = zoom;
+    document.documentElement.style.zoom = String(zoom);
+  };
+
+  const runMenuRuntimeCommand = (action) => {
+    const editor = activeMonacoEditor();
+
+    switch (action) {
+      case "undo":
+        return editor ? runMonacoEditorAction(editor, "undo") : runDocumentCommand("undo");
+      case "redo":
+        return editor ? runMonacoEditorAction(editor, "redo") : runDocumentCommand("redo");
+      case "cut":
+        return editor
+          ? runMonacoEditorAction(editor, "editor.action.clipboardCutAction")
+          : runDocumentCommand("cut");
+      case "copy":
+        return editor
+          ? runMonacoEditorAction(editor, "editor.action.clipboardCopyAction")
+          : runDocumentCommand("copy");
+      case "paste":
+        return editor
+          ? runMonacoEditorAction(editor, "editor.action.clipboardPasteAction")
+          : runDocumentCommand("paste");
+      case "delete":
+        return editor ? runMonacoEditorAction(editor, "deleteLeft") : runDocumentCommand("delete");
+      case "select_all":
+        return editor
+          ? runMonacoEditorAction(editor, "editor.action.selectAll")
+          : runDocumentCommand("selectAll");
+      case "find":
+        return editor ? runMonacoEditorAction(editor, "actions.find") : false;
+      case "replace":
+        return editor ? runMonacoEditorAction(editor, "editor.action.startFindReplaceAction") : false;
+      case "reload":
+      case "force_reload":
+        window.location.reload();
+        return true;
+      case "reset_zoom":
+        applyAppZoom(1);
+        return true;
+      case "zoom_in":
+        applyAppZoom((window.__bdsAppZoom || 1) + 0.1);
+        return true;
+      case "zoom_out":
+        applyAppZoom((window.__bdsAppZoom || 1) - 0.1);
+        return true;
+      case "toggle_full_screen":
+        if (document.fullscreenElement) {
+          document.exitFullscreen?.();
+        } else {
+          document.documentElement.requestFullscreen?.();
+        }
+
+        return true;
+      default:
+        return false;
+    }
+  };
 
   const cssVar = (name, fallback) => {
     const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -612,6 +717,12 @@ document.addEventListener("DOMContentLoaded", () => {
             setMediaThumbnailLoaded(event.target, false);
           }
         };
+
+        this.handleEvent("menu-runtime-command", ({ action }) => {
+          if (action) {
+            runMenuRuntimeCommand(String(action));
+          }
+        });
 
         window.addEventListener("bds:native-menu-action", this.handleNativeMenuAction);
         window.addEventListener("keydown", this.handleShortcutKeyDown, true);
@@ -1090,6 +1201,8 @@ document.addEventListener("DOMContentLoaded", () => {
               insertSpaces: true
             });
 
+            monacoEditors.set(this.editorId || this.el.id, this.editor);
+
             this.changeSubscription = this.editor.onDidChangeModelContent(() => {
               if (this.isApplyingRemoteUpdate) {
                 return;
@@ -1140,6 +1253,7 @@ document.addEventListener("DOMContentLoaded", () => {
       destroyed() {
         window.clearTimeout(this.syncTimer);
         this.changeSubscription?.dispose();
+        monacoEditors.delete(this.editorId || this.el.id);
         this.editor?.dispose();
       }
     },

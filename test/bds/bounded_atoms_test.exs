@@ -19,6 +19,25 @@ defmodule BDS.BoundedAtomsTest do
     assert BoundedAtoms.shell_command("toggle_panel") == :toggle_panel
   end
 
+  test "accepts implemented blog menu shell commands" do
+    commands = [
+      {"preview_post", :preview_post},
+      {"rebuild_database", :rebuild_database},
+      {"reindex_text", :reindex_text},
+      {"rebuild_embedding_index", :rebuild_embedding_index},
+      {"metadata_diff", :metadata_diff},
+      {"validate_translations", :validate_translations},
+      {"find_duplicates", :find_duplicates},
+      {"generate_sitemap", :generate_sitemap},
+      {"validate_site", :validate_site},
+      {"upload_site", :upload_site}
+    ]
+
+    for {value, expected} <- commands do
+      assert BoundedAtoms.shell_command(value) == expected
+    end
+  end
+
   test "falls back without creating atoms for unknown strings" do
     assert BoundedAtoms.sidebar_view("unknown", :posts) == :posts
     assert BoundedAtoms.editor_route("unknown", :dashboard) == :dashboard

@@ -279,6 +279,19 @@ defmodule BDS.Desktop.ShellCommands do
     end)
   end
 
+  defp dispatch("regenerate_calendar", project, _params) do
+    queue_task(project, "regenerate_calendar", "Regenerate Calendar", "Generation", fn report ->
+      {:ok, generation} = Generation.generate_site(project.id, [:core], on_progress: report)
+      report.(1.0, "Calendar regenerated")
+
+      %{
+        project_id: project.id,
+        sections: generation.sections,
+        generated_count: length(generation.generated_files)
+      }
+    end)
+  end
+
   defp dispatch("repair_metadata_diff", project, params) do
     items = normalize_metadata_diff_items(BDS.MapUtils.attr(params, :items, []))
     direction = BDS.MapUtils.attr(params, :direction)

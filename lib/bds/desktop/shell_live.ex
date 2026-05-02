@@ -56,6 +56,8 @@ defmodule BDS.Desktop.ShellLive do
   alias BDS.Projects
   alias BDS.Templates
   alias BDS.UI.{Commands, MenuBar, Session, Workbench}
+  alias Desktop.OS
+  alias BDS.Desktop.Shutdown
 
   @refresh_interval 1_500
   @output_entry_limit 20
@@ -71,6 +73,44 @@ defmodule BDS.Desktop.ShellLive do
                         :api_documentation,
                         :close_tab
                       ])
+  @socket_menu_actions MapSet.new([
+                         :new_post,
+                         :import_media,
+                         :save,
+                         :publish_selected,
+                         :quit,
+                         :view_on_github,
+                         :report_issue,
+                         :about
+                       ])
+  @runtime_menu_actions MapSet.new([
+                          :undo,
+                          :redo,
+                          :cut,
+                          :copy,
+                          :paste,
+                          :delete,
+                          :select_all,
+                          :find,
+                          :replace,
+                          :reload,
+                          :force_reload,
+                          :reset_zoom,
+                          :zoom_in,
+                          :zoom_out,
+                          :toggle_full_screen
+                        ])
+
+  def supported_menu_actions do
+    @local_menu_actions
+    |> MapSet.union(@socket_menu_actions)
+    |> MapSet.union(@runtime_menu_actions)
+    |> MapSet.union(MapSet.new([:open_in_browser, :open_data_folder]))
+    |> MapSet.union(MapSet.new([:preview_post, :rebuild_database, :reindex_text]))
+    |> MapSet.union(MapSet.new([:rebuild_embedding_index, :metadata_diff, :regenerate_calendar]))
+    |> MapSet.union(MapSet.new([:validate_translations, :find_duplicates]))
+    |> MapSet.union(MapSet.new([:generate_sitemap, :validate_site, :upload_site]))
+  end
 
   embed_templates("shell_live/*")
 
@@ -392,7 +432,10 @@ defmodule BDS.Desktop.ShellLive do
     if Layout.ignore_shortcut?(params) do
       {:noreply, socket}
     else
-      {:noreply, reload_shell(socket, Commands.handle_shortcut(socket.assigns.workbench, params))}
+      case Commands.command_for_shortcut(params) do
+        nil -> {:noreply, socket}
+        action -> {:noreply, handle_menu_action(socket, action)}
+      end
     end
   end
 
@@ -1833,16 +1876,98 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp handle_native_menu_action(socket, action) do
-    with action_atom when not is_nil(action_atom) <- shell_command_atom(action) do
-      if MapSet.member?(@local_menu_actions, action_atom) do
-        reload_shell(socket, MenuBar.execute(socket.assigns.workbench, action_atom))
-      else
-        apply_shell_command(socket, action)
-      end
-    else
-      _other -> append_output_entry(socket, "Menu", "Unsupported shell command", action, "error")
+    case BoundedAtoms.menu_action(action) do
+      nil -> append_output_entry(socket, "Menu", "Unsupported shell command", action, "error")
+      action_atom -> handle_menu_action(socket, action_atom)
     end
   end
+
+  defp handle_menu_action(socket, action) when is_atom(action) do
+    cond do
+      MapSet.member?(@local_menu_actions, action) ->
+        reload_shell(socket, MenuBar.execute(socket.assigns.workbench, action))
+
+      MapSet.member?(@socket_menu_actions, action) ->
+        handle_socket_menu_action(socket, action)
+
+      MapSet.member?(@runtime_menu_actions, action) ->
+        push_event(socket, "menu-runtime-command", %{action: Atom.to_string(action)})
+
+      shell_command?(action) ->
+        apply_shell_command(socket, Atom.to_string(action))
+
+      true ->
+        append_output_entry(socket, "Menu", "Unsupported shell command", Atom.to_string(action), "error")
+    end
+  end
+
+  defp handle_socket_menu_action(socket, :new_post), do: create_sidebar_item(socket, "post")
+  defp handle_socket_menu_action(socket, :import_media), do: create_sidebar_item(socket, "media")
+  defp handle_socket_menu_action(socket, :save), do: save_current_tab(socket)
+  defp handle_socket_menu_action(socket, :publish_selected), do: publish_current_tab(socket)
+
+  defp handle_socket_menu_action(socket, :quit) do
+    Shutdown.request_quit()
+    socket
+  end
+
+  defp handle_socket_menu_action(socket, :view_on_github) do
+    OS.launch_default_browser("https://github.com/rfc1437/bDS")
+    socket
+  end
+
+  defp handle_socket_menu_action(socket, :report_issue) do
+    OS.launch_default_browser("https://github.com/rfc1437/bDS/issues")
+    socket
+  end
+
+  defp handle_socket_menu_action(socket, :about) do
+    append_output_entry(
+      socket,
+      "About",
+      "Blogging Desktop Server",
+      "Version #{Application.spec(:bds, :vsn) |> to_string()}",
+      "info"
+    )
+  end
+
+  defp shell_command?(action), do: not is_nil(shell_command_atom(action))
+
+  defp save_current_tab(%{assigns: %{current_tab: %{type: :post, id: post_id}}} = socket) do
+    PostEditor.persist_socket(socket, post_id, :save, &reload_shell/2, &append_output_entry/5)
+  end
+
+  defp save_current_tab(%{assigns: %{current_tab: %{type: :media, id: media_id}}} = socket) do
+    MediaEditor.persist_socket(socket, media_id, &reload_shell/2, &append_output_entry/5)
+  end
+
+  defp save_current_tab(%{assigns: %{current_tab: %{type: :settings}}} = socket) do
+    SettingsEditor.save_project(socket, &reload_shell/2, &append_output_entry/5)
+  end
+
+  defp save_current_tab(%{assigns: %{current_tab: %{type: :menu_editor}}} = socket) do
+    MenuEditor.toolbar_action(socket, "save", &reload_shell/2, &append_output_entry/5)
+  end
+
+  defp save_current_tab(%{assigns: %{current_tab: %{type: :tags}}} = socket) do
+    TagsEditor.save_tag(socket, &reload_shell/2, &append_output_entry/5)
+  end
+
+  defp save_current_tab(%{assigns: %{current_tab: %{type: :scripts}}} = socket) do
+    CodeEntityEditor.save_script(socket, &reload_shell/2, &append_output_entry/5)
+  end
+
+  defp save_current_tab(%{assigns: %{current_tab: %{type: :templates}}} = socket) do
+    CodeEntityEditor.save_template(socket, &reload_shell/2, &append_output_entry/5)
+  end
+
+  defp save_current_tab(socket), do: reload_shell(socket, socket.assigns.workbench)
+
+  defp publish_current_tab(%{assigns: %{current_tab: %{type: :post, id: post_id}}} = socket) do
+    PostEditor.persist_socket(socket, post_id, :publish, &reload_shell/2, &append_output_entry/5)
+  end
+
+  defp publish_current_tab(socket), do: reload_shell(socket, socket.assigns.workbench)
 
   defp apply_shell_command(socket, action, params \\ %{}),
     do: ShellCommandRunner.execute(socket, action, params, shell_command_callbacks())

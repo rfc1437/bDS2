@@ -131,6 +131,24 @@ defmodule BDS.DesktopTest do
     assert menu_item(groups, :metadata_diff).shortcut == nil
   end
 
+  test "prod forwarded menu surface is covered by the shell dispatcher except unresolved filler action" do
+    forwarded_actions =
+      BDS.Desktop.MenuBar.groups(dev_mode?: false)
+      |> Enum.flat_map(fn group ->
+        group.items
+        |> Enum.reject(&Map.get(&1, :separator, false))
+        |> Enum.map(& &1.id)
+      end)
+      |> MapSet.new()
+
+    unsupported_actions =
+      forwarded_actions
+      |> MapSet.difference(BDS.Desktop.ShellLive.supported_menu_actions())
+      |> Enum.sort()
+
+    assert unsupported_actions == [:fill_missing_translations]
+  end
+
   test "native menu quit requests app-owned shutdown" do
     previous_module = Application.get_env(:bds, :desktop_shutdown_module)
     previous_pid = Application.get_env(:bds, :desktop_shutdown_test_pid)
