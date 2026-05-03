@@ -3,13 +3,11 @@ defmodule BDS.Desktop.ShellLive do
 
   use Phoenix.LiveView
 
-  require Logger
-
   import Phoenix.HTML
 
-  alias BDS.{AI, BoundedAtoms, ImportDefinitions, Media, Metadata, Posts, Scripts}
+  alias BDS.{AI, BoundedAtoms}
   alias BDS.CliSync.Watcher
-  alias BDS.Desktop.{FolderPicker, Overlay, ShellData, UILocale}
+  alias BDS.Desktop.{FolderPicker, ShellData, UILocale}
 
   alias BDS.Desktop.ShellLive.{
     ChatEditor,
@@ -17,8 +15,10 @@ defmodule BDS.Desktop.ShellLive do
     MediaEditor,
     MenuEditor,
     MiscEditor,
+    OverlayManager,
     ScriptEditor,
     SettingsEditor,
+    SidebarDelete,
     TagsEditor,
     TemplateEditor
   }
@@ -48,15 +48,12 @@ defmodule BDS.Desktop.ShellLive do
 
   import TabHelpers,
     only: [
-      tab_title: 2,
-      tab_subtitle: 2,
       tab_id_for_route: 2,
       tab_intent: 2,
       sidebar_route_atom: 1
     ]
 
   alias BDS.Projects
-  alias BDS.Templates
   alias BDS.UI.{Commands, MenuBar, Session, Workbench}
   alias Desktop.OS
   alias BDS.Desktop.Shutdown
@@ -263,7 +260,7 @@ defmodule BDS.Desktop.ShellLive do
         %{"route" => route, "id" => id} = params,
         socket
       ) do
-    {:noreply, request_sidebar_delete(socket, route, id, Map.get(params, "title"))}
+    {:noreply, SidebarDelete.request_delete(socket, route, id, Map.get(params, "title"), sidebar_delete_callbacks())}
   end
 
   def handle_event("toggle_offline_mode", _params, socket) do
@@ -310,262 +307,50 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, apply_shell_command(socket, action)}
   end
 
-  def handle_event("open_overlay", %{"kind" => kind}, socket) do
-    socket =
-      case socket.assigns[:current_tab] do
-        %{type: :post, id: post_id} when kind in ["ai_suggestions", "language_picker"] ->
-          send_update(__MODULE__.PostEditor, id: "post-editor-#{post_id}", action: :close_quick_actions)
-          socket
+  def handle_event("open_overlay", params, socket),
+    do: OverlayManager.handle_event("open_overlay", params, socket, overlay_callbacks())
 
-        %{type: :media, id: media_id}
-        when kind in ["ai_suggestions", "language_picker", "confirm_delete"] ->
-          send_update(__MODULE__.MediaEditor, id: "media-editor-#{media_id}", action: :close_quick_actions)
-          socket
+  def handle_event("close_overlay", params, socket),
+    do: OverlayManager.handle_event("close_overlay", params, socket, overlay_callbacks())
 
-        _other ->
-          socket
-      end
+  def handle_event("overlay_keydown", params, socket),
+    do: OverlayManager.handle_event("overlay_keydown", params, socket, overlay_callbacks())
 
-    overlay =
-      with overlay_kind when not is_nil(overlay_kind) <- ShellOverlayComponents.kind(kind),
-           %{type: route} <- socket.assigns[:current_tab] do
-        tab = socket.assigns.current_tab
-        title = tab_title(tab, socket.assigns.tab_meta)
-        subtitle = tab_subtitle(tab, socket.assigns.tab_meta)
+  def handle_event("overlay_toggle_ai_field", params, socket),
+    do: OverlayManager.handle_event("overlay_toggle_ai_field", params, socket, overlay_callbacks())
 
-        Overlay.open(
-          route,
-          overlay_kind,
-          ShellOverlayComponents.context(socket.assigns, title, subtitle)
-        )
-      end
+  def handle_event("overlay_set_search", params, socket),
+    do: OverlayManager.handle_event("overlay_set_search", params, socket, overlay_callbacks())
 
-    socket = assign(socket, :shell_overlay, overlay)
+  def handle_event("overlay_set_tab", params, socket),
+    do: OverlayManager.handle_event("overlay_set_tab", params, socket, overlay_callbacks())
 
-    socket =
-      if kind == "ai_suggestions" and not is_nil(overlay) do
-        if socket.assigns.offline_mode do
-          socket
-          |> assign(:shell_overlay, nil)
-          |> append_output_entry(
-            translated("AI Suggestions"),
-            translated("Automatic AI actions stay gated by airplane mode."),
-            nil,
-            "info"
-          )
-        else
-          spawn_ai_suggestions_task(socket)
-        end
-      else
-        socket
-      end
+  def handle_event("overlay_update_form", params, socket),
+    do: OverlayManager.handle_event("overlay_update_form", params, socket, overlay_callbacks())
 
-    {:noreply, socket}
-  end
+  def handle_event("overlay_select_result", params, socket),
+    do: OverlayManager.handle_event("overlay_select_result", params, socket, overlay_callbacks())
 
-  def handle_event("close_overlay", _params, socket) do
-    {:noreply, assign(socket, :shell_overlay, nil)}
-  end
+  def handle_event("overlay_insert_external", params, socket),
+    do: OverlayManager.handle_event("overlay_insert_external", params, socket, overlay_callbacks())
 
-  def handle_event("overlay_keydown", %{"key" => key}, socket) do
-    socket =
-      case {socket.assigns[:shell_overlay], key} do
-        {nil, _other} ->
-          socket
+  def handle_event("overlay_select_language", params, socket),
+    do: OverlayManager.handle_event("overlay_select_language", params, socket, overlay_callbacks())
 
-        {_overlay, "Escape"} ->
-          assign(socket, :shell_overlay, nil)
+  def handle_event("overlay_confirm", params, socket),
+    do: OverlayManager.handle_event("overlay_confirm", params, socket, overlay_callbacks())
 
-        {%{kind: :gallery} = overlay, "ArrowLeft"} ->
-          assign(socket, :shell_overlay, Overlay.lightbox_previous(overlay))
+  def handle_event("overlay_select_gallery_image", params, socket),
+    do: OverlayManager.handle_event("overlay_select_gallery_image", params, socket, overlay_callbacks())
 
-        {%{kind: :gallery} = overlay, "ArrowRight"} ->
-          assign(socket, :shell_overlay, Overlay.lightbox_next(overlay))
+  def handle_event("overlay_close_lightbox", params, socket),
+    do: OverlayManager.handle_event("overlay_close_lightbox", params, socket, overlay_callbacks())
 
-        _other ->
-          socket
-      end
+  def handle_event("overlay_lightbox_previous", params, socket),
+    do: OverlayManager.handle_event("overlay_lightbox_previous", params, socket, overlay_callbacks())
 
-    {:noreply, socket}
-  end
-
-  def handle_event("overlay_toggle_ai_field", %{"key" => key}, socket) do
-    {:noreply, update_shell_overlay(socket, &Overlay.toggle_ai_field(&1, key))}
-  end
-
-  def handle_event("overlay_set_search", %{"overlay" => %{"query" => query}}, socket) do
-    {:noreply, update_shell_overlay(socket, &Overlay.set_search_query(&1, query))}
-  end
-
-  def handle_event("overlay_set_tab", %{"tab" => tab}, socket) do
-    {:noreply,
-     update_shell_overlay(socket, &Overlay.set_active_tab(&1, ShellOverlayComponents.tab(tab)))}
-  end
-
-  def handle_event("overlay_update_form", %{"overlay" => params}, socket) do
-    socket =
-      socket
-      |> update_shell_overlay(
-        &Overlay.update_form_value(&1, :external_url, Map.get(params, "url", ""))
-      )
-      |> update_shell_overlay(
-        &Overlay.update_form_value(&1, :external_text, Map.get(params, "text", ""))
-      )
-
-    {:noreply, socket}
-  end
-
-  def handle_event("overlay_select_result", %{"id" => id}, socket) do
-    overlay = socket.assigns[:shell_overlay]
-    current_tab = socket.assigns[:current_tab]
-
-    socket =
-      case {overlay, current_tab} do
-        {%{kind: :insert_link}, %{type: :post, id: post_id}} ->
-          case Overlay.insert_link_result(overlay, id) do
-            nil ->
-              socket
-
-            result ->
-              send(self(), {:post_editor_insert_content, post_id, ShellOverlayComponents.markdown_link(result.title, result.canonical_url)})
-              socket
-          end
-
-        {%{kind: :insert_media}, %{type: :post, id: post_id}} ->
-          case Overlay.insert_media_result(overlay, id) do
-            nil ->
-              socket
-
-            result ->
-              syntax =
-                if result.is_image do
-                  "![#{result.title}](bds-media://#{result.media_id})"
-                else
-                  "[#{result.original_name}](bds-media://#{result.media_id})"
-                end
-
-              send(self(), {:post_editor_insert_content, post_id, syntax})
-              socket
-          end
-
-        _other ->
-          socket
-      end
-
-    {:noreply, socket}
-  end
-
-  def handle_event("overlay_insert_external", _params, socket) do
-    current_tab = socket.assigns[:current_tab]
-
-    socket =
-      case {socket.assigns[:shell_overlay], current_tab} do
-        {%{kind: :insert_link} = overlay, %{type: :post, id: post_id}} ->
-          details =
-            case {overlay.external_url, String.trim(overlay.external_text || "")} do
-              {"", _text} -> nil
-              {url, ""} -> url
-              {url, text} -> ShellOverlayComponents.markdown_link(text, url)
-            end
-
-          if details do
-            send(self(), {:post_editor_insert_content, post_id, details})
-          end
-
-          socket
-
-        _other ->
-          socket
-      end
-
-    {:noreply, socket}
-  end
-
-  def handle_event("overlay_select_language", %{"code" => code}, socket) do
-    current_tab = socket.assigns[:current_tab]
-
-    socket =
-      case {socket.assigns[:shell_overlay], current_tab} do
-        {%{kind: :language_picker}, %{type: :post, id: post_id}} ->
-          send(self(), {:post_editor_translate, post_id, code})
-          socket
-
-        {%{kind: :language_picker}, %{type: :media, id: media_id}} ->
-          send_update(MediaEditor, id: "media-editor-#{media_id}", action: :translate, language: code)
-          socket
-
-        _other ->
-          socket
-      end
-
-    {:noreply, socket}
-  end
-
-  def handle_event("overlay_confirm", _params, socket) do
-    current_tab = socket.assigns[:current_tab]
-
-    socket =
-      case {socket.assigns[:shell_overlay], current_tab} do
-        {%{kind: :confirm_delete, delete_action: %{source: :sidebar, route: route, id: id}}, _tab} ->
-          execute_sidebar_delete(socket, route, id)
-
-        {%{kind: :ai_suggestions} = overlay, %{type: :post, id: post_id}} ->
-          send(self(), {:post_editor_apply_ai_suggestions, post_id, Overlay.selected_ai_fields(overlay)})
-          socket
-
-        {%{kind: :ai_suggestions} = overlay, %{type: :media, id: media_id}} ->
-          send_update(MediaEditor, id: "media-editor-#{media_id}",
-            action: :apply_ai_suggestions,
-            fields: Overlay.selected_ai_fields(overlay)
-          )
-
-          socket
-
-        {%{kind: :confirm_delete}, %{type: :media, id: media_id}} ->
-          case Media.delete_media(media_id) do
-            {:ok, :deleted} ->
-              workbench = Workbench.close_tab(socket.assigns.workbench, :media, media_id)
-
-              socket
-              |> assign(:shell_overlay, nil)
-              |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:media, media_id}))
-              |> reload_shell(workbench)
-
-            {:error, reason} ->
-              socket
-              |> assign(:shell_overlay, nil)
-              |> append_output_entry(translated("Delete Media"), inspect(reason), nil, "error")
-              |> reload_shell(socket.assigns.workbench)
-          end
-
-        {%{kind: :confirm_delete, title: title, entity_name: entity_name}, _tab} ->
-          close_overlay_with_output(socket, title, entity_name)
-
-        {%{kind: :confirm_dialog, title: title, message: message}, _tab} ->
-          close_overlay_with_output(socket, title, message)
-
-        _other ->
-          socket
-      end
-
-    {:noreply, socket}
-  end
-
-  def handle_event("overlay_select_gallery_image", %{"id" => id}, socket) do
-    {:noreply, update_shell_overlay(socket, &Overlay.select_gallery_image(&1, id))}
-  end
-
-  def handle_event("overlay_close_lightbox", _params, socket) do
-    {:noreply, update_shell_overlay(socket, &Overlay.close_lightbox/1)}
-  end
-
-  def handle_event("overlay_lightbox_previous", _params, socket) do
-    {:noreply, update_shell_overlay(socket, &Overlay.lightbox_previous/1)}
-  end
-
-  def handle_event("overlay_lightbox_next", _params, socket) do
-    {:noreply, update_shell_overlay(socket, &Overlay.lightbox_next/1)}
-  end
+  def handle_event("overlay_lightbox_next", params, socket),
+    do: OverlayManager.handle_event("overlay_lightbox_next", params, socket, overlay_callbacks())
 
   def handle_event("toggle_project_menu", _params, socket) do
     {:noreply, assign(socket, :project_menu_open, not socket.assigns.project_menu_open)}
@@ -928,67 +713,11 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_info({:ai_suggestions_result, type, id, result}, socket) do
-    socket =
-      case socket.assigns[:shell_overlay] do
-        %{kind: :ai_suggestions} = overlay ->
-          current_tab = socket.assigns.current_tab
-
-          if current_tab && current_tab.type == type && current_tab.id == id do
-            suggestions =
-              case type do
-                :post ->
-                  %{
-                    "title" => result.title,
-                    "excerpt" => result.excerpt,
-                    "slug" => result.slug
-                  }
-
-                :media ->
-                  %{
-                    "title" => result.title,
-                    "alt" => result.alt,
-                    "caption" => result.caption
-                  }
-              end
-
-            assign(socket, :shell_overlay, Overlay.set_ai_suggestions(overlay, suggestions))
-          else
-            socket
-          end
-
-        _other ->
-          socket
-      end
-
-    {:noreply, socket}
+    OverlayManager.handle_info({:ai_suggestions_result, type, id, result}, socket)
   end
 
   def handle_info({:ai_suggestions_error, type, id, reason}, socket) do
-    Logger.error("AI suggestions error type=#{type} id=#{id} reason=#{inspect(reason)}")
-
-    socket =
-      case socket.assigns[:shell_overlay] do
-        %{kind: :ai_suggestions} = overlay ->
-          current_tab = socket.assigns.current_tab
-
-          if current_tab && current_tab.type == type && current_tab.id == id do
-            message =
-              if is_map(reason) and Map.has_key?(reason, :kind) do
-                "#{reason.kind}: #{inspect(Map.drop(reason, [:kind]))}"
-              else
-                inspect(reason)
-              end
-
-            assign(socket, :shell_overlay, Overlay.set_ai_suggestions_error(overlay, message))
-          else
-            socket
-          end
-
-        _other ->
-          socket
-      end
-
-    {:noreply, socket}
+    OverlayManager.handle_info({:ai_suggestions_error, type, id, reason}, socket)
   end
 
   def handle_info({:media_editor_output, title, message, level}, socket) do
@@ -1336,52 +1065,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp shell_command_atom(action), do: ShellCommandRunner.shell_command_atom(action)
 
-  defp spawn_ai_suggestions_task(socket) do
-    current_tab = socket.assigns.current_tab
-    language = ai_suggestions_language(socket)
-
-    case current_tab do
-      %{type: :post, id: post_id} ->
-        parent = self()
-
-        Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
-          case AI.analyze_post(post_id, language: language) do
-            {:ok, result} ->
-              send(parent, {:ai_suggestions_result, :post, post_id, result})
-
-            {:error, reason} ->
-              send(parent, {:ai_suggestions_error, :post, post_id, reason})
-          end
-        end)
-
-      %{type: :media, id: media_id} ->
-        parent = self()
-
-        Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
-          case AI.analyze_image(media_id, language: language) do
-            {:ok, result} ->
-              send(parent, {:ai_suggestions_result, :media, media_id, result})
-
-            {:error, reason} ->
-              send(parent, {:ai_suggestions_error, :media, media_id, reason})
-          end
-        end)
-
-      _other ->
-        :ok
-    end
-
-    socket
-  end
-
-  defp ai_suggestions_language(socket) do
-    active_project_id = socket.assigns.projects.active_project_id
-    {:ok, metadata} = Metadata.get_project_metadata(active_project_id)
-    metadata.main_language || "en"
-  rescue
-    _error -> "en"
-  end
-
   defp mac_ui? do
     case Application.get_env(:bds, :shell_platform) do
       nil -> match?({:unix, :darwin}, :os.type())
@@ -1389,240 +1072,19 @@ defmodule BDS.Desktop.ShellLive do
     end
   end
 
-  defp update_shell_overlay(socket, updater),
-    do: ChatSurface.update_shell_overlay(socket, updater)
+  defp overlay_callbacks,
+    do: %{
+      reload: &reload_shell/2,
+      append_output: &append_output_entry/5,
+      execute_sidebar_delete: fn socket, route, id ->
+        SidebarDelete.execute_delete(socket, route, id, sidebar_delete_callbacks())
+      end
+    }
 
-  defp close_overlay_with_output(socket, title, details) do
-    socket
-    |> append_output_entry(title, translated("Command completed"), details)
-    |> assign(:shell_overlay, nil)
-  end
+  defp sidebar_delete_callbacks,
+    do: %{
+      reload: &reload_shell/2,
+      append_output: &append_output_entry/5
+    }
 
-  defp request_sidebar_delete(socket, route, id, fallback_title) do
-    case sidebar_delete_target(socket, route, id, fallback_title) do
-      {:ok, entity_name} ->
-        assign(socket, :shell_overlay, %{
-          kind: :confirm_delete,
-          title: sidebar_delete_title(route),
-          entity_name: entity_name,
-          entity_type: route,
-          reference_count: 0,
-          reference_list: [],
-          delete_action: %{source: :sidebar, route: route, id: id}
-        })
-
-      {:error, reason} ->
-        socket
-        |> assign(:shell_overlay, nil)
-        |> append_output_entry(sidebar_delete_title(route), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp execute_sidebar_delete(socket, route, id) do
-    case route do
-      "post" ->
-        case Posts.delete_post(id) do
-          {:ok, :deleted} ->
-            workbench = BDS.UI.Workbench.close_tab(socket.assigns.workbench, :post, id)
-
-            socket
-            |> assign(:shell_overlay, nil)
-            |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:post, id}))
-            |> reload_shell(workbench)
-
-          {:error, reason} ->
-            socket
-            |> assign(:shell_overlay, nil)
-            |> append_output_entry(sidebar_delete_title("post"), inspect(reason), nil, "error")
-            |> reload_shell(socket.assigns.workbench)
-        end
-
-      "media" ->
-        case Media.delete_media(id) do
-          {:ok, :deleted} ->
-            workbench = Workbench.close_tab(socket.assigns.workbench, :media, id)
-
-            socket
-            |> assign(:shell_overlay, nil)
-            |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:media, id}))
-            |> reload_shell(workbench)
-
-          {:error, reason} ->
-            socket
-            |> assign(:shell_overlay, nil)
-            |> append_output_entry(translated("Delete Media"), inspect(reason), nil, "error")
-            |> reload_shell(socket.assigns.workbench)
-        end
-
-      "scripts" ->
-        delete_sidebar_script(socket, id)
-
-      "templates" ->
-        delete_sidebar_template(socket, id)
-
-      "chat" ->
-        delete_sidebar_chat(socket, id)
-
-      "import" ->
-        delete_sidebar_import(socket, id)
-
-      _other ->
-        socket
-        |> assign(:shell_overlay, nil)
-        |> append_output_entry(translated("Delete"), inspect(:unsupported_route), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp delete_sidebar_script(socket, script_id) do
-    case Scripts.delete_script(script_id) do
-      {:ok, :deleted} ->
-        workbench = Workbench.close_tab(socket.assigns.workbench, :scripts, script_id)
-
-        socket
-        |> assign(:shell_overlay, nil)
-        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:scripts, script_id}))
-        |> reload_shell(workbench)
-
-      {:error, reason} ->
-        socket
-        |> assign(:shell_overlay, nil)
-        |> append_output_entry(sidebar_delete_title("scripts"), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp delete_sidebar_template(socket, template_id) do
-    case Templates.delete_template(template_id, force: true) do
-      {:ok, :deleted} ->
-        workbench = Workbench.close_tab(socket.assigns.workbench, :templates, template_id)
-
-        socket
-        |> assign(:shell_overlay, nil)
-        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:templates, template_id}))
-        |> reload_shell(workbench)
-
-      {:error, reason} ->
-        socket
-        |> assign(:shell_overlay, nil)
-        |> append_output_entry(sidebar_delete_title("templates"), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp delete_sidebar_chat(socket, conversation_id) do
-    case AI.delete_chat_conversation(conversation_id) do
-      {:ok, :deleted} ->
-        workbench = Workbench.close_tab(socket.assigns.workbench, :chat, conversation_id)
-
-        socket
-        |> assign(:shell_overlay, nil)
-        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:chat, conversation_id}))
-        |> reload_shell(workbench)
-
-      {:error, reason} ->
-        socket
-        |> assign(:shell_overlay, nil)
-        |> append_output_entry(sidebar_delete_title("chat"), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp delete_sidebar_import(socket, definition_id) do
-    case ImportDefinitions.delete_definition(definition_id) do
-      {:ok, :deleted} ->
-        workbench = Workbench.close_tab(socket.assigns.workbench, :import, definition_id)
-
-        socket
-        |> assign(:shell_overlay, nil)
-        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:import, definition_id}))
-        |> reload_shell(workbench)
-
-      {:error, reason} ->
-        socket
-        |> assign(:shell_overlay, nil)
-        |> append_output_entry(sidebar_delete_title("import"), inspect(reason), nil, "error")
-        |> reload_shell(socket.assigns.workbench)
-    end
-  end
-
-  defp sidebar_delete_target(socket, route, id, fallback_title) do
-    active_project_id = socket.assigns.projects.active_project_id
-
-    case route do
-      "post" ->
-        case Posts.get_post(id) do
-          %{project_id: ^active_project_id} = post ->
-            {:ok, present_title(fallback_title) || present_title(post.title) || present_title(post.slug) || id}
-
-          _other ->
-            {:error, :not_found}
-        end
-
-      "media" ->
-        case Media.get_media(id) do
-          %{project_id: ^active_project_id} = media ->
-            {:ok,
-             present_title(fallback_title) || present_title(media.title) ||
-               present_title(media.original_name) || id}
-
-          _other ->
-            {:error, :not_found}
-        end
-
-      "scripts" ->
-        case Scripts.get_script(id) do
-          %{project_id: ^active_project_id} = script ->
-            {:ok, present_title(fallback_title) || present_title(script.title) || id}
-
-          _other ->
-            {:error, :not_found}
-        end
-
-      "templates" ->
-        case Templates.get_template(id) do
-          %{project_id: ^active_project_id} = template ->
-            {:ok, present_title(fallback_title) || present_title(template.title) || id}
-
-          _other ->
-            {:error, :not_found}
-        end
-
-      "chat" ->
-        case AI.get_chat_conversation(id) do
-          %{title: title} -> {:ok, present_title(fallback_title) || present_title(title) || id}
-          _other -> {:error, :not_found}
-        end
-
-      "import" ->
-        case ImportDefinitions.get_definition(id) do
-          %{project_id: ^active_project_id} = definition ->
-            {:ok, present_title(fallback_title) || present_title(definition.name) || id}
-
-          _other ->
-            {:error, :not_found}
-        end
-
-      _other ->
-        {:error, :unsupported_route}
-    end
-  end
-
-  defp sidebar_delete_title("chat"), do: translated("sidebar.chat.deleteConversation")
-  defp sidebar_delete_title("post"), do: translated("Delete") <> " " <> translated("Post")
-  defp sidebar_delete_title("media"), do: translated("Delete") <> " " <> translated("Media")
-  defp sidebar_delete_title("scripts"), do: translated("Delete") <> " " <> translated("Script")
-  defp sidebar_delete_title("templates"), do: translated("Delete") <> " " <> translated("Template")
-  defp sidebar_delete_title("import"), do: translated("Delete") <> " " <> translated("Import")
-  defp sidebar_delete_title(_route), do: translated("Delete")
-
-  defp present_title(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp present_title(_value), do: nil
 end
