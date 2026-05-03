@@ -161,13 +161,7 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:tab_meta, %{})
      |> assign(:project_menu_open, false)
       |> assign(:sidebar_filters_by_view, %{})
-      |> assign(:sidebar_filter_panels, %{})
-      |> assign(:media_editor_drafts, %{})
-     |> assign(:media_editor_quick_actions_open, %{})
-     |> assign(:media_editor_post_pickers_open, %{})
-      |> assign(:media_editor_post_picker_queries, %{})
-      |> assign(:media_editor_save_states, %{})
-      |> assign(:media_editor_translation_forms, %{})
+       |> assign(:sidebar_filter_panels, %{})
      |> assign(:chat_editor_inputs, %{})
      |> assign(:chat_model_selectors_open, %{})
      |> assign(:chat_editor_requests, %{})
@@ -329,116 +323,6 @@ defmodule BDS.Desktop.ShellLive do
       |> Workbench.set_panel_tab(:tasks)
 
     {:noreply, reload_shell(socket, workbench)}
-  end
-
-  def handle_event("change_media_editor", %{"media_editor" => params}, socket) do
-    {:noreply, MediaEditor.update(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("save_media_editor", %{"id" => media_id}, socket) do
-    {:noreply,
-     MediaEditor.persist_socket(socket, media_id, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("toggle_media_editor_quick_actions", %{"id" => media_id}, socket) do
-    {:noreply, MediaEditor.toggle_quick_actions(socket, media_id, &reload_shell/2)}
-  end
-
-  def handle_event("replace_media_editor_file", %{"id" => media_id}, socket) do
-    {:noreply,
-     MediaEditor.replace_file(socket, media_id, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("detect_media_editor_language", %{"id" => media_id}, socket) do
-    {:noreply,
-     MediaEditor.detect_language(socket, media_id, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("toggle_media_post_picker", %{"id" => media_id}, socket) do
-    {:noreply, MediaEditor.toggle_post_picker(socket, media_id, &reload_shell/2)}
-  end
-
-  def handle_event(
-        "change_media_post_picker",
-        %{"id" => media_id, "media_post_picker" => %{"query" => query}},
-        socket
-      ) do
-    {:noreply, MediaEditor.set_post_picker_query(socket, media_id, query, &reload_shell/2)}
-  end
-
-  def handle_event("link_media_to_post", %{"id" => media_id, "post-id" => post_id}, socket) do
-    {:noreply,
-     MediaEditor.link_post(socket, media_id, post_id, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("unlink_media_from_post", %{"id" => media_id, "post-id" => post_id}, socket) do
-    {:noreply,
-     MediaEditor.unlink_post(socket, media_id, post_id, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("edit_media_translation", %{"id" => media_id, "language" => language}, socket) do
-    {:noreply, MediaEditor.edit_translation(socket, media_id, language, &reload_shell/2)}
-  end
-
-  def handle_event("change_media_translation", %{"media_translation" => params}, socket) do
-    case socket.assigns.current_tab do
-      %{type: :media, id: media_id} ->
-        {:noreply, MediaEditor.update_translation(socket, media_id, params, &reload_shell/2)}
-
-      _other ->
-        {:noreply, socket}
-    end
-  end
-
-  def handle_event("save_media_translation", %{"id" => media_id}, socket) do
-    {:noreply,
-     MediaEditor.save_translation(socket, media_id, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event(
-        "refresh_media_translation",
-        %{"id" => media_id, "language" => language},
-        socket
-      ) do
-    {:noreply,
-     MediaEditor.refresh_translation(
-       socket,
-       media_id,
-       language,
-       &reload_shell/2,
-       &append_output_entry/5
-     )}
-  end
-
-  def handle_event(
-        "delete_media_translation",
-        %{"id" => media_id, "language" => language},
-        socket
-      ) do
-    {:noreply,
-     MediaEditor.delete_translation(
-       socket,
-       media_id,
-       language,
-       &reload_shell/2,
-       &append_output_entry/5
-     )}
-  end
-
-  def handle_event("close_media_translation_editor", _params, socket) do
-    case socket.assigns.current_tab do
-      %{type: :media, id: media_id} ->
-        {:noreply,
-         socket
-         |> assign(
-           :media_editor_translation_forms,
-           Map.delete(socket.assigns.media_editor_translation_forms, media_id)
-         )
-         |> reload_shell(socket.assigns.workbench)}
-
-      _other ->
-        {:noreply, socket}
-    end
   end
 
   def handle_event("settings_shell_command", %{"action" => action}, socket) do
@@ -693,11 +577,8 @@ defmodule BDS.Desktop.ShellLive do
 
         %{type: :media, id: media_id}
         when kind in ["ai_suggestions", "language_picker", "confirm_delete"] ->
-          assign(
-            socket,
-            :media_editor_quick_actions_open,
-            Map.put(socket.assigns.media_editor_quick_actions_open, media_id, false)
-          )
+          send_update(__MODULE__.MediaEditor, id: "media-editor-#{media_id}", action: :close_quick_actions)
+          socket
 
         _other ->
           socket
@@ -868,7 +749,8 @@ defmodule BDS.Desktop.ShellLive do
           socket
 
         {%{kind: :language_picker}, %{type: :media, id: media_id}} ->
-          MediaEditor.translate(socket, media_id, code, &reload_shell/2, &append_output_entry/5)
+          send_update(MediaEditor, id: "media-editor-#{media_id}", action: :translate, language: code)
+          socket
 
         _other ->
           socket
@@ -890,16 +772,29 @@ defmodule BDS.Desktop.ShellLive do
           socket
 
         {%{kind: :ai_suggestions} = overlay, %{type: :media, id: media_id}} ->
-          MediaEditor.apply_ai_suggestions(
-            socket,
-            media_id,
-            Overlay.selected_ai_fields(overlay),
-            &reload_shell/2,
-            &append_output_entry/5
+          send_update(MediaEditor, id: "media-editor-#{media_id}",
+            action: :apply_ai_suggestions,
+            fields: Overlay.selected_ai_fields(overlay)
           )
 
+          socket
+
         {%{kind: :confirm_delete}, %{type: :media, id: media_id}} ->
-          MediaEditor.delete_socket(socket, media_id, &reload_shell/2, &append_output_entry/5)
+          case Media.delete_media(media_id) do
+            {:ok, :deleted} ->
+              workbench = Workbench.close_tab(socket.assigns.workbench, :media, media_id)
+
+              socket
+              |> assign(:shell_overlay, nil)
+              |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:media, media_id}))
+              |> reload_shell(workbench)
+
+            {:error, reason} ->
+              socket
+              |> assign(:shell_overlay, nil)
+              |> append_output_entry(translated("Delete Media"), inspect(reason), nil, "error")
+              |> reload_shell(socket.assigns.workbench)
+          end
 
         {%{kind: :confirm_delete, title: title, entity_name: entity_name}, _tab} ->
           close_overlay_with_output(socket, title, entity_name)
@@ -1304,6 +1199,28 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, socket}
   end
 
+  def handle_info({:media_editor_output, title, message, level}, socket) do
+    {:noreply, append_output_entry(socket, title, message, nil, level)}
+  end
+
+  def handle_info({:media_editor_dirty, media_id, dirty?}, socket) do
+    workbench =
+      if dirty? do
+        Workbench.mark_dirty(socket.assigns.workbench, :media, media_id)
+      else
+        Workbench.clear_dirty(socket.assigns.workbench, :media, media_id)
+      end
+
+    {:noreply, assign(socket, :workbench, workbench)}
+  end
+
+  def handle_info({:media_editor_tab_meta, media_id, title, subtitle}, socket) do
+    tab_meta =
+      Map.put(socket.assigns.tab_meta, {:media, media_id}, %{title: title, subtitle: subtitle})
+
+    {:noreply, assign(socket, :tab_meta, tab_meta)}
+  end
+
   def handle_info(:reload_shell, socket) do
     {:noreply, reload_shell(socket, socket.assigns.workbench)}
   end
@@ -1380,7 +1297,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:menu_groups, socket.assigns[:menu_groups] || TitlebarMenu.groups())
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
     |> assign(:current_tab, current_tab(workbench))
-    |> assign_media_editor()
     |> assign_chat_editor()
     |> assign_import_editor()
     |> assign_misc_editor()
@@ -1423,10 +1339,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp current_tab(%{tabs: tabs, active_tab: {type, id}}) do
     Enum.find(tabs, &(&1.type == type and &1.id == id))
-  end
-
-  defp assign_media_editor(socket) do
-    MediaEditor.assign_socket(socket)
   end
 
   defp assign_chat_editor(socket) do
@@ -1594,7 +1506,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :media, id: media_id}}} = socket) do
-    MediaEditor.persist_socket(socket, media_id, &reload_shell/2, &append_output_entry/5)
+    send_update(MediaEditor, id: "media-editor-#{media_id}", action: :save)
+    socket
   end
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :settings}}} = socket) do
@@ -1740,9 +1653,21 @@ defmodule BDS.Desktop.ShellLive do
         end
 
       "media" ->
-        socket
-        |> assign(:shell_overlay, nil)
-        |> MediaEditor.delete_socket(id, &reload_shell/2, &append_output_entry/5)
+        case Media.delete_media(id) do
+          {:ok, :deleted} ->
+            workbench = Workbench.close_tab(socket.assigns.workbench, :media, id)
+
+            socket
+            |> assign(:shell_overlay, nil)
+            |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:media, id}))
+            |> reload_shell(workbench)
+
+          {:error, reason} ->
+            socket
+            |> assign(:shell_overlay, nil)
+            |> append_output_entry(translated("Delete Media"), inspect(reason), nil, "error")
+            |> reload_shell(socket.assigns.workbench)
+        end
 
       "scripts" ->
         delete_sidebar_script(socket, id)

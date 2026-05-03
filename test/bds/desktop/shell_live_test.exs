@@ -2444,7 +2444,11 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ ~s(data-testid="media-editor")
 
-    html = render_click(view, "toggle_media_editor_quick_actions", %{"id" => media.id})
+    html =
+      view
+      |> element("[data-testid='media-editor'] .quick-actions-btn")
+      |> render_click()
+
     assert html =~ "quick-actions-menu"
 
     html =
@@ -2705,7 +2709,10 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Titelbild"
     refute html =~ "Desktop workbench content routed through the Elixir shell."
 
-    html = render_click(view, "toggle_media_editor_quick_actions", %{"id" => media.id})
+    html =
+      view
+      |> element("[data-testid='media-editor'] .quick-actions-btn")
+      |> render_click()
 
     assert html =~ "quick-actions-menu"
     assert html =~ "Detect Language"
@@ -2727,7 +2734,10 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ "Updated Cover"
 
-    _html = render_click(view, "save_media_editor", %{"id" => media.id})
+    _html =
+      view
+      |> element("[data-testid='media-save-button']")
+      |> render_click()
 
     saved_media = Repo.get!(BDS.Media.Media, media.id)
     assert saved_media.title == "Updated Cover"
@@ -2791,7 +2801,10 @@ defmodule BDS.Desktop.ShellLiveTest do
              "[data-testid='media-editor'] .editor-content.media-editor .media-details .linked-posts-section"
            )
 
-    html = render_click(view, "edit_media_translation", %{"id" => media.id, "language" => "de"})
+    html =
+      view
+      |> element("[phx-click='edit_media_translation'][phx-value-language='de']")
+      |> render_click()
 
     assert html =~ ~s(class="translation-modal-backdrop")
     assert html =~ ~s(class="translation-modal")

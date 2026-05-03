@@ -23,7 +23,7 @@
           class="secondary quick-actions-btn"
           type="button"
           phx-click="toggle_media_editor_quick_actions"
-          phx-value-id={@media_editor.id}
+          phx-target={@myself}
         >
           <span class="quick-actions-btn-icon">⚡</span>
           <span class="quick-actions-btn-label"><%= translated("Quick Actions") %></span>
@@ -53,7 +53,7 @@
               class="quick-action-item"
               type="button"
               phx-click="detect_media_editor_language"
-              phx-value-id={@media_editor.id}
+              phx-target={@myself}
               disabled={not @media_editor.can_detect_language?}
             >
               <span class="quick-action-text">
@@ -83,10 +83,10 @@
         <% end %>
       </div>
 
-      <button class="secondary" type="button" phx-click="replace_media_editor_file" phx-value-id={@media_editor.id}>
+      <button class="secondary" type="button" phx-click="replace_media_editor_file" phx-target={@myself}>
         <%= translated("Replace File") %>
       </button>
-      <button data-testid="media-save-button" type="button" phx-click="save_media_editor" phx-value-id={@media_editor.id}>
+      <button data-testid="media-save-button" type="button" phx-click="save_media_editor" phx-target={@myself}>
         <%= translated("Save") %>
       </button>
       <button
@@ -118,7 +118,7 @@
     </div>
 
     <div class="media-details">
-      <form class="media-editor-details-form" data-testid="media-editor-form" phx-change="change_media_editor">
+      <form class="media-editor-details-form" data-testid="media-editor-form" phx-change="change_media_editor" phx-target={@myself}>
         <div class="editor-field">
           <label><%= translated("File Name") %></label>
           <input class="post-editor-input disabled" type="text" value={@media_editor.original_name} disabled />
@@ -193,15 +193,15 @@
                     class="linked-post-title linked-post-link"
                     type="button"
                     phx-click="edit_media_translation"
-                    phx-value-id={@media_editor.id}
+                    phx-target={@myself}
                     phx-value-language={translation.language}
                   >
                     <%= translation.flag %> <%= language_label(translation.language) %><%= if translation.title, do: " — #{translation.title}" %>
                   </button>
-                  <button class="secondary compact" type="button" phx-click="refresh_media_translation" phx-value-id={@media_editor.id} phx-value-language={translation.language}>
+                  <button class="secondary compact" type="button" phx-click="refresh_media_translation" phx-target={@myself} phx-value-language={translation.language}>
                     <%= translated("Refresh") %>
                   </button>
-                  <button class="unlink-btn" type="button" phx-click="delete_media_translation" phx-value-id={@media_editor.id} phx-value-language={translation.language}>×</button>
+                  <button class="unlink-btn" type="button" phx-click="delete_media_translation" phx-target={@myself} phx-value-language={translation.language}>×</button>
                 </div>
               <% end %>
             </div>
@@ -212,7 +212,7 @@
       <div class="editor-field linked-posts-section">
         <label>
           <%= translated("Linked Posts") %>
-          <button class="add-link-btn" type="button" phx-click="toggle_media_post_picker" phx-value-id={@media_editor.id}>
+          <button class="add-link-btn" type="button" phx-click="toggle_media_post_picker" phx-target={@myself}>
             <%= translated("Link to Post") %>
           </button>
         </label>
@@ -226,7 +226,7 @@
                 value={@media_editor.post_picker_query}
                 placeholder={translated("Search posts")}
                 phx-change="change_media_post_picker"
-                phx-value-id={@media_editor.id}
+                phx-target={@myself}
               />
             </div>
 
@@ -235,7 +235,7 @@
             <% else %>
               <div class="post-picker-list">
                 <%= for result <- @media_editor.post_picker_results do %>
-                  <button class="post-picker-item" type="button" phx-click="link_media_to_post" phx-value-id={@media_editor.id} phx-value-post-id={result.post_id}>
+                  <button class="post-picker-item" type="button" phx-click="link_media_to_post" phx-target={@myself} phx-value-post-id={result.post_id}>
                     <%= result.title %>
                   </button>
                 <% end %>
@@ -264,7 +264,7 @@
                 >
                   📄 <%= linked_post.title %>
                 </button>
-                <button class="unlink-btn" type="button" phx-click="unlink_media_from_post" phx-value-id={@media_editor.id} phx-value-post-id={linked_post.post_id}>×</button>
+                <button class="unlink-btn" type="button" phx-click="unlink_media_from_post" phx-target={@myself} phx-value-post-id={linked_post.post_id}>×</button>
               </div>
             <% end %>
           </div>
@@ -278,9 +278,9 @@
       <div class="translation-modal">
         <div class="translation-modal-header">
           <h2><%= translated("Edit Translation") %></h2>
-          <button class="translation-modal-close" type="button" phx-click="close_media_translation_editor">×</button>
+          <button class="translation-modal-close" type="button" phx-click="close_media_translation_editor" phx-target={@myself}>×</button>
         </div>
-        <form class="translation-modal-body" phx-change="change_media_translation">
+        <form class="translation-modal-body" phx-change="change_media_translation" phx-target={@myself}>
           <input type="hidden" name="media_translation[language]" value={@media_editor.editing_translation["language"]} />
           <div class="editor-field">
             <label><%= translated("Title") %></label>
@@ -296,8 +296,8 @@
           </div>
         </form>
         <div class="translation-modal-footer">
-          <button class="secondary" type="button" phx-click="close_media_translation_editor"><%= translated("Cancel") %></button>
-          <button type="button" phx-click="save_media_translation" phx-value-id={@media_editor.id}><%= translated("Save") %></button>
+          <button class="secondary" type="button" phx-click="close_media_translation_editor" phx-target={@myself}><%= translated("Cancel") %></button>
+          <button type="button" phx-click="save_media_translation" phx-target={@myself}><%= translated("Save") %></button>
         </div>
       </div>
     </div>

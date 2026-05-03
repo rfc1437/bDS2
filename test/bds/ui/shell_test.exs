@@ -401,8 +401,8 @@ defmodule BDS.UI.ShellTest do
     media_editor_ex =
       File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/media_editor.ex")
 
-    assert template =~ "<MediaEditor.media_editor"
-    assert media_editor_ex =~ "def build(%{current_tab: %{type: :media, id: media_id}} = assigns)"
+    assert template =~ "<.live_component module={MediaEditor}"
+    assert media_editor_ex =~ "defp build_data(socket)"
 
     refute live_ex =~ "defp update_media_editor("
     refute live_ex =~ "defp persist_media_editor("

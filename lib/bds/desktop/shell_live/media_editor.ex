@@ -1,7 +1,7 @@
 defmodule BDS.Desktop.ShellLive.MediaEditor do
   @moduledoc false
 
-  use Phoenix.Component
+  use Phoenix.LiveComponent
 
   import Ecto.Query
 
@@ -11,373 +11,256 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   alias BDS.Media.Translation
   alias BDS.Posts.Post
   alias BDS.Repo
-  alias BDS.UI.Workbench
 
   embed_templates("media_editor_html/*")
 
   @post_picker_limit 10
 
-  @spec assign_socket(term()) :: term()
-  def assign_socket(socket) do
-    assign(socket, :media_editor, build(socket.assigns))
+  @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def update(%{action: :save} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action]))
+      |> do_save()
+
+    {:ok, socket}
   end
 
-  @spec update(term(), term(), term()) :: term()
-  def update(socket, params, reload) do
-    case socket.assigns.current_tab do
-      %{type: :media, id: media_id} ->
-        case Media.get_media(media_id) do
-          nil ->
-            socket
+  def update(%{action: :close_quick_actions} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action]))
+      |> assign(:quick_actions_open?, false)
+      |> build_data()
 
-          %MediaRecord{} = media ->
-            draft = normalize_params(params)
-            socket |> reconcile_draft(media, draft) |> reload_with_assigned_workbench(reload)
-        end
+    {:ok, socket}
+  end
 
-      _other ->
-        socket
+  def update(%{action: :apply_ai_suggestions, fields: fields} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action, :fields]))
+      |> do_apply_ai_suggestions(fields)
+
+    {:ok, socket}
+  end
+
+  def update(%{action: :translate, language: language} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action, :language]))
+      |> do_translate(language)
+
+    {:ok, socket}
+  end
+
+  def update(assigns, socket) do
+    socket =
+      socket
+      |> assign(assigns)
+      |> ensure_state()
+      |> build_data()
+
+    {:ok, socket}
+  end
+
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
+  @impl true
+  def render(%{media_editor: nil} = assigns), do: ~H"<div></div>"
+
+  def render(assigns) do
+    media_editor(assigns)
+  end
+
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def handle_event("change_media_editor", %{"media_editor" => params}, socket) do
+    media = socket.assigns.media
+    draft = normalize_params(params)
+    dirty? = draft != persisted_form(media)
+    was_dirty? = socket.assigns.dirty?
+
+    socket =
+      socket
+      |> assign(:draft, draft)
+      |> assign(:dirty?, dirty?)
+      |> build_data()
+
+    if dirty? != was_dirty? do
+      notify_parent({:media_editor_dirty, socket.assigns.media_id, dirty?})
     end
+
+    {:noreply, socket}
   end
 
-  @spec persist_socket(term(), term(), term(), term()) :: term()
-  def persist_socket(socket, media_id, reload, append_output) do
-    case Media.get_media(media_id) do
-      nil ->
-        socket
-
-      %MediaRecord{} = media ->
-        draft = current_draft(socket.assigns, media)
-
-        case persist(media, draft) do
-          {:ok, updated_media} ->
-            workbench = Workbench.clear_dirty(socket.assigns.workbench, :media, media_id)
-
-            socket
-            |> assign(:workbench, workbench)
-            |> assign(
-              :media_editor_drafts,
-              Map.delete(socket.assigns.media_editor_drafts, media_id)
-            )
-            |> assign(
-              :media_editor_save_states,
-              Map.put(socket.assigns.media_editor_save_states, media_id, :saved)
-            )
-            |> assign(
-              :tab_meta,
-              Map.put(socket.assigns.tab_meta, {:media, media_id}, tab_meta(updated_media))
-            )
-            |> reload.(workbench)
-
-          {:error, reason} ->
-            socket
-            |> append_output.(translated("Media"), inspect(reason), nil, "error")
-            |> reload.(socket.assigns.workbench)
-        end
-    end
+  def handle_event("save_media_editor", _params, socket) do
+    {:noreply, do_save(socket)}
   end
 
-  @spec toggle_quick_actions(term(), term(), term()) :: term()
-  def toggle_quick_actions(socket, media_id, reload) do
-    workbench = socket.assigns.workbench
+  def handle_event("toggle_media_editor_quick_actions", _params, socket) do
+    socket =
+      socket
+      |> assign(:quick_actions_open?, not socket.assigns.quick_actions_open?)
+      |> build_data()
 
-    socket
-    |> assign(
-      :media_editor_quick_actions_open,
-      Map.update(socket.assigns.media_editor_quick_actions_open, media_id, true, &(!&1))
-    )
-    |> reload.(workbench)
+    {:noreply, socket}
   end
 
-  @spec replace_file(term(), term(), term(), term()) :: term()
-  def replace_file(socket, media_id, reload, append_output) do
+  def handle_event("replace_media_editor_file", _params, socket) do
+    media = socket.assigns.media
+
     case FilePicker.choose_file(translated("Replace Media File")) do
       {:ok, source_path} ->
-        case Media.replace_media_file(media_id, source_path) do
+        case Media.replace_media_file(media.id, source_path) do
           {:ok, %MediaRecord{} = updated_media} ->
-            workbench = Workbench.clear_dirty(socket.assigns.workbench, :media, media_id)
+            socket =
+              socket
+              |> assign(:media, updated_media)
+              |> assign(:draft, persisted_form(updated_media))
+              |> assign(:dirty?, false)
+              |> build_data()
 
-            socket
-            |> assign(:workbench, workbench)
-            |> assign(
-              :media_editor_drafts,
-              Map.delete(socket.assigns.media_editor_drafts, media_id)
-            )
-            |> assign(
-              :media_editor_save_states,
-              Map.put(socket.assigns.media_editor_save_states, media_id, :saved)
-            )
-            |> assign(
-              :tab_meta,
-              Map.put(socket.assigns.tab_meta, {:media, media_id}, tab_meta(updated_media))
-            )
-            |> reload.(workbench)
+            notify_parent({:media_editor_dirty, media.id, false})
+            notify_parent({:media_editor_tab_meta, media.id, display_title(updated_media), updated_media.original_name || updated_media.mime_type || ""})
+            {:noreply, socket}
 
           {:ok, nil} ->
-            socket |> reload.(socket.assigns.workbench)
+            {:noreply, build_data(socket)}
 
           {:error, reason} ->
-            socket
-            |> append_output.(translated("Replace File"), inspect(reason), nil, "error")
-            |> reload.(socket.assigns.workbench)
+            notify_output(socket, translated("Replace File"), inspect(reason), "error")
+            {:noreply, build_data(socket)}
         end
 
       :cancel ->
-        socket
+        {:noreply, socket}
 
       {:error, %{message: message}} ->
-        socket
-        |> append_output.(translated("Replace File"), message, nil, "error")
-        |> reload.(socket.assigns.workbench)
+        notify_output(socket, translated("Replace File"), message, "error")
+        {:noreply, build_data(socket)}
     end
   end
 
-  @spec detect_language(term(), term(), term(), term()) :: term()
-  def detect_language(socket, media_id, reload, append_output) do
-    if Map.get(socket.assigns, :offline_mode, true) do
-      socket
-      |> append_output.(
+  def handle_event("detect_media_editor_language", _params, socket) do
+    if socket.assigns.offline_mode do
+      notify_output(
+        socket,
         translated("Detect Language"),
         translated("Automatic AI actions stay gated by airplane mode."),
-        nil,
         "info"
       )
-      |> reload.(socket.assigns.workbench)
+
+      {:noreply, build_data(socket)}
     else
-      case Media.get_media(media_id) do
-        nil ->
-          socket
+      media = socket.assigns.media
+      draft = socket.assigns.draft
 
-        %MediaRecord{} = media ->
-          draft = current_draft(socket.assigns, media)
+      text =
+        Enum.join(
+          [
+            Map.get(draft, "title", ""),
+            Map.get(draft, "alt", ""),
+            Map.get(draft, "caption", "")
+          ],
+          "\n\n"
+        )
 
-          text =
-            Enum.join(
-              [
-                Map.get(draft, "title", ""),
-                Map.get(draft, "alt", ""),
-                Map.get(draft, "caption", "")
-              ],
-              "\n\n"
-            )
+      case AI.detect_language(text) do
+        {:ok, %{language_code: language_code}}
+        when is_binary(language_code) and language_code != "" ->
+          normalized = normalize_language(language_code)
 
-          case AI.detect_language(text) do
-            {:ok, %{language_code: language_code}}
-            when is_binary(language_code) and language_code != "" ->
-              normalized = normalize_language(language_code)
+          case Media.update_media(media.id, %{language: normalized}) do
+            {:ok, updated_media} ->
+              updated_draft = Map.put(draft, "language", normalized)
 
-              case Media.update_media(media.id, %{language: normalized}) do
-                {:ok, updated_media} ->
-                  updated_draft =
-                    Map.put(current_draft(socket.assigns, media), "language", normalized)
+              socket =
+                socket
+                |> assign(:media, updated_media)
+                |> assign(:draft, updated_draft)
+                |> assign(:dirty?, updated_draft != persisted_form(updated_media))
+                |> build_data()
 
-                  socket
-                  |> reconcile_draft(updated_media, updated_draft)
-                  |> reload_with_assigned_workbench(reload)
-
-                {:error, reason} ->
-                  socket
-                  |> append_output.(translated("Detect Language"), inspect(reason), nil, "error")
-                  |> reload.(socket.assigns.workbench)
-              end
+              {:noreply, socket}
 
             {:error, reason} ->
-              socket
-              |> append_output.(translated("Detect Language"), inspect(reason), nil, "error")
-              |> reload.(socket.assigns.workbench)
-
-            _other ->
-              socket
-              |> append_output.(
-                translated("Detect Language"),
-                translated("Language detection failed."),
-                nil,
-                "error"
-              )
-              |> reload.(socket.assigns.workbench)
-          end
-      end
-    end
-  end
-
-  @spec translate(term(), term(), term(), term(), term()) :: term()
-  def translate(socket, media_id, language, reload, append_output) do
-    if Map.get(socket.assigns, :offline_mode, true) do
-      socket
-      |> append_output.(
-        translated("Translate"),
-        translated("Automatic AI actions stay gated by airplane mode."),
-        nil,
-        "info"
-      )
-      |> reload.(socket.assigns.workbench)
-    else
-      normalized_language = normalize_language(language)
-
-      case AI.translate_media(media_id, normalized_language) do
-        {:ok, translation} ->
-          case Media.upsert_media_translation(media_id, normalized_language, translation) do
-            {:ok, _saved_translation} ->
-              socket
-              |> assign(
-                :media_editor_quick_actions_open,
-                Map.put(socket.assigns.media_editor_quick_actions_open, media_id, false)
-              )
-              |> assign(
-                :media_editor_translation_forms,
-                Map.delete(socket.assigns.media_editor_translation_forms, media_id)
-              )
-              |> reload.(socket.assigns.workbench)
-
-            {:error, reason} ->
-              socket
-              |> append_output.(translated("Translate"), inspect(reason), nil, "error")
-              |> reload.(socket.assigns.workbench)
+              notify_output(socket, translated("Detect Language"), inspect(reason), "error")
+              {:noreply, build_data(socket)}
           end
 
         {:error, reason} ->
-          socket
-          |> append_output.(translated("Translate"), inspect(reason), nil, "error")
-          |> reload.(socket.assigns.workbench)
+          notify_output(socket, translated("Detect Language"), inspect(reason), "error")
+          {:noreply, build_data(socket)}
+
+        _other ->
+          notify_output(
+            socket,
+            translated("Detect Language"),
+            translated("Language detection failed."),
+            "error"
+          )
+
+          {:noreply, build_data(socket)}
       end
     end
   end
 
-  @spec apply_ai_suggestions(term(), term(), term(), term(), term()) :: term()
-  def apply_ai_suggestions(socket, media_id, fields, reload, append_output) do
-    try do
-      case Media.get_media(media_id) do
-        nil ->
-          socket
+  def handle_event("toggle_media_post_picker", _params, socket) do
+    socket =
+      socket
+      |> assign(:post_picker_open?, not socket.assigns.post_picker_open?)
+      |> assign(:post_picker_query, "")
+      |> build_data()
 
-        %MediaRecord{} = media ->
-          attrs =
-            Enum.reduce(fields, current_draft(socket.assigns, media), fn field, acc ->
-              case field.key do
-                "title" -> Map.put(acc, "title", field.suggested_value)
-                "alt" -> Map.put(acc, "alt", field.suggested_value)
-                "caption" -> Map.put(acc, "caption", field.suggested_value)
-                _other -> acc
-              end
-            end)
-
-          socket
-          |> assign(:shell_overlay, nil)
-          |> reconcile_draft(media, attrs)
-          |> reload_with_assigned_workbench(reload)
-      end
-    rescue
-      error ->
-        socket
-        |> append_output.(translated("AI Suggestions"), inspect(error), nil, "error")
-        |> reload.(socket.assigns.workbench)
-    end
+    {:noreply, socket}
   end
 
-  @spec delete_socket(term(), term(), term(), term()) :: term()
-  def delete_socket(socket, media_id, reload, append_output) do
-    case Media.delete_media(media_id) do
-      {:ok, :deleted} ->
-        workbench = Workbench.close_tab(socket.assigns.workbench, :media, media_id)
+  def handle_event("change_media_post_picker", %{"media_post_picker" => %{"query" => query}}, socket) do
+    socket =
+      socket
+      |> assign(:post_picker_query, to_string(query || ""))
+      |> build_data()
 
-        socket
-        |> assign(:workbench, workbench)
-        |> assign(:shell_overlay, nil)
-        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:media, media_id}))
-        |> assign(:media_editor_drafts, Map.delete(socket.assigns.media_editor_drafts, media_id))
-        |> assign(
-          :media_editor_quick_actions_open,
-          Map.delete(socket.assigns.media_editor_quick_actions_open, media_id)
-        )
-        |> assign(
-          :media_editor_post_pickers_open,
-          Map.delete(socket.assigns.media_editor_post_pickers_open, media_id)
-        )
-        |> assign(
-          :media_editor_post_picker_queries,
-          Map.delete(socket.assigns.media_editor_post_picker_queries, media_id)
-        )
-        |> assign(
-          :media_editor_save_states,
-          Map.delete(socket.assigns.media_editor_save_states, media_id)
-        )
-        |> assign(
-          :media_editor_translation_forms,
-          Map.delete(socket.assigns.media_editor_translation_forms, media_id)
-        )
-        |> reload.(workbench)
-
-      {:error, reason} ->
-        socket
-        |> append_output.(translated("Delete Media"), inspect(reason), nil, "error")
-        |> reload.(socket.assigns.workbench)
-    end
+    {:noreply, socket}
   end
 
-  @spec toggle_post_picker(term(), term(), term()) :: term()
-  def toggle_post_picker(socket, media_id, reload) do
-    workbench = socket.assigns.workbench
+  def handle_event("link_media_to_post", %{"post-id" => post_id}, socket) do
+    media = socket.assigns.media
 
-    socket
-    |> assign(
-      :media_editor_post_pickers_open,
-      Map.update(socket.assigns.media_editor_post_pickers_open, media_id, true, &(!&1))
-    )
-    |> reload.(workbench)
-  end
-
-  @spec set_post_picker_query(term(), term(), term(), term()) :: term()
-  def set_post_picker_query(socket, media_id, query, reload) do
-    workbench = socket.assigns.workbench
-
-    socket
-    |> assign(
-      :media_editor_post_picker_queries,
-      Map.put(socket.assigns.media_editor_post_picker_queries, media_id, to_string(query || ""))
-    )
-    |> reload.(workbench)
-  end
-
-  @spec link_post(term(), term(), term(), term(), term()) :: term()
-  def link_post(socket, media_id, post_id, reload, append_output) do
-    case Media.link_media_to_post(media_id, post_id) do
+    case Media.link_media_to_post(media.id, post_id) do
       {:ok, _linked} ->
-        socket
-        |> assign(
-          :media_editor_post_pickers_open,
-          Map.put(socket.assigns.media_editor_post_pickers_open, media_id, false)
-        )
-        |> assign(
-          :media_editor_post_picker_queries,
-          Map.put(socket.assigns.media_editor_post_picker_queries, media_id, "")
-        )
-        |> reload.(socket.assigns.workbench)
+        socket =
+          socket
+          |> assign(:post_picker_open?, false)
+          |> assign(:post_picker_query, "")
+          |> build_data()
+
+        {:noreply, socket}
 
       {:error, reason} ->
-        socket
-        |> append_output.(translated("Link to Post"), inspect(reason), nil, "error")
-        |> reload.(socket.assigns.workbench)
+        notify_output(socket, translated("Link to Post"), inspect(reason), "error")
+        {:noreply, build_data(socket)}
     end
   end
 
-  @spec unlink_post(term(), term(), term(), term(), term()) :: term()
-  def unlink_post(socket, media_id, post_id, reload, append_output) do
-    case Media.unlink_media_from_post(media_id, post_id) do
+  def handle_event("unlink_media_from_post", %{"post-id" => post_id}, socket) do
+    media = socket.assigns.media
+
+    case Media.unlink_media_from_post(media.id, post_id) do
       {:ok, _unlinked} ->
-        socket |> reload.(socket.assigns.workbench)
+        {:noreply, build_data(socket)}
 
       {:error, reason} ->
-        socket
-        |> append_output.(translated("Unlink from Post"), inspect(reason), nil, "error")
-        |> reload.(socket.assigns.workbench)
+        notify_output(socket, translated("Unlink from Post"), inspect(reason), "error")
+        {:noreply, build_data(socket)}
     end
   end
 
-  @spec edit_translation(term(), term(), term(), term()) :: term()
-  def edit_translation(socket, media_id, language, reload) do
-    workbench = socket.assigns.workbench
-
-    translation = Repo.get_by(Translation, translation_for: media_id, language: language)
+  def handle_event("edit_media_translation", %{"language" => language}, socket) do
+    media = socket.assigns.media
+    translation = Repo.get_by(Translation, translation_for: media.id, language: language)
 
     form = %{
       "language" => language,
@@ -386,18 +269,15 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
       "caption" => (translation && translation.caption) || ""
     }
 
-    socket
-    |> assign(
-      :media_editor_translation_forms,
-      Map.put(socket.assigns.media_editor_translation_forms, media_id, form)
-    )
-    |> reload.(workbench)
+    socket =
+      socket
+      |> assign(:editing_translation, form)
+      |> build_data()
+
+    {:noreply, socket}
   end
 
-  @spec update_translation(term(), term(), term(), term()) :: term()
-  def update_translation(socket, media_id, params, reload) do
-    workbench = socket.assigns.workbench
-
+  def handle_event("change_media_translation", %{"media_translation" => params}, socket) do
     form = %{
       "language" => Map.get(params, "language", ""),
       "title" => Map.get(params, "title", ""),
@@ -405,108 +285,140 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
       "caption" => Map.get(params, "caption", "")
     }
 
-    socket
-    |> assign(
-      :media_editor_translation_forms,
-      Map.put(socket.assigns.media_editor_translation_forms, media_id, form)
-    )
-    |> reload.(workbench)
+    socket =
+      socket
+      |> assign(:editing_translation, form)
+      |> build_data()
+
+    {:noreply, socket}
   end
 
-  @spec save_translation(term(), term(), term(), term()) :: term()
-  def save_translation(socket, media_id, reload, append_output) do
-    case Map.get(socket.assigns.media_editor_translation_forms, media_id) do
+  def handle_event("save_media_translation", _params, socket) do
+    media = socket.assigns.media
+
+    case socket.assigns.editing_translation do
       %{"language" => language} = form when language not in [nil, ""] ->
-        case Media.upsert_media_translation(media_id, language, %{
+        case Media.upsert_media_translation(media.id, language, %{
                title: blank_to_nil(Map.get(form, "title")),
                alt: blank_to_nil(Map.get(form, "alt")),
                caption: blank_to_nil(Map.get(form, "caption"))
              }) do
           {:ok, _translation} ->
-            socket
-            |> assign(
-              :media_editor_translation_forms,
-              Map.delete(socket.assigns.media_editor_translation_forms, media_id)
-            )
-            |> reload.(socket.assigns.workbench)
+            socket =
+              socket
+              |> assign(:editing_translation, nil)
+              |> build_data()
+
+            {:noreply, socket}
 
           {:error, reason} ->
-            socket
-            |> append_output.(translated("Save Translation"), inspect(reason), nil, "error")
-            |> reload.(socket.assigns.workbench)
+            notify_output(socket, translated("Save Translation"), inspect(reason), "error")
+            {:noreply, build_data(socket)}
         end
 
       _other ->
-        socket
+        {:noreply, socket}
     end
   end
 
-  @spec refresh_translation(term(), term(), term(), term(), term()) :: term()
-  def refresh_translation(socket, media_id, language, reload, append_output) do
-    if Map.get(socket.assigns, :offline_mode, true) do
+  def handle_event("close_media_translation_editor", _params, socket) do
+    socket =
       socket
-      |> append_output.(
+      |> assign(:editing_translation, nil)
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("refresh_media_translation", %{"language" => language}, socket) do
+    media = socket.assigns.media
+
+    if socket.assigns.offline_mode do
+      notify_output(
+        socket,
         translated("Translate"),
         translated("Automatic AI actions stay gated by airplane mode."),
-        nil,
         "info"
       )
-      |> reload.(socket.assigns.workbench)
+
+      {:noreply, build_data(socket)}
     else
-      case AI.translate_media(media_id, normalize_language(language)) do
+      case AI.translate_media(media.id, normalize_language(language)) do
         {:ok, translation} ->
-          case Media.upsert_media_translation(media_id, language, translation) do
+          case Media.upsert_media_translation(media.id, language, translation) do
             {:ok, _saved_translation} ->
-              socket |> reload.(socket.assigns.workbench)
+              {:noreply, build_data(socket)}
 
             {:error, reason} ->
-              socket
-              |> append_output.(translated("Refresh Translation"), inspect(reason), nil, "error")
-              |> reload.(socket.assigns.workbench)
+              notify_output(socket, translated("Refresh Translation"), inspect(reason), "error")
+              {:noreply, build_data(socket)}
           end
 
         {:error, reason} ->
-          socket
-          |> append_output.(translated("Refresh Translation"), inspect(reason), nil, "error")
-          |> reload.(socket.assigns.workbench)
+          notify_output(socket, translated("Refresh Translation"), inspect(reason), "error")
+          {:noreply, build_data(socket)}
       end
     end
   end
 
-  @spec delete_translation(term(), term(), term(), term(), term()) :: term()
-  def delete_translation(socket, media_id, language, reload, append_output) do
-    case Media.delete_media_translation(media_id, language) do
+  def handle_event("delete_media_translation", %{"language" => language}, socket) do
+    media = socket.assigns.media
+
+    case Media.delete_media_translation(media.id, language) do
       {:ok, _deleted?} ->
-        socket
-        |> assign(
-          :media_editor_translation_forms,
-          Map.delete(socket.assigns.media_editor_translation_forms, media_id)
-        )
-        |> reload.(socket.assigns.workbench)
+        socket =
+          socket
+          |> assign(:editing_translation, nil)
+          |> build_data()
+
+        {:noreply, socket}
 
       {:error, reason} ->
-        socket
-        |> append_output.(translated("Delete Translation"), inspect(reason), nil, "error")
-        |> reload.(socket.assigns.workbench)
+        notify_output(socket, translated("Delete Translation"), inspect(reason), "error")
+        {:noreply, build_data(socket)}
     end
   end
 
-  @spec build(term()) :: term()
-  def build(%{current_tab: %{type: :media, id: media_id}} = assigns) do
-    case Media.get_media(media_id) do
+  defp ensure_state(socket) do
+    media_id = socket.assigns.current_tab.id
+    media = Media.get_media(media_id)
+
+    defaults = %{
+      media_id: media_id,
+      media: media,
+      draft: if(media, do: persisted_form(media), else: %{}),
+      quick_actions_open?: false,
+      post_picker_open?: false,
+      post_picker_query: "",
+      editing_translation: nil,
+      dirty?: false,
+      save_state: :idle
+    }
+
+    Enum.reduce(defaults, socket, fn {key, default}, acc ->
+      if is_nil(Map.get(acc.assigns, key)) do
+        assign(acc, key, default)
+      else
+        acc
+      end
+    end)
+  end
+
+  defp build_data(socket) do
+    case socket.assigns.media do
       nil ->
-        nil
+        assign(socket, :media_editor, nil)
 
       %MediaRecord{} = media ->
         linked_posts = Media.list_linked_posts(media.id)
         translations = Media.list_media_translations(media.id)
-        form = current_draft(assigns, media)
-        picker_query = Map.get(assigns.media_editor_post_picker_queries, media.id, "")
+        draft = socket.assigns.draft
+        picker_query = socket.assigns.post_picker_query
 
         {picker_results, picker_overflow_count} =
           post_picker_results(media, linked_posts, picker_query)
 
-        %{
+        data = %{
           id: media.id,
           display_title: display_title(media),
           original_name: media.original_name || media.filename || media.id,
@@ -515,44 +427,134 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
           dimensions: dimensions_label(media),
           is_image: image?(media),
           preview_url: preview_url(media),
-          dirty?: Workbench.dirty?(assigns.workbench, :media, media.id),
-          save_state: Map.get(assigns.media_editor_save_states, media.id, :idle),
-          quick_actions_open?: Map.get(assigns.media_editor_quick_actions_open, media.id, false),
-          post_picker_open?: Map.get(assigns.media_editor_post_pickers_open, media.id, false),
+          dirty?: socket.assigns.dirty?,
+          save_state: socket.assigns.save_state,
+          quick_actions_open?: socket.assigns.quick_actions_open?,
+          post_picker_open?: socket.assigns.post_picker_open?,
           post_picker_query: picker_query,
           post_picker_results: picker_results,
           post_picker_overflow_count: picker_overflow_count,
-          form: form,
+          form: draft,
           languages: language_codes(),
           translations: Enum.map(translations, &translation_view/1),
-          editing_translation: Map.get(assigns.media_editor_translation_forms, media.id),
+          editing_translation: socket.assigns.editing_translation,
           linked_posts: linked_posts,
-          can_detect_language?: detect_language_enabled?(form),
-          can_translate?: form["language"] not in [nil, ""]
+          can_detect_language?: detect_language_enabled?(draft),
+          can_translate?: draft["language"] not in [nil, ""]
         }
+
+        assign(socket, :media_editor, data)
     end
   end
 
-  def build(_assigns), do: nil
+  defp do_save(socket) do
+    media = socket.assigns.media
 
-  @spec translated(term(), term()) :: term()
-  def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+    case media do
+      nil ->
+        socket
 
-  @spec media_editor_save_state_label(term()) :: term()
-  def media_editor_save_state_label(:dirty), do: translated("Unsaved")
-  def media_editor_save_state_label(:saved), do: translated("Saved")
-  def media_editor_save_state_label(_state), do: translated("Idle")
+      %MediaRecord{} = media ->
+        draft = socket.assigns.draft
 
-  @spec language_label(term()) :: term()
-  def language_label(code) do
-    code
-    |> to_string()
-    |> String.upcase()
+        case persist(media, draft) do
+          {:ok, updated_media} ->
+            socket =
+              socket
+              |> assign(:media, updated_media)
+              |> assign(:draft, persisted_form(updated_media))
+              |> assign(:dirty?, false)
+              |> assign(:save_state, :saved)
+              |> build_data()
+
+            notify_parent({:media_editor_dirty, media.id, false})
+            notify_parent({:media_editor_tab_meta, media.id, display_title(updated_media), updated_media.original_name || updated_media.mime_type || ""})
+            notify_output(socket, translated("Media"), translated("Media saved"))
+            socket
+
+          {:error, reason} ->
+            notify_output(socket, translated("Media"), inspect(reason), "error")
+            |> build_data()
+        end
+    end
   end
 
-  @spec normalize_language(term()) :: term()
-  def normalize_language(value), do: value |> to_string() |> String.trim() |> String.downcase()
+  defp do_apply_ai_suggestions(socket, fields) do
+    media = socket.assigns.media
+
+    case media do
+      nil ->
+        socket
+
+      %MediaRecord{} = _media ->
+        updated_draft =
+          Enum.reduce(fields, socket.assigns.draft, fn field, acc ->
+            case field.key do
+              "title" -> Map.put(acc, "title", field.suggested_value)
+              "alt" -> Map.put(acc, "alt", field.suggested_value)
+              "caption" -> Map.put(acc, "caption", field.suggested_value)
+              _other -> acc
+            end
+          end)
+
+        dirty? = updated_draft != persisted_form(media)
+
+        socket =
+          socket
+          |> assign(:draft, updated_draft)
+          |> assign(:dirty?, dirty?)
+          |> assign(:save_state, :dirty)
+          |> assign(:quick_actions_open?, false)
+          |> build_data()
+
+        notify_parent({:media_editor_dirty, media.id, dirty?})
+        socket
+    end
+  end
+
+  defp do_translate(socket, language) do
+    if socket.assigns.offline_mode do
+      notify_output(
+        socket,
+        translated("Translate"),
+        translated("Automatic AI actions stay gated by airplane mode."),
+        "info"
+      )
+
+      build_data(socket)
+    else
+      media = socket.assigns.media
+      normalized_language = normalize_language(language)
+
+      case AI.translate_media(media.id, normalized_language) do
+        {:ok, translation} ->
+          case Media.upsert_media_translation(media.id, normalized_language, translation) do
+            {:ok, _saved_translation} ->
+              socket
+              |> assign(:quick_actions_open?, false)
+              |> assign(:editing_translation, nil)
+              |> build_data()
+
+            {:error, reason} ->
+              notify_output(socket, translated("Translate"), inspect(reason), "error")
+              |> build_data()
+          end
+
+        {:error, reason} ->
+          notify_output(socket, translated("Translate"), inspect(reason), "error")
+          |> build_data()
+      end
+    end
+  end
+
+  defp notify_parent(message) do
+    send(self(), message)
+  end
+
+  defp notify_output(socket, title, message, level \\ "info") do
+    send(self(), {:media_editor_output, title, message, level})
+    socket
+  end
 
   @spec persist(term(), term()) :: term()
   def persist(%MediaRecord{} = media, draft) do
@@ -564,68 +566,6 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
       language: blank_to_nil(Map.get(draft, "language")),
       tags: csv_to_list(Map.get(draft, "tags"))
     })
-  end
-
-  defp reconcile_draft(socket, %MediaRecord{} = media, draft) do
-    persisted = persisted_form(media)
-    dirty? = draft != persisted
-
-    workbench =
-      if dirty?,
-        do: Workbench.mark_dirty(socket.assigns.workbench, :media, media.id),
-        else: Workbench.clear_dirty(socket.assigns.workbench, :media, media.id)
-
-    drafts =
-      if dirty? do
-        Map.put(socket.assigns.media_editor_drafts, media.id, draft)
-      else
-        Map.delete(socket.assigns.media_editor_drafts, media.id)
-      end
-
-    socket
-    |> assign(:workbench, workbench)
-    |> assign(:media_editor_drafts, drafts)
-    |> assign(
-      :media_editor_save_states,
-      Map.put(
-        socket.assigns.media_editor_save_states,
-        media.id,
-        if(dirty?, do: :dirty, else: :idle)
-      )
-    )
-    |> assign(
-      :tab_meta,
-      Map.put(socket.assigns.tab_meta, {:media, media.id}, %{
-        title: blank_to_nil(Map.get(draft, "title")) || display_title(media),
-        subtitle: media.original_name || media.mime_type || ""
-      })
-    )
-  end
-
-  defp current_draft(assigns, %MediaRecord{} = media) do
-    Map.get(assigns.media_editor_drafts, media.id, persisted_form(media))
-  end
-
-  defp persisted_form(%MediaRecord{} = media) do
-    %{
-      "title" => media.title || "",
-      "alt" => media.alt || "",
-      "caption" => media.caption || "",
-      "tags" => Enum.join(media.tags, ", "),
-      "author" => media.author || "",
-      "language" => media.language || ""
-    }
-  end
-
-  defp normalize_params(params) do
-    %{
-      "title" => Map.get(params, "title", ""),
-      "alt" => Map.get(params, "alt", ""),
-      "caption" => Map.get(params, "caption", ""),
-      "tags" => Map.get(params, "tags", ""),
-      "author" => Map.get(params, "author", ""),
-      "language" => Map.get(params, "language", "")
-    }
   end
 
   defp translation_view(%Translation{} = translation) do
@@ -658,10 +598,6 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
       end)
 
     {Enum.take(posts, @post_picker_limit), max(length(posts) - @post_picker_limit, 0)}
-  end
-
-  defp tab_meta(%MediaRecord{} = media) do
-    %{title: display_title(media), subtitle: media.original_name || media.mime_type || ""}
   end
 
   defp preview_url(%MediaRecord{} = media) do
@@ -699,6 +635,28 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     |> Enum.map(& &1.code)
   end
 
+  defp normalize_params(params) do
+    %{
+      "title" => Map.get(params, "title", ""),
+      "alt" => Map.get(params, "alt", ""),
+      "caption" => Map.get(params, "caption", ""),
+      "tags" => Map.get(params, "tags", ""),
+      "author" => Map.get(params, "author", ""),
+      "language" => Map.get(params, "language", "")
+    }
+  end
+
+  defp persisted_form(%MediaRecord{} = media) do
+    %{
+      "title" => media.title || "",
+      "alt" => media.alt || "",
+      "caption" => media.caption || "",
+      "tags" => Enum.join(media.tags, ", "),
+      "author" => media.author || "",
+      "language" => media.language || ""
+    }
+  end
+
   defp normalize_query(value) do
     value
     |> to_string()
@@ -724,6 +682,22 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
-  defp reload_with_assigned_workbench(socket, reload),
-    do: reload.(socket, socket.assigns.workbench)
+  @spec translated(term(), term()) :: term()
+  def translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+
+  @spec media_editor_save_state_label(term()) :: term()
+  def media_editor_save_state_label(:dirty), do: translated("Unsaved")
+  def media_editor_save_state_label(:saved), do: translated("Saved")
+  def media_editor_save_state_label(_state), do: translated("Idle")
+
+  @spec language_label(term()) :: term()
+  def language_label(code) do
+    code
+    |> to_string()
+    |> String.upcase()
+  end
+
+  @spec normalize_language(term()) :: term()
+  def normalize_language(value), do: value |> to_string() |> String.trim() |> String.downcase()
 end

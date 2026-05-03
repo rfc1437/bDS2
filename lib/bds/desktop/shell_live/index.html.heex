@@ -385,8 +385,8 @@
             <% @current_tab.type == :post -> %>
               <.live_component module={PostEditor} id={"post-editor-#{@current_tab.id}"} current_tab={@current_tab} offline_mode={@offline_mode} />
 
-            <% @current_tab.type == :media and @media_editor -> %>
-              <MediaEditor.media_editor media_editor={@media_editor} />
+            <% @current_tab.type == :media -> %>
+              <.live_component module={MediaEditor} id={"media-editor-#{@current_tab.id}"} current_tab={@current_tab} offline_mode={@offline_mode} />
 
             <% @current_tab.type in [:settings, :style] and @current_project -> %>
               <.live_component module={SettingsEditor} id="settings-editor"

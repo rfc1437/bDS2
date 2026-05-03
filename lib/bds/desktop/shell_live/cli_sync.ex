@@ -58,27 +58,6 @@ defmodule BDS.Desktop.ShellLive.CliSync do
       |> assign(:workbench, workbench)
       |> assign(:shell_overlay, nil)
       |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:media, media_id}))
-      |> assign(:media_editor_drafts, Map.delete(socket.assigns.media_editor_drafts, media_id))
-      |> assign(
-        :media_editor_quick_actions_open,
-        Map.delete(socket.assigns.media_editor_quick_actions_open, media_id)
-      )
-      |> assign(
-        :media_editor_post_pickers_open,
-        Map.delete(socket.assigns.media_editor_post_pickers_open, media_id)
-      )
-      |> assign(
-        :media_editor_post_picker_queries,
-        Map.delete(socket.assigns.media_editor_post_picker_queries, media_id)
-      )
-      |> assign(
-        :media_editor_save_states,
-        Map.delete(socket.assigns.media_editor_save_states, media_id)
-      )
-      |> assign(
-        :media_editor_translation_forms,
-        Map.delete(socket.assigns.media_editor_translation_forms, media_id)
-      )
 
     {socket, workbench}
   end
