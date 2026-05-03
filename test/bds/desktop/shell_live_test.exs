@@ -1872,13 +1872,13 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     existing_ids = MapSet.new(Enum.map(BDS.Tasks.list_tasks(), & &1.id))
 
-    html =
-      view
-      |> element(
-        "[data-testid='metadata-diff-repair-button'][data-direction='file_to_db'][data-field='title']"
-      )
-      |> render_click()
+    view
+    |> element(
+      "[data-testid='metadata-diff-repair-button'][data-direction='file_to_db'][data-field='title']"
+    )
+    |> render_click()
 
+    html = render(view)
     assert html =~ "Repair Metadata Diff"
 
     repair_task = new_task!(existing_ids, "Repair Metadata Diff")
@@ -2000,11 +2000,11 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     existing_ids = MapSet.new(Enum.map(BDS.Tasks.list_tasks(), & &1.id))
 
-    html =
-      view
-      |> element("[data-testid='metadata-diff-import-button']")
-      |> render_click()
+    view
+    |> element("[data-testid='metadata-diff-import-button']")
+    |> render_click()
 
+    html = render(view)
     assert html =~ "Import Metadata Diff Orphans"
 
     import_task = new_task!(existing_ids, "Import Metadata Diff Orphans")
@@ -2055,13 +2055,13 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     existing_ids = MapSet.new(Enum.map(BDS.Tasks.list_tasks(), & &1.id))
 
-    html =
-      view
-      |> element(
-        "[data-testid='metadata-diff-repair-button'][data-direction='file_to_db'][data-field='content_hash']"
-      )
-      |> render_click()
+    view
+    |> element(
+      "[data-testid='metadata-diff-repair-button'][data-direction='file_to_db'][data-field='content_hash']"
+    )
+    |> render_click()
 
+    html = render(view)
     assert html =~ "Repair Metadata Diff"
 
     repair_task = new_task!(existing_ids, "Repair Metadata Diff")

@@ -1,7 +1,7 @@
 defmodule BDS.Desktop.ShellLive.MiscEditor do
   @moduledoc false
 
-  use Phoenix.Component
+  use Phoenix.LiveComponent
 
   import Ecto.Query
 
@@ -20,30 +20,60 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     :git_diff
   ]
 
-  @spec assign_socket(term()) :: term()
-  def assign_socket(socket) do
-    assign(socket, :misc_editor, build(socket.assigns))
+  # ── LiveComponent lifecycle ────────────────────────────────────────────────
+
+  @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def update(%{current_tab: current_tab, tab_meta: tab_meta, project_id: project_id}, socket) do
+    socket =
+      socket
+      |> assign(:current_tab, current_tab)
+      |> assign(:project_id, project_id)
+      |> assign(:tab_meta, tab_meta)
+      |> ensure_state()
+      |> build_data()
+
+    {:ok, socket}
   end
 
-  @spec rerun(term()) :: term()
-  def rerun(socket) do
-    case meta(socket.assigns) do
-      %{action: action} when is_binary(action) ->
-        {:command, action}
+  defp ensure_state(socket) do
+    socket
+    |> assign_new(:selected_pairs, fn -> MapSet.new() end)
+    |> assign_new(:git_selected_file, fn -> nil end)
+    |> assign_new(:active_tab, fn -> nil end)
+    |> assign_new(:active_field, fn -> nil end)
+  end
 
-      _other ->
-        case misc_route_action(socket.assigns.current_tab.type) do
-          nil -> {:noop, socket}
-          action -> {:command, action}
-        end
+  defp build_data(socket) do
+    misc_editor = do_build(socket.assigns)
+    assign(socket, :misc_editor, misc_editor)
+  end
+
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
+  @impl true
+  def render(assigns) do
+    misc_editor(assigns)
+  end
+
+  # ── Event handlers ─────────────────────────────────────────────────────────
+
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def handle_event("rerun_misc_editor", _params, socket) do
+    action = rerun_action(socket.assigns)
+
+    if action do
+      notify_command(action)
     end
+
+    {:noreply, socket}
   end
 
-  @spec apply_site_validation(term(), term()) :: term()
-  def apply_site_validation(socket, append_output) do
+  def handle_event("apply_site_validation", _params, socket) do
     meta = meta(socket.assigns)
     payload = Map.get(meta, :payload, %{})
-    project_id = Map.get(meta, :project_id, socket.assigns.projects.active_project_id)
+    project_id = Map.get(meta, :project_id, socket.assigns.project_id)
 
     report = %{
       sitemap_path: Map.get(payload, :sitemap_path),
@@ -57,98 +87,17 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
     case Generation.apply_validation(project_id, report) do
       {:ok, result} ->
-        {:rerun,
-         socket
-         |> append_output.(
-           translated("Site Validation"),
-           translated("Validation changes applied"),
-           inspect(result)
-         )}
+        notify_output(translated("Site Validation"), translated("Validation changes applied"), inspect(result))
+        notify_command("validate_site")
+        {:noreply, socket}
     end
   rescue
     error ->
-      {:socket,
-       append_output.(socket, translated("Site Validation"), inspect(error), nil, "error")}
+      notify_output(translated("Site Validation"), inspect(error), nil, "error")
+      {:noreply, socket}
   end
 
-  @spec toggle_duplicate(term(), term(), term()) :: term()
-  def toggle_duplicate(socket, pair_id, reload) do
-    selected_by_tab = Map.get(socket.assigns, :misc_editor_selected_pairs, %{})
-    current = Map.get(selected_by_tab, socket.assigns.current_tab.id, MapSet.new())
-
-    next =
-      if MapSet.member?(current, pair_id) do
-        MapSet.delete(current, pair_id)
-      else
-        MapSet.put(current, pair_id)
-      end
-
-    socket
-    |> assign(
-      :misc_editor_selected_pairs,
-      Map.put(selected_by_tab, socket.assigns.current_tab.id, next)
-    )
-    |> reload.(socket.assigns.workbench)
-  end
-
-  @spec dismiss_duplicate(term(), term(), term(), term(), term()) :: term()
-  def dismiss_duplicate(socket, post_id_a, post_id_b, reload, append_output) do
-    case Embeddings.dismiss_duplicate_pair(post_id_a, post_id_b) do
-      {:ok, _saved_pair} ->
-        socket
-        |> update_payload(fn payload ->
-          update_in(payload[:pairs], fn pairs ->
-            Enum.reject(pairs || [], fn pair ->
-              pair_identity(pair) == pair_id(post_id_a, post_id_b)
-            end)
-          end)
-        end)
-        |> clear_selected_pair(pair_id(post_id_a, post_id_b))
-        |> append_output.(translated("Find Duplicates"), translated("Pair dismissed"))
-        |> reload.(socket.assigns.workbench)
-
-      {:error, reason} ->
-        socket
-        |> append_output.(translated("Find Duplicates"), inspect(reason), nil, "error")
-        |> reload.(socket.assigns.workbench)
-    end
-  end
-
-  @spec dismiss_selected(term(), term(), term()) :: term()
-  def dismiss_selected(socket, reload, append_output) do
-    tab_id = socket.assigns.current_tab.id
-
-    selected =
-      socket.assigns.misc_editor_selected_pairs
-      |> Map.get(tab_id, MapSet.new())
-      |> MapSet.to_list()
-      |> Enum.map(&decode_pair_id/1)
-      |> Enum.reject(&is_nil/1)
-
-    case Embeddings.dismiss_duplicate_pairs(selected) do
-      {:ok, _saved_pairs} ->
-        socket
-        |> update_payload(fn payload ->
-          update_in(payload[:pairs], fn pairs ->
-            Enum.reject(pairs || [], fn pair -> pair_identity(pair) in selected end)
-          end)
-        end)
-        |> assign(
-          :misc_editor_selected_pairs,
-          Map.put(socket.assigns.misc_editor_selected_pairs, tab_id, MapSet.new())
-        )
-        |> append_output.(translated("Find Duplicates"), translated("Selected pairs dismissed"))
-        |> reload.(socket.assigns.workbench)
-
-      {:error, reason} ->
-        socket
-        |> append_output.(translated("Find Duplicates"), inspect(reason), nil, "error")
-        |> reload.(socket.assigns.workbench)
-    end
-  end
-
-  @spec fix_translation_validation(term(), term()) :: term()
-  def fix_translation_validation(socket, append_output) do
+  def handle_event("fix_translation_validation", _params, socket) do
     report =
       socket.assigns
       |> meta()
@@ -157,93 +106,254 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
     {:ok, result} = Posts.fix_invalid_translations(report)
 
-    {:rerun,
-     socket
-     |> append_output.(
-       translated("Translation Validation"),
-       translated("translationValidation.toast.fixSuccess", %{
-         dbRows: result.deleted_database_rows,
-         files: result.deleted_files,
-         flushed: result.flushed_translations
-       })
-     )}
+    notify_output(
+      translated("Translation Validation"),
+      translated("translationValidation.toast.fixSuccess", %{
+        dbRows: result.deleted_database_rows,
+        files: result.deleted_files,
+        flushed: result.flushed_translations
+      })
+    )
+
+    notify_command("validate_translations")
+    {:noreply, socket}
   rescue
     error ->
-      {:socket,
-       append_output.(socket, translated("Translation Validation"), inspect(error), nil, "error")}
+      notify_output(translated("Translation Validation"), inspect(error), nil, "error")
+      {:noreply, socket}
   end
 
-  @spec select_git_diff_file(term(), term()) :: term()
-  def select_git_diff_file(socket, file_path) do
-    assign(
-      socket,
-      :misc_editor_git_selected_files,
-      Map.put(
-        socket.assigns.misc_editor_git_selected_files,
-        socket.assigns.current_tab.id,
-        file_path
-      )
-    )
+  def handle_event("select_git_diff_file", %{"path" => path}, socket) do
+    {:noreply, assign(socket, :git_selected_file, path) |> build_data()}
   end
 
-  @spec metadata_diff_repair_request(term(), term(), term()) :: term()
-  def metadata_diff_repair_request(socket, field, direction) do
-    meta = meta(socket.assigns)
-    payload = Map.get(meta, :payload, %{})
-    items = Enum.map(Map.get(payload, :diff_reports, []), &normalize_metadata_diff_item/1)
-    tabs = metadata_diff_tabs(items, [])
-    active_tab = metadata_diff_active_tab(socket.assigns, tabs)
+  def handle_event("toggle_duplicate_pair", %{"pair-id" => pair_id}, socket) do
+    current = socket.assigns.selected_pairs
 
-    repair_items =
-      items
-      |> Enum.filter(&(&1.tab_id == active_tab))
-      |> Enum.filter(fn item -> Enum.any?(item.differences, &(diff_name(&1) == field)) end)
-      |> Enum.map(&%{"entity_type" => &1.entity_type, "entity_id" => &1.entity_id})
+    next =
+      if MapSet.member?(current, pair_id) do
+        MapSet.delete(current, pair_id)
+      else
+        MapSet.put(current, pair_id)
+      end
 
-    cond do
-      not metadata_diff_repairable_tab?(active_tab) ->
-        {:error, translated("No repair action available")}
+    {:noreply, assign(socket, :selected_pairs, next) |> build_data()}
+  end
 
-      repair_items == [] ->
-        {:error, translated("No metadata diff items selected")}
+  def handle_event(
+        "dismiss_duplicate_pair",
+        %{"post-id-a" => post_id_a, "post-id-b" => post_id_b},
+        socket
+      ) do
+    case Embeddings.dismiss_duplicate_pair(post_id_a, post_id_b) do
+      {:ok, _saved_pair} ->
+        tab_type = socket.assigns.current_tab.type
+        tab_id = socket.assigns.current_tab.id
+        pair_id = pair_id(post_id_a, post_id_b)
 
-      true ->
-        {:ok,
-         %{
-           "direction" => direction,
-           "field" => field,
-           "tab" => active_tab,
-           "items" => repair_items
-         }}
+        payload = Map.get(meta(socket.assigns), :payload, %{})
+
+        next_pairs =
+          update_in(payload[:pairs], fn pairs ->
+            Enum.reject(pairs || [], fn pair ->
+              pair_identity(pair) == pair_id
+            end)
+          end)
+
+        next_payload = Map.put(payload, :pairs, next_pairs)
+        notify_tab_meta(tab_type, tab_id, %{payload: next_payload})
+        notify_output(translated("Find Duplicates"), translated("Pair dismissed"))
+
+        selected = MapSet.delete(socket.assigns.selected_pairs, pair_id)
+        {:noreply, assign(socket, :selected_pairs, selected) |> build_data()}
+
+      {:error, reason} ->
+        notify_output(translated("Find Duplicates"), inspect(reason), nil, "error")
+        {:noreply, socket}
     end
   end
 
-  @spec metadata_diff_orphan_import_request(term()) :: term()
-  def metadata_diff_orphan_import_request(socket) do
-    meta = meta(socket.assigns)
-    payload = Map.get(meta, :payload, %{})
-    items = Enum.map(Map.get(payload, :diff_reports, []), &normalize_metadata_diff_item/1)
+  def handle_event("dismiss_selected_duplicates", _params, socket) do
+    selected =
+      socket.assigns.selected_pairs
+      |> MapSet.to_list()
+      |> Enum.map(&decode_pair_id/1)
+      |> Enum.reject(&is_nil/1)
 
-    orphan_files =
-      Enum.map(Map.get(payload, :orphan_reports, []), &normalize_metadata_diff_orphan/1)
+    case Embeddings.dismiss_duplicate_pairs(selected) do
+      {:ok, _saved_pairs} ->
+        tab_type = socket.assigns.current_tab.type
+        tab_id = socket.assigns.current_tab.id
+        payload = Map.get(meta(socket.assigns), :payload, %{})
 
-    tabs = metadata_diff_tabs(items, orphan_files)
-    active_tab = metadata_diff_active_tab(socket.assigns, tabs)
+        next_pairs =
+          update_in(payload[:pairs], fn pairs ->
+            Enum.reject(pairs || [], fn pair -> pair_identity(pair) in selected end)
+          end)
 
-    selected_orphans =
-      orphan_files
-      |> Enum.filter(&(&1.tab_id == active_tab))
-      |> Enum.map(&%{"file_path" => &1.file_path})
+        next_payload = Map.put(payload, :pairs, next_pairs)
+        notify_tab_meta(tab_type, tab_id, %{payload: next_payload})
+        notify_output(translated("Find Duplicates"), translated("Selected pairs dismissed"))
 
-    if selected_orphans == [] do
-      {:error, translated("No orphan files selected")}
+        {:noreply, assign(socket, :selected_pairs, MapSet.new()) |> build_data()}
+
+      {:error, reason} ->
+        notify_output(translated("Find Duplicates"), inspect(reason), nil, "error")
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("repair_metadata_diff", %{"field" => field, "direction" => direction}, socket) do
+    case metadata_diff_repair_request(socket.assigns, field, direction) do
+      {:ok, params} ->
+        notify_command("repair_metadata_diff", params)
+        {:noreply, socket}
+
+      {:error, message} ->
+        notify_output(translated("Metadata Diff"), message, nil, "error")
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("import_metadata_diff_orphans", _params, socket) do
+    case metadata_diff_orphan_import_request(socket.assigns) do
+      {:ok, params} ->
+        notify_command("import_metadata_diff_orphans", params)
+        {:noreply, socket}
+
+      {:error, message} ->
+        notify_output(translated("Metadata Diff"), message, nil, "error")
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("select_metadata_diff_tab", %{"tab" => tab}, socket) do
+    {:noreply,
+     socket
+     |> assign(:active_tab, tab)
+     |> assign(:active_field, nil)
+     |> build_data()}
+  end
+
+  def handle_event("toggle_metadata_diff_field", %{"field" => field}, socket) do
+    current = socket.assigns.active_field
+    next = if current == field, do: nil, else: field
+    {:noreply, assign(socket, :active_field, next) |> build_data()}
+  end
+
+  def handle_event("open_duplicate_post", %{"id" => id, "title" => title}, socket) do
+    notify_open_sidebar_item(%{"route" => "post", "id" => id, "title" => title, "subtitle" => "draft"}, :preview)
+    {:noreply, socket}
+  end
+
+  # ── Public helper functions (used by template) ─────────────────────────────
+
+  @spec translated(String.t(), map()) :: String.t()
+  def translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+
+  @spec misc_class(atom()) :: String.t()
+  def misc_class(:site_validation), do: "site-validation-view"
+  def misc_class(:metadata_diff), do: "metadata-diff-view"
+  def misc_class(:translation_validation), do: "translation-validation-view"
+  def misc_class(:find_duplicates), do: "duplicates-view"
+  def misc_class(:git_diff), do: "git-diff-view"
+
+  @spec summary_items(map()) :: [{String.t(), any()}]
+  def summary_items(%{summary: summary}) when is_map(summary), do: Enum.to_list(summary)
+  def summary_items(_misc), do: []
+
+  @spec duplicate_checked?(map(), String.t()) :: boolean()
+  def duplicate_checked?(misc, pair_id), do: MapSet.member?(misc.selected_pairs, pair_id)
+
+  @spec pair_id_from_pair(map()) :: String.t()
+  def pair_id_from_pair(pair), do: pair_identity(pair)
+
+  @spec translation_issue_label(map()) :: String.t()
+  def translation_issue_label(issue) do
+    case issue_value(issue, :issue) do
+      "same-language-as-canonical" ->
+        translated("translationValidation.issue.sameLanguage")
+
+      "do-not-translate-has-translations" ->
+        translated("translationValidation.issue.doNotTranslate")
+
+      "content-in-database" ->
+        translated("translationValidation.issue.contentInDatabase")
+
+      _other ->
+        translated("translationValidation.issue.missingSource")
+    end
+  end
+
+  @spec translation_issue_languages(map()) :: String.t()
+  def translation_issue_languages(issue) do
+    canonical_language = issue_value(issue, :canonical_language)
+    translation_language = issue_value(issue, :translation_language)
+
+    if canonical_language in [nil, ""] do
+      translation_language
     else
-      {:ok, %{"tab" => active_tab, "orphans" => selected_orphans}}
+      translated("translationValidation.languagesWithCanonical", %{
+        canonical: canonical_language,
+        translation: translation_language
+      })
     end
   end
 
-  @spec build(term()) :: term()
-  def build(%{current_tab: %{type: type}} = assigns) when type in @misc_routes do
+  @spec translation_issue_value(map(), atom() | String.t()) :: any()
+  def translation_issue_value(issue, key), do: issue_value(issue, key)
+
+  @spec git_diff_language(String.t() | nil) :: String.t()
+  def git_diff_language(nil), do: "plaintext"
+
+  def git_diff_language(file_path) do
+    case file_path |> Path.extname() |> String.downcase() do
+      ".md" -> "markdown"
+      ".markdown" -> "markdown"
+      ".mdx" -> "markdown"
+      ".ts" -> "typescript"
+      ".tsx" -> "typescript"
+      ".js" -> "javascript"
+      ".jsx" -> "javascript"
+      ".json" -> "json"
+      ".css" -> "css"
+      ".html" -> "html"
+      ".yml" -> "yaml"
+      ".yaml" -> "yaml"
+      _other -> "plaintext"
+    end
+  end
+
+  # ── Private helpers ────────────────────────────────────────────────────────
+
+  defp notify_command(action, params \\ %{}) do
+    send(self(), {:misc_editor_command, action, params})
+  end
+
+  defp notify_output(title, message, detail \\ nil, level \\ "info") do
+    send(self(), {:misc_editor_output, title, message, detail, level})
+  end
+
+  defp notify_tab_meta(tab_type, tab_id, updates) do
+    send(self(), {:misc_editor_tab_meta, tab_type, tab_id, updates})
+  end
+
+  defp notify_open_sidebar_item(params, intent) do
+    send(self(), {:open_sidebar_item, params, intent})
+  end
+
+  defp rerun_action(assigns) do
+    case meta(assigns) do
+      %{action: action} when is_binary(action) ->
+        action
+
+      _other ->
+        misc_route_action(assigns.current_tab.type)
+    end
+  end
+
+  defp do_build(%{current_tab: %{type: type}} = assigns) when type in @misc_routes do
     meta = meta(assigns)
     payload = Map.get(meta, :payload, %{})
 
@@ -256,29 +366,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     end
   end
 
-  @spec build(term()) :: term()
-  def build(_assigns), do: nil
-
-  @spec translated(term(), term()) :: term()
-  def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
-
-  @spec misc_class(term()) :: term()
-  def misc_class(:site_validation), do: "site-validation-view"
-  def misc_class(:metadata_diff), do: "metadata-diff-view"
-  def misc_class(:translation_validation), do: "translation-validation-view"
-  def misc_class(:find_duplicates), do: "duplicates-view"
-  def misc_class(:git_diff), do: "git-diff-view"
-
-  def summary_items(%{summary: summary}) when is_map(summary), do: Enum.to_list(summary)
-  @spec summary_items(term()) :: term()
-  def summary_items(_misc), do: []
-
-  @spec duplicate_checked?(term(), term()) :: term()
-  def duplicate_checked?(misc, pair_id), do: MapSet.member?(misc.selected_pairs, pair_id)
-
-  @spec pair_id_from_pair(term()) :: term()
-  def pair_id_from_pair(pair), do: pair_identity(pair)
+  defp do_build(_assigns), do: nil
 
   defp build_site_validation(meta, payload) do
     summary = Map.get(payload, :summary, %{})
@@ -311,8 +399,8 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
       Enum.map(Map.get(payload, :orphan_reports, []), &normalize_metadata_diff_orphan/1)
 
     tabs = metadata_diff_tabs(items, orphan_files)
-    active_tab = metadata_diff_active_tab(assigns, tabs)
-    active_field = metadata_diff_active_field(assigns)
+    active_tab = assigns.active_tab || metadata_diff_active_tab_fallback(tabs)
+    active_field = assigns.active_field
 
     current_tab =
       Enum.find(tabs, &(&1.id == active_tab)) || List.first(tabs) || empty_metadata_diff_tab()
@@ -358,22 +446,19 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   end
 
   defp build_duplicates(assigns, meta, payload) do
-    selected_pairs =
-      Map.get(assigns.misc_editor_selected_pairs, assigns.current_tab.id, MapSet.new())
-
     %{
       kind: :find_duplicates,
       title: Map.get(meta, :title, translated("Find Duplicates")),
       subtitle: Map.get(meta, :subtitle, ""),
       summary: Map.get(payload, :summary, %{}),
       pairs: Map.get(payload, :pairs, []),
-      selected_pairs: selected_pairs
+      selected_pairs: assigns.selected_pairs
     }
   end
 
   defp build_git_diff(assigns, meta) do
-    project_id = assigns.projects.active_project_id
-    selected_files = Map.get(assigns, :misc_editor_git_selected_files, %{})
+    project_id = assigns.project_id
+    selected_file = assigns.git_selected_file
 
     {files, diff, error_message} =
       case Git.status(project_id) do
@@ -386,7 +471,11 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
             |> Enum.sort()
 
           selected_file_path =
-            select_git_diff_path(assigns.current_tab.id, file_paths, selected_files)
+            if selected_file in file_paths do
+              selected_file
+            else
+              List.first(file_paths)
+            end
 
           diff =
             case selected_file_path do
@@ -427,81 +516,60 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     }
   end
 
-  @spec translation_issue_label(term()) :: term()
-  def translation_issue_label(issue) do
-    case issue_value(issue, :issue) do
-      "same-language-as-canonical" ->
-        translated("translationValidation.issue.sameLanguage")
-
-      "do-not-translate-has-translations" ->
-        translated("translationValidation.issue.doNotTranslate")
-
-      "content-in-database" ->
-        translated("translationValidation.issue.contentInDatabase")
-
-      _other ->
-        translated("translationValidation.issue.missingSource")
-    end
-  end
-
-  @spec translation_issue_languages(term()) :: term()
-  def translation_issue_languages(issue) do
-    canonical_language = issue_value(issue, :canonical_language)
-    translation_language = issue_value(issue, :translation_language)
-
-    if canonical_language in [nil, ""] do
-      translation_language
-    else
-      translated("translationValidation.languagesWithCanonical", %{
-        canonical: canonical_language,
-        translation: translation_language
-      })
-    end
-  end
-
-  @spec translation_issue_value(term(), term()) :: term()
-  def translation_issue_value(issue, key), do: issue_value(issue, key)
-
-  @spec git_diff_language(term()) :: term()
-  def git_diff_language(nil), do: "plaintext"
-
-  def git_diff_language(file_path) do
-    case file_path |> Path.extname() |> String.downcase() do
-      ".md" -> "markdown"
-      ".markdown" -> "markdown"
-      ".mdx" -> "markdown"
-      ".ts" -> "typescript"
-      ".tsx" -> "typescript"
-      ".js" -> "javascript"
-      ".jsx" -> "javascript"
-      ".json" -> "json"
-      ".css" -> "css"
-      ".html" -> "html"
-      ".yml" -> "yaml"
-      ".yaml" -> "yaml"
-      _other -> "plaintext"
-    end
-  end
-
   defp meta(assigns) do
     Map.get(assigns.tab_meta, {assigns.current_tab.type, assigns.current_tab.id}, %{})
   end
 
-  defp update_payload(socket, updater) do
-    key = {socket.assigns.current_tab.type, socket.assigns.current_tab.id}
-    meta = Map.get(socket.assigns.tab_meta, key, %{})
-    next_meta = Map.update(meta, :payload, %{}, updater)
-    assign(socket, :tab_meta, Map.put(socket.assigns.tab_meta, key, next_meta))
+  defp metadata_diff_repair_request(assigns, field, direction) do
+    payload = Map.get(meta(assigns), :payload, %{})
+    items = Enum.map(Map.get(payload, :diff_reports, []), &normalize_metadata_diff_item/1)
+    tabs = metadata_diff_tabs(items, [])
+    active_tab = assigns.active_tab || metadata_diff_active_tab_fallback(tabs)
+
+    repair_items =
+      items
+      |> Enum.filter(&(&1.tab_id == active_tab))
+      |> Enum.filter(fn item -> Enum.any?(item.differences, &(diff_name(&1) == field)) end)
+      |> Enum.map(&%{"entity_type" => &1.entity_type, "entity_id" => &1.entity_id})
+
+    cond do
+      not metadata_diff_repairable_tab?(active_tab) ->
+        {:error, translated("No repair action available")}
+
+      repair_items == [] ->
+        {:error, translated("No metadata diff items selected")}
+
+      true ->
+        {:ok,
+         %{
+           "direction" => direction,
+           "field" => field,
+           "tab" => active_tab,
+           "items" => repair_items
+         }}
+    end
   end
 
-  defp clear_selected_pair(socket, pair_id) do
-    tab_id = socket.assigns.current_tab.id
-    current = Map.get(socket.assigns.misc_editor_selected_pairs, tab_id, MapSet.new())
+  defp metadata_diff_orphan_import_request(assigns) do
+    payload = Map.get(meta(assigns), :payload, %{})
+    items = Enum.map(Map.get(payload, :diff_reports, []), &normalize_metadata_diff_item/1)
 
-    next_pairs =
-      Map.put(socket.assigns.misc_editor_selected_pairs, tab_id, MapSet.delete(current, pair_id))
+    orphan_files =
+      Enum.map(Map.get(payload, :orphan_reports, []), &normalize_metadata_diff_orphan/1)
 
-    assign(socket, :misc_editor_selected_pairs, next_pairs)
+    tabs = metadata_diff_tabs(items, orphan_files)
+    active_tab = assigns.active_tab || metadata_diff_active_tab_fallback(tabs)
+
+    selected_orphans =
+      orphan_files
+      |> Enum.filter(&(&1.tab_id == active_tab))
+      |> Enum.map(&%{"file_path" => &1.file_path})
+
+    if selected_orphans == [] do
+      {:error, translated("No orphan files selected")}
+    else
+      {:ok, %{"tab" => active_tab, "orphans" => selected_orphans}}
+    end
   end
 
   defp pair_id(post_id_a, post_id_b), do: Enum.sort([post_id_a, post_id_b]) |> Enum.join("::")
@@ -564,18 +632,8 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     }
   end
 
-  defp metadata_diff_active_tab(assigns, tabs) do
-    tab_id = Map.get(assigns.metadata_diff_active_tabs || %{}, assigns.current_tab.id)
-
-    if Enum.any?(tabs, &(&1.id == tab_id)) do
-      tab_id
-    else
-      tabs |> List.first() |> Map.get(:id)
-    end
-  end
-
-  defp metadata_diff_active_field(assigns) do
-    Map.get(assigns.metadata_diff_field_filters || %{}, assigns.current_tab.id)
+  defp metadata_diff_active_tab_fallback(tabs) do
+    tabs |> List.first() |> Map.get(:id)
   end
 
   defp metadata_diff_filtered_items(items, nil), do: items
@@ -736,16 +794,6 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   end
 
   defp issue_value(_issue, _key), do: nil
-
-  defp select_git_diff_path(tab_id, files, selected_files) do
-    selected = Map.get(selected_files, tab_id)
-
-    if selected in files do
-      selected
-    else
-      List.first(files)
-    end
-  end
 
   defp empty_git_diff(file_path) do
     %{file_path: file_path, original: "", modified: "", error: nil}

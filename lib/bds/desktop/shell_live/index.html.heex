@@ -421,8 +421,8 @@
             <% @current_tab.type == :import -> %>
               <.live_component module={ImportEditor} id={"import-editor-#{@current_tab.id}"} current_tab={@current_tab} offline_mode={@offline_mode} project_id={@projects.active_project_id} />
 
-            <% @current_tab.type in [:site_validation, :metadata_diff, :translation_validation, :find_duplicates, :git_diff] and @misc_editor -> %>
-              <MiscEditor.misc_editor misc_editor={@misc_editor} />
+            <% @current_tab.type in [:site_validation, :metadata_diff, :translation_validation, :find_duplicates, :git_diff] -> %>
+              <.live_component module={MiscEditor} id={"misc-editor-#{@current_tab.type}-#{@current_tab.id}"} current_tab={@current_tab} tab_meta={@tab_meta} project_id={@projects.active_project_id} />
 
             <% true -> %>
               <div class="editor-frame">

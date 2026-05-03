@@ -43,8 +43,7 @@ defmodule BDS.Desktop.ShellLive do
 
   import TaskLocalization,
     only: [
-      localize_task_status: 2,
-      translate_for_socket: 2
+      localize_task_status: 2
     ]
 
   import TabHelpers,
@@ -164,11 +163,7 @@ defmodule BDS.Desktop.ShellLive do
       |> assign(:sidebar_filters_by_view, %{})
        |> assign(:sidebar_filter_panels, %{})
       |> assign(:chat_editor_request_refs, %{})
-      |> assign(:misc_editor_selected_pairs, %{})
-     |> assign(:misc_editor_git_selected_files, %{})
-     |> assign(:metadata_diff_active_tabs, %{})
-     |> assign(:metadata_diff_field_filters, %{})
-     |> assign(:shell_overlay, nil)
+      |> assign(:shell_overlay, nil)
      |> assign(:output_entries, [])
      |> reload_shell(workbench)}
   end
@@ -313,133 +308,6 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("settings_shell_command", %{"action" => action}, socket) do
     {:noreply, apply_shell_command(socket, action)}
-  end
-
-  def handle_event("rerun_misc_editor", _params, socket) do
-    case MiscEditor.rerun(socket) do
-      {:command, action} -> {:noreply, apply_shell_command(socket, action)}
-      {:noop, next_socket} -> {:noreply, next_socket}
-    end
-  end
-
-  def handle_event("apply_site_validation", _params, socket) do
-    case MiscEditor.apply_site_validation(socket, &append_output_entry/5) do
-      {:rerun, next_socket} -> {:noreply, apply_shell_command(next_socket, "validate_site")}
-      {:socket, next_socket} -> {:noreply, next_socket}
-    end
-  end
-
-  def handle_event("fix_translation_validation", _params, socket) do
-    case MiscEditor.fix_translation_validation(socket, &append_output_entry/5) do
-      {:rerun, next_socket} ->
-        {:noreply, apply_shell_command(next_socket, "validate_translations")}
-
-      {:socket, next_socket} ->
-        {:noreply, next_socket}
-    end
-  end
-
-  def handle_event("select_git_diff_file", %{"path" => path}, socket) do
-    {:noreply, socket |> MiscEditor.select_git_diff_file(path) |> assign_misc_editor()}
-  end
-
-  def handle_event("toggle_duplicate_pair", %{"pair-id" => pair_id}, socket) do
-    {:noreply, MiscEditor.toggle_duplicate(socket, pair_id, &reload_shell/2)}
-  end
-
-  def handle_event(
-        "dismiss_duplicate_pair",
-        %{"post-id-a" => post_id_a, "post-id-b" => post_id_b},
-        socket
-      ) do
-    {:noreply,
-     MiscEditor.dismiss_duplicate(
-       socket,
-       post_id_a,
-       post_id_b,
-       &reload_shell/2,
-       &append_output_entry/5
-     )}
-  end
-
-  def handle_event("dismiss_selected_duplicates", _params, socket) do
-    {:noreply, MiscEditor.dismiss_selected(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("repair_metadata_diff", %{"field" => field, "direction" => direction}, socket) do
-    case MiscEditor.metadata_diff_repair_request(socket, field, direction) do
-      {:ok, params} ->
-        {:noreply, apply_shell_command(socket, "repair_metadata_diff", params)}
-
-      {:error, message} ->
-        {:noreply,
-         append_output_entry(
-           socket,
-           translate_for_socket(socket, "Metadata Diff"),
-           message,
-           nil,
-           "error"
-         )}
-    end
-  end
-
-  def handle_event("import_metadata_diff_orphans", _params, socket) do
-    case MiscEditor.metadata_diff_orphan_import_request(socket) do
-      {:ok, params} ->
-        {:noreply, apply_shell_command(socket, "import_metadata_diff_orphans", params)}
-
-      {:error, message} ->
-        {:noreply,
-         append_output_entry(
-           socket,
-           translate_for_socket(socket, "Metadata Diff"),
-           message,
-           nil,
-           "error"
-         )}
-    end
-  end
-
-  def handle_event("select_metadata_diff_tab", %{"tab" => tab}, socket) do
-    tab_id = socket.assigns.current_tab.id
-
-    socket =
-      socket
-      |> assign(
-        :metadata_diff_active_tabs,
-        Map.put(socket.assigns.metadata_diff_active_tabs, tab_id, tab)
-      )
-      |> assign(
-        :metadata_diff_field_filters,
-        Map.delete(socket.assigns.metadata_diff_field_filters, tab_id)
-      )
-      |> assign_misc_editor()
-
-    {:noreply, socket}
-  end
-
-  def handle_event("toggle_metadata_diff_field", %{"field" => field}, socket) do
-    tab_id = socket.assigns.current_tab.id
-    current = Map.get(socket.assigns.metadata_diff_field_filters, tab_id)
-
-    next_filters =
-      if current == field do
-        Map.delete(socket.assigns.metadata_diff_field_filters, tab_id)
-      else
-        Map.put(socket.assigns.metadata_diff_field_filters, tab_id, field)
-      end
-
-    {:noreply,
-     socket |> assign(:metadata_diff_field_filters, next_filters) |> assign_misc_editor()}
-  end
-
-  def handle_event("open_duplicate_post", %{"id" => id, "title" => title}, socket) do
-    {:noreply,
-     open_sidebar_item(
-       socket,
-       %{"route" => "post", "id" => id, "title" => title, "subtitle" => "draft"},
-       :preview
-     )}
   end
 
   def handle_event("open_overlay", %{"kind" => kind}, socket) do
@@ -1003,6 +871,21 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, append_output_entry(socket, title, message, nil, level)}
   end
 
+  def handle_info({:misc_editor_output, title, message, _detail, level}, socket) do
+    {:noreply, append_output_entry(socket, title, message, nil, level)}
+  end
+
+  def handle_info({:misc_editor_command, action, params}, socket) do
+    {:noreply, apply_shell_command(socket, action, params)}
+  end
+
+  def handle_info({:misc_editor_tab_meta, tab_type, tab_id, updates}, socket) do
+    key = {tab_type, tab_id}
+    current_meta = Map.get(socket.assigns.tab_meta, key, %{})
+    next_meta = Map.merge(current_meta, updates)
+    {:noreply, assign(socket, :tab_meta, Map.put(socket.assigns.tab_meta, key, next_meta))}
+  end
+
   def handle_info({:post_editor_output, title, message, level}, socket) do
     {:noreply, append_output_entry(socket, title, message, nil, level)}
   end
@@ -1206,7 +1089,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:menu_groups, socket.assigns[:menu_groups] || TitlebarMenu.groups())
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
     |> assign(:current_tab, current_tab(workbench))
-    |> assign_misc_editor()
   end
 
   defp translated(text, bindings \\ %{}),
@@ -1246,10 +1128,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp current_tab(%{tabs: tabs, active_tab: {type, id}}) do
     Enum.find(tabs, &(&1.type == type and &1.id == id))
-  end
-
-  defp assign_misc_editor(socket) do
-    MiscEditor.assign_socket(socket)
   end
 
   defp create_sidebar_item(socket, kind),
