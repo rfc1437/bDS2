@@ -23,6 +23,7 @@ defmodule BDS.Desktop.ShellLive do
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
   alias BDS.Desktop.ShellLive.PostEditor
   alias BDS.Desktop.ShellLive.SidebarComponents, as: ShellSidebarComponents
+  alias BDS.Desktop.ShellLive.SidebarEvents
   alias BDS.Desktop.ShellLive.SidebarState, as: ShellSidebarState
 
   alias BDS.Desktop.ShellLive.{
@@ -61,6 +62,24 @@ defmodule BDS.Desktop.ShellLive do
 
   @refresh_interval 1_500
   @output_entry_limit 20
+  @sidebar_filter_events [
+    "toggle_sidebar_filters",
+    "toggle_sidebar_archive",
+    "toggle_sidebar_tags",
+    "toggle_sidebar_categories",
+    "update_sidebar_search",
+    "clear_sidebar_search",
+    "clear_sidebar_tags",
+    "clear_sidebar_categories",
+    "toggle_sidebar_tag",
+    "toggle_sidebar_category",
+    "select_sidebar_year",
+    "select_sidebar_month",
+    "clear_sidebar_month",
+    "clear_sidebar_filters",
+    "load_more_sidebar"
+  ]
+
   @local_menu_actions MapSet.new([
                         :toggle_sidebar,
                         :toggle_panel,
@@ -242,186 +261,8 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, reload_shell(socket, Layout.resize(socket.assigns.workbench, target, width))}
   end
 
-  def handle_event("toggle_sidebar_filters", _params, socket) do
-    socket =
-      ShellSidebarState.put_filter_panel_state(socket, fn state ->
-        if state.visible do
-          %{state | visible: false}
-        else
-          %{
-            visible: true,
-            archive_collapsed: true,
-            tags_collapsed: true,
-            categories_collapsed: true,
-            expanded_year: nil
-          }
-        end
-      end)
-
-    {:noreply,
-     socket
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("toggle_sidebar_archive", _params, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filter_panel_state(fn state ->
-       %{state | archive_collapsed: not state.archive_collapsed}
-     end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("toggle_sidebar_tags", _params, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filter_panel_state(fn state ->
-       %{state | tags_collapsed: not state.tags_collapsed}
-     end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("toggle_sidebar_categories", _params, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filter_panel_state(fn state ->
-       %{state | categories_collapsed: not state.categories_collapsed}
-     end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("update_sidebar_search", %{"sidebar_filters" => params}, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filters(fn filters ->
-       Map.put(
-         filters,
-         :search,
-         ShellSidebarState.normalize_filter_string(Map.get(params, "search"))
-       )
-     end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("clear_sidebar_search", _params, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :search, nil) end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("clear_sidebar_tags", _params, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :tags, []) end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("clear_sidebar_categories", _params, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filters(fn filters -> Map.put(filters, :categories, []) end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("toggle_sidebar_tag", %{"tag" => tag}, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filters(fn filters ->
-       ShellSidebarState.toggle_filter_value(filters, :tags, tag)
-     end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("toggle_sidebar_category", %{"category" => category}, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filters(fn filters ->
-       ShellSidebarState.toggle_filter_value(filters, :categories, category)
-     end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("select_sidebar_year", %{"year" => year}, socket) do
-    parsed_year = ShellSidebarState.parse_optional_integer(year)
-
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filter_panel_state(fn state ->
-       %{
-         state
-         | archive_collapsed: false,
-           expanded_year: if(state.expanded_year == parsed_year, do: nil, else: parsed_year)
-       }
-     end)
-     |> ShellSidebarState.put_filters(fn filters ->
-       filters
-       |> Map.put(:year, parsed_year)
-       |> Map.put(:month, nil)
-     end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("select_sidebar_month", %{"year" => year, "month" => month}, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filter_panel_state(fn state ->
-       %{
-         state
-         | archive_collapsed: false,
-           expanded_year: ShellSidebarState.parse_optional_integer(year)
-       }
-     end)
-     |> ShellSidebarState.put_filters(fn filters ->
-       filters
-       |> Map.put(:year, ShellSidebarState.parse_optional_integer(year))
-       |> Map.put(:month, ShellSidebarState.parse_optional_integer(month))
-     end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("clear_sidebar_month", _params, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filter_panel_state(fn state ->
-       %{state | archive_collapsed: false}
-     end)
-     |> ShellSidebarState.put_filters(fn filters ->
-       filters |> Map.put(:year, nil) |> Map.put(:month, nil)
-     end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("clear_sidebar_filters", _params, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filters(fn filters ->
-       filters
-       |> Map.put(:search, nil)
-       |> Map.put(:year, nil)
-       |> Map.put(:month, nil)
-       |> Map.put(:tags, [])
-       |> Map.put(:categories, [])
-       |> Map.put(
-         :display_limit,
-         ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data)
-       )
-     end)
-     |> reload_shell(socket.assigns.workbench)}
-  end
-
-  def handle_event("load_more_sidebar", _params, socket) do
-    {:noreply,
-     socket
-     |> ShellSidebarState.put_filters(fn filters ->
-       Map.update(
-         filters,
-         :display_limit,
-         ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data),
-         &(&1 + ShellSidebarState.sidebar_page_size(socket.assigns.sidebar_data))
-       )
-     end)
-     |> reload_shell(socket.assigns.workbench)}
+  def handle_event(event, params, socket) when event in @sidebar_filter_events do
+    SidebarEvents.handle(socket, event, params, &reload_shell/2)
   end
 
   def handle_event("create_sidebar_item", %{"kind" => kind}, socket) do

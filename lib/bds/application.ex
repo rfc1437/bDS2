@@ -34,6 +34,7 @@ defmodule BDS.Application do
       BDS.Preview,
       BDS.Publishing,
       {Task.Supervisor, name: BDS.Tasks.TaskSupervisor},
+      {Task.Supervisor, name: BDS.TCP.TaskSupervisor},
       BDS.Scripting.JobStore,
       {Task.Supervisor, name: BDS.Scripting.TaskSupervisor},
       BDS.Scripting.JobSupervisor

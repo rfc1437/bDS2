@@ -139,6 +139,11 @@ defmodule BDS.Preview do
     {:reply, response, state}
   end
 
+  @impl true
+  def handle_info(_msg, state) do
+    {:noreply, state}
+  end
+
   defp ensure_running(%{project_id: project_id, is_running: true}, project_id), do: :ok
   defp ensure_running(_server, _project_id), do: {:error, :not_running}
 
@@ -265,7 +270,10 @@ defmodule BDS.Preview do
   defp accept_loop(listener, project_id) do
     case :gen_tcp.accept(listener) do
       {:ok, socket} ->
-        spawn(fn -> serve_client(socket, project_id) end)
+        Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
+          serve_client(socket, project_id)
+        end)
+
         accept_loop(listener, project_id)
 
       {:error, :closed} ->

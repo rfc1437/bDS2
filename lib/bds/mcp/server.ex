@@ -69,6 +69,11 @@ defmodule BDS.MCP.Server do
     {:reply, response, state}
   end
 
+  @impl true
+  def handle_info(_msg, state) do
+    {:noreply, state}
+  end
+
   defp ensure_started do
     case Process.whereis(__MODULE__) do
       nil ->
@@ -83,7 +88,10 @@ defmodule BDS.MCP.Server do
   defp accept_loop(listener) do
     case :gen_tcp.accept(listener) do
       {:ok, socket} ->
-        spawn(fn -> serve_client(socket) end)
+        Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
+          serve_client(socket)
+        end)
+
         accept_loop(listener)
 
       {:error, :closed} ->
