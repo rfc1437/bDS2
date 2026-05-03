@@ -16,7 +16,7 @@
                     <input
                       type="checkbox"
                       checked={field.accepted}
-                      disabled={field.locked}
+                      disabled={field.locked or field.loading}
                       phx-click="overlay_toggle_ai_field"
                       phx-value-key={field.key}
                     />
@@ -24,8 +24,9 @@
                   </label>
                   <div class="ai-suggestion-content">
                     <div class="ai-suggestion-label"><%= field.label %></div>
-                    <div class="ai-suggestion-current"><%= field.current_value %></div>
-                    <div class="ai-suggestion-value"><%= field.suggested_value %></div>
+                    <div class={["ai-suggestion-value", if(field.loading, do: "loading")]}>
+                      <%= if field.loading, do: "Loading…", else: field.suggested_value %>
+                    </div>
                   </div>
                 </div>
               <% end %>

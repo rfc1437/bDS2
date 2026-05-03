@@ -126,6 +126,49 @@ defmodule BDS.Desktop.ShellLiveTest do
     end
   end
 
+  defmodule AiSuggestionsServer do
+    use Plug.Router
+    import Phoenix.ConnTest, except: [post: 2]
+
+    plug(:match)
+    plug(:dispatch)
+
+    post "/v1/chat/completions" do
+      {:ok, request_body, conn} = Plug.Conn.read_body(conn)
+      request = Jason.decode!(request_body)
+      send(Application.fetch_env!(:bds, :test_pid), {:ai_suggestions_request, request})
+
+      operation = get_in(request, ["messages", Access.at(0), "content"]) || ""
+
+      content =
+        cond do
+          String.contains?(operation, "image") ->
+            Jason.encode!(%{
+              "title" => "AI Image Title",
+              "alt" => "AI Alt Text",
+              "caption" => "AI Caption"
+            })
+
+          true ->
+            Jason.encode!(%{
+              "title" => "AI Suggested Title",
+              "excerpt" => "AI Suggested Excerpt",
+              "slug" => "ai-suggested-slug"
+            })
+        end
+
+      body =
+        Jason.encode!(%{
+          "choices" => [%{"message" => %{"content" => content}}],
+          "usage" => %{"prompt_tokens" => 20, "completion_tokens" => 10}
+        })
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> send_resp(200, body)
+    end
+  end
+
   @endpoint BDS.Desktop.Endpoint
 
   setup do
@@ -2268,6 +2311,207 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(phx-hook="MonacoEditor")
     refute html =~ "post-editor-markdown-highlight"
     refute html =~ ~s(phx-value-mode="visual")
+  end
+
+  test "ai suggestions overlay is gated by offline mode for posts", %{project: project} do
+    assert :ok = AI.set_airplane_mode(true)
+
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Offline Post",
+        content: "Some content"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => post.id,
+        "title" => post.title,
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-testid="post-editor")
+
+    html =
+      view
+      |> element("[data-testid='post-editor'] .quick-actions-btn")
+      |> render_click()
+
+    assert html =~ "quick-actions-menu"
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='ai_suggestions']")
+      |> render_click()
+
+    refute html =~ "ai-suggestions-modal"
+    assert html =~ "Automatic AI actions stay gated by airplane mode"
+  end
+
+  test "ai suggestions overlay fetches async results for posts when online", %{project: project} do
+    Application.put_env(:bds, :test_pid, self())
+
+    server =
+      start_supervised!({Bandit, plug: AiSuggestionsServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert :ok = AI.set_airplane_mode(false)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "test-secret",
+               model: "gpt-test"
+             })
+
+    assert :ok = AI.put_model_preference(:title, "gpt-test")
+
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Online Post",
+        content: "Some content for AI analysis"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => post.id,
+        "title" => post.title,
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-testid="post-editor")
+
+    html =
+      view
+      |> element("[data-testid='post-editor'] .quick-actions-btn")
+      |> render_click()
+
+    assert html =~ "quick-actions-menu"
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='ai_suggestions']")
+      |> render_click()
+
+    assert html =~ "ai-suggestions-modal"
+    assert html =~ "Loading"
+
+    assert_receive {:ai_suggestions_request, _request}, 2_000
+
+    Process.sleep(200)
+    html = render(view)
+
+    assert html =~ "AI Suggested Title"
+    assert html =~ "AI Suggested Excerpt"
+    assert html =~ "ai-suggested-slug"
+    refute html =~ "Loading"
+  end
+
+  test "ai suggestions overlay is gated by offline mode for media", %{project: project} do
+    assert :ok = AI.set_airplane_mode(true)
+
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-shell-live-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    media_source_path = Path.join(temp_dir, "offline-media.jpg")
+    File.write!(media_source_path, "fake image body")
+
+    {:ok, media} =
+      Media.import_media(%{
+        project_id: project.id,
+        source_path: media_source_path,
+        title: "Offline Media"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "media",
+        "id" => media.id,
+        "title" => media.title,
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-testid="media-editor")
+
+    html = render_click(view, "toggle_media_editor_quick_actions", %{"id" => media.id})
+    assert html =~ "quick-actions-menu"
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='ai_suggestions']")
+      |> render_click()
+
+    refute html =~ "ai-suggestions-modal"
+    assert html =~ "Automatic AI actions stay gated by airplane mode"
+  end
+
+  test "ai suggestions async error closes overlay and shows toast", %{project: project} do
+    Application.put_env(:bds, :test_pid, self())
+
+    server =
+      start_supervised!({Bandit, plug: AiSuggestionsServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert :ok = AI.set_airplane_mode(false)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "test-secret",
+               model: "gpt-test"
+             })
+
+    assert :ok = AI.put_model_preference(:title, "gpt-test")
+
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Error Post",
+        content: "Some content"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => post.id,
+        "title" => post.title,
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-testid="post-editor")
+
+    html =
+      view
+      |> element("[data-testid='post-editor'] .quick-actions-btn")
+      |> render_click()
+
+    assert html =~ "quick-actions-menu"
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='ai_suggestions']")
+      |> render_click()
+
+    assert html =~ "ai-suggestions-modal"
+
+    send(view.pid, {:ai_suggestions_error, :post, post.id, :test_error})
+    html = render(view)
+
+    refute html =~ "ai-suggestions-modal"
   end
 
   test "script and template editors surface lifecycle state, load published file content, and allow publishing drafts",

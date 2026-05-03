@@ -71,6 +71,53 @@ defmodule BDS.Desktop.OverlayTest do
     assert confirm_dialog.message =~ "Cannot be undone"
   end
 
+  test "ai suggestions overlay starts in loading state and updates from async results" do
+    context = put_in(sample_context(), [:ai_fields, Access.all(), :loading], true)
+    context = put_in(context, [:ai_fields, Access.all(), :suggested_value], "")
+
+    ai_modal = Overlay.open(:post, :ai_suggestions, context)
+
+    assert Enum.all?(ai_modal.fields, & &1.loading)
+    assert Enum.all?(ai_modal.fields, &(&1.suggested_value == ""))
+
+    updated =
+      Overlay.set_ai_suggestions(ai_modal, %{"title" => "Better Title", "alt" => "Better Alt"})
+
+    title_field = Enum.find(updated.fields, &(&1.key == "title"))
+    assert title_field.suggested_value == "Better Title"
+    refute title_field.loading
+
+    alt_field = Enum.find(updated.fields, &(&1.key == "alt"))
+    assert alt_field.suggested_value == "Better Alt"
+    refute alt_field.loading
+
+    caption_field = Enum.find(updated.fields, &(&1.key == "caption"))
+    assert caption_field.suggested_value == ""
+    assert caption_field.loading
+  end
+
+  test "set_ai_suggestions ignores non-string or empty values" do
+    context = sample_context()
+    ai_modal = Overlay.open(:post, :ai_suggestions, context)
+
+    updated =
+      Overlay.set_ai_suggestions(ai_modal, %{
+        "title" => "Valid",
+        "alt" => "",
+        "caption" => nil,
+        "extra" => ["array"]
+      })
+
+    title_field = Enum.find(updated.fields, &(&1.key == "title"))
+    assert title_field.suggested_value == "Valid"
+
+    alt_field = Enum.find(updated.fields, &(&1.key == "alt"))
+    assert alt_field.suggested_value == "Street scene at dusk"
+
+    caption_field = Enum.find(updated.fields, &(&1.key == "caption"))
+    assert caption_field.suggested_value == "A busy corner at dusk"
+  end
+
   defp sample_context do
     %{
       current_tab: %{type: :post, id: "post-1", title: "Trip Notes", subtitle: "Draft"},

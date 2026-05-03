@@ -2496,6 +2496,15 @@ button svg * {
   color: #9d9d9d;
 }
 
+.ai-suggestion-value {
+  min-height: 1.4em;
+}
+
+.ai-suggestion-value.loading {
+  color: var(--accent-color);
+  font-style: italic;
+}
+
 .ai-suggestions-modal-footer,
 .confirm-delete-modal-footer,
 .confirm-dialog-actions {

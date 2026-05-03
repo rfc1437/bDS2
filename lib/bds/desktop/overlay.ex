@@ -228,6 +228,26 @@ defmodule BDS.Desktop.Overlay do
     }
   end
 
+  def set_ai_suggestions(%{kind: :ai_suggestions} = overlay, suggestions) do
+    fields =
+      Enum.map(overlay.fields, fn field ->
+        case Map.get(suggestions, field.key) do
+          nil ->
+            field
+
+          value when is_binary(value) and value != "" ->
+            %{field | suggested_value: value, loading: false}
+
+          _other ->
+            field
+        end
+      end)
+
+    %{overlay | fields: fields}
+  end
+
+  def set_ai_suggestions(overlay, _suggestions), do: overlay
+
   defp normalize_ai_fields(fields) do
     Enum.map(fields, fn field ->
       %{
@@ -236,7 +256,8 @@ defmodule BDS.Desktop.Overlay do
         current_value: Map.get(field, :current_value, ""),
         suggested_value: Map.get(field, :suggested_value, ""),
         accepted: not Map.get(field, :locked, false),
-        locked: Map.get(field, :locked, false)
+        locked: Map.get(field, :locked, false),
+        loading: Map.get(field, :loading, false)
       }
     end)
   end

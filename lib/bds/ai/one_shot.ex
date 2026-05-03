@@ -6,6 +6,7 @@ defmodule BDS.AI.OneShot do
   alias BDS.AI.Runtime
   alias BDS.Media.Media
   alias BDS.MapUtils
+  alias BDS.Posts
   alias BDS.Posts.Post
   alias BDS.Repo
 
@@ -202,7 +203,7 @@ defmodule BDS.AI.OneShot do
   end
 
   defp one_shot_system_prompt(:analyze_post) do
-    "Return JSON with keys title, excerpt, and slug."
+    "Return JSON with keys title, excerpt, and slug. Each value must be a single string (not an array or object)."
   end
 
   defp one_shot_system_prompt(:translate_post) do
@@ -280,7 +281,7 @@ defmodule BDS.AI.OneShot do
   defp extract_json_response(_response), do: {:error, %{kind: :invalid_json_response}}
 
   defp normalize_post_input(%Post{} = post) do
-    {:ok, %{title: post.title || "", excerpt: post.excerpt || "", content: post.content || ""}}
+    {:ok, %{title: post.title || "", excerpt: post.excerpt || "", content: Posts.editor_body(post)}}
   end
 
   defp normalize_post_input(post_id) when is_binary(post_id) do

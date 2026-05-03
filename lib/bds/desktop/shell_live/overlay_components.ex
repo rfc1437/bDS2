@@ -219,22 +219,25 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
             key: "title",
             label: ShellData.translate("Title", %{}, page_language),
             current_value: post.title || title,
-            suggested_value: refine_title(post.title || title),
-            locked: false
+            suggested_value: "",
+            locked: false,
+            loading: true
           },
           %{
             key: "excerpt",
             label: ShellData.translate("Excerpt", %{}, page_language),
             current_value: post.excerpt || subtitle,
-            suggested_value: refine_excerpt(post.title || title, post.excerpt || subtitle),
-            locked: false
+            suggested_value: "",
+            locked: false,
+            loading: true
           },
           %{
             key: "slug",
             label: ShellData.translate("Slug", %{}, page_language),
             current_value: post.slug || slugify(post.title || title),
-            suggested_value: refine_slug(post.slug || slugify(post.title || title)),
-            locked: post.status == :published
+            suggested_value: "",
+            locked: post.status == :published,
+            loading: true
           }
         ]
 
@@ -253,22 +256,25 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
             key: "title",
             label: ShellData.translate("Title", %{}, page_language),
             current_value: media.title || title,
-            suggested_value: refine_title(media.title || title),
-            locked: false
+            suggested_value: "",
+            locked: false,
+            loading: true
           },
           %{
             key: "alt",
             label: ShellData.translate("Alt Text", %{}, page_language),
             current_value: media.alt || "",
-            suggested_value: media.alt || title,
-            locked: false
+            suggested_value: "",
+            locked: false,
+            loading: true
           },
           %{
             key: "caption",
             label: ShellData.translate("Caption", %{}, page_language),
             current_value: media.caption || "",
-            suggested_value: refine_excerpt(title, media.caption || title),
-            locked: false
+            suggested_value: "",
+            locked: false,
+            loading: true
           }
         ]
 
@@ -380,17 +386,6 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   end
 
   defp pad2(value), do: value |> Integer.to_string() |> String.pad_leading(2, "0")
-
-  defp refine_title(nil), do: ""
-  defp refine_title(title), do: String.trim(title <> " Notes")
-
-  defp refine_excerpt(title, excerpt) do
-    base = excerpt |> to_string() |> String.trim()
-    if base == "", do: "#{title} overview", else: base <> "."
-  end
-
-  defp refine_slug(slug),
-    do: slug |> to_string() |> String.trim_trailing("-") |> Kernel.<>("-updated")
 
   defp slugify(value) do
     value

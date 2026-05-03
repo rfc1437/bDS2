@@ -717,7 +717,27 @@ defmodule BDS.Desktop.ShellLive do
         )
       end
 
-    {:noreply, assign(socket, :shell_overlay, overlay)}
+    socket = assign(socket, :shell_overlay, overlay)
+
+    socket =
+      if kind == "ai_suggestions" and not is_nil(overlay) do
+        if socket.assigns.offline_mode do
+          socket
+          |> assign(:shell_overlay, nil)
+          |> append_output_entry(
+            translated("AI Suggestions"),
+            translated("Automatic AI actions stay gated by airplane mode."),
+            nil,
+            "info"
+          )
+        else
+          spawn_ai_suggestions_task(socket)
+        end
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("close_overlay", _params, socket) do
@@ -1222,6 +1242,68 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, socket}
   end
 
+  def handle_info({:ai_suggestions_result, type, id, result}, socket) do
+    socket =
+      case socket.assigns[:shell_overlay] do
+        %{kind: :ai_suggestions} = overlay ->
+          current_tab = socket.assigns.current_tab
+
+          if current_tab && current_tab.type == type && current_tab.id == id do
+            suggestions =
+              case type do
+                :post ->
+                  %{
+                    "title" => result.title,
+                    "excerpt" => result.excerpt,
+                    "slug" => result.slug
+                  }
+
+                :media ->
+                  %{
+                    "title" => result.title,
+                    "alt" => result.alt,
+                    "caption" => result.caption
+                  }
+              end
+
+            assign(socket, :shell_overlay, Overlay.set_ai_suggestions(overlay, suggestions))
+          else
+            socket
+          end
+
+        _other ->
+          socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:ai_suggestions_error, type, id, reason}, socket) do
+    socket =
+      case socket.assigns[:shell_overlay] do
+        %{kind: :ai_suggestions} ->
+          current_tab = socket.assigns.current_tab
+
+          if current_tab && current_tab.type == type && current_tab.id == id do
+            socket
+            |> assign(:shell_overlay, nil)
+            |> append_output_entry(
+              translated("AI Suggestions"),
+              inspect(reason),
+              nil,
+              "error"
+            )
+          else
+            socket
+          end
+
+        _other ->
+          socket
+      end
+
+    {:noreply, socket}
+  end
+
   def handle_info(:reload_shell, socket) do
     {:noreply, reload_shell(socket, socket.assigns.workbench)}
   end
@@ -1563,6 +1645,43 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp shell_command_atom(action), do: ShellCommandRunner.shell_command_atom(action)
+
+  defp spawn_ai_suggestions_task(socket) do
+    current_tab = socket.assigns.current_tab
+
+    case current_tab do
+      %{type: :post, id: post_id} ->
+        parent = self()
+
+        Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
+          case AI.analyze_post(post_id) do
+            {:ok, result} ->
+              send(parent, {:ai_suggestions_result, :post, post_id, result})
+
+            {:error, reason} ->
+              send(parent, {:ai_suggestions_error, :post, post_id, reason})
+          end
+        end)
+
+      %{type: :media, id: media_id} ->
+        parent = self()
+
+        Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
+          case AI.analyze_image(media_id) do
+            {:ok, result} ->
+              send(parent, {:ai_suggestions_result, :media, media_id, result})
+
+            {:error, reason} ->
+              send(parent, {:ai_suggestions_error, :media, media_id, reason})
+          end
+        end)
+
+      _other ->
+        :ok
+    end
+
+    socket
+  end
 
   defp mac_ui? do
     case Application.get_env(:bds, :shell_platform) do

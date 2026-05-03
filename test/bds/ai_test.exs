@@ -150,6 +150,17 @@ defmodule BDS.AITest do
              usage: usage(22, 14, 0, 0)
            }}
 
+        :analyze_post ->
+          {:ok,
+           %{
+             json: %{
+               "title" => "Analyzed " <> (get_in(request.messages, [Access.at(1), "content"]) || ""),
+               "excerpt" => "Analyzed excerpt",
+               "slug" => "analyzed-slug"
+             },
+             usage: usage(15, 10, 0, 0)
+           }}
+
         :analyze_image ->
           {:ok,
            %{
@@ -476,6 +487,43 @@ defmodule BDS.AITest do
     assert endpoint.kind == :online
     assert request.operation == :translate_post
     assert request.model == "gpt-4.1-mini"
+  end
+
+  test "analyze_post uses editor_body so published posts include filesystem content" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(false)
+    assert :ok = BDS.AI.put_model_preference(:title, "gpt-4.1-mini")
+
+    assert {:ok, result} =
+             BDS.AI.analyze_post(
+               %{
+                 title: "Draft Post",
+                 excerpt: "Short summary",
+                 content: "# Draft body"
+               },
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend
+             )
+
+    assert result.title =~ "Draft Post"
+    assert result.excerpt == "Analyzed excerpt"
+    assert result.slug == "analyzed-slug"
+
+    assert_received {:runtime_request, _endpoint, request}
+    assert request.operation == :analyze_post
+    message = get_in(request.messages, [Access.at(1), "content"]) || ""
+    assert message =~ "# Draft body"
   end
 
   test "analyze_import_taxonomy uses the selected model override and returns only valid existing-term mappings" do
