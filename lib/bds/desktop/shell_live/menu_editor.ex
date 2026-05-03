@@ -1,7 +1,7 @@
 defmodule BDS.Desktop.ShellLive.MenuEditor do
   @moduledoc false
 
-  use Phoenix.Component
+  use Phoenix.LiveComponent
 
   alias BDS.Desktop.ShellData
 
@@ -15,158 +15,239 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
   embed_templates("menu_editor_html/*")
 
-  @spec assign_socket(term()) :: term()
-  def assign_socket(socket) do
-    case socket.assigns[:current_tab] do
-      %{type: :menu_editor, id: tab_id} ->
-        state = State.ensure_state(socket.assigns)
-        menu_editor = State.build(socket.assigns, state)
-
-        socket
-        |> assign(:menu_editor_state, state)
-        |> assign(:menu_editor, menu_editor)
-        |> assign(
-          :tab_meta,
-          Map.put(socket.assigns.tab_meta, {:menu_editor, tab_id}, %{
-            title: translated("menuEditor.tabTitle"),
-            subtitle: translated("menuEditor.description")
-          })
-        )
-
-      _other ->
-        assign(socket, :menu_editor, nil)
-    end
+  @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def update(%{action: :save} = assigns, socket) do
+    socket = assign(socket, Map.drop(assigns, [:action]))
+    socket = do_save(socket)
+    {:ok, socket}
   end
 
-  @spec select_item(term(), term(), term()) :: term()
-  def select_item(socket, item_id, reload) do
-    socket
-    |> State.update_state(fn state -> %{state | selected_id: item_id} end)
-    |> reload.(socket.assigns.workbench)
+  def update(assigns, socket) do
+    socket =
+      socket
+      |> assign(assigns)
+      |> ensure_project_assigns()
+      |> build_data()
+
+    {:ok, socket}
   end
 
-  @spec change_entry(term(), term(), term()) :: term()
-  def change_entry(socket, params, reload) do
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
+  @impl true
+  def render(assigns) do
+    menu_editor(assigns)
+  end
+
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def handle_event("menu_editor_select_item", %{"item_id" => item_id}, socket) do
+    socket =
+      socket
+      |> State.update_state(fn state -> %{state | selected_id: item_id} end)
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("change_menu_editor_entry", %{"menu_editor_entry" => params}, socket) do
     query = Map.get(params, "query", "")
 
-    socket
-    |> State.update_state(fn state -> put_in(state, [:draft, :query], query) end)
-    |> reload.(socket.assigns.workbench)
+    socket =
+      socket
+      |> State.update_state(fn state -> put_in(state, [:draft, :query], query) end)
+      |> build_data()
+
+    {:noreply, socket}
   end
 
-  @spec submit_entry(term(), term()) :: term()
-  def submit_entry(socket, reload) do
-    case DraftManagement.current_draft(socket.assigns) do
-      %{type: :page} ->
-        socket
-        |> State.update_state(&DraftManagement.finalize_submenu_draft/1)
-        |> reload.(socket.assigns.workbench)
+  def handle_event("submit_menu_editor_entry", _params, socket) do
+    socket =
+      case DraftManagement.current_draft(socket.assigns) do
+        %{type: :page} ->
+          socket
+          |> State.update_state(&DraftManagement.finalize_submenu_draft/1)
+          |> build_data()
 
-      %{type: :category} ->
-        socket
-        |> DraftManagement.confirm_category_draft(&State.update_state/2)
-        |> reload.(socket.assigns.workbench)
+        %{type: :category} ->
+          socket
+          |> DraftManagement.confirm_category_draft(&State.update_state/2)
+          |> build_data()
 
-      _other ->
-        reload.(socket, socket.assigns.workbench)
-    end
+        _other ->
+          socket
+      end
+
+    {:noreply, socket}
   end
 
-  @spec cancel_entry(term(), term()) :: term()
-  def cancel_entry(socket, reload) do
-    socket
-    |> State.update_state(&DraftManagement.cancel_draft/1)
-    |> reload.(socket.assigns.workbench)
+  def handle_event("cancel_menu_editor_entry", _params, socket) do
+    socket =
+      socket
+      |> State.update_state(&DraftManagement.cancel_draft/1)
+      |> build_data()
+
+    {:noreply, socket}
   end
 
-  @spec select_page(term(), term(), term()) :: term()
-  def select_page(socket, post_id, reload) do
-    case PageCategory.page_post(socket.assigns.projects.active_project_id, post_id) do
-      nil ->
-        reload.(socket, socket.assigns.workbench)
+  def handle_event("select_menu_editor_page", %{"post_id" => post_id}, socket) do
+    socket =
+      case PageCategory.page_post(socket.assigns.projects.active_project_id, post_id) do
+        nil ->
+          socket
 
-      post ->
-        socket
-        |> State.update_state(&DraftManagement.assign_page_to_draft(&1, post))
-        |> reload.(socket.assigns.workbench)
-    end
+        post ->
+          socket
+          |> State.update_state(&DraftManagement.assign_page_to_draft(&1, post))
+          |> build_data()
+      end
+
+    {:noreply, socket}
   end
 
-  @spec select_category(term(), term(), term()) :: term()
-  def select_category(socket, name, reload) do
+  def handle_event("select_menu_editor_category", %{"name" => name}, socket) do
     project_id = socket.assigns.projects.active_project_id
 
-    case Enum.find(PageCategory.category_options(project_id), &(&1.name == name)) do
-      nil ->
-        reload.(socket, socket.assigns.workbench)
+    socket =
+      case Enum.find(PageCategory.category_options(project_id), &(&1.name == name)) do
+        nil ->
+          socket
 
-      category ->
-        socket
-        |> State.update_state(&DraftManagement.assign_category_to_draft(&1, category))
-        |> reload.(socket.assigns.workbench)
-    end
+        category ->
+          socket
+          |> State.update_state(&DraftManagement.assign_category_to_draft(&1, category))
+          |> build_data()
+      end
+
+    {:noreply, socket}
   end
 
-  @spec toolbar_action(term(), term(), term(), term()) :: term()
-  def toolbar_action(socket, action, reload, append_output) do
-    case action do
-      "add-entry" ->
-        socket
-        |> State.update_state(&DraftManagement.start_page_draft/1)
-        |> reload.(socket.assigns.workbench)
-
-      "add-category-archive" ->
-        socket
-        |> State.update_state(&DraftManagement.start_category_draft/1)
-        |> reload.(socket.assigns.workbench)
-
-      "save" ->
-        State.save(socket, reload, append_output)
-
-      "move-up" ->
-        socket
-        |> State.update_state(&TreeOps.move_selected(&1, :up))
-        |> reload.(socket.assigns.workbench)
-
-      "move-down" ->
-        socket
-        |> State.update_state(&TreeOps.move_selected(&1, :down))
-        |> reload.(socket.assigns.workbench)
-
-      "indent" ->
-        socket
-        |> State.update_state(&TreeOps.indent_selected/1)
-        |> reload.(socket.assigns.workbench)
-
-      "unindent" ->
-        socket
-        |> State.update_state(&TreeOps.unindent_selected/1)
-        |> reload.(socket.assigns.workbench)
-
-      "delete" ->
-        socket
-        |> State.update_state(&TreeOps.delete_selected/1)
-        |> reload.(socket.assigns.workbench)
-
-      _other ->
-        reload.(socket, socket.assigns.workbench)
-    end
+  def handle_event("menu_editor_toolbar_action", %{"action" => action}, socket) do
+    socket = handle_toolbar_action(socket, action)
+    {:noreply, socket}
   end
 
-  @spec drop_item(term(), term(), term(), term(), term()) :: term()
-  def drop_item(socket, drag_item_id, target_item_id, position, reload) do
+  def handle_event(
+        "menu_editor_drop_item",
+        %{
+          "drag_item_id" => drag_item_id,
+          "target_item_id" => target_item_id,
+          "position" => position
+        },
+        socket
+      ) do
+    socket =
+      socket
+      |> State.update_state(&TreeOps.drop_selected(&1, drag_item_id, target_item_id, position))
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("menu_editor_keydown", %{"key" => "Escape"}, socket) do
+    socket =
+      socket
+      |> State.update_state(&DraftManagement.cancel_draft/1)
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("menu_editor_keydown", _params, socket) do
+    {:noreply, socket}
+  end
+
+  defp handle_toolbar_action(socket, "add-entry") do
     socket
-    |> State.update_state(&TreeOps.drop_selected(&1, drag_item_id, target_item_id, position))
-    |> reload.(socket.assigns.workbench)
+    |> State.update_state(&DraftManagement.start_page_draft/1)
+    |> build_data()
   end
 
-  @spec handle_keydown(term(), term(), term()) :: term()
-  def handle_keydown(socket, "Escape", reload) do
-    cancel_entry(socket, reload)
+  defp handle_toolbar_action(socket, "add-category-archive") do
+    socket
+    |> State.update_state(&DraftManagement.start_category_draft/1)
+    |> build_data()
   end
 
-  def handle_keydown(socket, _key, reload) do
-    reload.(socket, socket.assigns.workbench)
+  defp handle_toolbar_action(socket, "save") do
+    do_save(socket)
+  end
+
+  defp handle_toolbar_action(socket, "move-up") do
+    socket
+    |> State.update_state(&TreeOps.move_selected(&1, :up))
+    |> build_data()
+  end
+
+  defp handle_toolbar_action(socket, "move-down") do
+    socket
+    |> State.update_state(&TreeOps.move_selected(&1, :down))
+    |> build_data()
+  end
+
+  defp handle_toolbar_action(socket, "indent") do
+    socket
+    |> State.update_state(&TreeOps.indent_selected/1)
+    |> build_data()
+  end
+
+  defp handle_toolbar_action(socket, "unindent") do
+    socket
+    |> State.update_state(&TreeOps.unindent_selected/1)
+    |> build_data()
+  end
+
+  defp handle_toolbar_action(socket, "delete") do
+    socket
+    |> State.update_state(&TreeOps.delete_selected/1)
+    |> build_data()
+  end
+
+  defp handle_toolbar_action(socket, _other), do: socket
+
+  defp do_save(socket) do
+    state = socket.assigns.menu_editor_state
+
+    {:ok, _menu} =
+      BDS.Menu.update_menu(
+        state.project_id,
+        Enum.map(state.items, &TreeOps.persisted_item/1)
+      )
+
+    notify_output(translated("menuEditor.tabTitle"), translated("menuEditor.saved"), "info")
+    socket |> build_data()
+  end
+
+  defp ensure_project_assigns(socket) do
+    project_id = socket.assigns.project_id
+
+    if Map.has_key?(socket.assigns, :projects) do
+      socket
+    else
+      assign(socket, :projects, %{active_project_id: project_id})
+    end
+  end
+
+  defp build_data(socket) do
+    tab_id = socket.assigns.current_tab.id
+    state = State.ensure_state(socket.assigns)
+    menu_editor = State.build(socket.assigns, state)
+
+    tab_meta =
+      Map.put(socket.assigns.tab_meta, {:menu_editor, tab_id}, %{
+        title: translated("menuEditor.tabTitle"),
+        subtitle: translated("menuEditor.description")
+      })
+
+    socket
+    |> assign(:menu_editor_state, state)
+    |> assign(:menu_editor, menu_editor)
+    |> assign(:tab_meta, tab_meta)
+  end
+
+  defp notify_output(title, message, level) do
+    send(self(), {:menu_editor_output, title, message, level})
   end
 
   attr(:menu_editor, :map, required: true)
@@ -177,6 +258,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
   attr(:items, :list, required: true)
   attr(:menu_editor, :map, required: true)
   attr(:depth, :integer, required: true)
+  attr(:myself, :any, required: true)
 
   @spec menu_tree_level(term()) :: term()
   def menu_tree_level(assigns) do
@@ -199,6 +281,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
           data-selected={to_string(selected?)}
           phx-click={unless(editing?, do: "menu_editor_select_item")}
           phx-value-item_id={unless(editing?, do: item.item_id)}
+          phx-target={@myself}
           style={"--menu-editor-depth: #{@depth};"}
         >
           <span class="menu-editor-row-handle" data-menu-drag-handle="true" title={translated("menuEditor.dragHandle")}>⋮⋮</span>
@@ -213,6 +296,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
                 data-testid="menu-editor-entry-form"
                 phx-change="change_menu_editor_entry"
                 phx-submit="submit_menu_editor_entry"
+                phx-target={@myself}
               >
                 <input
                   class="menu-editor-inline-input"
@@ -241,7 +325,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
                         </button>
                       <% end %>
 
-                      <button class="menu-editor-inline-action" type="button" phx-click="cancel_menu_editor_entry">
+                      <button class="menu-editor-inline-action" type="button" phx-click="cancel_menu_editor_entry" phx-target={@myself}>
                         <%= translated("Cancel") %>
                       </button>
                     </div>
@@ -258,6 +342,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
                             type="button"
                             phx-click="select_menu_editor_page"
                             phx-value-post_id={post.id}
+                            phx-target={@myself}
                           >
                             <span><%= post.title %></span>
                             <small><%= post.slug %></small>
@@ -276,6 +361,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
                             type="button"
                             phx-click="select_menu_editor_category"
                             phx-value-name={category.name}
+                            phx-target={@myself}
                           >
                             <span><%= category.title %></span>
                             <small><%= category.name %></small>
@@ -294,7 +380,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
         <%= if item.children != [] do %>
           <ul class="menu-editor-tree-level">
-            <.menu_tree_level items={item.children} menu_editor={@menu_editor} depth={@depth + 1} />
+            <.menu_tree_level items={item.children} menu_editor={@menu_editor} depth={@depth + 1} myself={@myself} />
           </ul>
         <% end %>
       </li>

@@ -179,6 +179,13 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     %{title: translated("Working tree"), subtitle: translated("Working tree and history")}
   end
 
+  defp derived_tab_meta(%{type: :menu_editor}) do
+    %{
+      title: translated("menuEditor.tabTitle"),
+      subtitle: translated("menuEditor.description")
+    }
+  end
+
   defp derived_tab_meta(_tab), do: %{}
 
   defp merge_missing_meta(existing_meta, fresh_meta) do

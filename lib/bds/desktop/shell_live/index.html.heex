@@ -399,8 +399,12 @@
                 offline_mode={@offline_mode}
               />
 
-            <% @current_tab.type == :menu_editor and @menu_editor -> %>
-              <MenuEditor.menu_editor menu_editor={@menu_editor} />
+            <% @current_tab.type == :menu_editor and @current_project -> %>
+              <.live_component module={MenuEditor} id="menu-editor"
+                project_id={@current_project.id}
+                current_tab={@current_tab}
+                tab_meta={@tab_meta}
+              />
 
             <% @current_tab.type == :tags and @current_project -> %>
               <.live_component module={TagsEditor} id="tags-editor" project_id={@current_project.id} current_tab={@current_tab} tab_meta={@tab_meta} />

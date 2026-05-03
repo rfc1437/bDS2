@@ -527,51 +527,6 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, apply_shell_command(socket, action)}
   end
 
-  def handle_event("menu_editor_select_item", %{"item_id" => item_id}, socket) do
-    {:noreply, MenuEditor.select_item(socket, item_id, &reload_shell/2)}
-  end
-
-  def handle_event("change_menu_editor_entry", %{"menu_editor_entry" => params}, socket) do
-    {:noreply, MenuEditor.change_entry(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("submit_menu_editor_entry", _params, socket) do
-    {:noreply, MenuEditor.submit_entry(socket, &reload_shell/2)}
-  end
-
-  def handle_event("cancel_menu_editor_entry", _params, socket) do
-    {:noreply, MenuEditor.cancel_entry(socket, &reload_shell/2)}
-  end
-
-  def handle_event("select_menu_editor_page", %{"post_id" => post_id}, socket) do
-    {:noreply, MenuEditor.select_page(socket, post_id, &reload_shell/2)}
-  end
-
-  def handle_event("select_menu_editor_category", %{"name" => name}, socket) do
-    {:noreply, MenuEditor.select_category(socket, name, &reload_shell/2)}
-  end
-
-  def handle_event("menu_editor_toolbar_action", %{"action" => action}, socket) do
-    {:noreply, MenuEditor.toolbar_action(socket, action, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event(
-        "menu_editor_drop_item",
-        %{
-          "drag_item_id" => drag_item_id,
-          "target_item_id" => target_item_id,
-          "position" => position
-        },
-        socket
-      ) do
-    {:noreply,
-     MenuEditor.drop_item(socket, drag_item_id, target_item_id, position, &reload_shell/2)}
-  end
-
-  def handle_event("menu_editor_keydown", %{"key" => key}, socket) do
-    {:noreply, MenuEditor.handle_keydown(socket, key, &reload_shell/2)}
-  end
-
   def handle_event("change_script_editor", %{"script_editor" => params}, socket) do
     {:noreply, CodeEntityEditor.update_script(socket, params, &reload_shell/2)}
   end
@@ -1353,6 +1308,10 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, reload_shell(socket, socket.assigns.workbench)}
   end
 
+  def handle_info({:menu_editor_output, title, message, level}, socket) do
+    {:noreply, append_output_entry(socket, title, message, nil, level)}
+  end
+
   @impl true
   def render(assigns) do
     UILocale.put(assigns.page_language)
@@ -1423,7 +1382,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:current_tab, current_tab(workbench))
     |> assign_post_editor()
     |> assign_media_editor()
-    |> assign_menu_editor()
     |> assign_code_entity_editor()
     |> assign_chat_editor()
     |> assign_import_editor()
@@ -1475,10 +1433,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp assign_media_editor(socket) do
     MediaEditor.assign_socket(socket)
-  end
-
-  defp assign_menu_editor(socket) do
-    MenuEditor.assign_socket(socket)
   end
 
   defp assign_code_entity_editor(socket) do
@@ -1658,7 +1612,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :menu_editor}}} = socket) do
-    MenuEditor.toolbar_action(socket, "save", &reload_shell/2, &append_output_entry/5)
+    send_update(MenuEditor, id: "menu-editor", action: :save)
+    socket
   end
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :tags}}} = socket) do
