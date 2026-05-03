@@ -863,6 +863,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> render_change()
 
     _html = render_hook(view, "native_menu_action", %{"action" => "save"})
+    _html = render(view)
 
     saved_post = Posts.get_post!(post.id)
     assert saved_post.title == "Saved Through Menu"
@@ -2096,26 +2097,35 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ "gallery-button"
     refute html =~ "Desktop workbench content routed through the Elixir shell."
 
-    html = render_click(view, "toggle_post_editor_quick_actions", %{"id" => post.id})
+    html =
+      view
+      |> element("[data-testid='post-editor'] .quick-actions-btn")
+      |> render_click()
 
     assert html =~ "quick-actions-menu"
     assert html =~ "quick-action-item"
     assert html =~ "quick-actions-divider"
 
-    html = render_click(view, "set_post_editor_mode", %{"id" => post.id, "mode" => "preview"})
+    html =
+      view
+      |> element("[phx-click='set_post_editor_mode'][phx-value-mode='preview']")
+      |> render_click()
 
     assert html =~ ~s(data-testid="post-editor-preview")
     assert html =~ "editor-preview-frame"
     refute html =~ ~s(data-testid="post-editor-content")
 
-    html = render_click(view, "set_post_editor_mode", %{"id" => post.id, "mode" => "markdown"})
+    html =
+      view
+      |> element("[phx-click='set_post_editor_mode'][phx-value-mode='markdown']")
+      |> render_click()
 
     assert html =~ ~s(data-testid="post-editor-content")
     assert html =~ ~s(data-monaco-language="markdown-with-macros")
     assert html =~ ~s(phx-hook="MonacoEditor")
     refute html =~ "post-editor-markdown-highlight"
 
-    html =
+    _html =
       view
       |> form("[data-testid='post-editor-form']", %{
         post_editor: %{
@@ -2131,10 +2141,12 @@ defmodule BDS.Desktop.ShellLiveTest do
       })
       |> render_change()
 
+    html = render(view)
     assert html =~ ~s(class="tab active dirty")
     assert html =~ "Updated Shell Post"
 
-    _html = render_click(view, "save_post_editor", %{"id" => post.id})
+    _html = render_hook(view, "native_menu_action", %{"action" => "save"})
+    _html = render(view)
 
     saved_post = Posts.get_post!(post.id)
     assert saved_post.title == "Updated Shell Post"
@@ -2145,7 +2157,10 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert saved_post.author == "Ada Lovelace"
     assert saved_post.language == "de"
 
-    html = render_click(view, "publish_post_editor", %{"id" => post.id})
+    html =
+      view
+      |> element("[data-testid='post-publish-button']")
+      |> render_click()
 
     assert html =~ ~s(data-testid="post-status-badge")
     assert html =~ ~s(data-testid="post-delete-button")
@@ -2169,10 +2184,14 @@ defmodule BDS.Desktop.ShellLiveTest do
       })
       |> render_change()
 
-    _html = render_click(view, "save_post_editor", %{"id" => post.id})
+    _html = render_hook(view, "native_menu_action", %{"action" => "save"})
+    _html = render(view)
     assert Posts.get_post!(post.id).status == :draft
 
-    html = render_click(view, "discard_post_editor", %{"id" => post.id})
+    html =
+      view
+      |> element("[data-testid='post-discard-button']")
+      |> render_click()
 
     discarded_post = Posts.get_post!(post.id)
     assert html =~ "Updated Shell Post"

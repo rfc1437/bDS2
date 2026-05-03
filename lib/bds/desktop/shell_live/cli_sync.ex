@@ -46,29 +46,6 @@ defmodule BDS.Desktop.ShellLive.CliSync do
       |> assign(:workbench, workbench)
       |> assign(:shell_overlay, nil)
       |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:post, post_id}))
-      |> assign(:post_editor_drafts, Map.delete(socket.assigns.post_editor_drafts, post_id))
-      |> assign(
-        :post_editor_active_languages,
-        Map.delete(socket.assigns.post_editor_active_languages, post_id)
-      )
-      |> assign(
-        :post_editor_tag_queries,
-        Map.delete(socket.assigns.post_editor_tag_queries, post_id)
-      )
-      |> assign(
-        :post_editor_category_queries,
-        Map.delete(socket.assigns.post_editor_category_queries, post_id)
-      )
-      |> assign(
-        :post_editor_quick_actions_open,
-        Map.delete(socket.assigns.post_editor_quick_actions_open, post_id)
-      )
-      |> assign(:post_editor_modes, Map.delete(socket.assigns.post_editor_modes, post_id))
-      |> assign(:post_editor_expanded, Map.delete(socket.assigns.post_editor_expanded, post_id))
-      |> assign(
-        :post_editor_save_states,
-        Map.delete(socket.assigns.post_editor_save_states, post_id)
-      )
 
     {socket, workbench}
   end

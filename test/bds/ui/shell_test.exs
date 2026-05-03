@@ -379,8 +379,8 @@ defmodule BDS.UI.ShellTest do
         "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex"
       )
 
-    assert template =~ "<PostEditor.post_editor"
-    assert post_editor_ex =~ "def build(%{current_tab: %{type: :post, id: post_id}} = assigns)"
+    assert template =~ "<.live_component module={PostEditor}"
+    assert post_editor_ex =~ "defp build_data(socket)"
 
     assert Regex.match?(
              ~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= translated\("Quick Actions"\) %><\/span>/s,

@@ -160,17 +160,9 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:titlebar_menu_item_index, nil)
      |> assign(:tab_meta, %{})
      |> assign(:project_menu_open, false)
-     |> assign(:sidebar_filters_by_view, %{})
-     |> assign(:sidebar_filter_panels, %{})
-     |> assign(:post_editor_drafts, %{})
-     |> assign(:post_editor_active_languages, %{})
-     |> assign(:post_editor_tag_queries, %{})
-     |> assign(:post_editor_category_queries, %{})
-     |> assign(:post_editor_quick_actions_open, %{})
-     |> assign(:post_editor_modes, %{})
-     |> assign(:post_editor_expanded, %{})
-     |> assign(:post_editor_save_states, %{})
-     |> assign(:media_editor_drafts, %{})
+      |> assign(:sidebar_filters_by_view, %{})
+      |> assign(:sidebar_filter_panels, %{})
+      |> assign(:media_editor_drafts, %{})
      |> assign(:media_editor_quick_actions_open, %{})
      |> assign(:media_editor_post_pickers_open, %{})
       |> assign(:media_editor_post_picker_queries, %{})
@@ -337,79 +329,6 @@ defmodule BDS.Desktop.ShellLive do
       |> Workbench.set_panel_tab(:tasks)
 
     {:noreply, reload_shell(socket, workbench)}
-  end
-
-  def handle_event("change_post_editor", %{"post_editor" => params}, socket) do
-    {:noreply, PostEditor.update(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("save_post_editor", %{"id" => post_id}, socket) do
-    {:noreply,
-     PostEditor.persist_socket(socket, post_id, :save, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("publish_post_editor", %{"id" => post_id}, socket) do
-    {:noreply,
-     PostEditor.persist_socket(socket, post_id, :publish, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("discard_post_editor", %{"id" => post_id}, socket) do
-    {:noreply,
-     PostEditor.discard_socket(socket, post_id, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("delete_post_editor", %{"id" => post_id}, socket) do
-    {:noreply, PostEditor.delete_socket(socket, post_id, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("set_post_editor_mode", %{"id" => post_id, "mode" => mode}, socket) do
-    {:noreply, PostEditor.set_mode(socket, post_id, mode, &reload_shell/2)}
-  end
-
-  def handle_event("toggle_post_metadata", %{"id" => post_id}, socket) do
-    {:noreply, PostEditor.toggle_section(socket, post_id, :metadata, &reload_shell/2)}
-  end
-
-  def handle_event("toggle_post_excerpt", %{"id" => post_id}, socket) do
-    {:noreply, PostEditor.toggle_section(socket, post_id, :excerpt, &reload_shell/2)}
-  end
-
-  def handle_event(
-        "select_post_editor_language",
-        %{"id" => post_id, "language" => language},
-        socket
-      ) do
-    {:noreply, PostEditor.select_language(socket, post_id, language, &reload_shell/2)}
-  end
-
-  def handle_event("toggle_post_editor_quick_actions", %{"id" => post_id}, socket) do
-    {:noreply, PostEditor.toggle_quick_actions(socket, post_id, &reload_shell/2)}
-  end
-
-  def handle_event("detect_post_editor_language", %{"id" => post_id}, socket) do
-    {:noreply,
-     PostEditor.detect_language(socket, post_id, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("add_post_editor_tag", %{"id" => post_id, "tag" => tag}, socket) do
-    {:noreply, PostEditor.add_list_value(socket, post_id, :tags, tag, &reload_shell/2)}
-  end
-
-  def handle_event("remove_post_editor_tag", %{"id" => post_id, "tag" => tag}, socket) do
-    {:noreply, PostEditor.remove_list_value(socket, post_id, :tags, tag, &reload_shell/2)}
-  end
-
-  def handle_event("add_post_editor_category", %{"id" => post_id, "category" => category}, socket) do
-    {:noreply, PostEditor.add_list_value(socket, post_id, :categories, category, &reload_shell/2)}
-  end
-
-  def handle_event(
-        "remove_post_editor_category",
-        %{"id" => post_id, "category" => category},
-        socket
-      ) do
-    {:noreply,
-     PostEditor.remove_list_value(socket, post_id, :categories, category, &reload_shell/2)}
   end
 
   def handle_event("change_media_editor", %{"media_editor" => params}, socket) do
@@ -769,11 +688,8 @@ defmodule BDS.Desktop.ShellLive do
     socket =
       case socket.assigns[:current_tab] do
         %{type: :post, id: post_id} when kind in ["ai_suggestions", "language_picker"] ->
-          assign(
-            socket,
-            :post_editor_quick_actions_open,
-            Map.put(socket.assigns.post_editor_quick_actions_open, post_id, false)
-          )
+          send_update(__MODULE__.PostEditor, id: "post-editor-#{post_id}", action: :close_quick_actions)
+          socket
 
         %{type: :media, id: media_id}
         when kind in ["ai_suggestions", "language_picker", "confirm_delete"] ->
@@ -868,12 +784,8 @@ defmodule BDS.Desktop.ShellLive do
               socket
 
             result ->
-              PostEditor.insert_content(
-                socket,
-                post_id,
-                ShellOverlayComponents.markdown_link(result.title, result.canonical_url),
-                &reload_shell/2
-              )
+              send(self(), {:post_editor_insert_content, post_id, ShellOverlayComponents.markdown_link(result.title, result.canonical_url)})
+              socket
           end
 
         {%{kind: :insert_media}, %{type: :post, id: post_id}} ->
@@ -889,7 +801,8 @@ defmodule BDS.Desktop.ShellLive do
                   "[#{result.original_name}](bds-media://#{result.media_id})"
                 end
 
-              PostEditor.insert_content(socket, post_id, syntax, &reload_shell/2)
+              send(self(), {:post_editor_insert_content, post_id, syntax})
+              socket
           end
 
         _other ->
@@ -913,10 +826,10 @@ defmodule BDS.Desktop.ShellLive do
             end
 
           if details do
-            PostEditor.insert_content(socket, post_id, details, &reload_shell/2)
-          else
-            socket
+            send(self(), {:post_editor_insert_content, post_id, details})
           end
+
+          socket
 
         _other ->
           socket
@@ -931,7 +844,8 @@ defmodule BDS.Desktop.ShellLive do
     socket =
       case {socket.assigns[:shell_overlay], current_tab} do
         {%{kind: :language_picker}, %{type: :post, id: post_id}} ->
-          PostEditor.translate(socket, post_id, code, &reload_shell/2, &append_output_entry/5)
+          send(self(), {:post_editor_translate, post_id, code})
+          socket
 
         {%{kind: :language_picker}, %{type: :media, id: media_id}} ->
           MediaEditor.translate(socket, media_id, code, &reload_shell/2, &append_output_entry/5)
@@ -952,13 +866,8 @@ defmodule BDS.Desktop.ShellLive do
           execute_sidebar_delete(socket, route, id)
 
         {%{kind: :ai_suggestions} = overlay, %{type: :post, id: post_id}} ->
-          PostEditor.apply_ai_suggestions(
-            socket,
-            post_id,
-            Overlay.selected_ai_fields(overlay),
-            &reload_shell/2,
-            &append_output_entry/5
-          )
+          send(self(), {:post_editor_apply_ai_suggestions, post_id, Overlay.selected_ai_fields(overlay)})
+          socket
 
         {%{kind: :ai_suggestions} = overlay, %{type: :media, id: media_id}} ->
           MediaEditor.apply_ai_suggestions(
@@ -1272,6 +1181,47 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, append_output_entry(socket, title, message, nil, level)}
   end
 
+  def handle_info({:post_editor_output, title, message, level}, socket) do
+    {:noreply, append_output_entry(socket, title, message, nil, level)}
+  end
+
+  def handle_info({:post_editor_dirty, post_id, dirty?}, socket) do
+    workbench =
+      if dirty? do
+        BDS.UI.Workbench.mark_dirty(socket.assigns.workbench, :post, post_id)
+      else
+        BDS.UI.Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
+      end
+
+    {:noreply, assign(socket, :workbench, workbench)}
+  end
+
+  def handle_info({:post_editor_tab_meta, post_id, title, subtitle}, socket) do
+    tab_meta =
+      Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: title, subtitle: subtitle})
+
+    {:noreply, assign(socket, :tab_meta, tab_meta)}
+  end
+
+  def handle_info({:post_editor_insert_content, post_id, content}, socket) do
+    send_update(PostEditor, id: "post-editor-#{post_id}", action: :insert_content, content: content)
+    {:noreply, socket}
+  end
+
+  def handle_info({:post_editor_translate, post_id, language}, socket) do
+    send_update(PostEditor, id: "post-editor-#{post_id}", action: :translate, language: language)
+    {:noreply, socket}
+  end
+
+  def handle_info({:post_editor_apply_ai_suggestions, post_id, fields}, socket) do
+    send_update(PostEditor, id: "post-editor-#{post_id}",
+      action: :apply_ai_suggestions,
+      fields: fields
+    )
+
+    {:noreply, socket}
+  end
+
   def handle_info(:reload_shell, socket) do
     {:noreply, reload_shell(socket, socket.assigns.workbench)}
   end
@@ -1348,7 +1298,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:menu_groups, socket.assigns[:menu_groups] || TitlebarMenu.groups())
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
     |> assign(:current_tab, current_tab(workbench))
-    |> assign_post_editor()
     |> assign_media_editor()
     |> assign_chat_editor()
     |> assign_import_editor()
@@ -1392,10 +1341,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp current_tab(%{tabs: tabs, active_tab: {type, id}}) do
     Enum.find(tabs, &(&1.type == type and &1.id == id))
-  end
-
-  defp assign_post_editor(socket) do
-    PostEditor.assign_socket(socket)
   end
 
   defp assign_media_editor(socket) do
@@ -1562,7 +1507,8 @@ defmodule BDS.Desktop.ShellLive do
   defp shell_command?(action), do: not is_nil(shell_command_atom(action))
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :post, id: post_id}}} = socket) do
-    PostEditor.persist_socket(socket, post_id, :save, &reload_shell/2, &append_output_entry/5)
+    send_update(PostEditor, id: "post-editor-#{post_id}", action: :save)
+    socket
   end
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :media, id: media_id}}} = socket) do
@@ -1597,7 +1543,8 @@ defmodule BDS.Desktop.ShellLive do
   defp save_current_tab(socket), do: reload_shell(socket, socket.assigns.workbench)
 
   defp publish_current_tab(%{assigns: %{current_tab: %{type: :post, id: post_id}}} = socket) do
-    PostEditor.persist_socket(socket, post_id, :publish, &reload_shell/2, &append_output_entry/5)
+    send_update(PostEditor, id: "post-editor-#{post_id}", action: :publish)
+    socket
   end
 
   defp publish_current_tab(socket), do: reload_shell(socket, socket.assigns.workbench)
@@ -1657,9 +1604,21 @@ defmodule BDS.Desktop.ShellLive do
   defp execute_sidebar_delete(socket, route, id) do
     case route do
       "post" ->
-        socket
-        |> assign(:shell_overlay, nil)
-        |> PostEditor.delete_socket(id, &reload_shell/2, &append_output_entry/5)
+        case Posts.delete_post(id) do
+          {:ok, :deleted} ->
+            workbench = BDS.UI.Workbench.close_tab(socket.assigns.workbench, :post, id)
+
+            socket
+            |> assign(:shell_overlay, nil)
+            |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:post, id}))
+            |> reload_shell(workbench)
+
+          {:error, reason} ->
+            socket
+            |> assign(:shell_overlay, nil)
+            |> append_output_entry(sidebar_delete_title("post"), inspect(reason), nil, "error")
+            |> reload_shell(socket.assigns.workbench)
+        end
 
       "media" ->
         socket

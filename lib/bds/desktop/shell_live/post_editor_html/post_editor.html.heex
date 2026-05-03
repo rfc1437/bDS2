@@ -22,7 +22,7 @@
           class="secondary quick-actions-btn"
           type="button"
           phx-click="toggle_post_editor_quick_actions"
-          phx-value-id={@post_editor.id}
+          phx-target={@myself}
         >
           <span class="quick-actions-btn-icon">⚡</span>
           <span class="quick-actions-btn-label"><%= translated("Quick Actions") %></span>
@@ -66,26 +66,26 @@
       </div>
 
       <%= if @post_editor.can_publish? do %>
-        <button class="success" data-testid="post-publish-button" type="button" phx-click="publish_post_editor" phx-value-id={@post_editor.id}>
+        <button class="success" data-testid="post-publish-button" type="button" phx-click="publish_post_editor" phx-target={@myself}>
           <%= translated("Publish") %>
         </button>
       <% end %>
       <%= if @post_editor.can_publish? do %>
-        <button class="secondary danger" data-testid="post-discard-button" type="button" phx-click="discard_post_editor" phx-value-id={@post_editor.id} title={@post_editor.discard_title}>
+        <button class="secondary danger" data-testid="post-discard-button" type="button" phx-click="discard_post_editor" phx-target={@myself} title={@post_editor.discard_title}>
           <%= @post_editor.discard_label %>
         </button>
       <% end %>
       <%= if @post_editor.can_delete? do %>
-        <button class="secondary danger" data-testid="post-delete-button" type="button" phx-click="delete_post_editor" phx-value-id={@post_editor.id}>
+        <button class="secondary danger" data-testid="post-delete-button" type="button" phx-click="delete_post_editor" phx-target={@myself}>
           <%= translated("Delete") %>
         </button>
       <% end %>
     </div>
   </div>
 
-  <form class="post-editor-form editor-content" data-testid="post-editor-form" phx-change="change_post_editor">
+  <form class="post-editor-form editor-content" data-testid="post-editor-form" phx-change="change_post_editor" phx-target={@myself}>
     <div class="metadata-toggle-header">
-      <button class={["metadata-toggle", if(@post_editor.metadata_expanded, do: "expanded")]} type="button" phx-click="toggle_post_metadata" phx-value-id={@post_editor.id}>
+      <button class={["metadata-toggle", if(@post_editor.metadata_expanded, do: "expanded")]} type="button" phx-click="toggle_post_metadata" phx-target={@myself}>
         <span class="metadata-toggle-chevron"><%= if @post_editor.metadata_expanded, do: "▼", else: "▶" %></span>
         <span><%= translated("Metadata") %></span>
       </button>
@@ -100,8 +100,8 @@
             ]}
             type="button"
             phx-click="select_post_editor_language"
-            phx-value-id={@post_editor.id}
             phx-value-language={flag.language}
+            phx-target={@myself}
             title={flag.label}
             aria-label={flag.label}
           >
@@ -126,7 +126,7 @@
                 <%= for tag <- @post_editor.tag_chips do %>
                   <span class={["tag-chip", if(tag.color, do: "has-color")]} style={tag_chip_style(tag.color)}>
                     <span><%= tag.name %></span>
-                    <button class="tag-chip-remove" type="button" phx-click="remove_post_editor_tag" phx-value-id={@post_editor.id} phx-value-tag={tag.name} aria-label={translated("Remove tag")}>×</button>
+                    <button class="tag-chip-remove" type="button" phx-click="remove_post_editor_tag" phx-value-tag={tag.name} phx-target={@myself} aria-label={translated("Remove tag")}>×</button>
                   </span>
                 <% end %>
 
@@ -143,7 +143,7 @@
               <%= if String.trim(@post_editor.tag_query || "") != "" and (Enum.any?(@post_editor.tag_suggestions) or @post_editor.tag_query_addable?) do %>
                 <div class="tag-suggestions">
                   <%= for tag <- @post_editor.tag_suggestions do %>
-                    <button class="tag-suggestion" type="button" phx-click="add_post_editor_tag" phx-value-id={@post_editor.id} phx-value-tag={tag.name}>
+                    <button class="tag-suggestion" type="button" phx-click="add_post_editor_tag" phx-value-tag={tag.name} phx-target={@myself}>
                       <%= if tag.color do %>
                         <span class="tag-suggestion-color" style={"background-color: #{tag.color}"}></span>
                       <% end %>
@@ -152,7 +152,7 @@
                   <% end %>
 
                   <%= if @post_editor.tag_query_addable? do %>
-                    <button class="tag-suggestion create-new" type="button" phx-click="add_post_editor_tag" phx-value-id={@post_editor.id} phx-value-tag={@post_editor.tag_query}>
+                    <button class="tag-suggestion create-new" type="button" phx-click="add_post_editor_tag" phx-value-tag={@post_editor.tag_query} phx-target={@myself}>
                       <span class="tag-suggestion-icon">+</span>
                       <span><%= translated("Create tag") %>: <strong><%= @post_editor.tag_query %></strong></span>
                     </button>
@@ -181,7 +181,7 @@
                 data-testid="post-detect-language-button"
                 type="button"
                 phx-click="detect_post_editor_language"
-                phx-value-id={@post_editor.id}
+                phx-target={@myself}
                 disabled={not @post_editor.detect_language_enabled?}
               >
                 <%= translated("Detect") %>
@@ -211,7 +211,7 @@
                   <%= for category <- @post_editor.category_values do %>
                     <span class="tag-chip">
                       <span><%= category %></span>
-                      <button class="tag-chip-remove" type="button" phx-click="remove_post_editor_category" phx-value-id={@post_editor.id} phx-value-category={category} aria-label={translated("Remove category")}>×</button>
+                      <button class="tag-chip-remove" type="button" phx-click="remove_post_editor_category" phx-value-category={category} phx-target={@myself} aria-label={translated("Remove category")}>×</button>
                     </span>
                   <% end %>
 
@@ -228,13 +228,13 @@
                 <%= if String.trim(@post_editor.category_query || "") != "" and (Enum.any?(@post_editor.category_suggestions) or @post_editor.category_query_addable?) do %>
                   <div class="tag-suggestions">
                     <%= for category <- @post_editor.category_suggestions do %>
-                      <button class="tag-suggestion" type="button" phx-click="add_post_editor_category" phx-value-id={@post_editor.id} phx-value-category={category}>
+                      <button class="tag-suggestion" type="button" phx-click="add_post_editor_category" phx-value-category={category} phx-target={@myself}>
                         <span class="tag-suggestion-name"><%= category %></span>
                       </button>
                     <% end %>
 
                     <%= if @post_editor.category_query_addable? do %>
-                      <button class="tag-suggestion create-new" type="button" phx-click="add_post_editor_category" phx-value-id={@post_editor.id} phx-value-category={@post_editor.category_query}>
+                      <button class="tag-suggestion create-new" type="button" phx-click="add_post_editor_category" phx-value-category={@post_editor.category_query} phx-target={@myself}>
                         <span class="tag-suggestion-icon">+</span>
                         <span><%= translated("Create category") %>: <strong><%= @post_editor.category_query %></strong></span>
                       </button>
@@ -308,7 +308,7 @@
         </aside>
       </div>
 
-    <button class={["metadata-toggle", if(@post_editor.excerpt_expanded, do: "expanded")]} type="button" phx-click="toggle_post_excerpt" phx-value-id={@post_editor.id}>
+    <button class={["metadata-toggle", if(@post_editor.excerpt_expanded, do: "expanded")]} type="button" phx-click="toggle_post_excerpt" phx-target={@myself}>
       <span class="metadata-toggle-chevron"><%= if @post_editor.excerpt_expanded, do: "▼", else: "▶" %></span>
       <span><%= translated("Excerpt") %></span>
     </button>
@@ -333,8 +333,8 @@
                 class={if(@post_editor.mode == mode, do: "active")}
                 type="button"
                 phx-click="set_post_editor_mode"
-                phx-value-id={@post_editor.id}
                 phx-value-mode={mode}
+                phx-target={@myself}
               >
                 <%= post_editor_mode_label(mode) %>
               </button>

@@ -1,32 +1,26 @@
 defmodule BDS.Desktop.ShellLive.PostEditor do
   @moduledoc false
 
-  use Phoenix.Component
+  use Phoenix.LiveComponent
 
   alias BDS.{AI, Posts, Preview}
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, ListValues, Persistence, PostMetadata}
+  alias BDS.Desktop.UILocale
   alias BDS.Posts.Post
   alias BDS.Tags
-  alias BDS.UI.Workbench
 
   import DraftManagement,
     only: [
       current_draft: 4,
-      delete_nested_map: 3,
       editing_canonical_language?: 3,
-      maybe_update_draft: 7,
       normalize_language: 2,
       normalize_mode: 1,
       normalize_params: 3,
       persisted_form: 3,
-      put_draft_field: 6,
-      put_nested_map: 4,
-      put_query_state: 4,
-      query_value: 3,
+      persisted_form: 4,
       record_status: 1,
       record_title: 2,
-      reload_with_assigned_workbench: 2,
       save_state_for_action: 1,
       toggled_sections: 3
     ]
@@ -76,548 +70,301 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   embed_templates("post_editor_html/*")
 
-  @spec assign_socket(term()) :: term()
-  def assign_socket(socket) do
-    assigns =
-      Map.put(
-        socket.assigns,
-        :project_metadata,
-        project_metadata(socket.assigns.projects.active_project_id)
-      )
+  @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def update(%{action: :save} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action]))
+      |> do_save()
 
-    assign(socket, :post_editor, build(assigns))
+    {:ok, socket}
   end
 
-  @spec update(term(), term(), term()) :: term()
-  def update(socket, params, reload) do
-    case socket.assigns.current_tab do
-      %{type: :post, id: post_id} ->
-        case Posts.get_post(post_id) do
-          nil ->
-            socket
+  def update(%{action: :publish} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action]))
+      |> do_publish()
 
-          %Post{} = post ->
-            metadata = project_metadata(post.project_id)
-            canonical_language = canonical_language(post, metadata)
+    {:ok, socket}
+  end
 
-            current_language =
-              Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
+  def update(%{action: :close_quick_actions} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action]))
+      |> assign(:quick_actions_open?, false)
+      |> build_data()
 
-            requested_language = normalize_language(Map.get(params, "language"), current_language)
+    {:ok, socket}
+  end
 
-            next_language =
-              if current_language == canonical_language do
-                requested_language
-              else
-                current_language
-              end
+  def update(%{action: :insert_content, content: content} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action, :content]))
+      |> Phoenix.LiveView.push_event("post-editor-insert-content", %{
+        id: socket.assigns.post_id,
+        content: content
+      })
+      |> assign(:shell_overlay, nil)
 
-            draft = normalize_params(params, current_language, next_language)
-            current = current_draft(socket.assigns, post, metadata, next_language)
-            dirty? = draft != current
+    {:ok, socket}
+  end
 
-            socket
-            |> put_query_state(post_id, :tags, Map.get(params, "tag_query", ""))
-            |> put_query_state(post_id, :categories, Map.get(params, "category_query", ""))
-            |> maybe_update_draft(post_id, post, current_language, next_language, draft, dirty?)
-            |> reload_with_assigned_workbench(reload)
-        end
+  def update(%{action: :translate, language: language} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action, :language]))
+      |> do_translate(language)
 
-      _other ->
-        socket
+    {:ok, socket}
+  end
+
+  def update(%{action: :apply_ai_suggestions, fields: fields} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action, :fields]))
+      |> do_apply_ai_suggestions(fields)
+
+    {:ok, socket}
+  end
+
+  def update(assigns, socket) do
+    socket =
+      socket
+      |> assign(assigns)
+      |> ensure_state()
+      |> build_data()
+
+    {:ok, socket}
+  end
+
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
+  @impl true
+  def render(%{post_editor: nil} = assigns), do: ~H"<div></div>"
+
+  def render(assigns) do
+    post_editor(assigns)
+  end
+
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def handle_event("change_post_editor", %{"post_editor" => params}, socket) do
+    post_id = socket.assigns.post_id
+    current_language = socket.assigns.active_language
+    metadata = socket.assigns.project_metadata
+    post = socket.assigns.post
+
+    requested_language = normalize_language(Map.get(params, "language"), current_language)
+
+    next_language =
+      if current_language == socket.assigns.canonical_language do
+        requested_language
+      else
+        current_language
+      end
+
+    draft = normalize_params(params, current_language, next_language)
+    current = component_current_draft(socket, post, metadata, next_language)
+    dirty? = draft != current
+    was_dirty? = socket.assigns.dirty?
+
+    socket =
+      socket
+      |> assign(:tag_query, Map.get(params, "tag_query", ""))
+      |> assign(:category_query, Map.get(params, "category_query", ""))
+      |> maybe_update_component_draft(next_language, draft)
+      |> assign(:dirty?, dirty?)
+      |> build_data()
+
+    if dirty? != was_dirty? do
+      notify_parent({:post_editor_dirty, post_id, dirty?})
     end
+
+    {:noreply, socket}
   end
 
-  @spec persist_socket(term(), term(), term(), term(), term()) :: term()
-  def persist_socket(socket, post_id, action, reload, append_output) do
-    case Posts.get_post(post_id) do
-      nil ->
-        socket
-
-      %Post{} = post ->
-        metadata = project_metadata(post.project_id)
-        canonical_language = canonical_language(post, metadata)
-
-        active_language =
-          Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
-
-        draft = current_draft(socket.assigns, post, metadata, active_language)
-
-        case persist(post, draft, active_language, metadata, action) do
-          {:ok, record} ->
-            workbench = Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
-            normalized_form = persisted_form(Posts.get_post!(post_id), metadata, active_language)
-
-            socket
-            |> assign(:workbench, workbench)
-            |> assign(
-              :post_editor_drafts,
-              put_nested_map(
-                socket.assigns.post_editor_drafts,
-                post_id,
-                active_language,
-                normalized_form
-              )
-            )
-            |> assign(
-              :post_editor_save_states,
-              Map.put(
-                socket.assigns.post_editor_save_states,
-                post_id,
-                save_state_for_action(action)
-              )
-            )
-            |> assign(
-              :tab_meta,
-              Map.put(socket.assigns.tab_meta, {:post, post_id}, %{
-                title: record_title(record, Posts.get_post!(post_id)),
-                subtitle: Atom.to_string(record_status(record))
-              })
-            )
-            |> reload.(workbench)
-
-          {:error, reason} ->
-            socket
-            |> append_output.(translated("Post"), inspect(reason), nil, "error")
-            |> reload.(socket.assigns.workbench)
-        end
-    end
+  def handle_event("save_post_editor", _params, socket) do
+    {:noreply, do_save(socket)}
   end
 
-  @spec discard_socket(term(), term(), term(), term()) :: term()
-  def discard_socket(socket, post_id, reload, append_output) do
-    case Posts.get_post(post_id) do
-      nil ->
-        socket
-
-      %Post{} = post ->
-        metadata = project_metadata(post.project_id)
-        canonical_language = canonical_language(post, metadata)
-
-        active_language =
-          Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
-
-        case discard(post, active_language, metadata) do
-          {:ok, restored_post} ->
-            workbench = Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
-
-            socket
-            |> assign(:workbench, workbench)
-            |> assign(
-              :post_editor_drafts,
-              delete_nested_map(socket.assigns.post_editor_drafts, post_id, active_language)
-            )
-            |> assign(
-              :post_editor_save_states,
-              Map.put(socket.assigns.post_editor_save_states, post_id, :discarded)
-            )
-            |> assign(
-              :tab_meta,
-              Map.put(socket.assigns.tab_meta, {:post, post_id}, %{
-                title: restored_post.title || restored_post.slug || restored_post.id,
-                subtitle: Atom.to_string(restored_post.status || :draft)
-              })
-            )
-            |> reload.(workbench)
-
-          {:error, reason} ->
-            socket
-            |> append_output.(translated("Post"), inspect(reason), nil, "error")
-            |> reload.(socket.assigns.workbench)
-        end
-    end
+  def handle_event("publish_post_editor", _params, socket) do
+    {:noreply, do_publish(socket)}
   end
 
-  @spec delete_socket(term(), term(), term(), term()) :: term()
-  def delete_socket(socket, post_id, reload, append_output) do
-    case Posts.delete_post(post_id) do
-      {:ok, :deleted} ->
-        workbench = Workbench.close_tab(socket.assigns.workbench, :post, post_id)
-
-        socket
-        |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:post, post_id}))
-        |> assign(:post_editor_drafts, Map.delete(socket.assigns.post_editor_drafts, post_id))
-        |> assign(
-          :post_editor_active_languages,
-          Map.delete(socket.assigns.post_editor_active_languages, post_id)
-        )
-        |> assign(
-          :post_editor_tag_queries,
-          Map.delete(socket.assigns.post_editor_tag_queries, post_id)
-        )
-        |> assign(
-          :post_editor_category_queries,
-          Map.delete(socket.assigns.post_editor_category_queries, post_id)
-        )
-        |> assign(
-          :post_editor_quick_actions_open,
-          Map.delete(socket.assigns.post_editor_quick_actions_open, post_id)
-        )
-        |> assign(:post_editor_modes, Map.delete(socket.assigns.post_editor_modes, post_id))
-        |> assign(:post_editor_expanded, Map.delete(socket.assigns.post_editor_expanded, post_id))
-        |> assign(
-          :post_editor_save_states,
-          Map.delete(socket.assigns.post_editor_save_states, post_id)
-        )
-        |> reload.(workbench)
-
-      {:error, reason} ->
-        socket
-        |> append_output.(translated("Post"), inspect(reason), nil, "error")
-        |> reload.(socket.assigns.workbench)
-    end
+  def handle_event("discard_post_editor", _params, socket) do
+    {:noreply, do_discard(socket)}
   end
 
-  @spec set_mode(term(), term(), term(), term()) :: term()
-  def set_mode(socket, post_id, mode, reload) do
-    workbench = socket.assigns.workbench
+  def handle_event("delete_post_editor", _params, socket) do
+    {:noreply, do_delete(socket)}
+  end
+
+  def handle_event("set_post_editor_mode", %{"mode" => mode}, socket) do
     normalized_mode = normalize_mode(mode)
 
     if normalized_mode == :preview do
-      case Posts.get_post(post_id) do
-        %Post{} = post ->
-          _ = Preview.ensure_preview(post.project_id)
-
-        _other ->
-          :ok
+      case socket.assigns.post do
+        %Post{} = post -> _ = Preview.ensure_preview(post.project_id)
+        _other -> :ok
       end
     end
 
-    socket
-    |> assign(
-      :post_editor_modes,
-      Map.put(socket.assigns.post_editor_modes, post_id, normalized_mode)
-    )
-    |> reload.(workbench)
-  end
-
-  @spec toggle_section(term(), term(), term(), term()) :: term()
-  def toggle_section(socket, post_id, section, reload) when section in [:metadata, :excerpt] do
-    workbench = socket.assigns.workbench
-
-    socket
-    |> assign(
-      :post_editor_expanded,
-      Map.put(
-        socket.assigns.post_editor_expanded,
-        post_id,
-        toggled_sections(socket.assigns.post_editor_expanded, post_id, section)
-      )
-    )
-    |> reload.(workbench)
-  end
-
-  @spec select_language(term(), term(), term(), term()) :: term()
-  def select_language(socket, post_id, language, reload) do
-    workbench = socket.assigns.workbench
-
-    socket
-    |> assign(
-      :post_editor_active_languages,
-      Map.put(
-        socket.assigns.post_editor_active_languages,
-        post_id,
-        normalize_language(language, language)
-      )
-    )
-    |> reload.(workbench)
-  end
-
-  @spec toggle_quick_actions(term(), term(), term()) :: term()
-  def toggle_quick_actions(socket, post_id, reload) do
-    workbench = socket.assigns.workbench
-
-    socket
-    |> assign(
-      :post_editor_quick_actions_open,
-      Map.update(socket.assigns.post_editor_quick_actions_open, post_id, true, &(!&1))
-    )
-    |> reload.(workbench)
-  end
-
-  @spec detect_language(term(), term(), term(), term()) :: term()
-  def detect_language(socket, post_id, reload, append_output) do
-    if Map.get(socket.assigns, :offline_mode, true) do
+    socket =
       socket
-      |> append_output.(
-        translated("Detect Language"),
-        translated("Automatic AI actions stay gated by airplane mode."),
-        nil,
-        "info"
-      )
-      |> reload.(socket.assigns.workbench)
-    else
-      case Posts.get_post(post_id) do
-        nil ->
-          socket
+      |> assign(:mode, normalized_mode)
+      |> build_data()
 
-        %Post{} = post ->
-          metadata = project_metadata(post.project_id)
-          canonical_language = canonical_language(post, metadata)
-
-          active_language =
-            Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
-
-          draft = current_draft(socket.assigns, post, metadata, active_language)
-          text = Enum.join([Map.get(draft, "title", ""), Map.get(draft, "content", "")], "\n\n")
-
-          case AI.detect_language(text) do
-            {:ok, %{language_code: language_code}}
-            when is_binary(language_code) and language_code != "" ->
-              socket
-              |> put_draft_field(
-                post_id,
-                post,
-                active_language,
-                "language",
-                normalize_language(language_code, canonical_language)
-              )
-              |> reload_with_assigned_workbench(reload)
-
-            {:error, reason} ->
-              socket
-              |> append_output.(translated("Detect Language"), inspect(reason), nil, "error")
-              |> reload.(socket.assigns.workbench)
-
-            _other ->
-              socket
-              |> append_output.(
-                translated("Detect Language"),
-                translated("Language detection failed."),
-                nil,
-                "error"
-              )
-              |> reload.(socket.assigns.workbench)
-          end
-      end
-    end
+    {:noreply, socket}
   end
 
-  @spec translate(term(), term(), term(), term(), term()) :: term()
-  def translate(socket, post_id, language, reload, append_output) do
-    if Map.get(socket.assigns, :offline_mode, true) do
+  def handle_event("toggle_post_metadata", _params, socket) do
+    socket =
       socket
-      |> append_output.(
-        translated("Translate"),
-        translated("Automatic AI actions stay gated by airplane mode."),
-        nil,
-        "info"
-      )
-      |> reload.(socket.assigns.workbench)
-    else
-      normalized_language = normalize_language(language, "")
+      |> assign(:expanded, toggled_sections(socket.assigns.expanded, socket.assigns.post_id, :metadata))
+      |> build_data()
 
-      case AI.translate_post(post_id, normalized_language) do
-        {:ok, translation} ->
-          with {:ok, _saved_translation} <-
-                 Posts.upsert_post_translation(post_id, normalized_language, %{
-                   title: translation.title,
-                   excerpt: translation.excerpt,
-                   content: translation.content
-                 }) do
-            socket
-            |> assign(
-              :post_editor_active_languages,
-              Map.put(socket.assigns.post_editor_active_languages, post_id, normalized_language)
-            )
-            |> assign(
-              :post_editor_drafts,
-              delete_nested_map(socket.assigns.post_editor_drafts, post_id, normalized_language)
-            )
-            |> assign(
-              :post_editor_quick_actions_open,
-              Map.put(socket.assigns.post_editor_quick_actions_open, post_id, false)
-            )
-            |> reload.(socket.assigns.workbench)
-          else
-            {:error, reason} ->
-              socket
-              |> append_output.(translated("Translate"), inspect(reason), nil, "error")
-              |> reload.(socket.assigns.workbench)
-          end
+    {:noreply, socket}
+  end
 
-        {:error, reason} ->
-          socket
-          |> append_output.(translated("Translate"), inspect(reason), nil, "error")
-          |> reload.(socket.assigns.workbench)
+  def handle_event("toggle_post_excerpt", _params, socket) do
+    socket =
+      socket
+      |> assign(:expanded, toggled_sections(socket.assigns.expanded, socket.assigns.post_id, :excerpt))
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("select_post_editor_language", %{"language" => language}, socket) do
+    socket =
+      socket
+      |> assign(:active_language, normalize_language(language, language))
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("toggle_post_editor_quick_actions", _params, socket) do
+    socket =
+      socket
+      |> assign(:quick_actions_open?, not socket.assigns.quick_actions_open?)
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("detect_post_editor_language", _params, socket) do
+    {:noreply, do_detect_language(socket)}
+  end
+
+  def handle_event("add_post_editor_tag", %{"tag" => tag}, socket) do
+    {:noreply, do_add_list_value(socket, :tags, tag)}
+  end
+
+  def handle_event("remove_post_editor_tag", %{"tag" => tag}, socket) do
+    {:noreply, do_remove_list_value(socket, :tags, tag)}
+  end
+
+  def handle_event("add_post_editor_category", %{"category" => category}, socket) do
+    {:noreply, do_add_list_value(socket, :categories, category)}
+  end
+
+  def handle_event("remove_post_editor_category", %{"category" => category}, socket) do
+    {:noreply, do_remove_list_value(socket, :categories, category)}
+  end
+
+  def handle_event("insert_content", %{"content" => content}, socket) do
+    socket =
+      socket
+      |> Phoenix.LiveView.push_event("post-editor-insert-content", %{
+        id: socket.assigns.post_id,
+        content: content
+      })
+      |> assign(:shell_overlay, nil)
+
+    {:noreply, socket}
+  end
+
+  def handle_event("close_quick_actions", _params, socket) do
+    socket =
+      socket
+      |> assign(:quick_actions_open?, false)
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  defp component_current_draft(socket, post, metadata, active_language) do
+    persisted = persisted_form(post, metadata, active_language)
+    Map.get(socket.assigns.drafts, active_language, persisted)
+  end
+
+  defp ensure_state(socket) do
+    post_id = socket.assigns.current_tab.id
+    post = Posts.get_post(post_id)
+    metadata = project_metadata(post && post.project_id)
+    canonical = if post, do: canonical_language(post, metadata), else: "en"
+
+    defaults = %{
+      post_id: post_id,
+      post: post,
+      project_metadata: metadata,
+      canonical_language: canonical,
+      active_language: canonical,
+      drafts: %{},
+      tag_query: "",
+      category_query: "",
+      quick_actions_open?: false,
+      mode: :markdown,
+      expanded: %{metadata: post && blank?(post.title), excerpt: post && not blank?(post.excerpt)},
+      save_state: :idle,
+      dirty?: false
+    }
+
+    Enum.reduce(defaults, socket, fn {key, default}, acc ->
+      if is_nil(Map.get(acc.assigns, key)) do
+        assign(acc, key, default)
+      else
+        acc
       end
-    end
+    end)
   end
 
-  @spec apply_ai_suggestions(term(), term(), term(), term(), term()) :: term()
-  def apply_ai_suggestions(socket, post_id, fields, reload, append_output) do
-    case Posts.get_post(post_id) do
+  defp build_data(socket) do
+    case socket.assigns.post do
       nil ->
-        socket
-
-      %Post{} ->
-        attrs =
-          fields
-          |> Enum.reduce(%{}, fn field, acc ->
-            case field.key do
-              "title" -> Map.put(acc, :title, blank_to_nil(field.suggested_value))
-              "excerpt" -> Map.put(acc, :excerpt, blank_to_nil(field.suggested_value))
-              "slug" -> Map.put(acc, :slug, blank_to_nil(field.suggested_value))
-              _other -> acc
-            end
-          end)
-
-        if map_size(attrs) == 0 do
-          socket |> assign(:shell_overlay, nil)
-        else
-          case Posts.update_post(post_id, attrs) do
-            {:ok, updated_post} ->
-              metadata = project_metadata(updated_post.project_id)
-
-              active_language =
-                Map.get(
-                  socket.assigns.post_editor_active_languages,
-                  post_id,
-                  canonical_language(updated_post, metadata)
-                )
-
-              refreshed_form = persisted_form(updated_post, metadata, active_language)
-
-              socket
-              |> assign(
-                :post_editor_drafts,
-                put_nested_map(
-                  socket.assigns.post_editor_drafts,
-                  post_id,
-                  active_language,
-                  refreshed_form
-                )
-              )
-              |> assign(
-                :post_editor_save_states,
-                Map.put(socket.assigns.post_editor_save_states, post_id, :dirty)
-              )
-              |> assign(:shell_overlay, nil)
-              |> reload.(socket.assigns.workbench)
-
-            {:error, reason} ->
-              socket
-              |> append_output.(translated("AI Suggestions"), inspect(reason), nil, "error")
-              |> reload.(socket.assigns.workbench)
-          end
-        end
-    end
-  end
-
-  @spec insert_content(term(), term(), term(), term()) :: term()
-  def insert_content(socket, post_id, snippet, reload) do
-    socket
-    |> Phoenix.LiveView.push_event("post-editor-insert-content", %{id: post_id, content: snippet})
-    |> assign(:shell_overlay, nil)
-    |> reload.(socket.assigns.workbench)
-  end
-
-  @spec add_list_value(term(), term(), term(), term(), term()) :: term()
-  def add_list_value(socket, post_id, kind, value, reload) when kind in [:tags, :categories] do
-    case Posts.get_post(post_id) do
-      nil ->
-        socket
+        assign(socket, :post_editor, nil)
 
       %Post{} = post ->
-        metadata = project_metadata(post.project_id)
-        canonical_language = canonical_language(post, metadata)
-
-        active_language =
-          Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
-
-        draft = current_draft(socket.assigns, post, metadata, active_language)
-        normalized = normalize_list_entry(value)
-
-        if normalized == "" do
-          socket
-        else
-          ensure_list_value(post.project_id, kind, normalized)
-
-          updated =
-            draft
-            |> Map.get(field_key(kind), "")
-            |> csv_to_list()
-            |> Kernel.++([normalized])
-            |> Enum.uniq()
-            |> Enum.join(", ")
-
-          socket
-          |> put_query_state(post_id, kind, "")
-          |> put_draft_field(post_id, post, active_language, field_key(kind), updated)
-          |> reload_with_assigned_workbench(reload)
-        end
-    end
-  end
-
-  @spec remove_list_value(term(), term(), term(), term(), term()) :: term()
-  def remove_list_value(socket, post_id, kind, value, reload) when kind in [:tags, :categories] do
-    case Posts.get_post(post_id) do
-      nil ->
-        socket
-
-      %Post{} = post ->
-        metadata = project_metadata(post.project_id)
-        canonical_language = canonical_language(post, metadata)
-
-        active_language =
-          Map.get(socket.assigns.post_editor_active_languages, post_id, canonical_language)
-
-        draft = current_draft(socket.assigns, post, metadata, active_language)
-
-        updated =
-          draft
-          |> Map.get(field_key(kind), "")
-          |> csv_to_list()
-          |> Enum.reject(&(&1 == value))
-          |> Enum.join(", ")
-
-        socket
-        |> put_draft_field(post_id, post, active_language, field_key(kind), updated)
-        |> reload_with_assigned_workbench(reload)
-    end
-  end
-
-  @spec build(term()) :: term()
-  def build(%{current_tab: %{type: :post, id: post_id}} = assigns) do
-    case Posts.get_post(post_id) do
-      nil ->
-        nil
-
-      %Post{} = post ->
-        metadata = assigned_project_metadata(assigns)
-        canonical_language = canonical_language(post, metadata)
-
-        active_language =
-          Map.get(assigns.post_editor_active_languages, post.id, canonical_language)
-
+        metadata = socket.assigns.project_metadata
+        canonical_language = socket.assigns.canonical_language
+        active_language = socket.assigns.active_language
         translations = translations(post.id)
-        persisted = DraftManagement.persisted_form(post, metadata, active_language, translations)
+        persisted = persisted_form(post, metadata, active_language, translations)
 
         form =
-          assigns.post_editor_drafts
-          |> Map.get(post.id, %{})
+          socket.assigns.drafts
           |> Map.get(active_language, persisted)
 
-        expanded =
-          Map.get(assigns.post_editor_expanded, post.id, %{
-            metadata: blank?(post.title),
-            excerpt: not blank?(post.excerpt)
-          })
-
+        expanded = socket.assigns.expanded
         current_translation = Map.get(translations, active_language)
 
-        %{
+        data = %{
           id: post.id,
           display_title: display_title(form["title"], post.slug, post.id),
           subtitle: nil,
           slug: post.slug || post.id,
           status: post.status,
-          dirty?: Workbench.dirty?(assigns.workbench, :post, post.id),
-          save_state: Map.get(assigns.post_editor_save_states, post.id, :idle),
-          quick_actions_open?: Map.get(assigns.post_editor_quick_actions_open, post.id, false),
+          dirty?: socket.assigns.dirty?,
+          save_state: socket.assigns.save_state,
+          quick_actions_open?: socket.assigns.quick_actions_open?,
           metadata_expanded: Map.get(expanded, :metadata, false),
           excerpt_expanded: Map.get(expanded, :excerpt, false),
-          mode: Map.get(assigns.post_editor_modes, post.id, :markdown),
+          mode: socket.assigns.mode,
           editing_canonical?:
             editing_canonical_language?(translations, active_language, canonical_language),
           can_publish?: post.status == :draft,
@@ -635,20 +382,20 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
           tag_options: Tags.list_tags(post.project_id),
           tag_values: tag_values(form),
           tag_chips: tag_chips(form, Tags.list_tags(post.project_id)),
-          tag_query: query_value(assigns, :tags, post.id),
+          tag_query: socket.assigns.tag_query,
           tag_query_addable?:
             query_addable?(
-              query_value(assigns, :tags, post.id),
+              socket.assigns.tag_query,
               tag_values(form),
               Tags.list_tags(post.project_id),
               fn option -> option.name end
             ),
           category_values: category_values(form),
-          category_query: query_value(assigns, :categories, post.id),
+          category_query: socket.assigns.category_query,
           category_options: metadata.categories || [],
           category_query_addable?:
             query_addable?(
-              query_value(assigns, :categories, post.id),
+              socket.assigns.category_query,
               category_values(form),
               metadata.categories || [],
               & &1
@@ -657,13 +404,13 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
             tag_suggestions(
               form,
               Tags.list_tags(post.project_id),
-              query_value(assigns, :tags, post.id)
+              socket.assigns.tag_query
             ),
           category_suggestions:
             category_suggestions(
               form,
               metadata.categories || [],
-              query_value(assigns, :categories, post.id)
+              socket.assigns.category_query
             ),
           gallery_count: gallery_count(form),
           preview_url:
@@ -671,7 +418,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               post,
               active_language,
               canonical_language,
-              Map.get(assigns.post_editor_modes, post.id, :markdown)
+              socket.assigns.mode
             ),
           translation_flags:
             translation_flags(post, canonical_language, active_language, translations),
@@ -679,10 +426,388 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
           post_links: post_links(post.id),
           footer: footer(post, current_translation, active_language, canonical_language)
         }
+
+        assign(socket, :post_editor, data)
     end
   end
 
-  def build(_assigns), do: nil
+  defp do_save(socket) do
+    post = socket.assigns.post
+
+    case post do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        metadata = socket.assigns.project_metadata
+        active_language = socket.assigns.active_language
+        draft = component_current_draft(socket, post, metadata, active_language)
+
+        case persist(post, draft, active_language, metadata, :save) do
+          {:ok, record} ->
+            refreshed_post = Posts.get_post!(post.id)
+            _refreshed_form = persisted_form(refreshed_post, metadata, active_language)
+
+            socket =
+              socket
+              |> assign(:post, refreshed_post)
+              |> assign(:drafts, Map.delete(socket.assigns.drafts, active_language))
+              |> assign(:save_state, save_state_for_action(:save))
+              |> assign(:dirty?, false)
+              |> build_data()
+
+            notify_parent(
+              {:post_editor_tab_meta, post.id, record_title(record, refreshed_post),
+               Atom.to_string(record_status(record))}
+            )
+
+            notify_parent({:post_editor_dirty, post.id, false})
+            notify_output(socket, translated("Post"), translated("Post saved"))
+            socket
+
+          {:error, reason} ->
+            notify_output(socket, translated("Post"), inspect(reason), "error")
+            |> build_data()
+        end
+    end
+  end
+
+  defp do_publish(socket) do
+    post = socket.assigns.post
+
+    case post do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        metadata = socket.assigns.project_metadata
+        active_language = socket.assigns.active_language
+        draft = component_current_draft(socket, post, metadata, active_language)
+
+        case persist(post, draft, active_language, metadata, :publish) do
+          {:ok, record} ->
+            refreshed_post = Posts.get_post!(post.id)
+            _refreshed_form = persisted_form(refreshed_post, metadata, active_language)
+
+            socket =
+              socket
+              |> assign(:post, refreshed_post)
+              |> assign(:drafts, Map.delete(socket.assigns.drafts, active_language))
+              |> assign(:save_state, save_state_for_action(:publish))
+              |> assign(:dirty?, false)
+              |> build_data()
+
+            notify_parent(
+              {:post_editor_tab_meta, post.id, record_title(record, refreshed_post),
+               Atom.to_string(record_status(record))}
+            )
+
+            notify_parent({:post_editor_dirty, post.id, false})
+            notify_output(socket, translated("Post"), translated("Post published"))
+            socket
+
+          {:error, reason} ->
+            notify_output(socket, translated("Post"), inspect(reason), "error")
+            |> build_data()
+        end
+    end
+  end
+
+  defp do_discard(socket) do
+    post = socket.assigns.post
+
+    case post do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        metadata = socket.assigns.project_metadata
+        active_language = socket.assigns.active_language
+
+        case discard(post, active_language, metadata) do
+          {:ok, restored_post} ->
+            socket =
+              socket
+              |> assign(:post, restored_post)
+              |> assign(:drafts, Map.delete(socket.assigns.drafts, active_language))
+              |> assign(:save_state, :discarded)
+              |> assign(:dirty?, false)
+              |> build_data()
+
+            notify_parent(
+              {:post_editor_tab_meta, post.id,
+               restored_post.title || restored_post.slug || restored_post.id,
+               Atom.to_string(restored_post.status || :draft)}
+            )
+
+            notify_parent({:post_editor_dirty, post.id, false})
+            socket
+
+          {:error, reason} ->
+            notify_output(socket, translated("Post"), inspect(reason), "error")
+            |> build_data()
+        end
+    end
+  end
+
+  defp do_delete(socket) do
+    post_id = socket.assigns.post_id
+
+    case Posts.delete_post(post_id) do
+      {:ok, :deleted} ->
+        notify_parent({:close_tab, :post, post_id})
+        socket
+
+      {:error, reason} ->
+        notify_output(socket, translated("Post"), inspect(reason), "error")
+        |> build_data()
+    end
+  end
+
+  defp do_detect_language(socket) do
+    if Map.get(socket.assigns, :offline_mode, true) do
+      notify_output(
+        socket,
+        translated("Detect Language"),
+        translated("Automatic AI actions stay gated by airplane mode."),
+        "info"
+      )
+      |> build_data()
+    else
+      post = socket.assigns.post
+
+      case post do
+        nil ->
+          socket
+
+        %Post{} = post ->
+          metadata = socket.assigns.project_metadata
+          active_language = socket.assigns.active_language
+          draft = component_current_draft(socket, post, metadata, active_language)
+          text = Enum.join([Map.get(draft, "title", ""), Map.get(draft, "content", "")], "\n\n")
+
+          case AI.detect_language(text) do
+            {:ok, %{language_code: language_code}}
+            when is_binary(language_code) and language_code != "" ->
+              socket
+              |> put_component_draft_field("language", normalize_language(language_code, socket.assigns.canonical_language))
+              |> build_data()
+
+            {:error, reason} ->
+              notify_output(socket, translated("Detect Language"), inspect(reason), "error")
+              |> build_data()
+
+            _other ->
+              notify_output(
+                socket,
+                translated("Detect Language"),
+                translated("Language detection failed."),
+                "error"
+              )
+              |> build_data()
+          end
+      end
+    end
+  end
+
+  defp do_translate(socket, language) do
+    if Map.get(socket.assigns, :offline_mode, true) do
+      notify_output(
+        socket,
+        translated("Translate"),
+        translated("Automatic AI actions stay gated by airplane mode."),
+        "info"
+      )
+      |> build_data()
+    else
+      post_id = socket.assigns.post_id
+      normalized_language = normalize_language(language, "")
+
+      case AI.translate_post(post_id, normalized_language) do
+        {:ok, translation} ->
+          with {:ok, _saved_translation} <-
+                 Posts.upsert_post_translation(post_id, normalized_language, %{
+                   title: translation.title,
+                   excerpt: translation.excerpt,
+                   content: translation.content
+                 }) do
+            socket =
+              socket
+              |> assign(:active_language, normalized_language)
+              |> assign(:drafts, Map.delete(socket.assigns.drafts, normalized_language))
+              |> assign(:quick_actions_open?, false)
+              |> build_data()
+
+            notify_parent({:post_editor_dirty, post_id, false})
+            socket
+          else
+            {:error, reason} ->
+              notify_output(socket, translated("Translate"), inspect(reason), "error")
+              |> build_data()
+          end
+
+        {:error, reason} ->
+          notify_output(socket, translated("Translate"), inspect(reason), "error")
+          |> build_data()
+      end
+    end
+  end
+
+  defp do_apply_ai_suggestions(socket, fields) do
+    post_id = socket.assigns.post_id
+
+    case Posts.get_post(post_id) do
+      nil ->
+        socket
+
+      %Post{} = _post ->
+        attrs =
+          fields
+          |> Enum.reduce(%{}, fn field, acc ->
+            case field.key do
+              "title" -> Map.put(acc, :title, blank_to_nil(field.suggested_value))
+              "excerpt" -> Map.put(acc, :excerpt, blank_to_nil(field.suggested_value))
+              "slug" -> Map.put(acc, :slug, blank_to_nil(field.suggested_value))
+              _other -> acc
+            end
+          end)
+
+        if map_size(attrs) == 0 do
+          assign(socket, :shell_overlay, nil)
+        else
+          case Posts.update_post(post_id, attrs) do
+            {:ok, updated_post} ->
+              metadata = project_metadata(updated_post.project_id)
+              active_language = socket.assigns.active_language
+              refreshed_form = persisted_form(updated_post, metadata, active_language)
+
+              socket =
+                socket
+                |> assign(:post, updated_post)
+                |> assign(:project_metadata, metadata)
+                |> assign(:drafts, Map.put(socket.assigns.drafts, active_language, refreshed_form))
+                |> assign(:save_state, :dirty)
+                |> assign(:dirty?, true)
+                |> assign(:shell_overlay, nil)
+                |> build_data()
+
+              notify_parent({:post_editor_dirty, post_id, true})
+              socket
+
+            {:error, reason} ->
+              notify_output(socket, translated("AI Suggestions"), inspect(reason), "error")
+              |> build_data()
+          end
+        end
+    end
+  end
+
+  defp do_add_list_value(socket, kind, value) do
+    post = socket.assigns.post
+
+    case post do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        metadata = socket.assigns.project_metadata
+        active_language = socket.assigns.active_language
+        draft = component_current_draft(socket, post, metadata, active_language)
+        normalized = normalize_list_entry(value)
+
+        if normalized == "" do
+          socket
+        else
+          ensure_list_value(post.project_id, kind, normalized)
+
+          updated =
+            draft
+            |> Map.get(field_key(kind), "")
+            |> csv_to_list()
+            |> Kernel.++([normalized])
+            |> Enum.uniq()
+            |> Enum.join(", ")
+
+          socket =
+            socket
+            |> assign_query(kind, "")
+            |> put_component_draft_field(field_key(kind), updated)
+            |> build_data()
+
+          notify_parent({:post_editor_dirty, socket.assigns.post_id, true})
+          assign(socket, :dirty?, true)
+        end
+    end
+  end
+
+  defp do_remove_list_value(socket, kind, value) do
+    post = socket.assigns.post
+
+    case post do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        metadata = socket.assigns.project_metadata
+        active_language = socket.assigns.active_language
+        draft = component_current_draft(socket, post, metadata, active_language)
+
+        updated =
+          draft
+          |> Map.get(field_key(kind), "")
+          |> csv_to_list()
+          |> Enum.reject(&(&1 == value))
+          |> Enum.join(", ")
+
+        socket =
+          socket
+          |> put_component_draft_field(field_key(kind), updated)
+          |> build_data()
+
+        notify_parent({:post_editor_dirty, socket.assigns.post_id, true})
+        assign(socket, :dirty?, true)
+    end
+  end
+
+  defp maybe_update_component_draft(socket, next_language, draft) do
+    current_language = socket.assigns.active_language
+
+    cond do
+      current_language == next_language ->
+        assign(socket, :drafts, Map.put(socket.assigns.drafts, next_language, draft))
+
+      Map.has_key?(socket.assigns.drafts, current_language) ->
+        socket
+        |> assign(:active_language, next_language)
+        |> assign(:drafts, Map.put(socket.assigns.drafts, next_language, draft))
+
+      true ->
+        socket
+        |> assign(:active_language, next_language)
+        |> assign(:drafts, Map.put(%{}, next_language, draft))
+    end
+  end
+
+  defp put_component_draft_field(socket, field, value) do
+    active_language = socket.assigns.active_language
+    post = socket.assigns.post
+    metadata = socket.assigns.project_metadata
+    draft = current_draft(socket.assigns, post, metadata, active_language)
+    updated = Map.put(draft, field, value)
+    assign(socket, :drafts, Map.put(socket.assigns.drafts, active_language, updated))
+  end
+
+  defp assign_query(socket, :tags, value), do: assign(socket, :tag_query, value)
+  defp assign_query(socket, :categories, value), do: assign(socket, :category_query, value)
+
+  defp notify_parent(message) do
+    send(self(), message)
+  end
+
+  defp notify_output(socket, title, message, level \\ "info") do
+    send(self(), {:post_editor_output, title, message, level})
+    socket
+  end
 
   @spec post_status_label(term()) :: term()
   def post_status_label(status), do: ShellData.dashboard_status_label(status)
@@ -700,7 +825,5 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   @spec translated(term(), term()) :: term()
   def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
-
-  defp assigned_project_metadata(assigns), do: Map.get(assigns, :project_metadata, %{})
+    do: ShellData.translate(text, bindings, UILocale.current())
 end
