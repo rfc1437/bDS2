@@ -368,17 +368,34 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element("[data-testid='sidebar-open-item'][data-item-id='tags-cloud']")
       |> render_click()
 
-    html = render_click(view, "sync_tags_editor", %{})
+    html =
+      view
+      |> element("#tags-section-sync button[phx-click='sync_tags_editor']")
+      |> render_click()
 
     assert Enum.map(Tags.list_tags(project.id), & &1.name) == ["Alpha", "Beta"]
     assert html =~ "Alpha"
     assert html =~ "Beta"
 
-    _html = render_click(view, "toggle_tag_selection", %{"name" => "Alpha"})
-    _html = render_click(view, "toggle_tag_selection", %{"name" => "Beta"})
-    _html = render_change(view, "change_merge_target", %{"target" => "Alpha"})
+    _html =
+      view
+      |> element("#tags-editor-shell button[phx-click='toggle_tag_selection'][phx-value-name='Alpha']")
+      |> render_click()
 
-    html = render_click(view, "merge_tags_editor", %{})
+    _html =
+      view
+      |> element("#tags-editor-shell button[phx-click='toggle_tag_selection'][phx-value-name='Beta']")
+      |> render_click()
+
+    _html =
+      view
+      |> element("#tags-editor-shell select[phx-change='change_merge_target']")
+      |> render_change(%{"target" => "Alpha"})
+
+    html =
+      view
+      |> element("#tags-editor-shell button[phx-click='merge_tags_editor']")
+      |> render_click()
 
     assert Enum.map(Tags.list_tags(project.id), & &1.name) == ["Alpha"]
     assert Repo.get!(Post, post.id).tags == ["Alpha"]

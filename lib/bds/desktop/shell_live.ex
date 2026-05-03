@@ -180,13 +180,9 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:settings_editor_endpoint_models, %{})
      |> assign(:settings_editor_publishing_draft, %{})
      |> assign(:settings_editor_new_category, "")
-     |> assign(:style_editor_theme, nil)
-     |> assign(:style_editor_preview_mode, "auto")
-     |> assign(:tags_editor_selected, [])
-     |> assign(:tags_editor_new_tag, %{"name" => "", "color" => ""})
-     |> assign(:tags_editor_edit_draft, %{})
-     |> assign(:tags_editor_merge_target, "")
-     |> assign(:script_editor_drafts, %{})
+      |> assign(:style_editor_theme, nil)
+      |> assign(:style_editor_preview_mode, "auto")
+      |> assign(:script_editor_drafts, %{})
      |> assign(:template_editor_drafts, %{})
      |> assign(:chat_editor_inputs, %{})
      |> assign(:chat_model_selectors_open, %{})
@@ -680,42 +676,6 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("menu_editor_keydown", %{"key" => key}, socket) do
     {:noreply, MenuEditor.handle_keydown(socket, key, &reload_shell/2)}
-  end
-
-  def handle_event("toggle_tag_selection", %{"name" => tag_name}, socket) do
-    {:noreply, TagsEditor.toggle_selection(socket, tag_name, &reload_shell/2)}
-  end
-
-  def handle_event("change_new_tag_editor", %{"new_tag" => params}, socket) do
-    {:noreply, TagsEditor.update_new_tag(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("create_tag_editor", _params, socket) do
-    {:noreply, TagsEditor.create_tag(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("change_edit_tag_editor", %{"edit_tag" => params}, socket) do
-    {:noreply, TagsEditor.update_edit_tag(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("save_tag_editor", _params, socket) do
-    {:noreply, TagsEditor.save_tag(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("delete_tag_editor", _params, socket) do
-    {:noreply, TagsEditor.delete_selected(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("change_merge_target", %{"target" => target}, socket) do
-    {:noreply, TagsEditor.update_merge_target(socket, target, &reload_shell/2)}
-  end
-
-  def handle_event("merge_tags_editor", _params, socket) do
-    {:noreply, TagsEditor.merge_selected(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("sync_tags_editor", _params, socket) do
-    {:noreply, TagsEditor.sync(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("change_script_editor", %{"script_editor" => params}, socket) do
@@ -1483,6 +1443,14 @@ defmodule BDS.Desktop.ShellLive do
     end
   end
 
+  def handle_info({:tags_editor_output, title, message, level}, socket) do
+    {:noreply, append_output_entry(socket, title, message, nil, level)}
+  end
+
+  def handle_info(:tags_changed, socket) do
+    {:noreply, reload_shell(socket, socket.assigns.workbench)}
+  end
+
   @impl true
   def render(assigns) do
     UILocale.put(assigns.page_language)
@@ -1555,7 +1523,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign_media_editor()
     |> assign_settings_editor()
     |> assign_menu_editor()
-    |> assign_tags_editor()
     |> assign_code_entity_editor()
     |> assign_chat_editor()
     |> assign_import_editor()
@@ -1615,10 +1582,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp assign_menu_editor(socket) do
     MenuEditor.assign_socket(socket)
-  end
-
-  defp assign_tags_editor(socket) do
-    TagsEditor.assign_socket(socket)
   end
 
   defp assign_code_entity_editor(socket) do
@@ -1801,7 +1764,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :tags}}} = socket) do
-    TagsEditor.save_tag(socket, &reload_shell/2, &append_output_entry/5)
+    send_update(TagsEditor, id: "tags-editor", action: :save)
+    socket
   end
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :scripts}}} = socket) do

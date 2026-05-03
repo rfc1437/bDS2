@@ -1,12 +1,13 @@
 defmodule BDS.Desktop.ShellLive.TagsEditor do
   @moduledoc false
 
-  use Phoenix.Component
+  use Phoenix.LiveComponent
 
   import Ecto.Query
 
-  alias BDS.Desktop.ShellData
   alias BDS.{Repo, Tags}
+  alias BDS.Desktop.ShellData
+  alias BDS.Desktop.UILocale
   alias BDS.Posts.Post
   alias BDS.Tags.Tag
   alias BDS.Templates.Template
@@ -15,14 +16,37 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
 
   @tags_sections ~w(cloud manage merge)
 
-  @spec assign_socket(term()) :: term()
-  def assign_socket(socket) do
-    assign(socket, :tags_editor, build(socket.assigns))
+  @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def update(%{action: :save} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action]))
+      |> do_save()
+
+    {:ok, socket}
   end
 
-  @spec toggle_selection(term(), term(), term()) :: term()
-  def toggle_selection(socket, tag_name, reload) do
-    selected = Map.get(socket.assigns, :tags_editor_selected, [])
+  def update(assigns, socket) do
+    socket =
+      socket
+      |> assign(assigns)
+      |> load_data()
+
+    {:ok, socket}
+  end
+
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
+  @impl true
+  def render(assigns) do
+    tags_editor(assigns)
+  end
+
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def handle_event("toggle_tag_selection", %{"name" => tag_name}, socket) do
+    selected = socket.assigns.tags_editor.selected
 
     next_selected =
       if tag_name in selected do
@@ -31,26 +55,27 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
         selected ++ [tag_name]
       end
 
-    socket
-    |> assign(:tags_editor_selected, next_selected)
-    |> maybe_seed_edit_draft(next_selected)
-    |> reload.(socket.assigns.workbench)
+    socket =
+      socket
+      |> put_in_tags_editor([:selected], next_selected)
+      |> maybe_seed_edit_draft(socket.assigns.project_id, next_selected)
+
+    {:noreply, socket}
   end
 
-  @spec update_new_tag(term(), term(), term()) :: term()
-  def update_new_tag(socket, params, reload) do
-    socket
-    |> assign(:tags_editor_new_tag, %{
-      "name" => Map.get(params, "name", ""),
-      "color" => Map.get(params, "color", "")
-    })
-    |> reload.(socket.assigns.workbench)
+  def handle_event("change_new_tag_editor", %{"new_tag" => params}, socket) do
+    tags_editor =
+      Map.put(socket.assigns.tags_editor, :new_tag, %{
+        "name" => Map.get(params, "name", ""),
+        "color" => Map.get(params, "color", "")
+      })
+
+    {:noreply, assign(socket, :tags_editor, tags_editor)}
   end
 
-  @spec create_tag(term(), term(), term()) :: term()
-  def create_tag(socket, reload, append_output) do
-    project_id = socket.assigns.projects.active_project_id
-    draft = Map.get(socket.assigns, :tags_editor_new_tag, %{})
+  def handle_event("create_tag_editor", _params, socket) do
+    project_id = socket.assigns.project_id
+    draft = socket.assigns.tags_editor.new_tag
 
     case Tags.create_tag(%{
            project_id: project_id,
@@ -58,115 +83,83 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
            color: blank_to_nil(Map.get(draft, "color"))
          }) do
       {:ok, _tag} ->
+        notify_parent(:tags_changed)
+
         socket
-        |> assign(:tags_editor_new_tag, %{"name" => "", "color" => ""})
-        |> reload.(socket.assigns.workbench)
+        |> put_in_tags_editor([:new_tag], %{"name" => "", "color" => ""})
+        |> load_data()
+        |> noreply()
 
       {:error, reason} ->
-        socket
-        |> append_output.(translated("Tags"), inspect(reason), nil, "error")
-        |> reload.(socket.assigns.workbench)
+        notify_output(translated("Tags"), inspect(reason), "error")
+        {:noreply, socket}
     end
   end
 
-  @spec update_edit_tag(term(), term(), term()) :: term()
-  def update_edit_tag(socket, params, reload) do
-    socket
-    |> assign(:tags_editor_edit_draft, %{
-      "name" => Map.get(params, "name", ""),
-      "color" => Map.get(params, "color", ""),
-      "post_template_slug" => Map.get(params, "post_template_slug", "")
-    })
-    |> reload.(socket.assigns.workbench)
+  def handle_event("change_edit_tag_editor", %{"edit_tag" => params}, socket) do
+    tags_editor =
+      Map.put(socket.assigns.tags_editor, :edit_draft, %{
+        "name" => Map.get(params, "name", ""),
+        "color" => Map.get(params, "color", ""),
+        "post_template_slug" => Map.get(params, "post_template_slug", "")
+      })
+
+    {:noreply, assign(socket, :tags_editor, tags_editor)}
   end
 
-  @spec save_tag(term(), term(), term()) :: term()
-  def save_tag(socket, reload, append_output) do
-    selected = Map.get(socket.assigns, :tags_editor_selected, [])
-    draft = Map.get(socket.assigns, :tags_editor_edit_draft, %{})
+  def handle_event("save_tag_editor", _params, socket) do
+    {:noreply, do_save(socket)}
+  end
 
-    case selected do
+  def handle_event("delete_tag_editor", _params, socket) do
+    case socket.assigns.tags_editor.selected do
       [tag_name] ->
         case Repo.get_by(Tag,
-               project_id: socket.assigns.projects.active_project_id,
+               project_id: socket.assigns.project_id,
                name: tag_name
              ) do
           nil ->
-            reload.(socket, socket.assigns.workbench)
-
-          %Tag{} = tag ->
-            with {:ok, _updated_tag} <-
-                   Tags.update_tag(tag.id, %{
-                     color: blank_to_nil(Map.get(draft, "color")),
-                     post_template_slug: blank_to_nil(Map.get(draft, "post_template_slug"))
-                   }),
-                 {:ok, renamed_tag} <- maybe_rename_tag(tag, Map.get(draft, "name", tag.name)) do
-              socket
-              |> assign(:tags_editor_selected, [renamed_tag.name])
-              |> maybe_seed_edit_draft([renamed_tag.name])
-              |> reload.(socket.assigns.workbench)
-            else
-              {:error, reason} ->
-                socket
-                |> append_output.(translated("Tags"), inspect(reason), nil, "error")
-                |> reload.(socket.assigns.workbench)
-            end
-        end
-
-      _other ->
-        reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  @spec delete_selected(term(), term(), term()) :: term()
-  def delete_selected(socket, reload, append_output) do
-    case Map.get(socket.assigns, :tags_editor_selected, []) do
-      [tag_name] ->
-        case Repo.get_by(Tag,
-               project_id: socket.assigns.projects.active_project_id,
-               name: tag_name
-             ) do
-          nil ->
-            reload.(socket, socket.assigns.workbench)
+            {:noreply, socket}
 
           %Tag{} = tag ->
             case Tags.delete_tag(tag.id) do
               {:ok, _deleted} ->
+                notify_parent(:tags_changed)
+
                 socket
-                |> assign(:tags_editor_selected, [])
-                |> assign(:tags_editor_edit_draft, %{})
-                |> reload.(socket.assigns.workbench)
+                |> put_in_tags_editor([:selected], [])
+                |> put_in_tags_editor([:edit_draft], %{})
+                |> load_data()
+                |> noreply()
 
               {:error, reason} ->
-                socket
-                |> append_output.(translated("Tags"), inspect(reason), nil, "error")
-                |> reload.(socket.assigns.workbench)
+                notify_output(translated("Tags"), inspect(reason), "error")
+                {:noreply, socket}
             end
         end
 
       _other ->
-        reload.(socket, socket.assigns.workbench)
+        {:noreply, socket}
     end
   end
 
-  @spec update_merge_target(term(), term(), term()) :: term()
-  def update_merge_target(socket, target, reload) do
-    socket
-    |> assign(:tags_editor_merge_target, to_string(target || ""))
-    |> reload.(socket.assigns.workbench)
+  def handle_event("change_merge_target", %{"target" => target}, socket) do
+    tags_editor =
+      Map.put(socket.assigns.tags_editor, :merge_target, to_string(target || ""))
+
+    {:noreply, assign(socket, :tags_editor, tags_editor)}
   end
 
-  @spec merge_selected(term(), term(), term()) :: term()
-  def merge_selected(socket, reload, append_output) do
-    selected = Map.get(socket.assigns, :tags_editor_selected, [])
-    target_name = Map.get(socket.assigns, :tags_editor_merge_target, "")
+  def handle_event("merge_tags_editor", _params, socket) do
+    selected = socket.assigns.tags_editor.selected
+    target_name = socket.assigns.tags_editor.merge_target
 
     cond do
       length(selected) < 2 or target_name == "" ->
-        reload.(socket, socket.assigns.workbench)
+        {:noreply, socket}
 
       true ->
-        project_id = socket.assigns.projects.active_project_id
+        project_id = socket.assigns.project_id
 
         tags =
           Repo.all(
@@ -178,51 +171,90 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
 
         case target do
           nil ->
-            reload.(socket, socket.assigns.workbench)
+            {:noreply, socket}
 
           _target ->
             case Tags.merge_tags(Enum.map(sources, & &1.id), target.id) do
               {:ok, _merged} ->
+                notify_parent(:tags_changed)
+
                 socket
-                |> assign(:tags_editor_selected, [target.name])
-                |> assign(:tags_editor_merge_target, target.name)
-                |> maybe_seed_edit_draft([target.name])
-                |> reload.(socket.assigns.workbench)
+                |> put_in_tags_editor([:selected], [target.name])
+                |> put_in_tags_editor([:merge_target], target.name)
+                |> maybe_seed_edit_draft(project_id, [target.name])
+                |> load_data()
+                |> noreply()
 
               {:error, reason} ->
-                socket
-                |> append_output.(translated("Tags"), inspect(reason), nil, "error")
-                |> reload.(socket.assigns.workbench)
+                notify_output(translated("Tags"), inspect(reason), "error")
+                {:noreply, socket}
             end
         end
     end
   end
 
-  @spec sync(term(), term(), term()) :: term()
-  def sync(socket, reload, append_output) do
-    case Tags.sync_tags_from_posts(socket.assigns.projects.active_project_id) do
-      {:ok, _tags} -> reload.(socket, socket.assigns.workbench)
+  def handle_event("sync_tags_editor", _params, socket) do
+    case Tags.sync_tags_from_posts(socket.assigns.project_id) do
+      {:ok, _tags} ->
+        notify_parent(:tags_changed)
+        {:noreply, load_data(socket)}
+
       {:error, reason} ->
-        socket
-        |> append_output.(translated("Tags"), inspect(reason), nil, "error")
-        |> reload.(socket.assigns.workbench)
+        notify_output(translated("Tags"), inspect(reason), "error")
+        {:noreply, socket}
     end
   end
 
-  @spec build(term()) :: term()
-  def build(%{current_tab: %{type: :tags}} = assigns) do
-    project_id = assigns.projects.active_project_id
+  defp do_save(socket) do
+    selected = socket.assigns.tags_editor.selected
+    draft = socket.assigns.tags_editor.edit_draft
+    project_id = socket.assigns.project_id
+
+    case selected do
+      [tag_name] ->
+        case Repo.get_by(Tag, project_id: project_id, name: tag_name) do
+          nil ->
+            socket
+
+          %Tag{} = tag ->
+            with {:ok, _updated_tag} <-
+                   Tags.update_tag(tag.id, %{
+                     color: blank_to_nil(Map.get(draft, "color")),
+                     post_template_slug: blank_to_nil(Map.get(draft, "post_template_slug"))
+                   }),
+                 {:ok, renamed_tag} <- maybe_rename_tag(tag, Map.get(draft, "name", tag.name)) do
+              notify_parent(:tags_changed)
+
+              socket
+              |> put_in_tags_editor([:selected], [renamed_tag.name])
+              |> maybe_seed_edit_draft(project_id, [renamed_tag.name])
+              |> load_data()
+            else
+              {:error, reason} ->
+                notify_output(translated("Tags"), inspect(reason), "error")
+                socket
+            end
+        end
+
+      _other ->
+        socket
+    end
+  end
+
+  defp load_data(socket) do
+    project_id = socket.assigns.project_id
 
     tags =
       Repo.all(from tag in Tag, where: tag.project_id == ^project_id, order_by: [asc: tag.name])
 
     counts = tag_counts(project_id)
-    selected = Map.get(assigns, :tags_editor_selected, [])
+    selected = Map.get(socket.assigns, :tags_editor, %{}) |> Map.get(:selected, [])
 
     edit_tag =
       if length(selected) == 1, do: Enum.find(tags, &(&1.name == hd(selected))), else: nil
 
-    edit_draft = Map.get(assigns, :tags_editor_edit_draft, edit_draft(edit_tag))
+    edit_draft =
+      Map.get(socket.assigns, :tags_editor, %{}) |> Map.get(:edit_draft, edit_draft(edit_tag))
 
     templates =
       Repo.all(
@@ -232,27 +264,39 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
           select: %{slug: template.slug, title: template.title}
       )
 
-    selected_section = current_tags_section(assigns)
+    selected_section = current_tags_section(socket.assigns)
 
-    %{
+    data = %{
       tags:
         Enum.map(tags, fn tag ->
           %{name: tag.name, color: tag.color, count: Map.get(counts, tag.name, 0)}
         end),
       selected: selected,
-      new_tag: Map.get(assigns, :tags_editor_new_tag, %{"name" => "", "color" => ""}),
+      new_tag:
+        Map.get(socket.assigns, :tags_editor, %{}) |> Map.get(:new_tag, %{"name" => "", "color" => ""}),
       edit_draft: edit_draft,
       templates: templates,
-      merge_target: Map.get(assigns, :tags_editor_merge_target, List.first(selected) || ""),
+      merge_target:
+        Map.get(socket.assigns, :tags_editor, %{}) |> Map.get(:merge_target, List.first(selected) || ""),
       selected_section: selected_section
     }
+
+    assign(socket, :tags_editor, data)
   end
 
-  def build(_assigns), do: nil
+  defp put_in_tags_editor(socket, [key], value) do
+    assign(socket, :tags_editor, Map.put(socket.assigns.tags_editor, key, value))
+  end
 
-  @spec translated(term(), term()) :: term()
-  def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  defp noreply(socket), do: {:noreply, socket}
+
+  defp notify_parent(message) do
+    send(self(), message)
+  end
+
+  defp notify_output(title, message, level) do
+    send(self(), {:tags_editor_output, title, message, level})
+  end
 
   @spec tag_font_size(term(), term()) :: term()
   def tag_font_size(count, counts) do
@@ -274,14 +318,18 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
     |> Enum.join("; ")
   end
 
-  defp maybe_seed_edit_draft(socket, [tag_name]) do
-    case Repo.get_by(Tag, project_id: socket.assigns.projects.active_project_id, name: tag_name) do
-      %Tag{} = tag -> assign(socket, :tags_editor_edit_draft, edit_draft(tag))
-      _other -> assign(socket, :tags_editor_edit_draft, %{})
+  defp maybe_seed_edit_draft(socket, project_id, [tag_name]) do
+    case Repo.get_by(Tag, project_id: project_id, name: tag_name) do
+      %Tag{} = tag ->
+        put_in_tags_editor(socket, [:edit_draft], edit_draft(tag))
+
+      _other ->
+        put_in_tags_editor(socket, [:edit_draft], %{})
     end
   end
 
-  defp maybe_seed_edit_draft(socket, _selected), do: assign(socket, :tags_editor_edit_draft, %{})
+  defp maybe_seed_edit_draft(socket, _project_id, _selected),
+    do: put_in_tags_editor(socket, [:edit_draft], %{})
 
   defp edit_draft(nil), do: %{}
 
@@ -314,12 +362,11 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
     end
   end
 
-  defp current_tab_meta(assigns) do
-    case Map.get(assigns, :current_tab) do
-      %{type: type, id: id} -> Map.get(assigns[:tab_meta] || %{}, {type, id}, %{})
-      _other -> %{}
-    end
+  defp current_tab_meta(%{current_tab: %{type: type, id: id}, tab_meta: tab_meta}) do
+    Map.get(tab_meta || %{}, {type, id}, %{})
   end
+
+  defp current_tab_meta(_assigns), do: %{}
 
   defp tag_counts(project_id) do
     Repo.all(from post in Post, where: post.project_id == ^project_id, select: post.tags)
@@ -336,4 +383,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
       trimmed -> trimmed
     end
   end
+
+  defp translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, UILocale.current())
 end

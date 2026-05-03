@@ -397,8 +397,8 @@
             <% @current_tab.type == :menu_editor and @menu_editor -> %>
               <MenuEditor.menu_editor menu_editor={@menu_editor} />
 
-            <% @current_tab.type == :tags and @tags_editor -> %>
-              <TagsEditor.tags_editor tags_editor={@tags_editor} />
+            <% @current_tab.type == :tags and @current_project -> %>
+              <.live_component module={TagsEditor} id="tags-editor" project_id={@current_project.id} current_tab={@current_tab} tab_meta={@tab_meta} />
 
             <% @current_tab.type == :scripts and @script_editor -> %>
               <CodeEntityEditor.script_editor script_editor={@script_editor} />
