@@ -2,7 +2,7 @@ defmodule BDS.Desktop.MenuBar do
   @moduledoc false
 
   use BDS.Desktop.MenuCompat
-  alias BDS.Desktop.Shutdown
+  alias BDS.Desktop.{ShellData, Shutdown, UILocale}
   alias BDS.UI.Commands
   alias BDS.UI.MenuBar, as: ShellMenuBar
   alias Desktop.OS
@@ -22,6 +22,8 @@ defmodule BDS.Desktop.MenuBar do
 
   @impl true
   def mount(menu) do
+    UILocale.put(ShellData.ui_language())
+
     {:ok,
      Desktop.Menu.assign(
        menu,
@@ -85,6 +87,17 @@ defmodule BDS.Desktop.MenuBar do
   end
 
   @impl true
+  def handle_info({:set_ui_locale, locale}, menu) do
+    UILocale.put(locale)
+
+    {:noreply,
+     Desktop.Menu.assign(
+       menu,
+       :groups,
+       groups(dev_mode?: Application.get_env(:bds, :dev_routes, false))
+     )}
+  end
+
   def handle_info(_, menu) do
     {:noreply, menu}
   end
@@ -127,58 +140,60 @@ defmodule BDS.Desktop.MenuBar do
   defp native_label(label, nil), do: label
   defp native_label(label, shortcut), do: label <> "\t" <> shortcut
 
-  defp group_label(:file), do: "File"
-  defp group_label(:edit), do: "Edit"
-  defp group_label(:view), do: "View"
-  defp group_label(:blog), do: "Blog"
-  defp group_label(:help), do: "Help"
+  defp group_label(:file), do: translate("menuBar.file")
+  defp group_label(:edit), do: translate("menuBar.edit")
+  defp group_label(:view), do: translate("menuBar.view")
+  defp group_label(:blog), do: translate("menuBar.blog")
+  defp group_label(:help), do: translate("menuBar.help")
 
-  defp item_label(:new_post), do: "New Post"
-  defp item_label(:import_media), do: "Import Media"
-  defp item_label(:save), do: "Save"
-  defp item_label(:open_in_browser), do: "Open in Browser"
-  defp item_label(:open_data_folder), do: "Open Data Folder"
-  defp item_label(:close_tab), do: "Close Tab"
-  defp item_label(:quit), do: "Quit"
-  defp item_label(:undo), do: "Undo"
-  defp item_label(:redo), do: "Redo"
-  defp item_label(:cut), do: "Cut"
-  defp item_label(:copy), do: "Copy"
-  defp item_label(:paste), do: "Paste"
-  defp item_label(:delete), do: "Delete"
-  defp item_label(:select_all), do: "Select All"
-  defp item_label(:find), do: "Find"
-  defp item_label(:replace), do: "Replace"
-  defp item_label(:edit_preferences), do: "Preferences"
-  defp item_label(:view_posts), do: "Posts"
-  defp item_label(:view_media), do: "Media"
-  defp item_label(:toggle_sidebar), do: "Toggle Sidebar"
-  defp item_label(:toggle_panel), do: "Toggle Panel"
-  defp item_label(:toggle_assistant_sidebar), do: "Toggle Assistant Sidebar"
-  defp item_label(:toggle_dev_tools), do: "Toggle Dev Tools"
-  defp item_label(:reload), do: "Reload"
-  defp item_label(:force_reload), do: "Force Reload"
-  defp item_label(:reset_zoom), do: "Reset Zoom"
-  defp item_label(:zoom_in), do: "Zoom In"
-  defp item_label(:zoom_out), do: "Zoom Out"
-  defp item_label(:toggle_full_screen), do: "Toggle Full Screen"
-  defp item_label(:publish_selected), do: "Publish Selected"
-  defp item_label(:preview_post), do: "Preview Post"
-  defp item_label(:edit_menu), do: "Edit Menu"
-  defp item_label(:rebuild_database), do: "Rebuild Database"
-  defp item_label(:reindex_text), do: "Reindex Text"
-  defp item_label(:rebuild_embedding_index), do: "Rebuild Embedding Index"
-  defp item_label(:metadata_diff), do: "Metadata Diff"
-  defp item_label(:regenerate_calendar), do: "Regenerate Calendar"
-  defp item_label(:validate_translations), do: "Validate Translations"
-  defp item_label(:fill_missing_translations), do: "Fill Missing Translations"
-  defp item_label(:find_duplicates), do: "Find Duplicate Posts"
-  defp item_label(:generate_sitemap), do: "Generate Site"
-  defp item_label(:validate_site), do: "Validate Site"
-  defp item_label(:upload_site), do: "Upload Site"
-  defp item_label(:about), do: "About"
-  defp item_label(:documentation), do: "Documentation"
-  defp item_label(:api_documentation), do: "API Documentation"
-  defp item_label(:view_on_github), do: "View on GitHub"
-  defp item_label(:report_issue), do: "Report Issue"
+  defp item_label(:new_post), do: translate("menuBar.newPost")
+  defp item_label(:import_media), do: translate("menuBar.importMedia")
+  defp item_label(:save), do: translate("menuBar.save")
+  defp item_label(:open_in_browser), do: translate("menuBar.openInBrowser")
+  defp item_label(:open_data_folder), do: translate("menuBar.openDataFolder")
+  defp item_label(:close_tab), do: translate("menuBar.closeTab")
+  defp item_label(:quit), do: translate("menuBar.quit")
+  defp item_label(:undo), do: translate("menuBar.undo")
+  defp item_label(:redo), do: translate("menuBar.redo")
+  defp item_label(:cut), do: translate("menuBar.cut")
+  defp item_label(:copy), do: translate("menuBar.copy")
+  defp item_label(:paste), do: translate("menuBar.paste")
+  defp item_label(:delete), do: translate("menuBar.delete")
+  defp item_label(:select_all), do: translate("menuBar.selectAll")
+  defp item_label(:find), do: translate("menuBar.find")
+  defp item_label(:replace), do: translate("menuBar.replace")
+  defp item_label(:edit_preferences), do: translate("menuBar.preferences")
+  defp item_label(:view_posts), do: translate("menuBar.viewPosts")
+  defp item_label(:view_media), do: translate("menuBar.viewMedia")
+  defp item_label(:toggle_sidebar), do: translate("menuBar.toggleSidebar")
+  defp item_label(:toggle_panel), do: translate("menuBar.togglePanel")
+  defp item_label(:toggle_assistant_sidebar), do: translate("menuBar.toggleAssistantSidebar")
+  defp item_label(:toggle_dev_tools), do: translate("menuBar.toggleDevTools")
+  defp item_label(:reload), do: translate("menuBar.reload")
+  defp item_label(:force_reload), do: translate("menuBar.forceReload")
+  defp item_label(:reset_zoom), do: translate("menuBar.resetZoom")
+  defp item_label(:zoom_in), do: translate("menuBar.zoomIn")
+  defp item_label(:zoom_out), do: translate("menuBar.zoomOut")
+  defp item_label(:toggle_full_screen), do: translate("menuBar.toggleFullScreen")
+  defp item_label(:publish_selected), do: translate("menuBar.publishSelected")
+  defp item_label(:preview_post), do: translate("menuBar.previewPost")
+  defp item_label(:edit_menu), do: translate("menuBar.editMenu")
+  defp item_label(:rebuild_database), do: translate("menuBar.rebuildDatabase")
+  defp item_label(:reindex_text), do: translate("menuBar.reindexText")
+  defp item_label(:rebuild_embedding_index), do: translate("menuBar.rebuildEmbeddingIndex")
+  defp item_label(:metadata_diff), do: translate("menuBar.metadataDiff")
+  defp item_label(:regenerate_calendar), do: translate("menuBar.regenerateCalendar")
+  defp item_label(:validate_translations), do: translate("menuBar.validateTranslations")
+  defp item_label(:fill_missing_translations), do: translate("menuBar.fillMissingTranslations")
+  defp item_label(:find_duplicates), do: translate("menuBar.findDuplicates")
+  defp item_label(:generate_sitemap), do: translate("menuBar.generateSite")
+  defp item_label(:validate_site), do: translate("menuBar.validateSite")
+  defp item_label(:upload_site), do: translate("menuBar.uploadSite")
+  defp item_label(:about), do: translate("menuBar.about")
+  defp item_label(:documentation), do: translate("menuBar.documentation")
+  defp item_label(:api_documentation), do: translate("menuBar.apiDocumentation")
+  defp item_label(:view_on_github), do: translate("menuBar.viewOnGithub")
+  defp item_label(:report_issue), do: translate("menuBar.reportIssue")
+
+  defp translate(text), do: ShellData.translate(text, %{}, UILocale.current())
 end

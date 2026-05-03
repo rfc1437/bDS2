@@ -161,8 +161,9 @@ defmodule BDS.Desktop.ShellLive do
        |> assign(:sidebar_filter_panels, %{})
       |> assign(:chat_editor_request_refs, %{})
       |> assign(:shell_overlay, nil)
-     |> assign(:output_entries, [])
-     |> reload_shell(workbench)}
+      |> assign(:output_entries, [])
+      |> reload_shell(workbench)
+      |> tap(&sync_menu_bar_locale/1)}
   end
 
   @impl true
@@ -682,6 +683,7 @@ defmodule BDS.Desktop.ShellLive do
       socket
       |> assign(:page_language, normalized)
       |> reload_shell(socket.assigns.workbench)
+      |> tap(&sync_menu_bar_locale/1)
     end
   end
 
@@ -860,5 +862,14 @@ defmodule BDS.Desktop.ShellLive do
       apply_shell_command: &apply_shell_command/3,
       apply_shell_command_result: &apply_shell_command_result/2
     }
+
+  defp sync_menu_bar_locale(socket) do
+    locale = socket.assigns.page_language
+
+    case Process.whereis(BDS.Desktop.MenuBar) do
+      nil -> :ok
+      pid -> send(pid, {:set_ui_locale, locale})
+    end
+  end
 
 end
