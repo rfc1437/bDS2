@@ -1,307 +1,498 @@
 defmodule BDS.Desktop.ShellLive.ChatEditor do
   @moduledoc false
 
-  use Phoenix.Component
+  use Phoenix.LiveComponent
+
   import Phoenix.HTML, only: [raw: 1]
 
-  alias BDS.AI
-  alias BDS.MapUtils
-  alias BDS.Persistence
+  alias BDS.{AI, BoundedAtoms, MapUtils, Persistence}
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.ChatEditor.{MessageBuild, ModelSelection, ToolTracking}
+  alias BDS.Desktop.ShellLive.TabHelpers
 
   embed_templates("chat_editor_html/*")
 
-  # ── Public API: state assignment ───────────────────────────────────────────
+  # ── LiveComponent lifecycle ────────────────────────────────────────────────
 
-  @spec assign_socket(term()) :: term()
-  def assign_socket(socket) do
-    assign(socket, :chat_editor, MessageBuild.build(socket.assigns))
+  @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def update(%{action: :finish_request, result: result}, socket) do
+    {:ok, do_finish_request(socket, result)}
   end
 
-  defdelegate build(assigns), to: MessageBuild
+  def update(%{action: :note_tool_call, tool_call: tool_call}, socket) do
+    {:ok, do_note_tool_call(socket, tool_call)}
+  end
 
-  # ── Public API: model selection ────────────────────────────────────────────
+  def update(%{action: :note_tool_result, name: name}, socket) do
+    {:ok, do_note_tool_result(socket, name)}
+  end
 
-  defdelegate toggle_model_selector(socket, reload), to: ModelSelection
-  defdelegate set_model(socket, model_id, reload, append_output), to: ModelSelection
+  def update(%{action: :note_streaming_content, content: content}, socket) do
+    {:ok, do_note_streaming_content(socket, content)}
+  end
 
-  # ── Public API: input + surface state ──────────────────────────────────────
+  def update(assigns, socket) do
+    socket =
+      socket
+      |> assign(assigns)
+      |> ensure_state()
+      |> build_data()
 
-  @spec update_input(term(), term(), term()) :: term()
-  def update_input(socket, value, reload) do
-    %{id: conversation_id} = socket.assigns.current_tab
+    {:ok, socket}
+  end
 
-    socket
-    |> assign(
-      :chat_editor_inputs,
-      Map.put(socket.assigns.chat_editor_inputs, conversation_id, to_string(value || ""))
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
+  @impl true
+  def render(%{chat_editor: nil} = assigns), do: ~H"<div></div>"
+
+  def render(assigns) do
+    chat_editor(assigns)
+  end
+
+  # ── Event handlers ─────────────────────────────────────────────────────────
+
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def handle_event("change_chat_editor_input", %{"message" => message}, socket) do
+    {:noreply, assign(socket, :input, to_string(message || "")) |> build_data()}
+  end
+
+  def handle_event("toggle_chat_model_selector", _params, socket) do
+    {:noreply,
+     assign(socket, :model_selector_open?, not socket.assigns.model_selector_open?) |> build_data()}
+  end
+
+  def handle_event("select_chat_model", %{"model" => model_id}, socket) do
+    conversation_id = socket.assigns.conversation_id
+
+    case AI.set_conversation_model(conversation_id, model_id) do
+      {:ok, _conversation} ->
+        {:noreply, assign(socket, :model_selector_open?, false) |> build_data()}
+
+      {:error, reason} ->
+        notify_parent({:chat_editor_output, translated("Chat"), inspect(reason), "error"})
+        {:noreply, assign(socket, :model_selector_open?, false) |> build_data()}
+    end
+  end
+
+  def handle_event("send_chat_editor_message", _params, socket) do
+    {:noreply, do_send_message(socket)}
+  end
+
+  def handle_event("abort_chat_editor_message", _params, socket) do
+    {:noreply, do_abort_message(socket)}
+  end
+
+  def handle_event(
+        "change_chat_surface_form",
+        %{"surface" => %{"id" => surface_id, "fields" => fields}},
+        socket
+      ) do
+    next_data = Map.put(socket.assigns.surface_data, surface_id, fields)
+    {:noreply, assign(socket, :surface_data, next_data) |> build_data()}
+  end
+
+  def handle_event(
+        "select_chat_surface_tab",
+        %{"surface-id" => surface_id, "index" => index},
+        socket
+      ) do
+    socket =
+      socket
+      |> assign(:surface_tabs, Map.put(socket.assigns.surface_tabs, surface_id, parse_integer(index)))
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("dismiss_chat_surface", %{"surface-id" => surface_id}, socket) do
+    socket =
+      socket
+      |> assign(:dismissed_surfaces, MapSet.put(socket.assigns.dismissed_surfaces, surface_id))
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("chat_surface_action", params, socket) do
+    {:noreply, do_handle_surface_action(socket, params)}
+  end
+
+  def handle_event("open_chat_settings", _params, socket) do
+    notify_parent(
+      {:open_sidebar_item,
+       %{
+         "route" => "settings",
+         "id" => "settings-ai",
+         "title" => "Settings",
+         "subtitle" => "AI"
+       }, :pin}
     )
-    |> reload.(socket.assigns.workbench)
+
+    {:noreply, socket}
   end
 
-  @spec update_surface_form(term(), term(), term(), term()) :: term()
-  def update_surface_form(socket, surface_id, fields, reload)
-      when is_binary(surface_id) and is_map(fields) do
-    next_data = Map.put(socket.assigns.chat_editor_surface_data, surface_id, fields)
+  # ── State initialisation ──────────────────────────────────────────────────
 
-    socket
-    |> assign(:chat_editor_surface_data, next_data)
-    |> reload.(socket.assigns.workbench)
+  defp ensure_state(socket) do
+    conversation_id = socket.assigns.current_tab.id
+
+    defaults = %{
+      conversation_id: conversation_id,
+      input: "",
+      model_selector_open?: false,
+      request: nil,
+      surface_data: %{},
+      surface_tabs: %{},
+      dismissed_surfaces: MapSet.new(),
+      action_error: nil
+    }
+
+    Enum.reduce(defaults, socket, fn {key, default}, acc ->
+      if is_nil(Map.get(acc.assigns, key)) do
+        assign(acc, key, default)
+      else
+        acc
+      end
+    end)
   end
 
-  @spec select_surface_tab(term(), term(), term(), term()) :: term()
-  def select_surface_tab(socket, surface_id, index, reload)
-      when is_binary(surface_id) and is_integer(index) and index >= 0 do
-    socket
-    |> assign(
-      :chat_editor_surface_tabs,
-      Map.put(socket.assigns.chat_editor_surface_tabs, surface_id, index)
-    )
-    |> reload.(socket.assigns.workbench)
+  # ── Data builder ──────────────────────────────────────────────────────────
+
+  defp build_data(socket) do
+    conversation_id = socket.assigns.conversation_id
+    request = socket.assigns.request
+
+    fake_assigns = %{
+      current_tab: socket.assigns.current_tab,
+      chat_editor_requests: if(request, do: %{conversation_id => request}, else: %{}),
+      chat_model_selectors_open: %{conversation_id => socket.assigns.model_selector_open?},
+      chat_editor_inputs: %{conversation_id => socket.assigns.input},
+      chat_editor_surface_data: socket.assigns.surface_data,
+      chat_editor_surface_tabs: socket.assigns.surface_tabs,
+      chat_editor_dismissed_surfaces: socket.assigns.dismissed_surfaces,
+      chat_editor_action_errors: %{conversation_id => socket.assigns.action_error},
+      offline_mode: socket.assigns.offline_mode
+    }
+
+    chat_editor = MessageBuild.build(fake_assigns)
+    assign(socket, :chat_editor, chat_editor)
   end
 
-  @spec dismiss_surface(term(), term(), term()) :: term()
-  def dismiss_surface(socket, surface_id, reload) when is_binary(surface_id) do
-    socket
-    |> assign(
-      :chat_editor_dismissed_surfaces,
-      MapSet.put(socket.assigns.chat_editor_dismissed_surfaces, surface_id)
-    )
-    |> reload.(socket.assigns.workbench)
-  end
+  # ── Messaging ──────────────────────────────────────────────────────────────
 
-  @spec current_surface_data(term(), term()) :: term()
-  def current_surface_data(socket, surface_id) when is_binary(surface_id) do
-    Map.get(socket.assigns.chat_editor_surface_data, surface_id, %{})
-  end
-
-  @spec set_action_error(term(), term(), term(), term()) :: term()
-  def set_action_error(socket, conversation_id, message, reload)
-      when is_binary(conversation_id) and is_binary(message) do
-    socket
-    |> assign(
-      :chat_editor_action_errors,
-      Map.put(socket.assigns.chat_editor_action_errors, conversation_id, message)
-    )
-    |> reload.(socket.assigns.workbench)
-  end
-
-  @spec clear_action_error(term(), term(), term()) :: term()
-  def clear_action_error(socket, conversation_id, reload) when is_binary(conversation_id) do
-    socket
-    |> assign(
-      :chat_editor_action_errors,
-      Map.delete(socket.assigns.chat_editor_action_errors, conversation_id)
-    )
-    |> reload.(socket.assigns.workbench)
-  end
-
-  # ── Public API: messaging ──────────────────────────────────────────────────
-
-  @spec send_message(term(), term(), term()) :: term()
-  def send_message(socket, reload, append_output) do
-    %{id: conversation_id} = socket.assigns.current_tab
-    message = socket.assigns.chat_editor_inputs |> Map.get(conversation_id, "") |> String.trim()
+  defp do_send_message(socket) do
+    conversation_id = socket.assigns.conversation_id
+    message = String.trim(socket.assigns.input || "")
 
     cond do
       message == "" ->
-        reload.(socket, socket.assigns.workbench)
+        build_data(socket)
 
-      Map.has_key?(socket.assigns.chat_editor_requests, conversation_id) ->
-        reload.(socket, socket.assigns.workbench)
+      not is_nil(socket.assigns.request) ->
+        build_data(socket)
 
       socket.assigns.offline_mode ->
-        socket
-        |> append_output.(
-          translated("Chat"),
-          translated("Automatic AI actions stay gated by airplane mode."),
-          nil,
-          "info"
+        notify_parent(
+          {:chat_editor_output, translated("Chat"),
+           translated("Automatic AI actions stay gated by airplane mode."), "info"}
         )
-        |> reload.(socket.assigns.workbench)
+
+        build_data(socket)
 
       ModelSelection.needs_api_key?(false) ->
-        reload.(socket, socket.assigns.workbench)
+        build_data(socket)
 
       true ->
-        live_view_pid = self()
+        parent = self()
         started_at = Persistence.now_ms()
 
         task =
           Task.Supervisor.async_nolink(BDS.Tasks.TaskSupervisor, fn ->
             AI.send_chat_message(conversation_id, message,
-              project_id: socket.assigns.projects.active_project_id,
-              event_target: live_view_pid
+              project_id: active_project_id(socket),
+              event_target: parent
             )
           end)
 
         :ok = allow_repo_sandbox(task.pid)
 
+        notify_parent({:chat_editor_task_started, conversation_id, task.ref})
+
         socket
-        |> assign(
-          :chat_editor_inputs,
-          Map.put(socket.assigns.chat_editor_inputs, conversation_id, "")
-        )
-        |> assign(
-          :chat_editor_requests,
-          Map.put(socket.assigns.chat_editor_requests, conversation_id, %{
-            ref: task.ref,
-            pid: task.pid,
-            started_at: started_at,
-            message: message,
-            content: "",
-            tool_events: []
-          })
-        )
-        |> assign(
-          :chat_editor_request_refs,
-          Map.put(socket.assigns.chat_editor_request_refs, task.ref, conversation_id)
-        )
-        |> assign(
-          :chat_editor_action_errors,
-          Map.delete(socket.assigns.chat_editor_action_errors, conversation_id)
-        )
-        |> reload.(socket.assigns.workbench)
+        |> assign(:input, "")
+        |> assign(:request, %{
+          ref: task.ref,
+          pid: task.pid,
+          started_at: started_at,
+          message: message,
+          content: "",
+          tool_events: []
+        })
+        |> assign(:action_error, nil)
+        |> build_data()
     end
   end
 
-  @spec abort_message(term(), term()) :: term()
-  def abort_message(socket, reload) do
-    %{id: conversation_id} = socket.assigns.current_tab
+  defp do_abort_message(socket) do
+    conversation_id = socket.assigns.conversation_id
 
-    case Map.get(socket.assigns.chat_editor_requests, conversation_id) do
+    case socket.assigns.request do
       nil ->
-        reload.(socket, socket.assigns.workbench)
+        build_data(socket)
 
       %{ref: ref} = _request ->
         :ok = AI.cancel_chat(conversation_id)
 
+        notify_parent({:chat_editor_task_cancelled, conversation_id, ref})
+
+        # Allow the terminated task's DB connection to be cleaned up before rebuilding.
+        Process.sleep(20)
+
         socket
-        |> assign(
-          :chat_editor_requests,
-          Map.delete(socket.assigns.chat_editor_requests, conversation_id)
-        )
-        |> assign(
-          :chat_editor_request_refs,
-          Map.delete(socket.assigns.chat_editor_request_refs, ref)
-        )
-        |> reload.(socket.assigns.workbench)
+        |> assign(:request, nil)
+        |> build_data()
     end
   end
 
-  @spec note_tool_call(term(), term(), term(), term()) :: term()
-  def note_tool_call(socket, conversation_id, tool_call, reload)
-      when is_binary(conversation_id) and is_map(tool_call) do
-    update_request(
-      socket,
-      conversation_id,
-      fn request ->
-        update_in(
-          request.tool_events,
-          &(&1 ++
-              [
-                %{
-                  type: :call,
-                  id: ToolTracking.tool_call_id(tool_call),
-                  name: ToolTracking.tool_call_name(tool_call),
-                  arguments: ToolTracking.tool_call_arguments(tool_call)
-                }
-              ])
-        )
-      end,
-      reload
-    )
-  end
-
-  @spec note_tool_result(term(), term(), term(), term()) :: term()
-  def note_tool_result(socket, conversation_id, name, reload)
-      when is_binary(conversation_id) and is_binary(name) do
-    update_request(
-      socket,
-      conversation_id,
-      fn request ->
-        update_in(request.tool_events, &(&1 ++ [%{type: :result, name: name}]))
-      end,
-      reload
-    )
-  end
-
-  @spec note_streaming_content(term(), term(), term(), term()) :: term()
-  def note_streaming_content(socket, conversation_id, content, reload)
-      when is_binary(conversation_id) and is_binary(content) do
-    update_request(
-      socket,
-      conversation_id,
-      fn request -> %{request | content: content} end,
-      reload
-    )
-  end
-
-  @spec finish_request(term(), term(), term(), term(), term()) :: term()
-  def finish_request(socket, ref, result, reload, append_output) when is_reference(ref) do
-    case Map.pop(socket.assigns.chat_editor_request_refs, ref) do
-      {nil, _remaining_refs} ->
+  defp do_finish_request(socket, result) do
+    case result do
+      {:ok, reply} ->
         socket
+        |> update_tab_meta_from_reply(reply)
+        |> assign(:request, nil)
+        |> build_data()
 
-      {conversation_id, remaining_refs} ->
-        socket =
-          socket
-          |> assign(:chat_editor_request_refs, remaining_refs)
-          |> assign(
-            :chat_editor_requests,
-            Map.delete(socket.assigns.chat_editor_requests, conversation_id)
-          )
+      {:error, :cancelled} ->
+        assign(socket, :request, nil) |> build_data()
 
-        case result do
-          {:ok, reply} ->
-            socket
-            |> update_tab_meta_from_reply(conversation_id, reply)
-            |> reload.(socket.assigns.workbench)
+      {:error, %{kind: :endpoint_not_configured}} ->
+        assign(socket, :request, nil) |> build_data()
 
-          {:error, :cancelled} ->
-            reload.(socket, socket.assigns.workbench)
-
-          {:error, %{kind: :endpoint_not_configured}} ->
-            reload.(socket, socket.assigns.workbench)
-
-          {:error, reason} ->
-            socket
-            |> append_output.(translated("Chat"), format_error(reason), nil, "error")
-            |> reload.(socket.assigns.workbench)
-        end
+      {:error, reason} ->
+        notify_parent({:chat_editor_output, translated("Chat"), format_error(reason), "error"})
+        assign(socket, :request, nil) |> build_data()
     end
   end
 
-  defp update_tab_meta_from_reply(socket, conversation_id, reply) do
+  defp do_note_tool_call(socket, tool_call) when is_map(tool_call) do
+    update_request(socket, fn request ->
+      update_in(
+        request.tool_events,
+        &(&1 ++
+            [
+              %{
+                type: :call,
+                id: ToolTracking.tool_call_id(tool_call),
+                name: ToolTracking.tool_call_name(tool_call),
+                arguments: ToolTracking.tool_call_arguments(tool_call)
+              }
+            ])
+      )
+    end)
+  end
+
+  defp do_note_tool_result(socket, name) when is_binary(name) do
+    update_request(socket, fn request ->
+      update_in(request.tool_events, &(&1 ++ [%{type: :result, name: name}]))
+    end)
+  end
+
+  defp do_note_streaming_content(socket, content) when is_binary(content) do
+    update_request(socket, fn request -> %{request | content: content} end)
+  end
+
+  defp update_request(socket, updater) do
+    case socket.assigns.request do
+      nil ->
+        socket
+
+      request ->
+        socket
+        |> assign(:request, updater.(request))
+        |> build_data()
+    end
+  end
+
+  defp update_tab_meta_from_reply(socket, reply) do
     title =
       reply
       |> MapUtils.attr(:conversation, %{})
       |> MapUtils.attr(:title)
 
     if is_binary(title) and String.trim(title) != "" do
-      key = {:chat, conversation_id}
+      notify_parent({:chat_editor_tab_meta, socket.assigns.conversation_id, title, ""})
+    end
 
-      assign(socket, :tab_meta, Map.update(socket.assigns.tab_meta, key, %{title: title}, fn meta ->
-        Map.put(meta, :title, title)
-      end))
-    else
-      socket
+    socket
+  end
+
+  # ── Surface actions ────────────────────────────────────────────────────────
+
+  defp do_handle_surface_action(socket, params) do
+    surface_id = Map.get(params, "surface-id", "")
+
+    payload =
+      params
+      |> Map.get("payload")
+      |> decode_payload()
+      |> maybe_put_form_data(socket, surface_id)
+
+    case normalize_action(Map.get(params, "action", "")) do
+      :open_post ->
+        case Map.get(payload, "postId") || Map.get(payload, "post_id") do
+          post_id when is_binary(post_id) and post_id != "" ->
+            notify_parent(
+              {:open_sidebar_item,
+               %{
+                 "route" => "post",
+                 "id" => post_id,
+                 "title" => TabHelpers.post_title(post_id),
+                 "subtitle" => TabHelpers.post_subtitle(post_id)
+               }, :pin}
+            )
+
+            assign(socket, :action_error, nil) |> build_data()
+
+          _other ->
+            set_action_error(socket, "Invalid payload for openPost action")
+        end
+
+      :open_media ->
+        case Map.get(payload, "mediaId") || Map.get(payload, "media_id") do
+          media_id when is_binary(media_id) and media_id != "" ->
+            notify_parent(
+              {:open_sidebar_item,
+               %{
+                 "route" => "media",
+                 "id" => media_id,
+                 "title" => TabHelpers.media_title(media_id),
+                 "subtitle" => TabHelpers.media_subtitle(media_id)
+               }, :pin}
+            )
+
+            assign(socket, :action_error, nil) |> build_data()
+
+          _other ->
+            set_action_error(socket, "Invalid payload for openMedia action")
+        end
+
+      :open_settings ->
+        notify_parent(
+          {:open_sidebar_item,
+           %{
+             "route" => "settings",
+             "id" => "settings-ai",
+             "title" => "Settings",
+             "subtitle" => "AI"
+           }, :pin}
+        )
+
+        assign(socket, :action_error, nil) |> build_data()
+
+      :open_chat ->
+        chat_id =
+          Map.get(payload, "conversationId") || Map.get(payload, "conversation_id") ||
+            socket.assigns.conversation_id
+
+        notify_parent(
+          {:open_sidebar_item,
+           %{
+             "route" => "chat",
+             "id" => chat_id,
+             "title" => Map.get(payload, "title", "Chat"),
+             "subtitle" => Map.get(payload, "subtitle", "")
+           }, :pin}
+        )
+
+        assign(socket, :action_error, nil) |> build_data()
+
+      :switch_view ->
+        case BoundedAtoms.sidebar_view(Map.get(payload, "view")) do
+          nil ->
+            set_action_error(socket, "Invalid payload for switchView action")
+
+          view ->
+            notify_parent({:chat_editor_switch_view, view})
+            assign(socket, :action_error, nil) |> build_data()
+        end
+
+      :toggle_sidebar ->
+        notify_parent({:chat_editor_toggle_sidebar})
+        assign(socket, :action_error, nil) |> build_data()
+
+      :toggle_panel ->
+        notify_parent({:chat_editor_toggle_panel})
+        assign(socket, :action_error, nil) |> build_data()
+
+      :toggle_assistant_sidebar ->
+        notify_parent({:chat_editor_toggle_assistant_sidebar})
+        assign(socket, :action_error, nil) |> build_data()
+
+      :unknown ->
+        set_action_error(socket, "Unsupported assistant action")
+    end
+  end
+
+  defp set_action_error(socket, message) do
+    assign(socket, :action_error, message) |> build_data()
+  end
+
+  defp decode_payload(nil), do: %{}
+  defp decode_payload(""), do: %{}
+
+  defp decode_payload(payload) when is_binary(payload) do
+    case Jason.decode(payload) do
+      {:ok, decoded} when is_map(decoded) -> decoded
+      _other -> %{}
+    end
+  end
+
+  defp decode_payload(_payload), do: %{}
+
+  defp maybe_put_form_data(payload, socket, surface_id)
+       when is_binary(surface_id) and surface_id != "" do
+    form_data = Map.get(socket.assigns.surface_data, surface_id, %{})
+    if form_data == %{}, do: payload, else: Map.put(payload, "formData", form_data)
+  end
+
+  defp maybe_put_form_data(payload, _socket, _surface_id), do: payload
+
+  defp normalize_action(action) do
+    action
+    |> to_string()
+    |> String.replace("_", "")
+    |> String.downcase()
+    |> case do
+      "openpost" -> :open_post
+      "openmedia" -> :open_media
+      "opensettings" -> :open_settings
+      "openchat" -> :open_chat
+      "switchview" -> :switch_view
+      "setactiveview" -> :switch_view
+      "togglesidebar" -> :toggle_sidebar
+      "togglepanel" -> :toggle_panel
+      "openpanel" -> :toggle_panel
+      "toggleassistantsidebar" -> :toggle_assistant_sidebar
+      _other -> :unknown
     end
   end
 
   # ── HEEx-callable helpers ─────────────────────────────────────────────────
 
-  @spec message_role_label(term()) :: term()
+  @spec message_role_label(atom()) :: String.t()
   def message_role_label(:user), do: translated("chat.role.you")
   def message_role_label(_role), do: translated("chat.role.assistant")
 
   defdelegate tool_call_name(tool_call), to: ToolTracking
   defdelegate tool_call_arguments(tool_call), to: ToolTracking
 
-  @spec tool_surface_type(term()) :: term()
+  @spec tool_surface_type(map()) :: String.t()
   def tool_surface_type(surface), do: Map.get(surface, :type, "json")
 
+  @spec markdown_html(binary()) :: Phoenix.HTML.Safe.t()
   def markdown_html(content) when is_binary(content) do
     html =
       case Earmark.as_html(content, escape: true) do
@@ -313,13 +504,13 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     raw(html)
   end
 
-  @spec markdown_html(term()) :: term()
   def markdown_html(_content), do: ""
 
-  @spec payload_json(term()) :: term()
+  @spec payload_json(map() | nil) :: String.t()
   def payload_json(nil), do: "{}"
   def payload_json(payload) when is_map(payload), do: Jason.encode!(payload)
 
+  @spec chart_width(number(), term()) :: number()
   def chart_width(_max_value, value) when not is_number(value), do: 0
 
   def chart_width(max_value, value) when is_number(max_value) and max_value > 0 do
@@ -331,18 +522,17 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     |> Float.round(2)
   end
 
-  @spec chart_width(term(), term()) :: term()
   def chart_width(_max_value, _value), do: 0
 
+  @spec truthy?(term()) :: boolean()
   def truthy?(value) when value in [true, "true", 1, "1", "on"], do: true
-  @spec truthy?(term()) :: term()
   def truthy?(_value), do: false
 
   # ── HEEx components ───────────────────────────────────────────────────────
 
   attr(:markers, :list, required: true)
 
-  @spec chat_tool_markers(term()) :: term()
+  @spec chat_tool_markers(map()) :: Phoenix.LiveView.Rendered.t()
   def chat_tool_markers(assigns) do
     ~H"""
     <%= if @markers != [] do %>
@@ -372,15 +562,16 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   end
 
   attr(:surface, :map, required: true)
+  attr(:myself, :any, required: false)
 
-  @spec chat_surface(term()) :: term()
+  @spec chat_surface(map()) :: Phoenix.LiveView.Rendered.t()
   def chat_surface(assigns) do
     ~H"""
     <details id={@surface.id} class={["chat-inline-surface", "chat-inline-surface-#{@surface.type}"]} data-testid="chat-inline-surface" data-expanded={surface_expanded_attr(@surface)} open={Map.get(@surface, :expanded?, false)}>
       <summary class="chat-inline-surface-header">
         <span class="chat-inline-surface-icon"><%= surface_icon(@surface.type) %></span>
         <span class="chat-inline-surface-title"><%= surface_title(@surface) %></span>
-        <button class="chat-inline-surface-dismiss" type="button" phx-click="dismiss_chat_surface" phx-value-surface-id={@surface.id} aria-label={translated("chat.dismissSurface")} data-testid="chat-inline-surface-dismiss">×</button>
+        <button class="chat-inline-surface-dismiss" type="button" phx-click="dismiss_chat_surface" phx-target={@myself} phx-value-surface-id={@surface.id} aria-label={translated("chat.dismissSurface")} data-testid="chat-inline-surface-dismiss">×</button>
       </summary>
       <div class="chat-inline-surface-body">
       <%= case @surface.type do %>
@@ -400,6 +591,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
                     class="chat-surface-action-button"
                     type="button"
                     phx-click="chat_surface_action"
+                    phx-target={@myself}
                     phx-value-surface-id={@surface.id}
                     phx-value-action={action.action}
                     phx-value-payload={payload_json(action.payload)}
@@ -499,6 +691,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
                   class={["chat-surface-tab-button", if(index == @surface.selected_index, do: "active")]}
                   type="button"
                   phx-click="select_chat_surface_tab"
+                  phx-target={@myself}
                   phx-value-surface-id={@surface.id}
                   phx-value-index={index}
                 >
@@ -522,7 +715,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
           <%= if present?(@surface.title) do %>
             <h3><%= @surface.title %></h3>
           <% end %>
-          <form class="chat-surface-form" phx-change="change_chat_surface_form">
+          <form class="chat-surface-form" phx-change="change_chat_surface_form" phx-target={@myself}>
             <input type="hidden" name="surface[id]" value={@surface.id} />
 
             <%= for field <- @surface.fields do %>
@@ -559,6 +752,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
                 class="chat-surface-action-button"
                 type="button"
                 phx-click="chat_surface_action"
+                phx-target={@myself}
                 phx-value-surface-id={@surface.id}
                 phx-value-action={@surface.submit_action}
                 phx-value-payload="{}"
@@ -604,19 +798,12 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   # ── Private helpers ───────────────────────────────────────────────────────
 
-  defp update_request(socket, conversation_id, updater, reload) do
-    case Map.get(socket.assigns.chat_editor_requests, conversation_id) do
-      nil ->
-        socket
+  defp notify_parent(message) do
+    send(self(), message)
+  end
 
-      request ->
-        socket
-        |> assign(
-          :chat_editor_requests,
-          Map.put(socket.assigns.chat_editor_requests, conversation_id, updater.(request))
-        )
-        |> reload.(socket.assigns.workbench)
-    end
+  defp active_project_id(socket) do
+    socket.assigns[:project_id]
   end
 
   defp allow_repo_sandbox(pid) when is_pid(pid) do
@@ -665,7 +852,15 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   defp format_error(reason), do: inspect(reason)
 
-  @spec translated(term(), term()) :: term()
-  def translated(text, bindings \\ %{}),
+  defp parse_integer(value) when is_integer(value), do: value
+
+  defp parse_integer(value) do
+    case Integer.parse(to_string(value)) do
+      {int, _} -> int
+      :error -> 0
+    end
+  end
+
+  defp translated(text, bindings \\ %{}),
     do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

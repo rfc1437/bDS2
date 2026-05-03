@@ -3232,7 +3232,10 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "llama-current"
     refute html =~ ~s(<span>New Chat</span><span class="chat-model-selector-caret">▾</span>)
 
-    selector_html = render_click(view, "toggle_chat_model_selector", %{})
+    selector_html =
+      view
+      |> element("[data-testid='chat-model-selector-button']")
+      |> render_click()
     assert selector_html =~ ~s(class="chat-model-selector-menu")
     assert selector_html =~ ~s(data-testid="chat-model-selector-option")
     assert selector_html =~ "llama-current"
@@ -3244,10 +3247,12 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute css =~
              ".chat-panel-title {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  overflow: hidden;"
 
-    render_click(view, "select_chat_model", %{"model" => "llama-next"})
+    view
+    |> element("button[phx-value-model='llama-default']")
+    |> render_click()
 
-    assert AI.get_chat_conversation(conversation.id).model == "llama-next"
-    assert render(view) =~ "llama-next"
+    assert AI.get_chat_conversation(conversation.id).model == "llama-default"
+    assert render(view) =~ "llama-default"
   end
 
   test "chat editor updates the visible new-chat title after the first turn" do
@@ -3284,7 +3289,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(<span class="tab-title">New Chat</span>)
 
     _html =
-      render_change(view, "change_chat_editor_input", %{"message" => "Posts pro Monat 2026"})
+      view
+      |> element(".chat-input-wrapper")
+      |> render_change(%{"message" => "Posts pro Monat 2026"})
 
     _html =
       view
@@ -3384,10 +3391,12 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Posts"
     assert html =~ ~r/chat-message-content.*data-testid="chat-inline-surface"/s
 
+    surface_id = Regex.run(~r/id="([^"]+-surface-0)"/, html) |> Enum.at(1)
+
     dismissed_html =
-      render_click(view, "dismiss_chat_surface", %{
-        "surface-id" => Regex.run(~r/id="([^"]+-surface-0)"/, html) |> Enum.at(1)
-      })
+      view
+      |> element("button[phx-value-surface-id='#{surface_id}']")
+      |> render_click()
 
     refute dismissed_html =~ ~s(data-testid="chat-inline-surface")
   end
@@ -3503,7 +3512,10 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => conversation.model || "chat"
       })
 
-    _html = render_change(view, "change_chat_editor_input", %{"message" => "Update missing data"})
+    _html =
+      view
+      |> element(".chat-input-wrapper")
+      |> render_change(%{"message" => "Update missing data"})
 
     _html =
       view
@@ -3883,11 +3895,11 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Quick Action"
     assert html =~ "Open Post"
 
-    html =
-      view
-      |> element("[data-testid='chat-surface-action'][data-action='openPost']")
-      |> render_click()
+    view
+    |> element("[data-testid='chat-surface-action'][data-action='openPost']")
+    |> render_click()
 
+    html = render(view)
     assert html =~ ~s(data-tab-type="post")
     assert html =~ ~s(data-tab-id="#{post.id}")
   end
@@ -3919,7 +3931,10 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => conversation.model || "chat"
       })
 
-    _html = render_change(view, "change_chat_editor_input", %{"message" => "Please wait"})
+    _html =
+      view
+      |> element(".chat-input-wrapper")
+      |> render_change(%{"message" => "Please wait"})
 
     html =
       view
@@ -3976,7 +3991,10 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => conversation.model || "chat"
       })
 
-    _html = render_change(view, "change_chat_editor_input", %{"message" => "Newest question"})
+    _html =
+      view
+      |> element(".chat-input-wrapper")
+      |> render_change(%{"message" => "Newest question"})
 
     html =
       view
@@ -4046,7 +4064,10 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => conversation.model || "chat"
       })
 
-    _html = render_change(view, "change_chat_editor_input", %{"message" => "Newest question"})
+    _html =
+      view
+      |> element(".chat-input-wrapper")
+      |> render_change(%{"message" => "Newest question"})
 
     _html =
       view

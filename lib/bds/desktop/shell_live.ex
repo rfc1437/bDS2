@@ -53,8 +53,7 @@ defmodule BDS.Desktop.ShellLive do
       tab_subtitle: 2,
       tab_id_for_route: 2,
       tab_intent: 2,
-      sidebar_route_atom: 1,
-      parse_integer: 1
+      sidebar_route_atom: 1
     ]
 
   alias BDS.Projects
@@ -164,15 +163,8 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:project_menu_open, false)
       |> assign(:sidebar_filters_by_view, %{})
        |> assign(:sidebar_filter_panels, %{})
-     |> assign(:chat_editor_inputs, %{})
-     |> assign(:chat_model_selectors_open, %{})
-     |> assign(:chat_editor_requests, %{})
-     |> assign(:chat_editor_request_refs, %{})
-     |> assign(:chat_editor_surface_data, %{})
-     |> assign(:chat_editor_surface_tabs, %{})
-    |> assign(:chat_editor_dismissed_surfaces, MapSet.new())
-     |> assign(:chat_editor_action_errors, %{})
-     |> assign(:import_editor_analysis_states, %{})
+      |> assign(:chat_editor_request_refs, %{})
+      |> assign(:import_editor_analysis_states, %{})
      |> assign(:import_editor_analysis_task_refs, %{})
      |> assign(:import_editor_execution_states, %{})
      |> assign(:import_editor_execution_task_refs, %{})
@@ -329,65 +321,6 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("settings_shell_command", %{"action" => action}, socket) do
     {:noreply, apply_shell_command(socket, action)}
-  end
-
-  def handle_event("change_chat_editor_input", %{"message" => message}, socket) do
-    {:noreply, ChatEditor.update_input(socket, message, &reload_shell/2)}
-  end
-
-  def handle_event("toggle_chat_model_selector", _params, socket) do
-    {:noreply, ChatEditor.toggle_model_selector(socket, &reload_shell/2)}
-  end
-
-  def handle_event("select_chat_model", %{"model" => model_id}, socket) do
-    {:noreply, ChatEditor.set_model(socket, model_id, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("send_chat_editor_message", _params, socket) do
-    {:noreply, ChatEditor.send_message(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("abort_chat_editor_message", _params, socket) do
-    {:noreply, ChatEditor.abort_message(socket, &reload_shell/2)}
-  end
-
-  def handle_event("open_chat_settings", _params, socket) do
-    {:noreply,
-     socket
-     |> ChatSurface.clear_action_error()
-     |> open_sidebar_item(
-       %{"route" => "settings", "id" => "settings-ai", "title" => "Settings", "subtitle" => "AI"},
-       :pin
-     )}
-  end
-
-  def handle_event(
-        "change_chat_surface_form",
-        %{"surface" => %{"id" => surface_id, "fields" => fields}},
-        socket
-      ) do
-    {:noreply, ChatEditor.update_surface_form(socket, surface_id, fields, &reload_shell/2)}
-  end
-
-  def handle_event(
-        "select_chat_surface_tab",
-        %{"surface-id" => surface_id, "index" => index},
-        socket
-      ) do
-    {:noreply,
-     ChatEditor.select_surface_tab(socket, surface_id, parse_integer(index), &reload_shell/2)}
-  end
-
-  def handle_event("dismiss_chat_surface", %{"surface-id" => surface_id}, socket) do
-    {:noreply, ChatEditor.dismiss_surface(socket, surface_id, &reload_shell/2)}
-  end
-
-  def handle_event("chat_surface_action", params, socket) do
-    {:noreply,
-     ChatSurface.handle_action(socket, params, %{
-       reload: &reload_shell/2,
-       open_sidebar: &open_sidebar_item/3
-     })}
   end
 
   def handle_event("change_import_editor_definition", %{"import_definition" => params}, socket) do
@@ -957,9 +890,19 @@ defmodule BDS.Desktop.ShellLive do
            &append_output_entry/5
          )}
 
+      Map.has_key?(socket.assigns.chat_editor_request_refs, ref) ->
+        {conversation_id, remaining_refs} = Map.pop(socket.assigns.chat_editor_request_refs, ref)
+
+        send_update(ChatEditor,
+          id: "chat-editor-#{conversation_id}",
+          action: :finish_request,
+          result: result
+        )
+
+        {:noreply, assign(socket, :chat_editor_request_refs, remaining_refs)}
+
       true ->
-        {:noreply,
-         ChatEditor.finish_request(socket, ref, result, &reload_shell/2, &append_output_entry/5)}
+        {:noreply, socket}
     end
   end
 
@@ -986,20 +929,23 @@ defmodule BDS.Desktop.ShellLive do
             &append_output_entry/5
           )
 
-        true ->
-          case reason do
-            :normal ->
-              socket
+        Map.has_key?(socket.assigns.chat_editor_request_refs, ref) ->
+          {conversation_id, remaining_refs} = Map.pop(socket.assigns.chat_editor_request_refs, ref)
 
-            _other ->
-              ChatEditor.finish_request(
-                socket,
-                ref,
-                {:error, :cancelled},
-                &reload_shell/2,
-                &append_output_entry/5
-              )
+          if reason == :normal do
+            assign(socket, :chat_editor_request_refs, remaining_refs)
+          else
+            send_update(ChatEditor,
+              id: "chat-editor-#{conversation_id}",
+              action: :finish_request,
+              result: {:error, :cancelled}
+            )
+
+            assign(socket, :chat_editor_request_refs, remaining_refs)
           end
+
+        true ->
+          socket
       end
 
     {:noreply, next_socket}
@@ -1027,16 +973,80 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_info({:chat_tool_call, conversation_id, tool_call}, socket) do
-    {:noreply, ChatEditor.note_tool_call(socket, conversation_id, tool_call, &reload_shell/2)}
+    send_update(ChatEditor,
+      id: "chat-editor-#{conversation_id}",
+      action: :note_tool_call,
+      tool_call: tool_call
+    )
+
+    {:noreply, socket}
   end
 
   def handle_info({:chat_tool_result, conversation_id, name}, socket) do
-    {:noreply, ChatEditor.note_tool_result(socket, conversation_id, name, &reload_shell/2)}
+    send_update(ChatEditor,
+      id: "chat-editor-#{conversation_id}",
+      action: :note_tool_result,
+      name: name
+    )
+
+    {:noreply, socket}
   end
 
   def handle_info({:chat_streaming_content, conversation_id, content}, socket) do
+    send_update(ChatEditor,
+      id: "chat-editor-#{conversation_id}",
+      action: :note_streaming_content,
+      content: content
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:chat_editor_task_started, conversation_id, ref}, socket) do
+    refs = Map.put(socket.assigns.chat_editor_request_refs, ref, conversation_id)
+    {:noreply, assign(socket, :chat_editor_request_refs, refs)}
+  end
+
+  def handle_info({:chat_editor_task_cancelled, _conversation_id, ref}, socket) do
+    refs = Map.delete(socket.assigns.chat_editor_request_refs, ref)
+    {:noreply, assign(socket, :chat_editor_request_refs, refs)}
+  end
+
+  def handle_info({:chat_editor_output, title, message, level}, socket) do
+    {:noreply, append_output_entry(socket, title, message, nil, level)}
+  end
+
+  def handle_info({:chat_editor_tab_meta, conversation_id, title, subtitle}, socket) do
+    tab_meta =
+      Map.put(socket.assigns.tab_meta, {:chat, conversation_id}, %{
+        title: title,
+        subtitle: subtitle || ""
+      })
+
     {:noreply,
-     ChatEditor.note_streaming_content(socket, conversation_id, content, &reload_shell/2)}
+     socket
+     |> assign(:tab_meta, tab_meta)
+     |> reload_shell(socket.assigns.workbench)}
+  end
+
+  def handle_info({:open_sidebar_item, params, intent}, socket) do
+    {:noreply, open_sidebar_item(socket, params, intent)}
+  end
+
+  def handle_info({:chat_editor_toggle_sidebar}, socket) do
+    {:noreply, reload_shell(socket, Workbench.toggle_sidebar(socket.assigns.workbench))}
+  end
+
+  def handle_info({:chat_editor_toggle_panel}, socket) do
+    {:noreply, reload_shell(socket, Workbench.toggle_panel(socket.assigns.workbench))}
+  end
+
+  def handle_info({:chat_editor_toggle_assistant_sidebar}, socket) do
+    {:noreply, reload_shell(socket, Workbench.toggle_assistant_sidebar(socket.assigns.workbench))}
+  end
+
+  def handle_info({:chat_editor_switch_view, view}, socket) do
+    {:noreply, reload_shell(socket, Workbench.click_activity(socket.assigns.workbench, view))}
   end
 
   def handle_info({:entity_changed, payload}, socket) when is_map(payload) do
@@ -1301,7 +1311,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:menu_groups, socket.assigns[:menu_groups] || TitlebarMenu.groups())
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
     |> assign(:current_tab, current_tab(workbench))
-    |> assign_chat_editor()
     |> assign_import_editor()
     |> assign_misc_editor()
   end
@@ -1343,10 +1352,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp current_tab(%{tabs: tabs, active_tab: {type, id}}) do
     Enum.find(tabs, &(&1.type == type and &1.id == id))
-  end
-
-  defp assign_chat_editor(socket) do
-    ChatEditor.assign_socket(socket)
   end
 
   defp assign_import_editor(socket) do

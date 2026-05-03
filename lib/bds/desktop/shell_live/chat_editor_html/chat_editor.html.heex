@@ -15,6 +15,7 @@
             class="chat-model-selector-button chat-model-selector-inline"
             type="button"
             phx-click="toggle_chat_model_selector"
+            phx-target={@myself}
             data-testid="chat-model-selector-button"
           >
             <span><%= @chat_editor.effective_model || translated("chat.modelUnavailable") %></span>
@@ -37,6 +38,7 @@
                       ]}
                       type="button"
                       phx-click="select_chat_model"
+                      phx-target={@myself}
                       phx-value-model={model.id}
                       data-testid="chat-model-selector-option"
                       data-provider={group.provider}
@@ -60,7 +62,7 @@
         <h2><%= translated("chat.apiKeyRequiredTitle") %></h2>
         <p><%= translated("chat.apiKeyRequiredDescription") %></p>
         <div class="api-key-form">
-          <button class="api-key-submit" type="button" phx-click="open_chat_settings"><%= translated("chat.openSettings") %></button>
+          <button class="api-key-submit" type="button" phx-click="open_chat_settings" phx-target={@myself}><%= translated("chat.openSettings") %></button>
         </div>
       </div>
     <% else %>
@@ -100,7 +102,7 @@
             <%= if message.role == :assistant do %>
               <div class="chat-message-text"><%= markdown_html(message.content || "") %></div>
               <%= for surface <- message.inline_surfaces do %>
-                <.chat_surface surface={surface} />
+                <.chat_surface surface={surface} myself={@myself} />
               <% end %>
             <% else %>
               <div class="chat-message-text chat-user-message-text" data-testid="chat-user-message-text"><%= message.content || "" %></div>
@@ -124,7 +126,7 @@
               <div class="chat-message-text"><%= markdown_html(@chat_editor.streaming_content) %></div>
             <% end %>
             <%= for surface <- @chat_editor.streaming_inline_surfaces do %>
-              <.chat_surface surface={surface} />
+              <.chat_surface surface={surface} myself={@myself} />
             <% end %>
           </div>
         </div>
@@ -147,12 +149,12 @@
   <%= unless @chat_editor.needs_api_key? do %>
     <div class="chat-input-container" data-testid="chat-input-container">
       <%= if @chat_editor.is_streaming do %>
-        <button class="chat-abort-button" data-testid="chat-abort-button" type="button" phx-click="abort_chat_editor_message">◼ <%= translated("chat.stop") %></button>
+        <button class="chat-abort-button" data-testid="chat-abort-button" type="button" phx-click="abort_chat_editor_message" phx-target={@myself}>◼ <%= translated("chat.stop") %></button>
       <% end %>
 
-      <form class="chat-input-wrapper" phx-change="change_chat_editor_input" phx-submit="send_chat_editor_message">
+      <form class="chat-input-wrapper" phx-change="change_chat_editor_input" phx-submit="send_chat_editor_message" phx-target={@myself}>
         <textarea class="chat-input chat-surface-input" name="message" rows="1" placeholder={translated("chat.inputPlaceholder")} disabled={@chat_editor.is_streaming}><%= @chat_editor.input %></textarea>
-        <button class="chat-send-button" data-testid="chat-send-button" type="button" phx-click="send_chat_editor_message" disabled={@chat_editor.send_disabled?}>↑</button>
+        <button class="chat-send-button" data-testid="chat-send-button" type="button" phx-click="send_chat_editor_message" phx-target={@myself} disabled={@chat_editor.send_disabled?}>↑</button>
       </form>
 
       <%= if @chat_editor.action_error do %>
