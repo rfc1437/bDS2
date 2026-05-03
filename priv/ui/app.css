@@ -2505,6 +2505,18 @@ button svg * {
   font-style: italic;
 }
 
+.ai-suggestions-error {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  background: rgba(220, 50, 50, 0.12);
+  border: 1px solid rgba(220, 50, 50, 0.35);
+  color: #ff6b6b;
+}
+
 .ai-suggestions-modal-footer,
 .confirm-delete-modal-footer,
 .confirm-dialog-actions {

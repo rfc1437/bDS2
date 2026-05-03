@@ -32,10 +32,17 @@ defmodule BDS.AI.Runtime do
 
   @spec validate_target(atom(), String.t(), :airplane | :online) :: :ok | {:error, term()}
   def validate_target(:analyze_image, model, _mode) do
-    if Catalog.model_capabilities(model).supports_attachment do
-      :ok
-    else
-      {:error, %{kind: :model_capability_missing, capability: :supports_attachment, model: model}}
+    capabilities = Catalog.model_capabilities(model)
+
+    cond do
+      capabilities.supports_attachment ->
+        :ok
+
+      capabilities.supports_attachment == false ->
+        {:error, %{kind: :model_capability_missing, capability: :supports_attachment, model: model}}
+
+      true ->
+        :ok
     end
   end
 

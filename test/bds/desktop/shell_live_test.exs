@@ -2460,6 +2460,78 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Automatic AI actions stay gated by airplane mode"
   end
 
+  test "ai suggestions overlay fetches async results for media when online", %{project: project} do
+    Application.put_env(:bds, :test_pid, self())
+
+    server =
+      start_supervised!({Bandit, plug: AiSuggestionsServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert :ok = AI.set_airplane_mode(false)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "test-secret",
+               model: "gpt-test"
+             })
+
+    assert :ok = AI.put_model_preference(:image_analysis, "gpt-test")
+    assert :ok = AI.put_model_capabilities("gpt-test", %{supports_attachment: true})
+
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-shell-live-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    media_source_path = Path.join(temp_dir, "online-media.jpg")
+    File.write!(media_source_path, "fake image body")
+
+    {:ok, media} =
+      Media.import_media(%{
+        project_id: project.id,
+        source_path: media_source_path,
+        title: "Online Media"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "media",
+        "id" => media.id,
+        "title" => media.title,
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-testid="media-editor")
+
+    html =
+      view
+      |> element("[data-testid='media-editor'] .quick-actions-btn")
+      |> render_click()
+
+    assert html =~ "quick-actions-menu"
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='ai_suggestions']")
+      |> render_click()
+
+    assert html =~ "ai-suggestions-modal"
+    assert html =~ "Loading"
+
+    assert_receive {:ai_suggestions_request, _request}, 2_000
+
+    Process.sleep(200)
+    html = render(view)
+
+    assert html =~ "AI Image Title"
+    assert html =~ "AI Alt Text"
+    assert html =~ "AI Caption"
+    refute html =~ "Loading"
+  end
+
   test "ai suggestions async error closes overlay and shows toast", %{project: project} do
     Application.put_env(:bds, :test_pid, self())
 
@@ -2515,7 +2587,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     send(view.pid, {:ai_suggestions_error, :post, post.id, :test_error})
     html = render(view)
 
-    refute html =~ "ai-suggestions-modal"
+    assert html =~ "ai-suggestions-modal"
+    assert html =~ "ai-suggestions-error"
+    assert html =~ "test_error"
   end
 
   test "script and template editors surface lifecycle state, load published file content, and allow publishing drafts",

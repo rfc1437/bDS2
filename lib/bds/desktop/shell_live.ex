@@ -3,6 +3,8 @@ defmodule BDS.Desktop.ShellLive do
 
   use Phoenix.LiveView
 
+  require Logger
+
   import Phoenix.HTML
 
   alias BDS.{AI, BoundedAtoms, ImportDefinitions, Media, Posts, Scripts}
@@ -1174,20 +1176,22 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_info({:ai_suggestions_error, type, id, reason}, socket) do
+    Logger.error("AI suggestions error type=#{type} id=#{id} reason=#{inspect(reason)}")
+
     socket =
       case socket.assigns[:shell_overlay] do
-        %{kind: :ai_suggestions} ->
+        %{kind: :ai_suggestions} = overlay ->
           current_tab = socket.assigns.current_tab
 
           if current_tab && current_tab.type == type && current_tab.id == id do
-            socket
-            |> assign(:shell_overlay, nil)
-            |> append_output_entry(
-              translated("AI Suggestions"),
-              inspect(reason),
-              nil,
-              "error"
-            )
+            message =
+              if is_map(reason) and Map.has_key?(reason, :kind) do
+                "#{reason.kind}: #{inspect(Map.drop(reason, [:kind]))}"
+              else
+                inspect(reason)
+              end
+
+            assign(socket, :shell_overlay, Overlay.set_ai_suggestions_error(overlay, message))
           else
             socket
           end

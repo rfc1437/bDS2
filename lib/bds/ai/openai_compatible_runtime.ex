@@ -41,16 +41,43 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
       |> maybe_disable_thinking(request.model)
       |> maybe_put_tools(Map.get(request, :tools, []))
 
+    payload_json = Jason.encode!(payload)
+
     Logger.debug(
-      "AI OpenAI-compatible request operation=#{inspect(Map.get(request, :operation))} model=#{inspect(request.model)} url=#{url} tools=#{payload |> Map.get("tools", []) |> length()}"
+      "AI OpenAI-compatible request operation=#{inspect(Map.get(request, :operation))} model=#{inspect(request.model)} url=#{url} tools=#{payload |> Map.get("tools", []) |> length()} payload_size=#{byte_size(payload_json)}"
     )
 
-    with {:ok, response} <- HttpClient.post(url, headers, Jason.encode!(payload)),
-         200 <- response.status do
-      normalize_response(response.body)
-    else
-      status when is_integer(status) -> {:error, %{kind: :http_error, status: status}}
-      {:error, reason} -> {:error, %{kind: :http_error, reason: reason}}
+    case HttpClient.post(url, headers, payload_json) do
+      {:ok, %{status: 200, body: body}} ->
+        result = normalize_response(body)
+
+        case result do
+          {:ok, %{json: nil, content: content}} when is_binary(content) ->
+            Logger.warning(
+              "AI OpenAI-compatible response parsed but content is not valid JSON. Content: #{String.slice(content, 0, 500)}"
+            )
+
+          {:ok, _} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.error(
+              "AI OpenAI-compatible response normalization failed: #{inspect(reason)} body=#{String.slice(body, 0, 1000)}"
+            )
+        end
+
+        result
+
+      {:ok, %{status: status, body: body}} ->
+        Logger.error(
+          "AI OpenAI-compatible HTTP error status=#{status} body=#{String.slice(body, 0, 2000)}"
+        )
+
+        {:error, %{kind: :http_error, status: status, body: body}}
+
+      {:error, reason} ->
+        Logger.error("AI OpenAI-compatible HTTP request failed: #{inspect(reason)}")
+        {:error, %{kind: :http_error, reason: reason}}
     end
   end
 

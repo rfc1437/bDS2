@@ -1,6 +1,8 @@
 defmodule BDS.AI.OneShot do
   @moduledoc false
 
+  require Logger
+
   alias BDS.AI.Chat
   alias BDS.AI.OpenAICompatibleRuntime
   alias BDS.AI.Runtime
@@ -8,6 +10,7 @@ defmodule BDS.AI.OneShot do
   alias BDS.MapUtils
   alias BDS.Posts
   alias BDS.Posts.Post
+  alias BDS.Projects
   alias BDS.Repo
 
   @default_max_output_tokens 16_384
@@ -163,6 +166,22 @@ defmodule BDS.AI.OneShot do
     end
   end
 
+  defp run_one_shot(:analyze_image = operation, payload, opts, formatter) do
+    runtime = Keyword.get(opts, :runtime, OpenAICompatibleRuntime)
+
+    with {:ok, endpoint, model, mode} <- Runtime.resolve_target(operation, opts),
+         :ok <- Runtime.validate_target(operation, model, mode),
+         {:ok, payload} <- resolve_image_data_url(payload),
+         request <- build_one_shot_request(operation, payload, model),
+         {:ok, response} <-
+           runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts),
+         {:ok, json} <- extract_json_response(response),
+         usage <- Chat.normalize_usage(response.usage),
+         {:ok, result} <- formatter.(json, usage) do
+      {:ok, result}
+    end
+  end
+
   defp run_one_shot(operation, payload, opts, formatter) do
     runtime = Keyword.get(opts, :runtime, OpenAICompatibleRuntime)
 
@@ -273,12 +292,25 @@ defmodule BDS.AI.OneShot do
 
   defp extract_json_response(%{content: content}) when is_binary(content) do
     case Jason.decode(content) do
-      {:ok, json} when is_map(json) -> {:ok, json}
-      _other -> {:error, %{kind: :invalid_json_response}}
+      {:ok, json} when is_map(json) ->
+        {:ok, json}
+
+      _other ->
+        Logger.error(
+          "AI extract_json_response failed to parse content as JSON. Content: #{String.slice(content, 0, 1000)}"
+        )
+
+        {:error, %{kind: :invalid_json_response, content: content}}
     end
   end
 
-  defp extract_json_response(_response), do: {:error, %{kind: :invalid_json_response}}
+  defp extract_json_response(response) do
+    Logger.error(
+      "AI extract_json_response received response with no JSON and no content: #{inspect(Map.take(response, [:content, :json, :tool_calls]))}"
+    )
+
+    {:error, %{kind: :invalid_json_response}}
+  end
 
   defp normalize_post_input(%Post{} = post) do
     {:ok, %{title: post.title || "", excerpt: post.excerpt || "", content: Posts.editor_body(post)}}
@@ -307,7 +339,9 @@ defmodule BDS.AI.OneShot do
        title: media.title || "",
        alt: media.alt || "",
        caption: media.caption || "",
-       image_url: Map.get(media, :image_url) || media_path_to_file_url(media.file_path)
+       image_url: Map.get(media, :image_url),
+       file_path: media.file_path,
+       project_id: media.project_id
      }}
   end
 
@@ -325,15 +359,69 @@ defmodule BDS.AI.OneShot do
        title: MapUtils.attr(attrs, :title) || "",
        alt: MapUtils.attr(attrs, :alt) || "",
        caption: MapUtils.attr(attrs, :caption) || "",
-       image_url: MapUtils.attr(attrs, :image_url)
+       image_url: MapUtils.attr(attrs, :image_url),
+       file_path: MapUtils.attr(attrs, :file_path),
+       project_id: MapUtils.attr(attrs, :project_id)
      }}
   end
 
   defp ensure_image_media(%{mime_type: "image/" <> _rest}), do: :ok
   defp ensure_image_media(_media), do: {:error, %{kind: :invalid_media_type}}
 
-  defp media_path_to_file_url(nil), do: nil
-  defp media_path_to_file_url(path), do: "file://" <> path
+  defp resolve_image_data_url(%{image_url: "data:" <> _} = media) do
+    Logger.debug("AI analyze_image using existing data URL")
+    {:ok, media}
+  end
+
+  defp resolve_image_data_url(%{image_url: "http" <> _} = media) do
+    Logger.debug("AI analyze_image using HTTP URL: #{media.image_url}")
+    {:ok, media}
+  end
+
+  defp resolve_image_data_url(%{image_url: "file://" <> path, mime_type: mime_type} = media) do
+    with {:ok, binary} <- File.read(path) do
+      data_url = "data:#{mime_type};base64," <> Base.encode64(binary)
+      Logger.debug("AI analyze_image converted file://#{path} to data URL (#{byte_size(data_url)} chars)")
+      {:ok, %{media | image_url: data_url}}
+    else
+      {:error, reason} ->
+        Logger.error("AI analyze_image failed to read file://#{path}: #{inspect(reason)}")
+        {:error, :file_not_found}
+    end
+  end
+
+  defp resolve_image_data_url(%{file_path: file_path, project_id: project_id, mime_type: mime_type} = media)
+       when is_binary(file_path) and is_binary(project_id) do
+    case Projects.get_project(project_id) do
+      nil ->
+        Logger.error("AI analyze_image project not found: #{project_id}")
+        {:error, :file_not_found}
+
+      project ->
+        absolute_path = Path.join(Projects.project_data_dir(project), file_path)
+
+        case File.read(absolute_path) do
+          {:ok, binary} ->
+            data_url = "data:#{mime_type};base64," <> Base.encode64(binary)
+            Logger.debug("AI analyze_image converted #{absolute_path} to data URL (#{byte_size(data_url)} chars)")
+            {:ok, %{media | image_url: data_url}}
+
+          {:error, reason} ->
+            Logger.error("AI analyze_image failed to read #{absolute_path}: #{inspect(reason)}")
+            {:error, :file_not_found}
+        end
+    end
+  end
+
+  defp resolve_image_data_url(%{image_url: url} = media) when is_binary(url) and url != "" do
+    Logger.debug("AI analyze_image using URL: #{url}")
+    {:ok, media}
+  end
+
+  defp resolve_image_data_url(_media) do
+    Logger.error("AI analyze_image missing image source (no file_path, project_id, or image_url)")
+    {:error, :missing_image_source}
+  end
 
   defp normalize_string_list(values) do
     values

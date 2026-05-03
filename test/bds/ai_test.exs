@@ -130,6 +130,47 @@ defmodule BDS.AITest do
     end
   end
 
+  defmodule ErrorCompletionServer do
+    use Plug.Router
+
+    plug(:match)
+    plug(:dispatch)
+
+    post "/v1/chat/completions" do
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      send(Application.fetch_env!(:bds, :test_pid), {:error_payload, Jason.decode!(body)})
+
+      response = %{
+        "error" => %{
+          "message" => "Invalid image data",
+          "type" => "invalid_request_error"
+        }
+      }
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(400, Jason.encode!(response))
+    end
+  end
+
+  defmodule NonJsonContentServer do
+    use Plug.Router
+
+    plug(:match)
+    plug(:dispatch)
+
+    post "/v1/chat/completions" do
+      response = %{
+        "choices" => [%{"message" => %{"content" => "This is not valid JSON"}}],
+        "usage" => %{"prompt_tokens" => 4, "completion_tokens" => 2}
+      }
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, Jason.encode!(response))
+    end
+  end
+
   defmodule FakeRuntime do
     def generate(endpoint, request, opts) do
       test_pid = Keyword.fetch!(opts, :test_pid)
@@ -410,6 +451,99 @@ defmodule BDS.AITest do
     assert payload["chat_template_kwargs"] == %{"enable_thinking" => false}
   end
 
+  test "openai-compatible generation includes response body in HTTP error details" do
+    Application.put_env(:bds, :test_pid, self())
+
+    server =
+      start_supervised!({Bandit, plug: ErrorCompletionServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    previous_level = Logger.level()
+    Logger.configure(level: :error)
+
+    log =
+      capture_log(fn ->
+        assert {:error, %{kind: :http_error, status: 400, body: body}} =
+                 BDS.AI.OpenAICompatibleRuntime.generate(
+                   %{url: "http://127.0.0.1:#{port}/v1", api_key: nil},
+                   %{
+                     model: "gpt-test",
+                     messages: [%{"role" => "user", "content" => "Hello"}],
+                     max_output_tokens: 128,
+                     tools: []
+                   },
+                   []
+                 )
+
+        assert body =~ "Invalid image data"
+      end)
+
+    Logger.configure(level: previous_level)
+
+    assert log =~ "AI OpenAI-compatible HTTP error status=400"
+    assert log =~ "Invalid image data"
+    assert_received {:error_payload, payload}
+    assert payload["model"] == "gpt-test"
+  end
+
+  test "analyze_image logs non-JSON content when the model returns invalid JSON" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{
+                 url: "http://localhost:11434/v1",
+                 api_key: nil,
+                 model: "llama-default"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(true)
+    assert :ok = BDS.AI.put_model_preference(:airplane_image_analysis, "llava")
+
+    assert :ok =
+             BDS.AI.put_model_capabilities("llava", %{
+               supports_attachment: true,
+               supports_tool_calls: false,
+               disables_reasoning: false
+             })
+
+    defmodule NonJsonContentRuntime do
+      def generate(_endpoint, _request, _opts) do
+        {:ok,
+         %{
+           content: "This is not valid JSON",
+           json: nil,
+           tool_calls: [],
+           usage: %{input_tokens: 4, output_tokens: 2}
+         }}
+      end
+    end
+
+    previous_level = Logger.level()
+    Logger.configure(level: :error)
+
+    log =
+      capture_log(fn ->
+        assert {:error, %{kind: :invalid_json_response, content: "This is not valid JSON"}} =
+                 BDS.AI.analyze_image(
+                   %{
+                     mime_type: "image/png",
+                     image_url: "data:image/png;base64,abc123"
+                   },
+                   runtime: NonJsonContentRuntime,
+                   test_pid: self(),
+                   secret_backend: FakeSecretBackend
+                 )
+      end)
+
+    Logger.configure(level: previous_level)
+
+    assert log =~ "AI extract_json_response failed to parse content as JSON"
+    assert log =~ "This is not valid JSON"
+  end
+
   test "airplane mode routes title tasks to airplane endpoint and offline title model" do
     assert {:ok, _endpoint} =
              BDS.AI.put_endpoint(
@@ -582,7 +716,7 @@ defmodule BDS.AITest do
                  title: "Source",
                  alt: nil,
                  caption: nil,
-                 image_url: "file:///tmp/test.png"
+                 image_url: "https://example.com/test.png"
                },
                runtime: FakeRuntime,
                test_pid: self(),
@@ -603,7 +737,7 @@ defmodule BDS.AITest do
                  title: "Source",
                  alt: nil,
                  caption: nil,
-                 image_url: "file:///tmp/test.png"
+                 image_url: "https://example.com/test.png"
                },
                runtime: FakeRuntime,
                test_pid: self(),
@@ -617,6 +751,120 @@ defmodule BDS.AITest do
     assert request.operation == :analyze_image
     assert request.model == "llama3.2"
     assert BDS.AI.Catalog.model_capabilities("llama3.2").disables_reasoning
+  end
+
+  test "analyze_image converts file:// URLs to base64 data URLs before sending" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{
+                 url: "http://localhost:11434/v1",
+                 api_key: nil,
+                 model: "llama-default"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(true)
+    assert :ok = BDS.AI.put_model_preference(:airplane_image_analysis, "llama3.2")
+
+    assert :ok =
+             BDS.AI.put_model_capabilities("llama3.2", %{
+               supports_attachment: true,
+               supports_tool_calls: false,
+               disables_reasoning: false
+             })
+
+    tmp_path =
+      Path.join(System.tmp_dir!(), "bds-test-image-#{System.unique_integer([:positive])}.png")
+
+    File.write!(tmp_path, <<137, 80, 78, 71, 13, 10, 26, 10>>)
+    on_exit(fn -> File.rm(tmp_path) end)
+
+    assert {:ok, analysis} =
+             BDS.AI.analyze_image(
+               %{
+                 mime_type: "image/png",
+                 title: "Source",
+                 alt: nil,
+                 caption: nil,
+                 image_url: "file://#{tmp_path}"
+               },
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend
+             )
+
+    assert analysis.title == "Sunset"
+
+    assert_received {:runtime_request, _endpoint, request}
+    user_message = Enum.at(request.messages, 1)
+    image_content = Enum.at(user_message["content"], 1)
+    assert image_content["type"] == "image_url"
+    assert image_content["image_url"]["url"] =~ ~r/^data:image\/png;base64,/
+  end
+
+  test "analyze_image reads local media files and sends them as base64 data URLs" do
+    {:ok, project} = create_project_fixture("Image Analysis")
+
+    image_dir = Path.join(project.data_path, "media")
+    File.mkdir_p!(image_dir)
+    image_path = Path.join(image_dir, "test.png")
+    File.write!(image_path, <<137, 80, 78, 71, 13, 10, 26, 10>>)
+
+    media =
+      Repo.insert!(
+        Media.changeset(%Media{}, %{
+          id: Ecto.UUID.generate(),
+          project_id: project.id,
+          filename: "test.png",
+          original_name: "test.png",
+          mime_type: "image/png",
+          size: 8,
+          title: "Test",
+          file_path: "media/test.png",
+          sidecar_path: "media/test.png.meta",
+          created_at: Persistence.now_ms(),
+          updated_at: Persistence.now_ms()
+        })
+      )
+
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{
+                 url: "http://localhost:11434/v1",
+                 api_key: nil,
+                 model: "llama-default"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(true)
+    assert :ok = BDS.AI.put_model_preference(:airplane_image_analysis, "llama3.2")
+
+    assert :ok =
+             BDS.AI.put_model_capabilities("llama3.2", %{
+               supports_attachment: true,
+               supports_tool_calls: false,
+               disables_reasoning: false
+             })
+
+    assert {:ok, analysis} =
+             BDS.AI.analyze_image(
+               media.id,
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend
+             )
+
+    assert analysis.title == "Sunset"
+
+    assert_received {:runtime_request, _endpoint, request}
+    user_message = Enum.at(request.messages, 1)
+    image_content = Enum.at(user_message["content"], 1)
+    assert image_content["type"] == "image_url"
+    assert image_content["image_url"]["url"] =~ ~r/^data:image\/png;base64,/
   end
 
   test "chat persists user, tool, and assistant messages with usage and blog stats prompt augmentation" do

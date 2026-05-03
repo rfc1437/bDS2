@@ -9,6 +9,12 @@
             <button class="ai-suggestions-modal-close" type="button" phx-click="close_overlay">×</button>
           </div>
           <div class="ai-suggestions-modal-body">
+            <%= if Map.get(@shell_overlay, :error) do %>
+              <div class="ai-suggestions-error">
+                <strong><%= translated("Error") %></strong>
+                <span><%= @shell_overlay.error %></span>
+              </div>
+            <% end %>
             <div class="ai-suggestions-list">
               <%= for field <- @shell_overlay.fields do %>
                 <div class="ai-suggestion-item">

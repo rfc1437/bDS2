@@ -27,6 +27,10 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
         ),
       "online_title_model" => get_model_preference(:title),
       "online_image_analysis_model" => get_model_preference(:image_analysis),
+      "online_chat_images" =>
+        model_supports_images?(
+          get_model_preference(:image_analysis)
+        ),
       "offline_url" => Map.get(airplane_endpoint || %{}, :url, ""),
       "offline_api_key" => Map.get(airplane_endpoint || %{}, :api_key, ""),
       "offline_mode" => Map.get(assigns, :offline_mode, AI.airplane_mode?(true)),
@@ -43,6 +47,10 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
         ),
       "offline_title_model" => get_model_preference(:airplane_title),
       "offline_image_analysis_model" => get_model_preference(:airplane_image_analysis),
+      "offline_chat_images" =>
+        model_supports_images?(
+          get_model_preference(:airplane_image_analysis)
+        ),
       "system_prompt" => EditorSettings.get_global_setting("ai.system_prompt") || ""
     }
   end
@@ -112,9 +120,14 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
              attrs.online_chat_tools,
              attrs.online_chat_disable_reasoning
            ),
-         :ok <- maybe_put_model_preference(:title, attrs.online_title_model),
-         :ok <- maybe_put_model_preference(:image_analysis, attrs.online_image_analysis_model),
-         :ok <- maybe_put_model_preference(:airplane_chat, attrs.offline_chat_model),
+          :ok <- maybe_put_model_preference(:title, attrs.online_title_model),
+          :ok <- maybe_put_model_preference(:image_analysis, attrs.online_image_analysis_model),
+          :ok <-
+            maybe_put_image_model_capabilities(
+              attrs.online_image_analysis_model,
+              attrs.online_chat_images
+            ),
+          :ok <- maybe_put_model_preference(:airplane_chat, attrs.offline_chat_model),
          :ok <-
            maybe_put_chat_model_capabilities(
              attrs.offline_chat_model,
@@ -122,12 +135,17 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
              attrs.offline_chat_disable_reasoning
            ),
          :ok <- maybe_put_model_preference(:airplane_title, attrs.offline_title_model),
-         :ok <-
-           maybe_put_model_preference(
-             :airplane_image_analysis,
-             attrs.offline_image_analysis_model
-           ),
-         :ok <- EditorSettings.put_global_setting("ai.system_prompt", attrs.system_prompt) do
+          :ok <-
+            maybe_put_model_preference(
+              :airplane_image_analysis,
+              attrs.offline_image_analysis_model
+            ),
+          :ok <-
+            maybe_put_image_model_capabilities(
+              attrs.offline_image_analysis_model,
+              attrs.offline_chat_images
+            ),
+          :ok <- EditorSettings.put_global_setting("ai.system_prompt", attrs.system_prompt) do
       socket
       |> assign(:settings_editor_ai_draft, %{})
       |> assign(:offline_mode, attrs.offline_mode)
@@ -166,6 +184,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
       online_chat_disable_reasoning: truthy?(Map.get(draft, "online_chat_disable_reasoning")),
       online_title_model: blank_to_nil(Map.get(draft, "online_title_model")),
       online_image_analysis_model: blank_to_nil(Map.get(draft, "online_image_analysis_model")),
+      online_chat_images: truthy?(Map.get(draft, "online_chat_images")),
       offline_url: blank_to_nil(Map.get(draft, "offline_url")),
       offline_api_key: blank_to_nil(Map.get(draft, "offline_api_key")),
       offline_mode: truthy?(Map.get(draft, "offline_mode")),
@@ -174,6 +193,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
       offline_chat_disable_reasoning: truthy?(Map.get(draft, "offline_chat_disable_reasoning")),
       offline_title_model: blank_to_nil(Map.get(draft, "offline_title_model")),
       offline_image_analysis_model: blank_to_nil(Map.get(draft, "offline_image_analysis_model")),
+      offline_chat_images: truthy?(Map.get(draft, "offline_chat_images")),
       system_prompt: Map.get(draft, "system_prompt", "")
     }
   end
@@ -188,6 +208,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
         truthy?(Map.get(params, "online_chat_disable_reasoning")),
       "online_title_model" => Map.get(params, "online_title_model", ""),
       "online_image_analysis_model" => Map.get(params, "online_image_analysis_model", ""),
+      "online_chat_images" => truthy?(Map.get(params, "online_chat_images")),
       "offline_url" => Map.get(params, "offline_url", ""),
       "offline_api_key" => Map.get(params, "offline_api_key", ""),
       "offline_mode" => truthy?(Map.get(params, "offline_mode")),
@@ -197,6 +218,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
         truthy?(Map.get(params, "offline_chat_disable_reasoning")),
       "offline_title_model" => Map.get(params, "offline_title_model", ""),
       "offline_image_analysis_model" => Map.get(params, "offline_image_analysis_model", ""),
+      "offline_chat_images" => truthy?(Map.get(params, "offline_chat_images")),
       "system_prompt" => Map.get(params, "system_prompt", "")
     }
   end
@@ -225,11 +247,30 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
     })
   end
 
+  defp maybe_put_image_model_capabilities(nil, _supports_images), do: :ok
+  defp maybe_put_image_model_capabilities("", _supports_images), do: :ok
+
+  defp maybe_put_image_model_capabilities(model, supports_images) do
+    existing = BDS.AI.Catalog.model_capabilities(model)
+
+    AI.put_model_capabilities(model, %{
+      supports_attachment: supports_images,
+      supports_tool_calls: existing.supports_tool_calls,
+      disables_reasoning: existing.disables_reasoning
+    })
+  end
+
   defp model_supports_tool_calls?(nil), do: false
   defp model_supports_tool_calls?(""), do: false
 
   defp model_supports_tool_calls?(model),
     do: BDS.AI.Catalog.model_capabilities(model).supports_tool_calls
+
+  defp model_supports_images?(nil), do: false
+  defp model_supports_images?(""), do: false
+
+  defp model_supports_images?(model),
+    do: BDS.AI.Catalog.model_capabilities(model).supports_attachment
 
   defp model_disables_reasoning?(nil), do: false
   defp model_disables_reasoning?(""), do: false

@@ -248,6 +248,12 @@ defmodule BDS.Desktop.Overlay do
 
   def set_ai_suggestions(overlay, _suggestions), do: overlay
 
+  def set_ai_suggestions_error(%{kind: :ai_suggestions} = overlay, error_message) do
+    Map.put(overlay, :error, error_message)
+  end
+
+  def set_ai_suggestions_error(overlay, _error_message), do: overlay
+
   defp normalize_ai_fields(fields) do
     Enum.map(fields, fn field ->
       %{

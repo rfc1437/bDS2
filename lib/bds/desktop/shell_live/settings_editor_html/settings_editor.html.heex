@@ -246,6 +246,10 @@
               <div class="setting-control"><input type="text" list="settings-ai-online-models" name="settings_ai[online_image_analysis_model]" value={@settings_editor.ai["online_image_analysis_model"]} /></div>
             </div>
             <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Online Image Support") %></label></div>
+              <div class="setting-control"><label><input type="checkbox" name="settings_ai[online_chat_images]" checked={@settings_editor.ai["online_chat_images"]} /> <%= translated("Enable image analysis for the online image analysis model") %></label></div>
+            </div>
+            <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Offline Endpoint URL") %></label></div>
               <div class="setting-control">
                 <div class="setting-input-group">
@@ -281,6 +285,10 @@
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Offline Image Analysis Model") %></label></div>
               <div class="setting-control"><input type="text" list="settings-ai-offline-models" name="settings_ai[offline_image_analysis_model]" value={@settings_editor.ai["offline_image_analysis_model"]} /></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= translated("Offline Image Support") %></label></div>
+              <div class="setting-control"><label><input type="checkbox" name="settings_ai[offline_chat_images]" checked={@settings_editor.ai["offline_chat_images"]} /> <%= translated("Enable image analysis for the offline image analysis model") %></label></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("System Prompt") %></label></div>
