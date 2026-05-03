@@ -70,11 +70,9 @@ defmodule BDS.Desktop.ImportShellLiveTest do
     refute html =~ "Desktop workbench content routed through the Elixir shell."
 
     _html =
-      render_change(view, "change_import_conflict_resolution", %{
-        "item_type" => "post",
-        "item_name" => "conflict-me",
-        "resolution" => "overwrite"
-      })
+      view
+      |> element("form:has(input[value='conflict-me'])")
+      |> render_change(%{"resolution" => "overwrite"})
 
     updated_definition = ImportDefinitions.get_definition(definition.id)
     updated_report = ImportDefinitions.decode_analysis_result(updated_definition)

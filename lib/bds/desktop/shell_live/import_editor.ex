@@ -1,10 +1,10 @@
 defmodule BDS.Desktop.ShellLive.ImportEditor do
   @moduledoc false
 
-  use Phoenix.Component
+  use Phoenix.LiveComponent
 
-  alias BDS.AI
-  alias BDS.Desktop.ShellData
+  alias BDS.{AI, ImportAnalysis, ImportDefinitions, ImportExecution}
+  alias BDS.Desktop.{FilePicker, FolderPicker, ShellData}
 
   alias BDS.Desktop.ShellLive.ImportEditor.{
     AnalysisState,
@@ -13,21 +13,21 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     TaxonomyEditing
   }
 
-  alias BDS.ImportDefinitions
-
   import AnalysisState,
     only: [
       default_analysis_state: 0,
       default_sections: 0,
       detail_items: 2,
-      importable_counts: 1
+      importable_counts: 1,
+      translate_phase: 1
     ]
 
   import ProgressTracking,
     only: [
       default_execution_state: 0,
       execution_progress_width: 1,
-      format_eta: 1
+      format_eta: 1,
+      translate_execution_phase: 1
     ]
 
   import TaxonomyEditing,
@@ -38,179 +38,721 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       taxonomy_pill_class: 1
     ]
 
-  defdelegate change_definition(socket, params, reload), to: AnalysisState
-  defdelegate select_uploads_folder(socket, reload, append_output), to: AnalysisState
-  defdelegate select_and_analyze(socket, reload, append_output), to: AnalysisState
+  # ── LiveComponent lifecycle ────────────────────────────────────────────────
 
-  defdelegate note_analysis_progress(socket, definition_id, step, detail, reload),
-    to: AnalysisState
+  @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def update(%{action: :finish_analysis, ref: ref, result: result}, socket) do
+    socket =
+      case socket.assigns.analysis_state do
+        %{ref: ^ref} = _state -> do_finish_analysis(socket, result)
+        _other -> socket
+      end
 
-  defdelegate finish_analysis(socket, ref, result, reload, append_output), to: AnalysisState
+    {:ok, build_data(socket)}
+  end
 
-  defdelegate execute_import(socket, reload, append_output), to: ProgressTracking
+  def update(%{action: :finish_execution, ref: ref, result: result}, socket) do
+    socket =
+      case socket.assigns.execution_state do
+        %{ref: ^ref} = _state -> do_finish_execution(socket, result)
+        _other -> socket
+      end
 
-  defdelegate note_execution_progress(
-                socket,
-                definition_id,
-                phase,
-                current,
-                total,
-                detail,
-                reload
-              ),
-              to: ProgressTracking
+    {:ok, build_data(socket)}
+  end
 
-  defdelegate finish_execution(socket, ref, result, reload, append_output), to: ProgressTracking
+  def update(%{action: :note_analysis_progress, step: step, detail: detail}, socket) do
+    socket =
+      socket
+      |> assign(
+        :analysis_state,
+        Map.merge(socket.assigns.analysis_state, %{loading: true, step: step, detail: detail})
+      )
+      |> build_data()
 
-  defdelegate handle_task_down(socket, kind, ref, reason, reload, append_output),
-    to: ProgressTracking
+    {:ok, socket}
+  end
 
-  defdelegate change_conflict_resolution(socket, params, reload), to: ConflictResolution
+  def update(
+        %{
+          action: :note_execution_progress,
+          phase: phase,
+          current: current,
+          total: total,
+          detail: detail
+        },
+        socket
+      ) do
+    {detail_text, eta} = ProgressTracking.decompose_progress_detail(detail)
 
-  defdelegate start_taxonomy_edit(socket, params, reload), to: TaxonomyEditing
-  defdelegate cancel_taxonomy_edit(socket, reload), to: TaxonomyEditing
-  defdelegate save_taxonomy_edit(socket, params, reload), to: TaxonomyEditing
-  defdelegate clear_taxonomy_mapping(socket, params, reload), to: TaxonomyEditing
-  defdelegate analyze_taxonomy_ai(socket, reload, append_output), to: TaxonomyEditing
+    socket =
+      socket
+      |> assign(
+        :execution_state,
+        Map.merge(socket.assigns.execution_state, %{
+          is_executing: true,
+          phase: translate_execution_phase(phase),
+          current: current,
+          total: total,
+          detail: detail_text,
+          eta: eta
+        })
+      )
+      |> build_data()
 
-  @spec assign_socket(term()) :: term()
-  def assign_socket(socket) do
-    case socket.assigns[:current_tab] do
-      %{type: :import, id: definition_id} ->
-        case ImportDefinitions.get_definition(definition_id) do
-          nil ->
-            assign(socket, :import_editor, nil)
+    {:ok, socket}
+  end
 
-          definition ->
-            report = ImportDefinitions.decode_analysis_result(definition)
-            taxonomy_terms = existing_taxonomy_terms(socket.assigns.projects.active_project_id)
+  def update(assigns, socket) do
+    socket =
+      socket
+      |> assign(assigns)
+      |> ensure_state()
+      |> build_data()
 
-            analysis_state =
-              Map.get(
-                socket.assigns.import_editor_analysis_states,
-                definition.id,
-                default_analysis_state()
+    {:ok, socket}
+  end
+
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
+  @impl true
+  def render(assigns) do
+    import_editor = %{
+      id: assigns.definition_id,
+      definition_name: assigns.definition_name,
+      uploads_folder_path: assigns.uploads_folder_path,
+      wxr_file_path: assigns.wxr_file_path,
+      report: assigns.report,
+      taxonomy_terms: assigns.taxonomy_terms,
+      taxonomy_edit: assigns.taxonomy_edit,
+      analysis_state: assigns.analysis_state,
+      execution_state: assigns.execution_state,
+      importable_counts: assigns.importable_counts,
+      sections: assigns.sections,
+      selected_model: assigns.selected_model,
+      selected_model_label: assigns.selected_model_label,
+      model_selector_open?: assigns.model_selector_open?,
+      available_models: assigns.available_models,
+      offline?: assigns.offline_mode?,
+      is_loading: assigns.analysis_state.loading
+    }
+
+    assigns = Map.put(assigns, :import_editor, import_editor)
+    import_editor(assigns)
+  end
+
+  # ── Event handlers ─────────────────────────────────────────────────────────
+
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def handle_event("change_import_editor_definition", %{"import_definition" => params}, socket) do
+    definition_id = socket.assigns.definition_id
+
+    socket =
+      case ImportDefinitions.update_definition(definition_id, %{name: Map.get(params, "name", "")}) do
+        {:ok, _definition} -> build_data(socket)
+        _other -> build_data(socket)
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("select_import_uploads_folder", _params, socket) do
+    definition_id = socket.assigns.definition_id
+
+    socket =
+      case FolderPicker.choose_directory(translated("importAnalysis.uploadsFolder")) do
+        {:ok, uploads_folder_path} ->
+          {:ok, _definition} =
+            ImportDefinitions.update_definition(definition_id, %{
+              uploads_folder_path: uploads_folder_path
+            })
+
+          build_data(socket)
+
+        :cancel ->
+          build_data(socket)
+
+        {:error, %{message: message}} ->
+          notify_output(translated("activity.import"), message, "error")
+          build_data(socket)
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("select_import_wxr_file", _params, socket) do
+    definition_id = socket.assigns.definition_id
+    project_id = socket.assigns.project_id
+
+    socket =
+      case FilePicker.choose_file(translated("importAnalysis.wxrFile")) do
+        {:ok, wxr_file_path} ->
+          {:ok, definition} =
+            ImportDefinitions.update_definition(definition_id, %{
+              wxr_file_path: wxr_file_path,
+              last_analysis_result: nil
+            })
+
+          parent = self()
+
+          task =
+            Task.Supervisor.async_nolink(BDS.Tasks.TaskSupervisor, fn ->
+              ImportAnalysis.analyze_wxr(
+                project_id,
+                wxr_file_path,
+                definition.uploads_folder_path,
+                on_progress: fn step, detail ->
+                  send(parent, {:import_analysis_progress, translate_phase(step), detail})
+                end
+              )
+            end)
+
+          :ok = allow_repo_sandbox(task.pid)
+
+          socket
+          |> assign(:analysis_state, %{
+            loading: true,
+            step: translated("importAnalysis.analyzingWxr"),
+            detail: Path.basename(wxr_file_path),
+            file_path: wxr_file_path,
+            ref: task.ref
+          })
+          |> assign(:execution_state, default_execution_state())
+          |> build_data()
+
+        :cancel ->
+          build_data(socket)
+
+        {:error, %{message: message}} ->
+          notify_output(translated("activity.import"), message, "error")
+          build_data(socket)
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("execute_import_editor", _params, socket) do
+    definition_id = socket.assigns.definition_id
+    project_id = socket.assigns.project_id
+
+    socket =
+      with %{} = definition <- ImportDefinitions.get_definition(definition_id),
+           %{} = report <- ImportDefinitions.decode_analysis_result(definition) do
+        default_author = AnalysisState.default_author(project_id)
+        counts = importable_counts(report)
+
+        if counts.total == 0 do
+          build_data(socket)
+        else
+          parent = self()
+
+          task =
+            Task.Supervisor.async_nolink(BDS.Tasks.TaskSupervisor, fn ->
+              ImportExecution.execute_import(project_id, report,
+                uploads_folder_path: definition.uploads_folder_path,
+                default_author: default_author,
+                on_progress: fn phase, current, total, detail ->
+                  send(
+                    parent,
+                    {:import_execution_progress, phase, current, total, detail}
+                  )
+                end
+              )
+            end)
+
+          :ok = AnalysisState.allow_repo_sandbox(task.pid)
+
+          progress_phase = translate_execution_phase("posts")
+
+          socket
+          |> assign(:execution_state, %{
+            is_executing: true,
+            completed: false,
+            error: nil,
+            count: counts.total,
+            result: nil,
+            phase: progress_phase,
+            current: 0,
+            total: counts.total,
+            detail: nil,
+            eta: nil,
+            ref: task.ref
+          })
+          |> build_data()
+        end
+      else
+        _other -> build_data(socket)
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("change_import_conflict_resolution", params, socket) do
+    definition_id = socket.assigns.definition_id
+
+    socket =
+      with %{} = definition <- ImportDefinitions.get_definition(definition_id),
+           %{} = report <- ImportDefinitions.decode_analysis_result(definition),
+           updated_report <-
+             ConflictResolution.update_conflict_resolution(
+               report,
+               Map.get(params, "item_type"),
+               Map.get(params, "item_name"),
+               Map.get(params, "resolution")
+             ),
+           {:ok, _definition} <-
+             ImportDefinitions.update_definition(definition_id, %{
+               last_analysis_result: updated_report
+             }) do
+        build_data(socket)
+      else
+        _other -> build_data(socket)
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event(
+        "start_import_taxonomy_edit",
+        %{"type" => type, "name" => name, "mapped_to" => mapped_to},
+        socket
+      ) do
+    socket =
+      socket
+      |> assign(:taxonomy_edit, %{
+        type: type,
+        name: name,
+        value: mapped_to |> to_string() |> blank_to_nil()
+      })
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("save_import_taxonomy_edit", params, socket) do
+    definition_id = socket.assigns.definition_id
+    project_id = socket.assigns.project_id
+
+    socket =
+      with %{} = definition <- ImportDefinitions.get_definition(definition_id),
+           %{} = report <- ImportDefinitions.decode_analysis_result(definition),
+           type <- Map.get(params, "type"),
+           name <- Map.get(params, "name"),
+           mapped_to <- Map.get(params, "mapped_to"),
+           normalized_value <-
+             TaxonomyEditing.normalize_taxonomy_mapping_value(project_id, type, mapped_to),
+           updated_report <- TaxonomyEditing.update_taxonomy_mapping(report, type, name, normalized_value),
+           {:ok, _definition} <-
+             ImportDefinitions.update_definition(definition_id, %{
+               last_analysis_result: updated_report
+             }) do
+        socket
+        |> assign(:taxonomy_edit, nil)
+        |> build_data()
+      else
+        _other ->
+          socket
+          |> assign(:taxonomy_edit, nil)
+          |> build_data()
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("cancel_import_taxonomy_edit", _params, socket) do
+    {:noreply, assign(socket, :taxonomy_edit, nil) |> build_data()}
+  end
+
+  def handle_event("clear_import_taxonomy_mapping", %{"type" => type, "name" => name}, socket) do
+    definition_id = socket.assigns.definition_id
+    project_id = socket.assigns.project_id
+
+    socket =
+      with %{} = definition <- ImportDefinitions.get_definition(definition_id),
+           %{} = report <- ImportDefinitions.decode_analysis_result(definition),
+           normalized_value <-
+             TaxonomyEditing.normalize_taxonomy_mapping_value(project_id, type, ""),
+           updated_report <- TaxonomyEditing.update_taxonomy_mapping(report, type, name, normalized_value),
+           {:ok, _definition} <-
+             ImportDefinitions.update_definition(definition_id, %{
+               last_analysis_result: updated_report
+             }) do
+        socket
+        |> assign(:taxonomy_edit, nil)
+        |> build_data()
+      else
+        _other ->
+          socket
+          |> assign(:taxonomy_edit, nil)
+          |> build_data()
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("toggle_import_section", %{"section" => section}, socket) do
+    section_atom = BDS.BoundedAtoms.import_section(section)
+
+    socket =
+      if section_atom do
+        next_sections = Map.update!(socket.assigns.sections, section_atom, &(!&1))
+        assign(socket, :sections, next_sections) |> build_data()
+      else
+        build_data(socket)
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("toggle_import_ai_model_selector", _params, socket) do
+    {:noreply,
+     assign(socket, :model_selector_open?, not socket.assigns.model_selector_open?) |> build_data()}
+  end
+
+  def handle_event("select_import_ai_model", %{"model" => model_id}, socket) do
+    socket =
+      socket
+      |> assign(:selected_model, model_id)
+      |> assign(:model_selector_open?, false)
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("analyze_import_taxonomy_ai", _params, socket) do
+    definition_id = socket.assigns.definition_id
+    project_id = socket.assigns.project_id
+
+    socket =
+      with %{} = definition <- ImportDefinitions.get_definition(definition_id),
+           %{} = report <- ImportDefinitions.decode_analysis_result(definition) do
+        if socket.assigns.offline_mode? do
+          notify_output(
+            translated("activity.import"),
+            ShellData.translate(
+              "Automatic AI actions stay gated by airplane mode.",
+              %{},
+              socket.assigns[:page_language] || ShellData.ui_language()
+            ),
+            "info"
+          )
+
+          build_data(socket)
+        else
+          taxonomy_terms = existing_taxonomy_terms(project_id)
+
+          import_terms = %{
+            categories: Enum.map(Map.get(report.items, :categories, []), & &1.name),
+            tags: Enum.map(Map.get(report.items, :tags, []), & &1.name)
+          }
+
+          opts =
+            if socket.assigns.selected_model do
+              [model: socket.assigns.selected_model]
+            else
+              []
+            end
+
+          case AI.analyze_import_taxonomy(import_terms, taxonomy_terms, opts) do
+            {:ok, analysis} ->
+              updated_report = TaxonomyEditing.apply_taxonomy_mappings(report, analysis)
+
+              {:ok, _definition} =
+                ImportDefinitions.update_definition(definition_id, %{
+                  last_analysis_result: updated_report
+                })
+
+              mapped_count = TaxonomyEditing.auto_mapped_count(report, updated_report)
+
+              notify_output(
+                translated("activity.import"),
+                translated("importAnalysis.mappedCount", %{count: mapped_count}),
+                "info"
               )
 
-            execution_state =
-              Map.get(
-                socket.assigns.import_editor_execution_states,
-                definition.id,
-                default_execution_state()
-              )
+              build_data(socket)
 
-            sections =
-              Map.get(socket.assigns.import_editor_sections, definition.id, default_sections())
+            {:error, reason} ->
+              notify_output(translated("activity.import"), inspect(reason), "error")
+              build_data(socket)
+          end
+        end
+      else
+        _other -> build_data(socket)
+      end
 
-            selected_model = selected_model(socket.assigns, definition.id)
-            available_models = AI.available_chat_models(selected_model)
+    {:noreply, socket}
+  end
 
-            import_editor = %{
-              definition_id: definition.id,
-              definition_name: definition.name,
-              uploads_folder_path: definition.uploads_folder_path,
-              wxr_file_path: definition.wxr_file_path,
-              report: report,
-              taxonomy_terms: taxonomy_terms,
-              taxonomy_edit: Map.get(socket.assigns.import_editor_taxonomy_edits, definition.id),
-              analysis_state: analysis_state,
-              execution_state: execution_state,
-              importable_counts: importable_counts(report),
-              sections: sections,
-              selected_model: selected_model,
-              selected_model_label: selected_model_label(selected_model, available_models),
-              model_selector_open?:
-                Map.get(socket.assigns.import_editor_model_selectors_open, definition.id, false),
-              available_models: available_models,
-              offline?: Map.get(socket.assigns, :offline_mode, true),
-              is_loading: analysis_state.loading
-            }
+  # ── handle_info for async tasks ────────────────────────────────────────────
 
+  @spec handle_info({:import_analysis_progress, atom() | String.t(), String.t()}, Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_info({:import_analysis_progress, step, detail}, socket) do
+    socket =
+      socket
+      |> assign(
+        :analysis_state,
+        Map.merge(socket.assigns.analysis_state, %{loading: true, step: step, detail: detail})
+      )
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_info(
+        {:import_execution_progress, phase, current, total, detail},
+        socket
+      ) do
+    {detail_text, eta} = ProgressTracking.decompose_progress_detail(detail)
+
+    socket =
+      socket
+      |> assign(
+        :execution_state,
+        Map.merge(socket.assigns.execution_state, %{
+          is_executing: true,
+          phase: translate_execution_phase(phase),
+          current: current,
+          total: total,
+          detail: detail_text,
+          eta: eta
+        })
+      )
+      |> build_data()
+
+    {:noreply, socket}
+  end
+
+  def handle_info({ref, result}, socket) when is_reference(ref) do
+    Process.demonitor(ref, [:flush])
+
+    socket =
+      cond do
+        match?(%{ref: ^ref}, socket.assigns.analysis_state) ->
+          do_finish_analysis(socket, result)
+
+        match?(%{ref: ^ref}, socket.assigns.execution_state) ->
+          do_finish_execution(socket, result)
+
+        true ->
+          socket
+      end
+
+    {:noreply, build_data(socket)}
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, reason}, socket) when is_reference(ref) do
+    socket =
+      cond do
+        match?(%{ref: ^ref}, socket.assigns.analysis_state) and reason not in [:normal, :shutdown] ->
+          message = if is_binary(reason), do: reason, else: inspect(reason)
+
+          socket
+          |> assign(:analysis_state, default_analysis_state())
+          |> notify_output(translated("activity.import"), message, "error")
+
+        match?(%{ref: ^ref}, socket.assigns.execution_state) and reason not in [:normal, :shutdown] ->
+          message = if is_binary(reason), do: reason, else: inspect(reason)
+
+          socket
+          |> assign(
+            :execution_state,
+            Map.merge(socket.assigns.execution_state, %{
+              is_executing: false,
+              completed: false,
+              error: message,
+              ref: nil
+            })
+          )
+          |> notify_output(translated("activity.import"), message, "error")
+
+        true ->
+          socket
+      end
+
+    {:noreply, build_data(socket)}
+  end
+
+  # ── State helpers ──────────────────────────────────────────────────────────
+
+  defp ensure_state(socket) do
+    definition_id = socket.assigns.current_tab.id
+
+    defaults = %{
+      definition_id: definition_id,
+      analysis_state: default_analysis_state(),
+      execution_state: default_execution_state(),
+      sections: default_sections(),
+      taxonomy_edit: nil,
+      model_selector_open?: false,
+      selected_model: nil,
+      project_id: socket.assigns[:project_id],
+      offline_mode?: socket.assigns[:offline_mode] || true
+    }
+
+    Enum.reduce(defaults, socket, fn {key, default}, acc ->
+      if is_nil(Map.get(acc.assigns, key)) do
+        assign(acc, key, default)
+      else
+        acc
+      end
+    end)
+  end
+
+  defp build_data(socket) do
+    definition_id = socket.assigns.definition_id
+
+    case ImportDefinitions.get_definition(definition_id) do
+      nil ->
+        assign(socket, :report, nil)
+
+      definition ->
+        report = ImportDefinitions.decode_analysis_result(definition)
+        taxonomy_terms = existing_taxonomy_terms(socket.assigns.project_id)
+        selected_model = resolve_selected_model(socket)
+        available_models = AI.available_chat_models(selected_model)
+
+        socket
+        |> assign(:definition_name, definition.name)
+        |> assign(:uploads_folder_path, definition.uploads_folder_path)
+        |> assign(:wxr_file_path, definition.wxr_file_path)
+        |> assign(:report, report)
+        |> assign(:taxonomy_terms, taxonomy_terms)
+        |> assign(:importable_counts, importable_counts(report))
+        |> assign(:selected_model, selected_model)
+        |> assign(:selected_model_label, selected_model_label(selected_model, available_models))
+        |> assign(:available_models, available_models)
+        |> maybe_update_tab_meta(definition.name)
+    end
+  end
+
+  defp maybe_update_tab_meta(socket, name) do
+    title = name || translated("importAnalysis.untitledImport")
+
+    notify_parent(
+      {:import_editor_tab_meta, socket.assigns.definition_id, title,
+       translated("importAnalysis.headerDescription")}
+    )
+
+    socket
+  end
+
+  defp resolve_selected_model(socket) do
+    socket.assigns.selected_model || preferred_model(socket)
+  end
+
+  defp preferred_model(socket) do
+    preference_key = if socket.assigns.offline_mode?, do: :airplane_chat, else: :chat
+
+    case AI.get_model_preference(preference_key) do
+      {:ok, model} when is_binary(model) and model != "" -> model
+      _other -> nil
+    end
+  end
+
+  defp selected_model_label(nil, []), do: translated("importAnalysis.analyzeWith")
+  defp selected_model_label(nil, [model | _rest]), do: model.name || model.id
+
+  defp selected_model_label(model_id, available_models) do
+    case Enum.find(available_models, &(&1.id == model_id)) do
+      nil -> model_id
+      model -> model.name || model.id
+    end
+  end
+
+  # ── Task finishers ─────────────────────────────────────────────────────────
+
+  defp do_finish_analysis(socket, result) do
+    analysis_state = socket.assigns.analysis_state
+    definition_id = socket.assigns.definition_id
+
+    socket = assign(socket, :analysis_state, default_analysis_state())
+
+    case result do
+      {:ok, report} ->
+        attrs =
+          %{
+            wxr_file_path: analysis_state.file_path,
+            last_analysis_result: report
+          }
+          |> maybe_put(:name, AnalysisState.suggested_definition_name(report))
+
+        case ImportDefinitions.update_definition(definition_id, attrs) do
+          {:ok, _definition} ->
             socket
-            |> assign(:import_editor, import_editor)
-            |> assign(
-              :tab_meta,
-              Map.put(socket.assigns.tab_meta, {:import, definition.id}, %{
-                title: definition.name || translated("importAnalysis.untitledImport"),
-                subtitle: translated("importAnalysis.headerDescription")
-              })
-            )
+
+          {:error, reason} ->
+            notify_output(socket, translated("activity.import"), inspect(reason), "error")
         end
 
-      _other ->
-        assign(socket, :import_editor, nil)
+      {:error, %{message: message}} ->
+        notify_output(socket, translated("activity.import"), message, "error")
+
+      {:error, reason} ->
+        notify_output(socket, translated("activity.import"), inspect(reason), "error")
     end
   end
 
-  @spec toggle_section(term(), term(), term()) :: term()
-  def toggle_section(socket, section, reload) do
-    with %{id: definition_id} <- socket.assigns.current_tab,
-         section_key
-         when section_key in [
-                "post_conflicts",
-                "page_conflicts",
-                "posts",
-                "other",
-                "pages",
-                "media",
-                "taxonomy",
-                "macros"
-              ] <- section,
-         section_atom when not is_nil(section_atom) <-
-           BDS.BoundedAtoms.import_section(section_key) do
-      next_sections =
-        socket.assigns.import_editor_sections
-        |> Map.get(definition_id, default_sections())
-        |> Map.update!(section_atom, &(!&1))
+  defp do_finish_execution(socket, result) do
+    previous_state = socket.assigns.execution_state
 
-      socket
-      |> assign(
-        :import_editor_sections,
-        Map.put(socket.assigns.import_editor_sections, definition_id, next_sections)
-      )
-      |> reload.(socket.assigns.workbench)
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
+    socket =
+      case result do
+        {:ok, _execution_result} ->
+          socket
+          |> assign(:execution_state, %{
+            previous_state
+            | is_executing: false,
+              completed: true,
+              error: nil,
+              current: previous_state.total,
+              detail: nil,
+              ref: nil
+          })
+          |> notify_output(
+            translated("activity.import"),
+            translated("importAnalysis.importComplete", %{count: previous_state.count}),
+            "info"
+          )
+
+        {:error, %{message: message}} ->
+          socket
+          |> assign(:execution_state, %{
+            previous_state
+            | is_executing: false,
+              completed: false,
+              error: message,
+              ref: nil
+          })
+          |> notify_output(translated("activity.import"), message, "error")
+
+        {:error, reason} ->
+          message = inspect(reason)
+
+          socket
+          |> assign(:execution_state, %{
+            previous_state
+            | is_executing: false,
+              completed: false,
+              error: message,
+              ref: nil
+          })
+          |> notify_output(translated("activity.import"), message, "error")
+      end
+
+    # Allow DB connections to settle before rebuilding
+    Process.sleep(20)
+    socket
   end
 
-  @spec toggle_model_selector(term(), term()) :: term()
-  def toggle_model_selector(socket, reload) do
-    with %{id: definition_id} <- socket.assigns.current_tab do
-      current = Map.get(socket.assigns.import_editor_model_selectors_open, definition_id, false)
-
-      socket
-      |> assign(
-        :import_editor_model_selectors_open,
-        Map.put(socket.assigns.import_editor_model_selectors_open, definition_id, not current)
-      )
-      |> reload.(socket.assigns.workbench)
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
-
-  @spec select_ai_model(term(), term(), term()) :: term()
-  def select_ai_model(socket, model_id, reload) do
-    with %{id: definition_id} <- socket.assigns.current_tab do
-      socket
-      |> assign(
-        :import_editor_selected_models,
-        Map.put(socket.assigns.import_editor_selected_models, definition_id, model_id)
-      )
-      |> assign(
-        :import_editor_model_selectors_open,
-        Map.put(socket.assigns.import_editor_model_selectors_open, definition_id, false)
-      )
-      |> reload.(socket.assigns.workbench)
-    else
-      _other -> reload.(socket, socket.assigns.workbench)
-    end
-  end
+  # ── Rendering (existing function components) ───────────────────────────────
 
   attr(:import_editor, :map, required: true)
 
-  @spec import_editor(term()) :: term()
+  @spec import_editor(map()) :: Phoenix.LiveView.Rendered.t()
   def import_editor(assigns) do
     assigns =
       assigns
@@ -265,7 +807,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
     ~H"""
     <div class="import-analysis" data-testid="import-editor">
-      <form class="import-analysis-header" data-testid="import-editor-form" phx-change="change_import_editor_definition">
+      <form class="import-analysis-header" data-testid="import-editor-form" phx-change="change_import_editor_definition" phx-target={@myself}>
         <input
           class="import-definition-name"
           type="text"
@@ -282,7 +824,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           <div class={["import-file-path", if(blank?(@import_editor.uploads_folder_path), do: "placeholder")]}>
             <%= @import_editor.uploads_folder_path || translated("importAnalysis.noFolderSelected") %>
           </div>
-          <button type="button" phx-click="select_import_uploads_folder"><%= translated("Open") %></button>
+          <button type="button" phx-click="select_import_uploads_folder" phx-target={@myself}><%= translated("Open") %></button>
         </div>
 
         <div class="import-file-row">
@@ -290,7 +832,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           <div class={["import-file-path", if(blank?(@import_editor.wxr_file_path), do: "placeholder")]}>
             <%= @import_editor.wxr_file_path || translated("importAnalysis.selectFileToAnalyze") %>
           </div>
-          <button class="import-analyze-btn" type="button" phx-click="select_import_wxr_file"><%= translated("importAnalysis.selectAndAnalyze") %></button>
+          <button class="import-analyze-btn" type="button" phx-click="select_import_wxr_file" phx-target={@myself}><%= translated("importAnalysis.selectAndAnalyze") %></button>
         </div>
       </div>
 
@@ -386,7 +928,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
               <%= if @counts.pages > 0 do %><span class="import-count-tag"><%= @counts.pages %> <%= translated("importAnalysis.pages") %></span><% end %>
             </div>
 
-            <button class="import-execute-btn" type="button" phx-click="execute_import_editor" disabled={@counts.total == 0}>
+            <button class="import-execute-btn" type="button" phx-click="execute_import_editor" phx-target={@myself} disabled={@counts.total == 0}>
               <%= if @counts.total == 0 do %>
                 <%= translated("importAnalysis.nothingToImport") %>
               <% else %>
@@ -409,32 +951,32 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         <% end %>
 
         <%= if Enum.any?(@post_conflicts) do %>
-          <.conflict_section title={translated("importAnalysis.postSlugConflicts")} items={@post_conflicts} expanded={@sections.post_conflicts} section="post_conflicts" />
+          <.conflict_section title={translated("importAnalysis.postSlugConflicts")} items={@post_conflicts} expanded={@sections.post_conflicts} section="post_conflicts" myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(@page_conflicts) do %>
-          <.conflict_section title={translated("importAnalysis.pageSlugConflicts")} items={@page_conflicts} expanded={@sections.page_conflicts} section="page_conflicts" />
+          <.conflict_section title={translated("importAnalysis.pageSlugConflicts")} items={@page_conflicts} expanded={@sections.page_conflicts} section="page_conflicts" myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(@post_items) do %>
-          <.post_detail_section title={translated("importAnalysis.postsWithCount", %{count: length(@post_items)})} items={@post_items} expanded={@sections.posts} section="posts" />
+          <.post_detail_section title={translated("importAnalysis.postsWithCount", %{count: length(@post_items)})} items={@post_items} expanded={@sections.posts} section="posts" myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(@other_items) do %>
-          <.post_detail_section title={translated("importAnalysis.otherWithCount", %{count: length(@other_items)})} items={@other_items} expanded={@sections.other} section="other" show_type={true} />
+          <.post_detail_section title={translated("importAnalysis.otherWithCount", %{count: length(@other_items)})} items={@other_items} expanded={@sections.other} section="other" show_type={true} myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(@detail_pages) do %>
-          <.post_detail_section title={translated("importAnalysis.pagesWithCount", %{count: length(@detail_pages)})} items={@detail_pages} expanded={@sections.pages} section="pages" />
+          <.post_detail_section title={translated("importAnalysis.pagesWithCount", %{count: length(@detail_pages)})} items={@detail_pages} expanded={@sections.pages} section="pages" myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(@detail_media) do %>
-          <.media_detail_section title={translated("importAnalysis.mediaWithCount", %{count: length(@detail_media)})} items={@detail_media} expanded={@sections.media} section="media" />
+          <.media_detail_section title={translated("importAnalysis.mediaWithCount", %{count: length(@detail_media)})} items={@detail_media} expanded={@sections.media} section="media" myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(Map.get(@report.items, :categories, [])) or Enum.any?(Map.get(@report.items, :tags, [])) do %>
           <section class="import-detail-section">
-            <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-value-section="taxonomy">
+            <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-target={@myself} phx-value-section="taxonomy">
               <span><%= translated("importAnalysis.taxonomyTitle") %></span>
               <span class="toggle-icon"><%= if @sections.taxonomy, do: "▾", else: "▸" %></span>
             </button>
@@ -442,11 +984,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
             <%= if @sections.taxonomy do %>
               <div class="taxonomy-analyze-row">
                 <div class="taxonomy-analyze-dropdown">
-                  <button class="taxonomy-analyze-btn" type="button" phx-click="toggle_import_ai_model_selector"><%= translated("importAnalysis.analyzeWith") %></button>
+                  <button class="taxonomy-analyze-btn" type="button" phx-click="toggle_import_ai_model_selector" phx-target={@myself}><%= translated("importAnalysis.analyzeWith") %></button>
                   <%= if @import_editor.model_selector_open? do %>
                     <div class="taxonomy-model-dropdown">
                       <%= for model <- @import_editor.available_models do %>
-                        <button class="taxonomy-model-option" type="button" phx-click="select_import_ai_model" phx-value-model={model.id}>
+                        <button class="taxonomy-model-option" type="button" phx-click="select_import_ai_model" phx-target={@myself} phx-value-model={model.id}>
                           <%= model.provider_name || model.provider || translated("importAnalysis.unknown") %>: <%= model.name || model.id %>
                         </button>
                       <% end %>
@@ -454,7 +996,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                   <% end %>
                 </div>
 
-                <button class="taxonomy-analyze-btn" type="button" phx-click="analyze_import_taxonomy_ai" disabled={Enum.empty?(@import_editor.available_models) and not @import_editor.offline?}>
+                <button class="taxonomy-analyze-btn" type="button" phx-click="analyze_import_taxonomy_ai" phx-target={@myself} disabled={Enum.empty?(@import_editor.available_models) and not @import_editor.offline?}>
                   <%= @import_editor.selected_model_label %>
                 </button>
 
@@ -468,6 +1010,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                   suggestions={Map.get(@import_editor.taxonomy_terms, :categories, [])}
                   edit={@import_editor.taxonomy_edit}
                   type="categories"
+                  myself={@myself}
                 />
                 <.taxonomy_group
                   title={translated("importAnalysis.tags")}
@@ -475,6 +1018,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                   suggestions={Map.get(@import_editor.taxonomy_terms, :tags, [])}
                   edit={@import_editor.taxonomy_edit}
                   type="tags"
+                  myself={@myself}
                 />
               </div>
             <% end %>
@@ -484,7 +1028,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         <% macros = Map.get(@report, :macros, %{}) %>
         <%= if Enum.any?(Map.get(macros, :discovered, [])) do %>
           <section class="import-detail-section">
-            <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-value-section="macros">
+            <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-target={@myself} phx-value-section="macros">
               <span><%= translated("importAnalysis.macrosWithCount", %{count: macros.total || length(macros.discovered)}) %></span>
               <span class="toggle-icon"><%= if @sections.macros, do: "▾", else: "▸" %></span>
             </button>
@@ -552,12 +1096,13 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:items, :list, required: true)
   attr(:expanded, :boolean, required: true)
   attr(:section, :string, required: true)
+  attr(:myself, :any, required: true)
 
-  @spec conflict_section(term()) :: term()
+  @spec conflict_section(map()) :: Phoenix.LiveView.Rendered.t()
   def conflict_section(assigns) do
     ~H"""
     <section class="import-detail-section conflicts-section">
-      <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-value-section={@section}>
+      <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-target={@myself} phx-value-section={@section}>
         <span><%= @title %></span>
         <span class="toggle-icon"><%= if @expanded, do: "▾", else: "▸" %></span>
       </button>
@@ -579,7 +1124,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                 <td><%= Map.get(item, :title) %></td>
                 <td><%= Map.get(item, :existing_title) || translated("importAnalysis.none") %></td>
                 <td>
-                  <form phx-change="change_import_conflict_resolution">
+                  <form phx-change="change_import_conflict_resolution" phx-target={@myself}>
                     <input type="hidden" name="item_type" value={Map.get(item, :item_type)} />
                     <input type="hidden" name="item_name" value={Map.get(item, :slug)} />
                     <select class="resolution-select" name="resolution">
@@ -603,12 +1148,13 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:expanded, :boolean, required: true)
   attr(:section, :string, required: true)
   attr(:show_type, :boolean, default: false)
+  attr(:myself, :any, required: true)
 
-  @spec post_detail_section(term()) :: term()
+  @spec post_detail_section(map()) :: Phoenix.LiveView.Rendered.t()
   def post_detail_section(assigns) do
     ~H"""
     <section class="import-detail-section">
-      <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-value-section={@section}>
+      <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-target={@myself} phx-value-section={@section}>
         <span><%= @title %></span>
         <span class="toggle-icon"><%= if @expanded, do: "▾", else: "▸" %></span>
       </button>
@@ -653,12 +1199,13 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:items, :list, required: true)
   attr(:expanded, :boolean, required: true)
   attr(:section, :string, required: true)
+  attr(:myself, :any, required: true)
 
-  @spec media_detail_section(term()) :: term()
+  @spec media_detail_section(map()) :: Phoenix.LiveView.Rendered.t()
   def media_detail_section(assigns) do
     ~H"""
     <section class="import-detail-section">
-      <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-value-section={@section}>
+      <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-target={@myself} phx-value-section={@section}>
         <span><%= @title %></span>
         <span class="toggle-icon"><%= if @expanded, do: "▾", else: "▸" %></span>
       </button>
@@ -694,7 +1241,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:label, :string, required: true)
   attr(:stats, :map, required: true)
 
-  @spec stat_card(term()) :: term()
+  @spec stat_card(map()) :: Phoenix.LiveView.Rendered.t()
   def stat_card(assigns) do
     ~H"""
     <div class="import-stat-card">
@@ -713,7 +1260,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:label, :string, required: true)
   attr(:stats, :map, required: true)
 
-  @spec other_stat_card(term()) :: term()
+  @spec other_stat_card(map()) :: Phoenix.LiveView.Rendered.t()
   def other_stat_card(assigns) do
     ~H"""
     <div class="import-stat-card import-stat-card-other">
@@ -731,7 +1278,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:label, :string, required: true)
   attr(:stats, :map, required: true)
 
-  @spec media_stat_card(term()) :: term()
+  @spec media_stat_card(map()) :: Phoenix.LiveView.Rendered.t()
   def media_stat_card(assigns) do
     ~H"""
     <div class="import-stat-card">
@@ -751,7 +1298,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:label, :string, required: true)
   attr(:stats, :map, required: true)
 
-  @spec taxonomy_stat_card(term()) :: term()
+  @spec taxonomy_stat_card(map()) :: Phoenix.LiveView.Rendered.t()
   def taxonomy_stat_card(assigns) do
     ~H"""
     <div class="import-stat-card">
@@ -771,8 +1318,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   attr(:suggestions, :list, required: true)
   attr(:edit, :map, default: nil)
   attr(:type, :string, required: true)
+  attr(:myself, :any, required: true)
 
-  @spec taxonomy_group(term()) :: term()
+  @spec taxonomy_group(map()) :: Phoenix.LiveView.Rendered.t()
   def taxonomy_group(assigns) do
     ~H"""
     <div class="taxonomy-group">
@@ -785,7 +1333,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       <div class="import-taxonomy-list">
         <%= for item <- @items do %>
           <%= if taxonomy_item_editing?(@edit, @type, item.name) do %>
-            <form class="import-taxonomy-edit-form" phx-submit="save_import_taxonomy_edit">
+            <form class="import-taxonomy-edit-form" phx-submit="save_import_taxonomy_edit" phx-target={@myself}>
               <input type="hidden" name="type" value={@type} />
               <input type="hidden" name="name" value={item.name} />
               <span class={taxonomy_pill_class(item)}><%= item.name %></span>
@@ -799,9 +1347,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                 autocomplete="off"
               />
               <button class="taxonomy-edit-btn" type="submit" title={translated("importAnalysis.mapToPlaceholder")}>✓</button>
-              <button class="taxonomy-edit-btn ghost" type="button" phx-click="cancel_import_taxonomy_edit" title={translated("Cancel")}>×</button>
+              <button class="taxonomy-edit-btn ghost" type="button" phx-click="cancel_import_taxonomy_edit" phx-target={@myself} title={translated("Cancel")}>×</button>
               <%= if present?(item.mapped_to) do %>
-                <button class="taxonomy-clear-btn" type="button" phx-click="clear_import_taxonomy_mapping" phx-value-type={@type} phx-value-name={item.name} title={translated("importAnalysis.clearMapping")}>×</button>
+                <button class="taxonomy-clear-btn" type="button" phx-click="clear_import_taxonomy_mapping" phx-target={@myself} phx-value-type={@type} phx-value-name={item.name} title={translated("importAnalysis.clearMapping")}>×</button>
               <% end %>
             </form>
           <% else %>
@@ -813,6 +1361,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                   class={taxonomy_pill_class(item)}
                   type="button"
                   phx-click="start_import_taxonomy_edit"
+                  phx-target={@myself}
                   phx-value-type={@type}
                   phx-value-name={item.name}
                   phx-value-mapped_to={Map.get(item, :mapped_to) || ""}
@@ -826,11 +1375,12 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                   class="import-taxonomy-pill mapped-target"
                   type="button"
                   phx-click="start_import_taxonomy_edit"
+                  phx-target={@myself}
                   phx-value-type={@type}
                   phx-value-name={item.name}
                   phx-value-mapped_to={Map.get(item, :mapped_to) || ""}
                 ><%= item.mapped_to %></button>
-                <button class="taxonomy-clear-btn" type="button" phx-click="clear_import_taxonomy_mapping" phx-value-type={@type} phx-value-name={item.name} title={translated("importAnalysis.clearMapping")}>×</button>
+                <button class="taxonomy-clear-btn" type="button" phx-click="clear_import_taxonomy_mapping" phx-target={@myself} phx-value-type={@type} phx-value-name={item.name} title={translated("importAnalysis.clearMapping")}>×</button>
               <% end %>
             </div>
           <% end %>
@@ -838,6 +1388,31 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       </div>
     </div>
     """
+  end
+
+  # ── Private helpers ───────────────────────────────────────────────────────
+
+  defp notify_parent(message) do
+    send(self(), message)
+  end
+
+  defp notify_output(socket, title, message, level \\ "info") do
+    notify_parent({:import_editor_output, title, message, level})
+    socket
+  end
+
+  defp allow_repo_sandbox(pid) when is_pid(pid) do
+    if Code.ensure_loaded?(Ecto.Adapters.SQL.Sandbox) do
+      try do
+        Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), pid)
+      rescue
+        _error -> :ok
+      end
+    else
+      :ok
+    end
+
+    :ok
   end
 
   defp joined_or_none(values) when is_list(values) and values != [], do: Enum.join(values, ", ")
@@ -855,35 +1430,6 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   defp total_media_stats(stats), do: total_stats(stats) + stats.missing_count
 
-  defp selected_model(assigns, definition_id) do
-    Map.get(assigns.import_editor_selected_models, definition_id) || preferred_model(assigns)
-  end
-
-  defp preferred_model(assigns) do
-    preference_key = if Map.get(assigns, :offline_mode, true), do: :airplane_chat, else: :chat
-
-    case AI.get_model_preference(preference_key) do
-      {:ok, model} when is_binary(model) and model != "" -> model
-      _other -> nil
-    end
-  end
-
-  defp selected_model_label(nil, []), do: translated("importAnalysis.analyzeWith")
-  defp selected_model_label(nil, [model | _rest]), do: model.name || model.id
-
-  defp selected_model_label(model_id, available_models) do
-    case Enum.find(available_models, &(&1.id == model_id)) do
-      nil -> model_id
-      model -> model.name || model.id
-    end
-  end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
-
-  defp present?(value), do: value not in [nil, ""]
-  defp blank?(value), do: value in [nil, ""]
-
   defp conflict_resolution_selected?(item, "ignore") do
     Map.get(item, :resolution, "ignore") in ["ignore", "skip"]
   end
@@ -891,4 +1437,15 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   defp conflict_resolution_selected?(item, "overwrite") do
     Map.get(item, :resolution) in ["overwrite", "merge"]
   end
+
+  defp present?(value), do: value not in [nil, ""]
+  defp blank?(value), do: value in [nil, ""]
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(value), do: value
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

@@ -164,15 +164,7 @@ defmodule BDS.Desktop.ShellLive do
       |> assign(:sidebar_filters_by_view, %{})
        |> assign(:sidebar_filter_panels, %{})
       |> assign(:chat_editor_request_refs, %{})
-      |> assign(:import_editor_analysis_states, %{})
-     |> assign(:import_editor_analysis_task_refs, %{})
-     |> assign(:import_editor_execution_states, %{})
-     |> assign(:import_editor_execution_task_refs, %{})
-     |> assign(:import_editor_sections, %{})
-     |> assign(:import_editor_taxonomy_edits, %{})
-     |> assign(:import_editor_model_selectors_open, %{})
-     |> assign(:import_editor_selected_models, %{})
-     |> assign(:misc_editor_selected_pairs, %{})
+      |> assign(:misc_editor_selected_pairs, %{})
      |> assign(:misc_editor_git_selected_files, %{})
      |> assign(:metadata_diff_active_tabs, %{})
      |> assign(:metadata_diff_field_filters, %{})
@@ -321,59 +313,6 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("settings_shell_command", %{"action" => action}, socket) do
     {:noreply, apply_shell_command(socket, action)}
-  end
-
-  def handle_event("change_import_editor_definition", %{"import_definition" => params}, socket) do
-    {:noreply, ImportEditor.change_definition(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("select_import_uploads_folder", _params, socket) do
-    {:noreply,
-     ImportEditor.select_uploads_folder(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("select_import_wxr_file", _params, socket) do
-    {:noreply, ImportEditor.select_and_analyze(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("execute_import_editor", _params, socket) do
-    {:noreply, ImportEditor.execute_import(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("change_import_conflict_resolution", params, socket) do
-    {:noreply, ImportEditor.change_conflict_resolution(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("start_import_taxonomy_edit", params, socket) do
-    {:noreply, ImportEditor.start_taxonomy_edit(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("save_import_taxonomy_edit", params, socket) do
-    {:noreply, ImportEditor.save_taxonomy_edit(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("cancel_import_taxonomy_edit", _params, socket) do
-    {:noreply, ImportEditor.cancel_taxonomy_edit(socket, &reload_shell/2)}
-  end
-
-  def handle_event("clear_import_taxonomy_mapping", params, socket) do
-    {:noreply, ImportEditor.clear_taxonomy_mapping(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("toggle_import_section", %{"section" => section}, socket) do
-    {:noreply, ImportEditor.toggle_section(socket, section, &reload_shell/2)}
-  end
-
-  def handle_event("toggle_import_ai_model_selector", _params, socket) do
-    {:noreply, ImportEditor.toggle_model_selector(socket, &reload_shell/2)}
-  end
-
-  def handle_event("select_import_ai_model", %{"model" => model_id}, socket) do
-    {:noreply, ImportEditor.select_ai_model(socket, model_id, &reload_shell/2)}
-  end
-
-  def handle_event("analyze_import_taxonomy_ai", _params, socket) do
-    {:noreply, ImportEditor.analyze_taxonomy_ai(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("rerun_misc_editor", _params, socket) do
@@ -870,26 +809,6 @@ defmodule BDS.Desktop.ShellLive do
     Process.demonitor(ref, [:flush])
 
     cond do
-      Map.has_key?(socket.assigns.import_editor_analysis_task_refs, ref) ->
-        {:noreply,
-         ImportEditor.finish_analysis(
-           socket,
-           ref,
-           result,
-           &reload_shell/2,
-           &append_output_entry/5
-         )}
-
-      Map.has_key?(socket.assigns.import_editor_execution_task_refs, ref) ->
-        {:noreply,
-         ImportEditor.finish_execution(
-           socket,
-           ref,
-           result,
-           &reload_shell/2,
-           &append_output_entry/5
-         )}
-
       Map.has_key?(socket.assigns.chat_editor_request_refs, ref) ->
         {conversation_id, remaining_refs} = Map.pop(socket.assigns.chat_editor_request_refs, ref)
 
@@ -909,26 +828,6 @@ defmodule BDS.Desktop.ShellLive do
   def handle_info({:DOWN, ref, :process, _pid, reason}, socket) when is_reference(ref) do
     next_socket =
       cond do
-        Map.has_key?(socket.assigns.import_editor_analysis_task_refs, ref) ->
-          ImportEditor.handle_task_down(
-            socket,
-            :analysis,
-            ref,
-            reason,
-            &reload_shell/2,
-            &append_output_entry/5
-          )
-
-        Map.has_key?(socket.assigns.import_editor_execution_task_refs, ref) ->
-          ImportEditor.handle_task_down(
-            socket,
-            :execution,
-            ref,
-            reason,
-            &reload_shell/2,
-            &append_output_entry/5
-          )
-
         Map.has_key?(socket.assigns.chat_editor_request_refs, ref) ->
           {conversation_id, remaining_refs} = Map.pop(socket.assigns.chat_editor_request_refs, ref)
 
@@ -951,25 +850,21 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, next_socket}
   end
 
-  def handle_info({:import_analysis_progress, definition_id, step, detail}, socket) do
-    {:noreply,
-     ImportEditor.note_analysis_progress(socket, definition_id, step, detail, &reload_shell/2)}
+  def handle_info({:import_editor_output, title, message, level}, socket) do
+    {:noreply, append_output_entry(socket, title, message, nil, level)}
   end
 
-  def handle_info(
-        {:import_execution_progress, definition_id, phase, current, total, detail},
-        socket
-      ) do
+  def handle_info({:import_editor_tab_meta, definition_id, title, subtitle}, socket) do
+    tab_meta =
+      Map.put(socket.assigns.tab_meta, {:import, definition_id}, %{
+        title: title,
+        subtitle: subtitle || ""
+      })
+
     {:noreply,
-     ImportEditor.note_execution_progress(
-       socket,
-       definition_id,
-       phase,
-       current,
-       total,
-       detail,
-       &reload_shell/2
-     )}
+     socket
+     |> assign(:tab_meta, tab_meta)
+     |> reload_shell(socket.assigns.workbench)}
   end
 
   def handle_info({:chat_tool_call, conversation_id, tool_call}, socket) do
@@ -1311,7 +1206,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:menu_groups, socket.assigns[:menu_groups] || TitlebarMenu.groups())
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
     |> assign(:current_tab, current_tab(workbench))
-    |> assign_import_editor()
     |> assign_misc_editor()
   end
 
@@ -1352,10 +1246,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp current_tab(%{tabs: tabs, active_tab: {type, id}}) do
     Enum.find(tabs, &(&1.type == type and &1.id == id))
-  end
-
-  defp assign_import_editor(socket) do
-    ImportEditor.assign_socket(socket)
   end
 
   defp assign_misc_editor(socket) do
@@ -1769,7 +1659,6 @@ defmodule BDS.Desktop.ShellLive do
         socket
         |> assign(:shell_overlay, nil)
         |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:import, definition_id}))
-        |> clear_import_editor_state(definition_id)
         |> reload_shell(workbench)
 
       {:error, reason} ->
@@ -1778,39 +1667,6 @@ defmodule BDS.Desktop.ShellLive do
         |> append_output_entry(sidebar_delete_title("import"), inspect(reason), nil, "error")
         |> reload_shell(socket.assigns.workbench)
     end
-  end
-
-  defp clear_import_editor_state(socket, definition_id) do
-    socket
-    |> assign(
-      :import_editor_analysis_states,
-      Map.delete(socket.assigns.import_editor_analysis_states, definition_id)
-    )
-    |> assign(
-      :import_editor_analysis_task_refs,
-      Map.delete(socket.assigns.import_editor_analysis_task_refs, definition_id)
-    )
-    |> assign(
-      :import_editor_execution_states,
-      Map.delete(socket.assigns.import_editor_execution_states, definition_id)
-    )
-    |> assign(
-      :import_editor_execution_task_refs,
-      Map.delete(socket.assigns.import_editor_execution_task_refs, definition_id)
-    )
-    |> assign(:import_editor_sections, Map.delete(socket.assigns.import_editor_sections, definition_id))
-    |> assign(
-      :import_editor_taxonomy_edits,
-      Map.delete(socket.assigns.import_editor_taxonomy_edits, definition_id)
-    )
-    |> assign(
-      :import_editor_model_selectors_open,
-      Map.delete(socket.assigns.import_editor_model_selectors_open, definition_id)
-    )
-    |> assign(
-      :import_editor_selected_models,
-      Map.delete(socket.assigns.import_editor_selected_models, definition_id)
-    )
   end
 
   defp sidebar_delete_target(socket, route, id, fallback_title) do
