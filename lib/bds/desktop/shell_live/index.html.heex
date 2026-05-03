@@ -409,11 +409,11 @@
             <% @current_tab.type == :tags and @current_project -> %>
               <.live_component module={TagsEditor} id="tags-editor" project_id={@current_project.id} current_tab={@current_tab} tab_meta={@tab_meta} />
 
-            <% @current_tab.type == :scripts and @script_editor -> %>
-              <CodeEntityEditor.script_editor script_editor={@script_editor} />
+            <% @current_tab.type == :scripts -> %>
+              <.live_component module={ScriptEditor} id={"script-editor-#{@current_tab.id}"} current_tab={@current_tab} />
 
-            <% @current_tab.type == :templates and @template_editor -> %>
-              <CodeEntityEditor.template_editor template_editor={@template_editor} />
+            <% @current_tab.type == :templates -> %>
+              <.live_component module={TemplateEditor} id={"template-editor-#{@current_tab.id}"} current_tab={@current_tab} />
 
             <% @current_tab.type == :chat and @chat_editor -> %>
               <ChatEditor.chat_editor chat_editor={@chat_editor} />

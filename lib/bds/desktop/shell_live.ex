@@ -11,13 +11,14 @@ defmodule BDS.Desktop.ShellLive do
 
   alias BDS.Desktop.ShellLive.{
     ChatEditor,
-    CodeEntityEditor,
     ImportEditor,
     MediaEditor,
     MenuEditor,
     MiscEditor,
+    ScriptEditor,
     SettingsEditor,
-    TagsEditor
+    TagsEditor,
+    TemplateEditor
   }
 
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
@@ -175,8 +176,6 @@ defmodule BDS.Desktop.ShellLive do
       |> assign(:media_editor_post_picker_queries, %{})
       |> assign(:media_editor_save_states, %{})
       |> assign(:media_editor_translation_forms, %{})
-      |> assign(:script_editor_drafts, %{})
-     |> assign(:template_editor_drafts, %{})
      |> assign(:chat_editor_inputs, %{})
      |> assign(:chat_model_selectors_open, %{})
      |> assign(:chat_editor_requests, %{})
@@ -525,53 +524,6 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("settings_shell_command", %{"action" => action}, socket) do
     {:noreply, apply_shell_command(socket, action)}
-  end
-
-  def handle_event("change_script_editor", %{"script_editor" => params}, socket) do
-    {:noreply, CodeEntityEditor.update_script(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("save_script_editor", _params, socket) do
-    {:noreply, CodeEntityEditor.save_script(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("publish_script_editor", %{"id" => _script_id}, socket) do
-    {:noreply,
-     CodeEntityEditor.publish_script(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("run_script_editor", _params, socket) do
-    {:noreply, CodeEntityEditor.run_script(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("check_script_editor", _params, socket) do
-    {:noreply, CodeEntityEditor.check_script(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("delete_script_editor", _params, socket) do
-    {:noreply, CodeEntityEditor.delete_script(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("change_template_editor", %{"template_editor" => params}, socket) do
-    {:noreply, CodeEntityEditor.update_template(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("save_template_editor", _params, socket) do
-    {:noreply, CodeEntityEditor.save_template(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("publish_template_editor", %{"id" => _template_id}, socket) do
-    {:noreply,
-     CodeEntityEditor.publish_template(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("validate_template_editor", _params, socket) do
-    {:noreply,
-     CodeEntityEditor.validate_template(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("delete_template_editor", _params, socket) do
-    {:noreply, CodeEntityEditor.delete_template(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("change_chat_editor_input", %{"message" => message}, socket) do
@@ -1312,6 +1264,22 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, append_output_entry(socket, title, message, nil, level)}
   end
 
+  def handle_info({:script_editor_output, title, message, level}, socket) do
+    {:noreply, append_output_entry(socket, title, message, nil, level)}
+  end
+
+  def handle_info({:template_editor_output, title, message, level}, socket) do
+    {:noreply, append_output_entry(socket, title, message, nil, level)}
+  end
+
+  def handle_info(:reload_shell, socket) do
+    {:noreply, reload_shell(socket, socket.assigns.workbench)}
+  end
+
+  def handle_info({:close_tab, type, id}, socket) do
+    {:noreply, reload_shell(socket, BDS.UI.Workbench.close_tab(socket.assigns.workbench, type, id))}
+  end
+
   @impl true
   def render(assigns) do
     UILocale.put(assigns.page_language)
@@ -1382,7 +1350,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:current_tab, current_tab(workbench))
     |> assign_post_editor()
     |> assign_media_editor()
-    |> assign_code_entity_editor()
     |> assign_chat_editor()
     |> assign_import_editor()
     |> assign_misc_editor()
@@ -1433,10 +1400,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp assign_media_editor(socket) do
     MediaEditor.assign_socket(socket)
-  end
-
-  defp assign_code_entity_editor(socket) do
-    CodeEntityEditor.assign_socket(socket)
   end
 
   defp assign_chat_editor(socket) do
@@ -1621,12 +1584,14 @@ defmodule BDS.Desktop.ShellLive do
     socket
   end
 
-  defp save_current_tab(%{assigns: %{current_tab: %{type: :scripts}}} = socket) do
-    CodeEntityEditor.save_script(socket, &reload_shell/2, &append_output_entry/5)
+  defp save_current_tab(%{assigns: %{current_tab: %{type: :scripts, id: script_id}}} = socket) do
+    send_update(ScriptEditor, id: "script-editor-#{script_id}", action: :save)
+    socket
   end
 
-  defp save_current_tab(%{assigns: %{current_tab: %{type: :templates}}} = socket) do
-    CodeEntityEditor.save_template(socket, &reload_shell/2, &append_output_entry/5)
+  defp save_current_tab(%{assigns: %{current_tab: %{type: :templates, id: template_id}}} = socket) do
+    send_update(TemplateEditor, id: "template-editor-#{template_id}", action: :save)
+    socket
   end
 
   defp save_current_tab(socket), do: reload_shell(socket, socket.assigns.workbench)
@@ -1729,7 +1694,6 @@ defmodule BDS.Desktop.ShellLive do
         socket
         |> assign(:shell_overlay, nil)
         |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:scripts, script_id}))
-        |> assign(:script_editor_drafts, Map.delete(socket.assigns.script_editor_drafts, script_id))
         |> reload_shell(workbench)
 
       {:error, reason} ->
@@ -1748,10 +1712,6 @@ defmodule BDS.Desktop.ShellLive do
         socket
         |> assign(:shell_overlay, nil)
         |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {:templates, template_id}))
-        |> assign(
-          :template_editor_drafts,
-          Map.delete(socket.assigns.template_editor_drafts, template_id)
-        )
         |> reload_shell(workbench)
 
       {:error, reason} ->

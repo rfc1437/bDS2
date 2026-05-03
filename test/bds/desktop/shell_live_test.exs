@@ -2344,7 +2344,12 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert draft_script_html =~ ~s(data-testid="script-publish-button")
     assert draft_script_html =~ ~s(class="success")
-    draft_script_html = render_click(view, "publish_script_editor", %{"id" => draft_script.id})
+
+    draft_script_html =
+      view
+      |> element("[data-testid='script-publish-button']")
+      |> render_click()
+
     assert Scripts.get_script(draft_script.id).status == :published
     refute draft_script_html =~ ~s(data-testid="script-publish-button")
     assert draft_script_html =~ ~s(data-testid="script-status-badge")
@@ -2360,7 +2365,12 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert draft_template_html =~ ~s(data-testid="template-publish-button")
     assert draft_template_html =~ ~s(class="success")
-    draft_template_html = render_click(view, "publish_template_editor", %{"id" => draft_template.id})
+
+    draft_template_html =
+      view
+      |> element("[data-testid='template-publish-button']")
+      |> render_click()
+
     assert Templates.get_template(draft_template.id).status == :published
     refute draft_template_html =~ ~s(data-testid="template-publish-button")
     assert draft_template_html =~ ~s(data-testid="template-status-badge")
