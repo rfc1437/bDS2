@@ -21,8 +21,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       persisted_form: 4,
       record_status: 1,
       record_title: 2,
-      save_state_for_action: 1,
-      toggled_sections: 3
+      save_state_for_action: 1
     ]
 
   import ListValues,
@@ -224,7 +223,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   def handle_event("toggle_post_metadata", _params, socket) do
     socket =
       socket
-      |> assign(:expanded, toggled_sections(socket.assigns.expanded, socket.assigns.post_id, :metadata))
+      |> assign(:expanded, Map.update(socket.assigns.expanded, :metadata, false, &(!&1)))
       |> build_data()
 
     {:noreply, socket}
@@ -233,7 +232,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   def handle_event("toggle_post_excerpt", _params, socket) do
     socket =
       socket
-      |> assign(:expanded, toggled_sections(socket.assigns.expanded, socket.assigns.post_id, :excerpt))
+      |> assign(:expanded, Map.update(socket.assigns.expanded, :excerpt, false, &(!&1)))
       |> build_data()
 
     {:noreply, socket}
