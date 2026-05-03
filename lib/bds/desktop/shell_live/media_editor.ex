@@ -525,8 +525,9 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     else
       media = socket.assigns.media
       normalized_language = normalize_language(language)
+      source_language = normalize_language(media.language)
 
-      case AI.translate_media(media.id, normalized_language) do
+      case AI.translate_media(media.id, normalized_language, source_language: source_language) do
         {:ok, translation} ->
           case Media.upsert_media_translation(media.id, normalized_language, translation) do
             {:ok, _saved_translation} ->

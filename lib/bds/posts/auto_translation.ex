@@ -353,6 +353,7 @@ defmodule BDS.Posts.AutoTranslation do
   defp translate_post(%Post{} = post, language, opts \\ []) do
     auto_publish? = Keyword.get(opts, :auto_publish, false)
     content = Posts.editor_body(post)
+    source_language = normalize_language(post.language)
 
     if String.trim(content) == "" do
       {:error, :no_content_to_translate}
@@ -361,7 +362,7 @@ defmodule BDS.Posts.AutoTranslation do
              AI.translate_post(
                %{title: post.title || "", excerpt: post.excerpt || "", content: content},
                language,
-               ai_opts()
+               Keyword.put(ai_opts(), :source_language, source_language)
              ),
            {:ok, saved_translation} <-
              Posts.upsert_post_translation(post.id, language, %{
@@ -384,7 +385,14 @@ defmodule BDS.Posts.AutoTranslation do
     do: Posts.publish_post_translation(post_id, language)
 
   defp translate_media(media_id, language) do
-    with {:ok, translation} <- AI.translate_media(media_id, language, ai_opts()),
+    source_language =
+      case Repo.get(Media.Media, media_id) do
+        nil -> ""
+        media -> normalize_language(media.language)
+      end
+
+    with {:ok, translation} <-
+           AI.translate_media(media_id, language, Keyword.put(ai_opts(), :source_language, source_language)),
          {:ok, saved_translation} <-
            Media.upsert_media_translation(media_id, language, %{
              title: translation.title,

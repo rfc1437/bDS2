@@ -191,6 +191,17 @@ defmodule BDS.AITest do
              usage: usage(22, 14, 0, 0)
            }}
 
+        :translate_media ->
+          {:ok,
+           %{
+             json: %{
+               "title" => "Medientitel",
+               "alt" => "Medien Alt",
+               "caption" => "Medien Beschriftung"
+             },
+             usage: usage(12, 10, 0, 0)
+           }}
+
         :analyze_post ->
           {:ok,
            %{
@@ -621,6 +632,86 @@ defmodule BDS.AITest do
     assert endpoint.kind == :online
     assert request.operation == :translate_post
     assert request.model == "gpt-4.1-mini"
+  end
+
+  test "translate_post includes source language in prompt when provided via opts" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(false)
+    assert :ok = BDS.AI.put_model_preference(:title, "gpt-4.1-mini")
+
+    assert {:ok, translation} =
+             BDS.AI.translate_post(
+               %{
+                 title: "Hello World",
+                 excerpt: "Short summary",
+                 content: "# Hello\n\nSource body"
+               },
+               "de",
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend,
+               source_language: "en"
+             )
+
+    assert translation.title == "Hallo Welt"
+
+    assert_received {:runtime_request, _endpoint, request}
+    assert request.operation == :translate_post
+    system_message = get_in(request.messages, [Access.at(0), "content"]) || ""
+    user_message = get_in(request.messages, [Access.at(1), "content"]) || ""
+    assert system_message =~ "English"
+    assert user_message =~ "English"
+    assert user_message =~ "German"
+  end
+
+  test "translate_media includes source language in prompt when provided via opts" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(false)
+    assert :ok = BDS.AI.put_model_preference(:title, "gpt-4.1-mini")
+
+    assert {:ok, translation} =
+             BDS.AI.translate_media(
+               %{
+                 title: "Image Title",
+                 alt: "Image Alt",
+                 caption: "Image Caption"
+               },
+               "de",
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend,
+               source_language: "en"
+             )
+
+    assert translation.title == "Medientitel"
+
+    assert_received {:runtime_request, _endpoint, request}
+    assert request.operation == :translate_media
+    system_message = get_in(request.messages, [Access.at(0), "content"]) || ""
+    user_message = get_in(request.messages, [Access.at(1), "content"]) || ""
+    assert system_message =~ "English"
+    assert user_message =~ "English"
+    assert user_message =~ "German"
   end
 
   test "analyze_post uses editor_body so published posts include filesystem content" do

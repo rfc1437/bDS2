@@ -621,8 +621,9 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     else
       post_id = socket.assigns.post_id
       normalized_language = normalize_language(language, "")
+      source_language = socket.assigns.canonical_language
 
-      case AI.translate_post(post_id, normalized_language) do
+      case AI.translate_post(post_id, normalized_language, source_language: source_language) do
         {:ok, translation} ->
           with {:ok, _saved_translation} <-
                  Posts.upsert_post_translation(post_id, normalized_language, %{
