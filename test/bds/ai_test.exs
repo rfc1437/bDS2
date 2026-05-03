@@ -660,6 +660,44 @@ defmodule BDS.AITest do
     assert message =~ "# Draft body"
   end
 
+  test "analyze_post respects the language option and instructs the model to respond in that language" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(false)
+    assert :ok = BDS.AI.put_model_preference(:title, "gpt-4.1-mini")
+
+    assert {:ok, result} =
+             BDS.AI.analyze_post(
+               %{
+                 title: "Draft Post",
+                 excerpt: "Short summary",
+                 content: "# Draft body"
+               },
+               language: "de",
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend
+             )
+
+    assert result.title =~ "Draft Post"
+
+    assert_received {:runtime_request, _endpoint, request}
+    assert request.operation == :analyze_post
+    system_message = get_in(request.messages, [Access.at(0), "content"]) || ""
+    user_message = get_in(request.messages, [Access.at(1), "content"]) || ""
+    assert system_message =~ "German"
+    assert user_message =~ "German"
+  end
+
   test "analyze_import_taxonomy uses the selected model override and returns only valid existing-term mappings" do
     assert {:ok, _endpoint} =
              BDS.AI.put_endpoint(
@@ -865,6 +903,54 @@ defmodule BDS.AITest do
     image_content = Enum.at(user_message["content"], 1)
     assert image_content["type"] == "image_url"
     assert image_content["image_url"]["url"] =~ ~r/^data:image\/png;base64,/
+  end
+
+  test "analyze_image respects the language option and instructs the model to respond in that language" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{
+                 url: "http://localhost:11434/v1",
+                 api_key: nil,
+                 model: "llama-default"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(true)
+    assert :ok = BDS.AI.put_model_preference(:airplane_image_analysis, "llama3.2")
+
+    assert :ok =
+             BDS.AI.put_model_capabilities("llama3.2", %{
+               supports_attachment: true,
+               supports_tool_calls: false,
+               disables_reasoning: false
+             })
+
+    assert {:ok, analysis} =
+             BDS.AI.analyze_image(
+               %{
+                 mime_type: "image/png",
+                 title: "Source",
+                 alt: nil,
+                 caption: nil,
+                 image_url: "https://example.com/test.png"
+               },
+               language: "de",
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend
+             )
+
+    assert analysis.title == "Sunset"
+
+    assert_received {:runtime_request, _endpoint, request}
+    assert request.operation == :analyze_image
+    system_message = get_in(request.messages, [Access.at(0), "content"]) || ""
+    user_message = Enum.at(request.messages, 1)
+    text_content = Enum.at(user_message["content"], 0)
+    assert system_message =~ "German"
+    assert text_content["text"] =~ "German"
   end
 
   test "chat persists user, tool, and assistant messages with usage and blog stats prompt augmentation" do

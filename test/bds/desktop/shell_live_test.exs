@@ -2415,6 +2415,68 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ "Loading"
   end
 
+  test "ai suggestions overlay sends project main language for posts", %{project: project} do
+    Application.put_env(:bds, :test_pid, self())
+
+    server =
+      start_supervised!({Bandit, plug: AiSuggestionsServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert :ok = AI.set_airplane_mode(false)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "test-secret",
+               model: "gpt-test"
+             })
+
+    assert :ok = AI.put_model_preference(:title, "gpt-test")
+
+    assert {:ok, _metadata} = Metadata.update_project_metadata(project.id, %{main_language: "de"})
+
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "German Post",
+        content: "Some content for AI analysis"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => post.id,
+        "title" => post.title,
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-testid="post-editor")
+
+    html =
+      view
+      |> element("[data-testid='post-editor'] .quick-actions-btn")
+      |> render_click()
+
+    assert html =~ "quick-actions-menu"
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='ai_suggestions']")
+      |> render_click()
+
+    assert html =~ "ai-suggestions-modal"
+
+    assert_receive {:ai_suggestions_request, request}, 2_000
+
+    system_message = get_in(request, ["messages", Access.at(0), "content"]) || ""
+    user_message = get_in(request, ["messages", Access.at(1), "content"]) || ""
+    assert system_message =~ "German"
+    assert user_message =~ "German"
+  end
+
   test "ai suggestions overlay is gated by offline mode for media", %{project: project} do
     assert :ok = AI.set_airplane_mode(true)
 
@@ -2530,6 +2592,77 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "AI Alt Text"
     assert html =~ "AI Caption"
     refute html =~ "Loading"
+  end
+
+  test "ai suggestions overlay sends project main language for media", %{project: project} do
+    Application.put_env(:bds, :test_pid, self())
+
+    server =
+      start_supervised!({Bandit, plug: AiSuggestionsServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert :ok = AI.set_airplane_mode(false)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "test-secret",
+               model: "gpt-test"
+             })
+
+    assert :ok = AI.put_model_preference(:image_analysis, "gpt-test")
+    assert :ok = AI.put_model_capabilities("gpt-test", %{supports_attachment: true})
+
+    assert {:ok, _metadata} = Metadata.update_project_metadata(project.id, %{main_language: "de"})
+
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-shell-live-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    media_source_path = Path.join(temp_dir, "german-media.jpg")
+    File.write!(media_source_path, "fake image body")
+
+    {:ok, media} =
+      Media.import_media(%{
+        project_id: project.id,
+        source_path: media_source_path,
+        title: "German Media"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "media",
+        "id" => media.id,
+        "title" => media.title,
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-testid="media-editor")
+
+    html =
+      view
+      |> element("[data-testid='media-editor'] .quick-actions-btn")
+      |> render_click()
+
+    assert html =~ "quick-actions-menu"
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='ai_suggestions']")
+      |> render_click()
+
+    assert html =~ "ai-suggestions-modal"
+
+    assert_receive {:ai_suggestions_request, request}, 2_000
+
+    system_message = get_in(request, ["messages", Access.at(0), "content"]) || ""
+    user_message = Enum.at(request["messages"], 1)
+    text_content = Enum.at(user_message["content"], 0)
+    assert system_message =~ "German"
+    assert text_content["text"] =~ "German"
   end
 
   test "ai suggestions async error closes overlay and shows toast", %{project: project} do

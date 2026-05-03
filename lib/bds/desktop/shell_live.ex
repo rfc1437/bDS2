@@ -7,7 +7,7 @@ defmodule BDS.Desktop.ShellLive do
 
   import Phoenix.HTML
 
-  alias BDS.{AI, BoundedAtoms, ImportDefinitions, Media, Posts, Scripts}
+  alias BDS.{AI, BoundedAtoms, ImportDefinitions, Media, Metadata, Posts, Scripts}
   alias BDS.CliSync.Watcher
   alias BDS.Desktop.{FolderPicker, Overlay, ShellData, UILocale}
 
@@ -1565,13 +1565,14 @@ defmodule BDS.Desktop.ShellLive do
 
   defp spawn_ai_suggestions_task(socket) do
     current_tab = socket.assigns.current_tab
+    language = ai_suggestions_language(socket)
 
     case current_tab do
       %{type: :post, id: post_id} ->
         parent = self()
 
         Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
-          case AI.analyze_post(post_id) do
+          case AI.analyze_post(post_id, language: language) do
             {:ok, result} ->
               send(parent, {:ai_suggestions_result, :post, post_id, result})
 
@@ -1584,7 +1585,7 @@ defmodule BDS.Desktop.ShellLive do
         parent = self()
 
         Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
-          case AI.analyze_image(media_id) do
+          case AI.analyze_image(media_id, language: language) do
             {:ok, result} ->
               send(parent, {:ai_suggestions_result, :media, media_id, result})
 
@@ -1598,6 +1599,14 @@ defmodule BDS.Desktop.ShellLive do
     end
 
     socket
+  end
+
+  defp ai_suggestions_language(socket) do
+    active_project_id = socket.assigns.projects.active_project_id
+    {:ok, metadata} = Metadata.get_project_metadata(active_project_id)
+    metadata.main_language || "en"
+  rescue
+    _error -> "en"
   end
 
   defp mac_ui? do

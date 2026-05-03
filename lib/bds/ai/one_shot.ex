@@ -172,7 +172,7 @@ defmodule BDS.AI.OneShot do
     with {:ok, endpoint, model, mode} <- Runtime.resolve_target(operation, opts),
          :ok <- Runtime.validate_target(operation, model, mode),
          {:ok, payload} <- resolve_image_data_url(payload),
-         request <- build_one_shot_request(operation, payload, model),
+         request <- build_one_shot_request(operation, payload, model, opts),
          {:ok, response} <-
            runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts),
          {:ok, json} <- extract_json_response(response),
@@ -187,7 +187,7 @@ defmodule BDS.AI.OneShot do
 
     with {:ok, endpoint, model, mode} <- Runtime.resolve_target(operation, opts),
          :ok <- Runtime.validate_target(operation, model, mode),
-         request <- build_one_shot_request(operation, payload, model),
+         request <- build_one_shot_request(operation, payload, model, opts),
          {:ok, response} <-
            runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts),
          {:ok, json} <- extract_json_response(response),
@@ -197,55 +197,65 @@ defmodule BDS.AI.OneShot do
     end
   end
 
-  defp build_one_shot_request(operation, payload, model) do
+  defp build_one_shot_request(operation, payload, model, opts) do
+    language = Keyword.get(opts, :language)
+
     %{
       operation: operation,
       model: model,
       max_output_tokens: @default_max_output_tokens,
       messages: [
-        %{"role" => "system", "content" => one_shot_system_prompt(operation)},
-        %{"role" => "user", "content" => one_shot_user_content(operation, payload)}
+        %{"role" => "system", "content" => one_shot_system_prompt(operation, language)},
+        %{"role" => "user", "content" => one_shot_user_content(operation, payload, language)}
       ]
     }
   end
 
-  defp one_shot_system_prompt(:detect_language) do
+  defp one_shot_system_prompt(:detect_language, _language) do
     "Return JSON with exactly one key: language_code."
   end
 
-  defp one_shot_system_prompt(:analyze_taxonomy) do
+  defp one_shot_system_prompt(:analyze_taxonomy, _language) do
     "Return JSON with keys tags and categories, each an array of short strings."
   end
 
-  defp one_shot_system_prompt(:import_taxonomy_mapping) do
+  defp one_shot_system_prompt(:import_taxonomy_mapping, _language) do
     "You are helping import WordPress taxonomy into an existing blog. Return JSON with exactly two keys: categoryMappings and tagMappings. Each value must be an object mapping imported term names to existing project term names. Only map when the imported term should reuse an existing term to avoid duplicates. Do not invent target terms. Leave unmapped items out of the objects."
   end
 
-  defp one_shot_system_prompt(:analyze_post) do
+  defp one_shot_system_prompt(:analyze_post, nil) do
     "Return JSON with keys title, excerpt, and slug. Each value must be a single string (not an array or object)."
   end
 
-  defp one_shot_system_prompt(:translate_post) do
+  defp one_shot_system_prompt(:analyze_post, language) do
+    "Return JSON with keys title, excerpt, and slug. Each value must be a single string (not an array or object). Respond in #{language_name(language)}."
+  end
+
+  defp one_shot_system_prompt(:translate_post, _language) do
     "Return JSON with keys title, excerpt, and content. Preserve Markdown structure."
   end
 
-  defp one_shot_system_prompt(:analyze_image) do
+  defp one_shot_system_prompt(:analyze_image, nil) do
     "Return JSON with keys title, alt, and caption for the provided image."
   end
 
-  defp one_shot_system_prompt(:translate_media) do
+  defp one_shot_system_prompt(:analyze_image, language) do
+    "Return JSON with keys title, alt, and caption for the provided image. Respond in #{language_name(language)}."
+  end
+
+  defp one_shot_system_prompt(:translate_media, _language) do
     "Return JSON with keys title, alt, and caption translated to the requested language."
   end
 
-  defp one_shot_user_content(:detect_language, %{text: text}) do
+  defp one_shot_user_content(:detect_language, %{text: text}, _language) do
     "Detect the language of this text: #{text}"
   end
 
-  defp one_shot_user_content(:analyze_taxonomy, post) do
+  defp one_shot_user_content(:analyze_taxonomy, post, _language) do
     "Suggest categories and tags for the following post.\nTitle: #{post.title}\nExcerpt: #{post.excerpt}\nContent: #{truncate_text(post.content, 2000)}"
   end
 
-  defp one_shot_user_content(:import_taxonomy_mapping, payload) do
+  defp one_shot_user_content(:import_taxonomy_mapping, payload, _language) do
     [
       "Analyze these imported taxonomy terms and suggest which ones should map to existing project terms.",
       "",
@@ -266,15 +276,19 @@ defmodule BDS.AI.OneShot do
     |> Enum.join("\n")
   end
 
-  defp one_shot_user_content(:analyze_post, post) do
+  defp one_shot_user_content(:analyze_post, post, nil) do
     "Suggest an improved title, excerpt, and slug.\nTitle: #{post.title}\nExcerpt: #{post.excerpt}\nContent: #{truncate_text(post.content, 2000)}"
   end
 
-  defp one_shot_user_content(:translate_post, post) do
+  defp one_shot_user_content(:analyze_post, post, language) do
+    "Suggest an improved title, excerpt, and slug in #{language_name(language)}.\nTitle: #{post.title}\nExcerpt: #{post.excerpt}\nContent: #{truncate_text(post.content, 2000)}"
+  end
+
+  defp one_shot_user_content(:translate_post, post, _language) do
     "Translate this post to #{post.target_language}.\nTitle: #{post.title}\nExcerpt: #{post.excerpt}\nContent: #{post.content}"
   end
 
-  defp one_shot_user_content(:analyze_image, media) do
+  defp one_shot_user_content(:analyze_image, media, nil) do
     [
       %{
         "type" => "text",
@@ -284,9 +298,26 @@ defmodule BDS.AI.OneShot do
     ]
   end
 
-  defp one_shot_user_content(:translate_media, media) do
+  defp one_shot_user_content(:analyze_image, media, language) do
+    [
+      %{
+        "type" => "text",
+        "text" => "Analyze this image and return title, alt text, and caption in #{language_name(language)}."
+      },
+      %{"type" => "image_url", "image_url" => %{"url" => media.image_url}}
+    ]
+  end
+
+  defp one_shot_user_content(:translate_media, media, _language) do
     "Translate this media metadata to #{media.target_language}.\nTitle: #{media.title}\nAlt: #{media.alt}\nCaption: #{media.caption}"
   end
+
+  defp language_name("de"), do: "German"
+  defp language_name("en"), do: "English"
+  defp language_name("fr"), do: "French"
+  defp language_name("it"), do: "Italian"
+  defp language_name("es"), do: "Spanish"
+  defp language_name(language), do: String.capitalize(to_string(language))
 
   defp extract_json_response(%{json: json}) when is_map(json), do: {:ok, json}
 
