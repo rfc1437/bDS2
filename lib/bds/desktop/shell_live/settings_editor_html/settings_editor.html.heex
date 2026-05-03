@@ -9,7 +9,7 @@
   <div class="settings-view">
     <div class="settings-header">
       <h2 data-testid="editor-title"><%= translated("Settings") %></h2>
-      <form class="settings-search" phx-change="change_settings_search">
+      <form class="settings-search" phx-change="change_settings_search" phx-target={@myself}>
         <input type="text" name="query" value={@settings_editor.search_query} placeholder={translated("Search settings")} />
       </form>
     </div>
@@ -27,7 +27,7 @@
             <h3><%= translated("Project") %></h3>
             <p class="setting-section-description"><%= translated("Blog identity, URLs, authoring defaults, and bookmarklet setup") %></p>
           </div>
-          <form class="setting-section-content" phx-change="change_settings_project">
+          <form class="setting-section-content" phx-change="change_settings_project" phx-target={@myself}>
             <div class="setting-row">
               <div class="setting-info">
                 <label class="setting-label"><%= translated("Project Name") %></label>
@@ -97,7 +97,7 @@
               <div class="setting-control"><p class="setting-description"><%= translated("Bookmarklet copy support is wired through the desktop runtime and project public URL.") %></p></div>
             </div>
           </form>
-          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_project"><%= translated("Save") %></button></div>
+          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_project" phx-target={@myself}><%= translated("Save") %></button></div>
         </div>
       <% end %>
 
@@ -107,7 +107,7 @@
             <h3><%= translated("Editor") %></h3>
             <p class="setting-section-description"><%= translated("Default editing mode and diff presentation") %></p>
           </div>
-          <form class="setting-section-content" phx-change="change_settings_editor">
+          <form class="setting-section-content" phx-change="change_settings_editor" phx-target={@myself}>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Default Editor Mode") %></label></div>
               <div class="setting-control">
@@ -136,7 +136,7 @@
               <div class="setting-control"><label><input type="checkbox" name="settings_editor[hide_unchanged_regions]" checked={@settings_editor.editor["hide_unchanged_regions"]} /> <%= translated("Collapse unchanged diff hunks") %></label></div>
             </div>
           </form>
-          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_editor"><%= translated("Save") %></button></div>
+          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_editor" phx-target={@myself}><%= translated("Save") %></button></div>
         </div>
       <% end %>
 
@@ -183,11 +183,11 @@
                     </td>
                     <td>
                       <div class="setting-input-group">
-                        <form id={"category-form-#{category.name}"} phx-submit="save_settings_category">
+                        <form id={"category-form-#{category.name}"} phx-submit="save_settings_category" phx-target={@myself}>
                           <input type="hidden" name="category_settings[category]" value={category.name} />
                         </form>
                         <button class="secondary" type="submit" form={"category-form-#{category.name}"}><%= translated("Save") %></button>
-                        <button class="secondary" type="button" phx-click="remove_settings_category" phx-value-category={category.name} disabled={category.protected?}><%= translated("Remove") %></button>
+                        <button class="secondary" type="button" phx-click="remove_settings_category" phx-target={@myself} phx-value-category={category.name} disabled={category.protected?}><%= translated("Remove") %></button>
                       </div>
                     </td>
                   </tr>
@@ -198,12 +198,12 @@
               <div class="setting-info"><label class="setting-label"><%= translated("Add Category") %></label></div>
               <div class="setting-control">
                 <div class="setting-input-group">
-                  <input type="text" value={@settings_editor.new_category} phx-change="change_settings_new_category" name="name" />
-                  <button class="primary" type="button" phx-click="add_settings_category"><%= translated("Add") %></button>
+                  <input type="text" value={@settings_editor.new_category} phx-change="change_settings_new_category" phx-target={@myself} name="name" />
+                  <button class="primary" type="button" phx-click="add_settings_category" phx-target={@myself}><%= translated("Add") %></button>
                 </div>
               </div>
             </div>
-            <div class="setting-actions"><button class="secondary" type="button" phx-click="reset_settings_categories"><%= translated("Reset to Defaults") %></button></div>
+            <div class="setting-actions"><button class="secondary" type="button" phx-click="reset_settings_categories" phx-target={@myself}><%= translated("Reset to Defaults") %></button></div>
           </div>
         </div>
       <% end %>
@@ -211,13 +211,13 @@
       <%= if @settings_editor.ai_visible? do %>
         <div class="setting-section" id="settings-section-ai">
           <div class="setting-section-header"><h3><%= translated("AI") %></h3><p class="setting-section-description"><%= translated("OpenAI-compatible endpoints, model routing, airplane mode, and system prompt") %></p></div>
-          <form class="setting-section-content" phx-change="change_settings_ai">
+          <form class="setting-section-content" phx-change="change_settings_ai" phx-target={@myself}>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Online Endpoint URL") %></label></div>
               <div class="setting-control">
                 <div class="setting-input-group">
                   <input type="url" name="settings_ai[online_url]" value={@settings_editor.ai["online_url"]} />
-                  <button class="secondary" type="button" phx-click="refresh_settings_ai_models" phx-value-endpoint="online"><%= translated("Refresh Online Models") %></button>
+                  <button class="secondary" type="button" phx-click="refresh_settings_ai_models" phx-target={@myself} phx-value-endpoint="online"><%= translated("Refresh Online Models") %></button>
                 </div>
               </div>
             </div>
@@ -250,7 +250,7 @@
               <div class="setting-control">
                 <div class="setting-input-group">
                   <input type="url" name="settings_ai[offline_url]" value={@settings_editor.ai["offline_url"]} />
-                  <button class="secondary" type="button" phx-click="refresh_settings_ai_models" phx-value-endpoint="airplane"><%= translated("Refresh Offline Models") %></button>
+                  <button class="secondary" type="button" phx-click="refresh_settings_ai_models" phx-target={@myself} phx-value-endpoint="airplane"><%= translated("Refresh Offline Models") %></button>
                 </div>
               </div>
             </div>
@@ -297,14 +297,14 @@
               <% end %>
             </datalist>
           </form>
-          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_ai"><%= translated("Save") %></button><button class="secondary" type="button" phx-click="reset_settings_ai_prompt"><%= translated("Reset to Default") %></button></div>
+          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_ai" phx-target={@myself}><%= translated("Save") %></button><button class="secondary" type="button" phx-click="reset_settings_ai_prompt" phx-target={@myself}><%= translated("Reset to Default") %></button></div>
         </div>
       <% end %>
 
       <%= if @settings_editor.technology_visible? do %>
         <div class="setting-section" id="settings-section-technology">
           <div class="setting-section-header"><h3><%= translated("Technology") %></h3><p class="setting-section-description"><%= translated("Application-level runtime behavior and semantic indexing") %></p></div>
-          <form class="setting-section-content" phx-change="change_settings_project">
+          <form class="setting-section-content" phx-change="change_settings_project" phx-target={@myself}>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= translated("Semantic Similarity") %></label></div>
               <div class="setting-control"><label><input type="checkbox" name="settings_project[semantic_similarity_enabled]" checked={@settings_editor.technology["semantic_similarity_enabled"]} /> <%= translated("Enable duplicate search and related-post embeddings") %></label></div>
@@ -314,20 +314,20 @@
               <div class="setting-control"><p class="setting-description"><%= translated("Scripting capabilities are configured at the application layer in the rewrite and do not expose runtime switching here.") %></p></div>
             </div>
           </form>
-          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_project"><%= translated("Save") %></button></div>
+          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_project" phx-target={@myself}><%= translated("Save") %></button></div>
         </div>
       <% end %>
 
       <%= if @settings_editor.publishing_visible? do %>
         <div class="setting-section" id="settings-section-publishing">
           <div class="setting-section-header"><h3><%= translated("Publishing") %></h3><p class="setting-section-description"><%= translated("Deployment credentials for upload tasks") %></p></div>
-          <form class="setting-section-content" phx-change="change_settings_publishing">
+          <form class="setting-section-content" phx-change="change_settings_publishing" phx-target={@myself}>
             <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= translated("SSH Mode") %></label></div><div class="setting-control"><select name="settings_publishing[ssh_mode]"><option value="scp" selected={@settings_editor.publishing["ssh_mode"] == "scp"}>scp</option><option value="rsync" selected={@settings_editor.publishing["ssh_mode"] == "rsync"}>rsync</option></select></div></div>
             <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= translated("Host") %></label></div><div class="setting-control"><input type="text" name="settings_publishing[ssh_host]" value={@settings_editor.publishing["ssh_host"]} /></div></div>
             <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= translated("Username") %></label></div><div class="setting-control"><input type="text" name="settings_publishing[ssh_user]" value={@settings_editor.publishing["ssh_user"]} /></div></div>
             <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= translated("Remote Path") %></label></div><div class="setting-control"><input type="text" name="settings_publishing[ssh_remote_path]" value={@settings_editor.publishing["ssh_remote_path"]} /></div></div>
           </form>
-          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_publishing"><%= translated("Save") %></button><button class="secondary" type="button" phx-click="clear_settings_publishing"><%= translated("Clear") %></button></div>
+          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_publishing" phx-target={@myself}><%= translated("Save") %></button><button class="secondary" type="button" phx-click="clear_settings_publishing" phx-target={@myself}><%= translated("Clear") %></button></div>
         </div>
       <% end %>
 
@@ -342,7 +342,7 @@
                   <p class="setting-description"><%= agent.config_path || translated("Not supported in the rewrite yet") %></p>
                 </div>
                 <div class="setting-control">
-                  <button class="secondary" type="button" phx-click="toggle_settings_mcp_agent" phx-value-agent={agent.id} disabled={not agent.supported?}>
+                  <button class="secondary" type="button" phx-click="toggle_settings_mcp_agent" phx-target={@myself} phx-value-agent={agent.id} disabled={not agent.supported?}>
                     <%= if agent.configured?, do: translated("Remove"), else: translated("Add") %>
                   </button>
                 </div>

@@ -1200,7 +1200,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ "Anthropic / Online API Key"
 
     _html =
-      render_change(view, "change_settings_ai", %{
+      view
+      |> element("#settings-editor-shell form[phx-change='change_settings_ai']")
+      |> render_change(%{
         "settings_ai" => %{
           "online_url" => "https://api.example.test/v1",
           "online_api_key" => "online-secret",
@@ -1221,7 +1223,10 @@ defmodule BDS.Desktop.ShellLiveTest do
         }
       })
 
-    _html = render_click(view, "save_settings_ai")
+    _html =
+      view
+      |> element("#settings-editor-shell button[phx-click='save_settings_ai']")
+      |> render_click()
 
     assert {:ok, online_endpoint} = AI.get_endpoint(:online)
     assert online_endpoint.url == "https://api.example.test/v1"
@@ -1268,7 +1273,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Refresh Offline Models"
 
     _html =
-      render_change(view, "change_settings_ai", %{
+      view
+      |> element("#settings-editor-shell form[phx-change='change_settings_ai']")
+      |> render_change(%{
         "settings_ai" => %{
           "online_url" => "https://api.example.test/v1",
           "offline_url" => "http://localhost:11434/v1"
@@ -1277,7 +1284,7 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     html =
       view
-      |> element("button[phx-click='refresh_settings_ai_models'][phx-value-endpoint='online']")
+      |> element("#settings-editor-shell button[phx-click='refresh_settings_ai_models'][phx-value-endpoint='online']")
       |> render_click()
 
     assert html =~ ~s(<option value="gpt-4.1"></option>)
@@ -1285,7 +1292,7 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     html =
       view
-      |> element("button[phx-click='refresh_settings_ai_models'][phx-value-endpoint='airplane']")
+      |> element("#settings-editor-shell button[phx-click='refresh_settings_ai_models'][phx-value-endpoint='airplane']")
       |> render_click()
 
     assert html =~ ~s(<option value="llama3.3"></option>)

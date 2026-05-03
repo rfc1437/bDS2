@@ -6,7 +6,7 @@
 
   <div class="style-theme-picker" role="group" aria-label={translated("Theme picker")}>
     <%= for theme <- @style_editor.themes do %>
-      <button type="button" class={["style-theme-option", if(theme.name == @style_editor.selected_theme, do: "selected")]} phx-click="select_style_theme" phx-value-theme={theme.name} aria-pressed={theme.name == @style_editor.selected_theme}>
+      <button type="button" class={["style-theme-option", if(theme.name == @style_editor.selected_theme, do: "selected")]} phx-click="select_style_theme" phx-target={@myself} phx-value-theme={theme.name} aria-pressed={theme.name == @style_editor.selected_theme}>
         <span class="style-theme-swatch">
           <span class="style-theme-tones" aria-hidden="true">
             <span class="style-theme-tone style-theme-tone-accent" style={"background: linear-gradient(135deg, #{theme.accent_color}, #{theme.dark_bg_color})"}></span>
@@ -22,13 +22,13 @@
   <div class="style-apply-row">
     <label class="style-preview-mode-control">
       <span><%= translated("Preview Mode") %></span>
-      <select phx-change="change_style_preview_mode" name="mode">
+      <select phx-change="change_style_preview_mode" phx-target={@myself} name="mode">
         <option value="auto" selected={@style_editor.preview_mode == "auto"}><%= translated("Auto") %></option>
         <option value="light" selected={@style_editor.preview_mode == "light"}><%= translated("Light") %></option>
         <option value="dark" selected={@style_editor.preview_mode == "dark"}><%= translated("Dark") %></option>
       </select>
     </label>
-    <button class="primary" type="button" phx-click="apply_style_theme" disabled={@style_editor.selected_theme == @style_editor.applied_theme}><%= translated("Apply Theme") %></button>
+    <button class="primary" type="button" phx-click="apply_style_theme" phx-target={@myself} disabled={@style_editor.selected_theme == @style_editor.applied_theme}><%= translated("Apply Theme") %></button>
   </div>
 
   <div class="style-preview-container">

@@ -172,16 +172,9 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:media_editor_drafts, %{})
      |> assign(:media_editor_quick_actions_open, %{})
      |> assign(:media_editor_post_pickers_open, %{})
-     |> assign(:media_editor_post_picker_queries, %{})
-     |> assign(:media_editor_save_states, %{})
-     |> assign(:media_editor_translation_forms, %{})
-     |> assign(:settings_editor_search, "")
-     |> assign(:settings_editor_project_draft, %{})
-     |> assign(:settings_editor_endpoint_models, %{})
-     |> assign(:settings_editor_publishing_draft, %{})
-     |> assign(:settings_editor_new_category, "")
-      |> assign(:style_editor_theme, nil)
-      |> assign(:style_editor_preview_mode, "auto")
+      |> assign(:media_editor_post_picker_queries, %{})
+      |> assign(:media_editor_save_states, %{})
+      |> assign(:media_editor_translation_forms, %{})
       |> assign(:script_editor_drafts, %{})
      |> assign(:template_editor_drafts, %{})
      |> assign(:chat_editor_inputs, %{})
@@ -530,107 +523,8 @@ defmodule BDS.Desktop.ShellLive do
     end
   end
 
-  def handle_event("change_settings_search", %{"query" => query}, socket) do
-    {:noreply, SettingsEditor.update_search(socket, query, &reload_shell/2)}
-  end
-
-  def handle_event("change_settings_project", %{"settings_project" => params}, socket) do
-    {:noreply, SettingsEditor.update_project_draft(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("change_settings_editor", %{"settings_editor" => params}, socket) do
-    {:noreply, SettingsEditor.update_editor_draft(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("save_settings_editor", _params, socket) do
-    {:noreply, SettingsEditor.save_editor(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("save_settings_project", _params, socket) do
-    {:noreply, SettingsEditor.save_project(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("change_settings_publishing", %{"settings_publishing" => params}, socket) do
-    {:noreply, SettingsEditor.update_publishing_draft(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("change_settings_ai", %{"settings_ai" => params}, socket) do
-    {:noreply, SettingsEditor.update_ai_draft(socket, params, &reload_shell/2)}
-  end
-
-  def handle_event("refresh_settings_ai_models", %{"endpoint" => endpoint}, socket) do
-    case BoundedAtoms.ai_endpoint(endpoint) do
-      nil ->
-        {:noreply, reload_shell(socket, socket.assigns.workbench)}
-
-      endpoint_key ->
-        {:noreply,
-         SettingsEditor.refresh_ai_models(
-           socket,
-           endpoint_key,
-           &reload_shell/2,
-           &append_output_entry/5
-         )}
-    end
-  end
-
-  def handle_event("save_settings_ai", _params, socket) do
-    {:noreply, SettingsEditor.save_ai(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("reset_settings_ai_prompt", _params, socket) do
-    {:noreply, SettingsEditor.reset_ai_prompt(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("save_settings_publishing", _params, socket) do
-    {:noreply, SettingsEditor.save_publishing(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("clear_settings_publishing", _params, socket) do
-    {:noreply, SettingsEditor.clear_publishing(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("change_settings_new_category", %{"name" => name}, socket) do
-    {:noreply, SettingsEditor.update_new_category(socket, name, &reload_shell/2)}
-  end
-
-  def handle_event("add_settings_category", _params, socket) do
-    {:noreply, SettingsEditor.add_category(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("reset_settings_categories", _params, socket) do
-    {:noreply, SettingsEditor.reset_categories(socket, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("save_settings_category", %{"category_settings" => params}, socket) do
-    {:noreply,
-     SettingsEditor.save_category(socket, params, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("remove_settings_category", %{"category" => category}, socket) do
-    {:noreply,
-     SettingsEditor.remove_category(socket, category, &reload_shell/2, &append_output_entry/5)}
-  end
-
   def handle_event("settings_shell_command", %{"action" => action}, socket) do
     {:noreply, apply_shell_command(socket, action)}
-  end
-
-  def handle_event("toggle_settings_mcp_agent", %{"agent" => agent}, socket) do
-    {:noreply,
-     SettingsEditor.toggle_mcp_agent(socket, agent, &reload_shell/2, &append_output_entry/5)}
-  end
-
-  def handle_event("select_style_theme", %{"theme" => theme}, socket) do
-    {:noreply, SettingsEditor.select_style_theme(socket, theme, &reload_shell/2)}
-  end
-
-  def handle_event("change_style_preview_mode", %{"mode" => mode}, socket) do
-    {:noreply, SettingsEditor.change_style_preview_mode(socket, mode, &reload_shell/2)}
-  end
-
-  def handle_event("apply_style_theme", _params, socket) do
-    {:noreply, SettingsEditor.apply_style_theme(socket, &reload_shell/2, &append_output_entry/5)}
   end
 
   def handle_event("menu_editor_select_item", %{"item_id" => item_id}, socket) do
@@ -1451,6 +1345,14 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, reload_shell(socket, socket.assigns.workbench)}
   end
 
+  def handle_info({:settings_output, title, message, level}, socket) do
+    {:noreply, append_output_entry(socket, title, message, nil, level)}
+  end
+
+  def handle_info(:settings_changed, socket) do
+    {:noreply, reload_shell(socket, socket.assigns.workbench)}
+  end
+
   @impl true
   def render(assigns) do
     UILocale.put(assigns.page_language)
@@ -1521,7 +1423,6 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:current_tab, current_tab(workbench))
     |> assign_post_editor()
     |> assign_media_editor()
-    |> assign_settings_editor()
     |> assign_menu_editor()
     |> assign_code_entity_editor()
     |> assign_chat_editor()
@@ -1574,10 +1475,6 @@ defmodule BDS.Desktop.ShellLive do
 
   defp assign_media_editor(socket) do
     MediaEditor.assign_socket(socket)
-  end
-
-  defp assign_settings_editor(socket) do
-    SettingsEditor.assign_socket(socket)
   end
 
   defp assign_menu_editor(socket) do
@@ -1756,7 +1653,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :settings}}} = socket) do
-    SettingsEditor.save_project(socket, &reload_shell/2, &append_output_entry/5)
+    send_update(SettingsEditor, id: "settings-editor", action: :save_project)
+    socket
   end
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :menu_editor}}} = socket) do

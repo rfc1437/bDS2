@@ -1,7 +1,7 @@
 defmodule BDS.Desktop.ShellLive.SettingsEditor do
   @moduledoc false
 
-  use Phoenix.Component
+  use Phoenix.LiveComponent
 
   import Ecto.Query
 
@@ -22,57 +22,188 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
   @settings_sections ~w(project editor content ai technology publishing data mcp)
   @supported_languages ["en", "de", "fr", "it", "es"]
 
-  defdelegate update_project_draft(socket, params, reload), to: ProjectSettings
-  defdelegate save_project(socket, reload, append_output), to: ProjectSettings
-  defdelegate update_editor_draft(socket, params, reload), to: EditorSettings
-  defdelegate save_editor(socket, reload, append_output), to: EditorSettings
-  defdelegate update_publishing_draft(socket, params, reload), to: PublishingSettings
-  defdelegate save_publishing(socket, reload, append_output), to: PublishingSettings
-  defdelegate clear_publishing(socket, reload, append_output), to: PublishingSettings
-  defdelegate update_ai_draft(socket, params, reload), to: AISettings
-  defdelegate refresh_ai_models(socket, endpoint_key, reload, append_output), to: AISettings
-  defdelegate save_ai(socket, reload, append_output), to: AISettings
-  defdelegate reset_ai_prompt(socket, reload, append_output), to: AISettings
-  defdelegate update_new_category(socket, name, reload), to: ManagedCategories
-  defdelegate add_category(socket, reload, append_output), to: ManagedCategories
-  defdelegate reset_categories(socket, reload, append_output), to: ManagedCategories
-  defdelegate save_category(socket, params, reload, append_output), to: ManagedCategories
-  defdelegate remove_category(socket, category, reload, append_output), to: ManagedCategories
-  defdelegate toggle_mcp_agent(socket, agent, reload, append_output), to: MCPConfig
-  defdelegate select_style_theme(socket, theme, reload), to: StyleEditor
-  defdelegate change_style_preview_mode(socket, mode, reload), to: StyleEditor
-  defdelegate apply_style_theme(socket, reload, append_output), to: StyleEditor
   defdelegate theme_display_name(theme), to: StyleEditor
   defdelegate protected_category?(category), to: ManagedCategories
 
-  @spec assign_socket(term()) :: term()
-  def assign_socket(socket) do
-    case socket.assigns[:current_tab] do
-      %{type: :settings} ->
-        socket
-        |> assign(:settings_editor, build_settings(socket.assigns))
-        |> assign(:style_editor, nil)
+  @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def update(%{action: :save_project} = assigns, socket) do
+    socket = assign(socket, Map.drop(assigns, [:action]))
+    socket = ProjectSettings.save_project(socket, reload_callback(), append_output_callback())
+    {:ok, socket}
+  end
 
-      %{type: :style} ->
-        socket
-        |> assign(:settings_editor, nil)
-        |> assign(:style_editor, StyleEditor.build_style(socket.assigns))
+  def update(assigns, socket) do
+    socket =
+      socket
+      |> assign(assigns)
+      |> initialize_state()
+      |> build_data()
 
-      _other ->
-        socket
-        |> assign(:settings_editor, nil)
-        |> assign(:style_editor, nil)
+    {:ok, socket}
+  end
+
+  @spec render(map()) :: Phoenix.LiveView.Rendered.t()
+  @impl true
+  def render(assigns) do
+    case assigns.current_tab do
+      %{type: :settings} -> settings_editor(assigns)
+      %{type: :style} -> style_editor(assigns)
+      _other -> ~H""
     end
   end
 
-  @spec update_search(term(), term(), term()) :: term()
-  def update_search(socket, query, reload) do
-    socket
-    |> assign(:settings_editor_search, to_string(query || ""))
-    |> reload.(socket.assigns.workbench)
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  @impl true
+  def handle_event("change_settings_search", %{"query" => query}, socket) do
+    socket =
+      socket
+      |> assign(:settings_editor_search, to_string(query || ""))
+      |> build_data()
+
+    {:noreply, socket}
   end
 
-  @spec build_settings(term()) :: term()
+  def handle_event("change_settings_project", %{"settings_project" => params}, socket) do
+    {:noreply, ProjectSettings.update_project_draft(socket, params, reload_callback())}
+  end
+
+  def handle_event("change_settings_editor", %{"settings_editor" => params}, socket) do
+    {:noreply, EditorSettings.update_editor_draft(socket, params, reload_callback())}
+  end
+
+  def handle_event("save_settings_editor", _params, socket) do
+    {:noreply, EditorSettings.save_editor(socket, reload_callback(), append_output_callback())}
+  end
+
+  def handle_event("save_settings_project", _params, socket) do
+    socket = ProjectSettings.save_project(socket, reload_callback(), append_output_callback())
+    notify_parent(:settings_changed)
+    {:noreply, socket}
+  end
+
+  def handle_event("change_settings_publishing", %{"settings_publishing" => params}, socket) do
+    {:noreply, PublishingSettings.update_publishing_draft(socket, params, reload_callback())}
+  end
+
+  def handle_event("change_settings_ai", %{"settings_ai" => params}, socket) do
+    {:noreply, AISettings.update_ai_draft(socket, params, reload_callback())}
+  end
+
+  def handle_event("refresh_settings_ai_models", %{"endpoint" => endpoint}, socket) do
+    case BDS.BoundedAtoms.ai_endpoint(endpoint) do
+      nil ->
+        {:noreply, build_data(socket)}
+
+      endpoint_key ->
+        {:noreply,
+         AISettings.refresh_ai_models(
+           socket,
+           endpoint_key,
+           reload_callback(),
+           append_output_callback()
+         )}
+    end
+  end
+
+  def handle_event("save_settings_ai", _params, socket) do
+    socket = AISettings.save_ai(socket, reload_callback(), append_output_callback())
+    notify_parent(:settings_changed)
+    {:noreply, socket}
+  end
+
+  def handle_event("reset_settings_ai_prompt", _params, socket) do
+    {:noreply, AISettings.reset_ai_prompt(socket, reload_callback(), append_output_callback())}
+  end
+
+  def handle_event("save_settings_publishing", _params, socket) do
+    socket = PublishingSettings.save_publishing(socket, reload_callback(), append_output_callback())
+    notify_parent(:settings_changed)
+    {:noreply, socket}
+  end
+
+  def handle_event("clear_settings_publishing", _params, socket) do
+    {:noreply, PublishingSettings.clear_publishing(socket, reload_callback(), append_output_callback())}
+  end
+
+  def handle_event("change_settings_new_category", %{"name" => name}, socket) do
+    {:noreply, ManagedCategories.update_new_category(socket, name, reload_callback())}
+  end
+
+  def handle_event("add_settings_category", _params, socket) do
+    socket = ManagedCategories.add_category(socket, reload_callback(), append_output_callback())
+    notify_parent(:settings_changed)
+    {:noreply, socket}
+  end
+
+  def handle_event("reset_settings_categories", _params, socket) do
+    socket = ManagedCategories.reset_categories(socket, reload_callback(), append_output_callback())
+    notify_parent(:settings_changed)
+    {:noreply, socket}
+  end
+
+  def handle_event("save_settings_category", %{"category_settings" => params}, socket) do
+    socket = ManagedCategories.save_category(socket, params, reload_callback(), append_output_callback())
+    notify_parent(:settings_changed)
+    {:noreply, socket}
+  end
+
+  def handle_event("remove_settings_category", %{"category" => category}, socket) do
+    socket = ManagedCategories.remove_category(socket, category, reload_callback(), append_output_callback())
+    notify_parent(:settings_changed)
+    {:noreply, socket}
+  end
+
+  def handle_event("toggle_settings_mcp_agent", %{"agent" => agent}, socket) do
+    socket = MCPConfig.toggle_mcp_agent(socket, agent, reload_callback(), append_output_callback())
+    notify_parent(:settings_changed)
+    {:noreply, socket}
+  end
+
+  def handle_event("select_style_theme", %{"theme" => theme}, socket) do
+    {:noreply, StyleEditor.select_style_theme(socket, theme, reload_callback())}
+  end
+
+  def handle_event("change_style_preview_mode", %{"mode" => mode}, socket) do
+    {:noreply, StyleEditor.change_style_preview_mode(socket, mode, reload_callback())}
+  end
+
+  def handle_event("apply_style_theme", _params, socket) do
+    socket = StyleEditor.apply_style_theme(socket, reload_callback(), append_output_callback())
+    notify_parent(:settings_changed)
+    {:noreply, socket}
+  end
+
+  defp initialize_state(socket) do
+    defaults = %{
+      settings_editor_search: "",
+      settings_editor_project_draft: %{},
+      settings_editor_editor_draft: %{},
+      settings_editor_ai_draft: %{},
+      settings_editor_publishing_draft: %{},
+      settings_editor_new_category: "",
+      settings_editor_endpoint_models: %{},
+      style_editor_theme: nil,
+      style_editor_preview_mode: "auto"
+    }
+
+    Enum.reduce(defaults, socket, fn {key, default}, acc ->
+      if is_nil(Map.get(acc.assigns, key)) do
+        assign(acc, key, default)
+      else
+        acc
+      end
+    end)
+  end
+
+  defp build_data(socket) do
+    socket
+    |> assign(:settings_editor, build_settings(socket.assigns))
+    |> assign(:style_editor, build_style(socket.assigns))
+  end
+
+  @spec build_settings(map()) :: term()
   def build_settings(%{projects: %{active_project_id: nil}}), do: nil
 
   def build_settings(assigns) do
@@ -148,9 +279,27 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
     }
   end
 
-  @spec translated(term(), term()) :: term()
-  def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+  @spec build_style(map()) :: term()
+  def build_style(%{projects: %{active_project_id: nil}}), do: nil
+
+  def build_style(assigns) do
+    StyleEditor.build_style(assigns)
+  end
+
+  defp reload_callback do
+    fn socket, _workbench -> build_data(socket) end
+  end
+
+  defp append_output_callback do
+    fn socket, title, message, _details, level ->
+      send(self(), {:settings_output, title, message, level})
+      socket
+    end
+  end
+
+  defp notify_parent(message) do
+    send(self(), message)
+  end
 
   defp current_settings_section(assigns) do
     meta = current_tab_meta(assigns)
@@ -236,4 +385,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
 
   defp section_matches?(query, keywords),
     do: Enum.any?(keywords, &String.contains?(&1, String.downcase(query)))
+
+  @spec translated(term(), term()) :: term()
+  def translated(text, bindings \\ %{}),
+    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end
