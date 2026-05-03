@@ -7,28 +7,28 @@
         "status-#{@template_editor.status}"
       ]} data-testid="template-status-badge"><%= BDS.Desktop.ShellData.dashboard_status_label(@template_editor.status) %></span>
       <%= if @template_editor.can_publish? do %>
-        <button class="success" data-testid="template-publish-button" type="button" phx-click="publish_template_editor" phx-target={@myself}><%= BDS.Desktop.ShellData.translate("Publish", %{}, BDS.Desktop.UILocale.current()) %></button>
+        <button class="success" data-testid="template-publish-button" type="button" phx-click="publish_template_editor" phx-target={@myself}><%= dgettext("ui", "Publish") %></button>
       <% end %>
-      <button class="secondary templates-save-button" type="button" phx-click="save_template_editor" phx-target={@myself}><%= BDS.Desktop.ShellData.translate("Save", %{}, BDS.Desktop.UILocale.current()) %></button>
-      <button class="secondary templates-validate-button" type="button" phx-click="validate_template_editor" phx-target={@myself}><%= BDS.Desktop.ShellData.translate("Validate", %{}, BDS.Desktop.UILocale.current()) %></button>
-      <button class="secondary danger" type="button" phx-click="delete_template_editor" phx-target={@myself}><%= BDS.Desktop.ShellData.translate("Delete", %{}, BDS.Desktop.UILocale.current()) %></button>
+      <button class="secondary templates-save-button" type="button" phx-click="save_template_editor" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
+      <button class="secondary templates-validate-button" type="button" phx-click="validate_template_editor" phx-target={@myself}><%= dgettext("ui", "Validate") %></button>
+      <button class="secondary danger" type="button" phx-click="delete_template_editor" phx-target={@myself}><%= dgettext("ui", "Delete") %></button>
     </div>
   </div>
   <form class="editor-content templates-view" phx-change="change_template_editor" phx-target={@myself}>
     <div class="editor-header-row templates-meta-row">
       <div class="editor-meta">
         <div class="editor-field-row">
-          <div class="editor-field"><label><%= BDS.Desktop.ShellData.translate("Title", %{}, BDS.Desktop.UILocale.current()) %></label><input type="text" name="template_editor[title]" value={@template_editor.title} /></div>
-          <div class="editor-field"><label><%= BDS.Desktop.ShellData.translate("Slug", %{}, BDS.Desktop.UILocale.current()) %></label><input type="text" name="template_editor[slug]" value={@template_editor.slug} /></div>
+          <div class="editor-field"><label><%= dgettext("ui", "Title") %></label><input type="text" name="template_editor[title]" value={@template_editor.title} /></div>
+          <div class="editor-field"><label><%= dgettext("ui", "Slug") %></label><input type="text" name="template_editor[slug]" value={@template_editor.slug} /></div>
         </div>
         <div class="editor-field-row">
-          <div class="editor-field"><label><%= BDS.Desktop.ShellData.translate("Kind", %{}, BDS.Desktop.UILocale.current()) %></label><select name="template_editor[kind]"><option value="post" selected={@template_editor.kind == :post or @template_editor.kind == "post"}>post</option><option value="list" selected={@template_editor.kind == :list or @template_editor.kind == "list"}>list</option><option value="not-found" selected={@template_editor.kind == :"not-found" or @template_editor.kind == "not-found"}>not-found</option><option value="partial" selected={@template_editor.kind == :partial or @template_editor.kind == "partial"}>partial</option></select></div>
-          <div class="editor-field templates-enabled-field"><label><input type="checkbox" name="template_editor[enabled]" checked={@template_editor.enabled} /> <%= BDS.Desktop.ShellData.translate("Enabled", %{}, BDS.Desktop.UILocale.current()) %></label></div>
+          <div class="editor-field"><label><%= dgettext("ui", "Kind") %></label><select name="template_editor[kind]"><option value="post" selected={@template_editor.kind == :post or @template_editor.kind == "post"}>post</option><option value="list" selected={@template_editor.kind == :list or @template_editor.kind == "list"}>list</option><option value="not-found" selected={@template_editor.kind == :"not-found" or @template_editor.kind == "not-found"}>not-found</option><option value="partial" selected={@template_editor.kind == :partial or @template_editor.kind == "partial"}>partial</option></select></div>
+          <div class="editor-field templates-enabled-field"><label><input type="checkbox" name="template_editor[enabled]" checked={@template_editor.enabled} /> <%= dgettext("ui", "Enabled") %></label></div>
         </div>
       </div>
     </div>
     <div class="editor-body templates-editor">
-      <div class="editor-toolbar templates-toolbar"><div class="editor-toolbar-left"><label><%= BDS.Desktop.ShellData.translate("Content", %{}, BDS.Desktop.UILocale.current()) %></label></div></div>
+      <div class="editor-toolbar templates-toolbar"><div class="editor-toolbar-left"><label><%= dgettext("ui", "Content") %></label></div></div>
       <div
         id={"template-editor-monaco-shell-#{@template_editor.id}"}
         class="templates-monaco monaco-editor-shell"
@@ -42,6 +42,6 @@
         <textarea id={"template-editor-content-#{@template_editor.id}"} class="monaco-editor-input code-editor-textarea" name="template_editor[content]" spellcheck="false"><%= @template_editor.content %></textarea>
       </div>
     </div>
-    <div class="editor-footer"><span class="text-muted text-small"><%= BDS.Desktop.ShellData.translate("Created", %{}, BDS.Desktop.UILocale.current()) %>: <%= BDS.Persistence.timestamp_to_iso8601(@template_editor.created_at) %></span><span class="text-muted text-small"><%= BDS.Desktop.ShellData.translate("Updated", %{}, BDS.Desktop.UILocale.current()) %>: <%= BDS.Persistence.timestamp_to_iso8601(@template_editor.updated_at) %></span></div>
+    <div class="editor-footer"><span class="text-muted text-small"><%= dgettext("ui", "Created") %>: <%= BDS.Persistence.timestamp_to_iso8601(@template_editor.created_at) %></span><span class="text-muted text-small"><%= dgettext("ui", "Updated") %>: <%= BDS.Persistence.timestamp_to_iso8601(@template_editor.updated_at) %></span></div>
   </form>
 </div>

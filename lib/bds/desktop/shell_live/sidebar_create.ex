@@ -1,11 +1,12 @@
 defmodule BDS.Desktop.ShellLive.SidebarCreate do
   @moduledoc false
 
-  alias BDS.Desktop.{FilePicker, ShellData}
+  alias BDS.Desktop.{FilePicker}
   alias BDS.AI
   alias BDS.ImportDefinitions
   alias BDS.Scripts
   alias BDS.Templates
+  use Gettext, backend: BDS.Gettext
 
   @doc """
   Create a new sidebar item of the given kind for the active project.
@@ -35,13 +36,13 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
 
       {:error, reason} ->
         socket
-        |> callbacks.append_output.(translated("sidebar.newPost"), inspect(reason), nil, "error")
+        |> callbacks.append_output.(dgettext("ui", "New Post"), inspect(reason), nil, "error")
         |> callbacks.reload.(socket.assigns.workbench)
     end
   end
 
   def create(socket, project_id, "media", callbacks) do
-    case FilePicker.choose_file(translated("sidebar.importMedia")) do
+    case FilePicker.choose_file(dgettext("ui", "Import media")) do
       {:ok, source_path} ->
         case BDS.Media.import_media(%{project_id: project_id, source_path: source_path}) do
           {:ok, _media} ->
@@ -50,7 +51,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
           {:error, reason} ->
             socket
             |> callbacks.append_output.(
-              translated("sidebar.importMedia"),
+              dgettext("ui", "Import media"),
               inspect(reason),
               nil,
               "error"
@@ -63,7 +64,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
 
       {:error, %{message: message}} ->
         socket
-        |> callbacks.append_output.(translated("sidebar.importMedia"), message, nil, "error")
+        |> callbacks.append_output.(dgettext("ui", "Import media"), message, nil, "error")
         |> callbacks.reload.(socket.assigns.workbench)
     end
   end
@@ -71,7 +72,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
   def create(socket, project_id, "script", callbacks) do
     case Scripts.create_script(%{
            project_id: project_id,
-           title: translated("sidebar.scripts.newScript"),
+           title: dgettext("ui", "New Script"),
            kind: :utility,
            content: "print(\"new script\")",
            entrypoint: "main",
@@ -92,7 +93,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
       {:error, reason} ->
         socket
         |> callbacks.append_output.(
-          translated("sidebar.scripts.newScript"),
+          dgettext("ui", "New Script"),
           inspect(reason),
           nil,
           "error"
@@ -104,7 +105,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
   def create(socket, project_id, "template", callbacks) do
     case Templates.create_template(%{
            project_id: project_id,
-           title: translated("sidebar.templates.newTemplate"),
+           title: dgettext("ui", "New Template"),
            kind: :post,
            content: "",
            enabled: true
@@ -124,7 +125,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
       {:error, reason} ->
         socket
         |> callbacks.append_output.(
-          translated("sidebar.templates.newTemplate"),
+          dgettext("ui", "New Template"),
           inspect(reason),
           nil,
           "error"
@@ -149,7 +150,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
 
       {:error, reason} ->
         socket
-        |> callbacks.append_output.(translated("chat.newChat"), inspect(reason), nil, "error")
+        |> callbacks.append_output.(dgettext("ui", "New Chat"), inspect(reason), nil, "error")
         |> callbacks.reload.(socket.assigns.workbench)
     end
   end
@@ -157,7 +158,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
   def create(socket, project_id, "import", callbacks) do
     case ImportDefinitions.create_definition(%{
            project_id: project_id,
-           name: translated("sidebar.import.newDefinition")
+           name: dgettext("ui", "New Import Definition")
          }) do
       {:ok, definition} ->
         callbacks.open_sidebar.(
@@ -174,7 +175,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
       {:error, reason} ->
         socket
         |> callbacks.append_output.(
-          translated("sidebar.import.newDefinition"),
+          dgettext("ui", "New Import Definition"),
           inspect(reason),
           nil,
           "error"
@@ -193,6 +194,4 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
   def action(:chat), do: %{kind: "chat", label: "chat.newChat"}
   def action(:import), do: %{kind: "import", label: "sidebar.import.newDefinition"}
   def action(_view), do: nil
-
-  defp translated(text), do: ShellData.translate(text, %{}, BDS.Desktop.UILocale.current())
 end

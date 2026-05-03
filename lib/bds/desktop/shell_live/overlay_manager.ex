@@ -7,7 +7,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
   import Phoenix.LiveView, only: [send_update: 2]
 
   alias BDS.{AI, Media, Metadata}
-  alias BDS.Desktop.{Overlay, ShellData, UILocale}
+  alias BDS.Desktop.{Overlay}
 
   alias BDS.Desktop.ShellLive.{
     MediaEditor,
@@ -16,6 +16,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
   }
 
   alias BDS.Desktop.ShellLive.OverlayComponents, as: ShellOverlayComponents
+  use Gettext, backend: BDS.Gettext
 
   # ── Event handlers ─────────────────────────────────────────────────────────
 
@@ -67,8 +68,8 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
         if socket.assigns.offline_mode do
           callbacks.append_output.(
             socket,
-            translated("AI Suggestions"),
-            translated("Automatic AI actions stay gated by airplane mode."),
+            dgettext("ui", "AI Suggestions"),
+            dgettext("ui", "Automatic AI actions stay gated by airplane mode."),
             nil,
             "info"
           )
@@ -265,7 +266,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
               socket
               |> assign(:shell_overlay, nil)
               |> callbacks.append_output.(
-                translated("Delete Media"),
+                dgettext("ui", "Delete Media"),
                 inspect(reason),
                 nil,
                 "error"
@@ -392,7 +393,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
         ) :: Phoenix.LiveView.Socket.t()
   defp close_overlay_with_output(socket, append_output, title, details) do
     socket
-    |> append_output.(title, translated("Command completed"), details, "info")
+    |> append_output.(title, dgettext("ui", "Command completed"), details, "info")
     |> assign(:shell_overlay, nil)
   end
 
@@ -444,7 +445,4 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
     _error -> "en"
   end
 
-  @spec translated(String.t(), map()) :: String.t()
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, UILocale.current())
 end

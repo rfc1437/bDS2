@@ -2,6 +2,7 @@ defmodule BDS.UI.Sidebar do
   @moduledoc false
 
   import Ecto.Query
+  use Gettext, backend: BDS.Gettext
 
   alias BDS.AI.ChatConversation
   alias BDS.ImportDefinitions
@@ -29,8 +30,8 @@ defmodule BDS.UI.Sidebar do
       "chat" => view(project_id, "chat"),
       "import" =>
         entity_list_view(
-          "Import",
-          "Import definitions",
+          dgettext("ui", "Import"),
+          dgettext("ui", "Import definitions"),
           "import",
           list_import_definitions(project_id)
         ),
@@ -57,21 +58,36 @@ defmodule BDS.UI.Sidebar do
         media_view(project_id, params)
 
       "scripts" ->
-        entity_list_view("Scripts", "Automation helpers", "scripts", list_scripts(project_id))
+        entity_list_view(
+          dgettext("ui", "Scripts"),
+          dgettext("ui", "Automation helpers"),
+          "scripts",
+          list_scripts(project_id)
+        )
 
       "templates" ->
-        entity_list_view("Templates", "Site rendering", "templates", list_templates(project_id))
+        entity_list_view(
+          dgettext("ui", "Templates"),
+          dgettext("ui", "Site rendering"),
+          "templates",
+          list_templates(project_id)
+        )
 
       "tags" ->
         tags_nav_view(list_tags(project_id))
 
       "chat" ->
-        entity_list_view("Chat", "AI conversations", "chat", list_conversations())
+        entity_list_view(
+          dgettext("ui", "Chat"),
+          dgettext("ui", "AI conversations"),
+          "chat",
+          list_conversations()
+        )
 
       "import" ->
         entity_list_view(
-          "Import",
-          "Import definitions",
+          dgettext("ui", "Import"),
+          dgettext("ui", "Import definitions"),
           "import",
           list_import_definitions(project_id)
         )
@@ -92,11 +108,35 @@ defmodule BDS.UI.Sidebar do
       "posts" => empty_view("posts"),
       "pages" => empty_view("pages"),
       "media" => empty_view("media"),
-      "scripts" => entity_list_view("Scripts", "Automation helpers", "scripts", []),
-      "templates" => entity_list_view("Templates", "Site rendering", "templates", []),
+      "scripts" =>
+        entity_list_view(
+          dgettext("ui", "Scripts"),
+          dgettext("ui", "Automation helpers"),
+          "scripts",
+          []
+        ),
+      "templates" =>
+        entity_list_view(
+          dgettext("ui", "Templates"),
+          dgettext("ui", "Site rendering"),
+          "templates",
+          []
+        ),
       "tags" => tags_nav_view([]),
-      "chat" => entity_list_view("Chat", "AI conversations", "chat", []),
-      "import" => entity_list_view("Import", "Import definitions", "import", []),
+      "chat" =>
+        entity_list_view(
+          dgettext("ui", "Chat"),
+          dgettext("ui", "AI conversations"),
+          "chat",
+          []
+        ),
+      "import" =>
+        entity_list_view(
+          dgettext("ui", "Import"),
+          dgettext("ui", "Import definitions"),
+          "import",
+          []
+        ),
       "git" => git_view(),
       "settings" => settings_nav_view()
     }
@@ -105,19 +145,56 @@ defmodule BDS.UI.Sidebar do
   defp empty_view("posts"), do: posts_view_data([], [], %{}, false, empty_filter_params(), %{})
   defp empty_view("pages"), do: posts_view_data([], [], %{}, true, empty_filter_params(), %{})
   defp empty_view("media"), do: media_view_data([], [], empty_filter_params(), %{})
-  defp empty_view("scripts"), do: entity_list_view("Scripts", "Automation helpers", "scripts", [])
+
+  defp empty_view("scripts"),
+    do:
+      entity_list_view(
+        dgettext("ui", "Scripts"),
+        dgettext("ui", "Automation helpers"),
+        "scripts",
+        []
+      )
 
   defp empty_view("templates"),
-    do: entity_list_view("Templates", "Site rendering", "templates", [])
+    do:
+      entity_list_view(
+        dgettext("ui", "Templates"),
+        dgettext("ui", "Site rendering"),
+        "templates",
+        []
+      )
 
   defp empty_view("tags"), do: tags_nav_view([])
-  defp empty_view("chat"), do: entity_list_view("Chat", "AI conversations", "chat", [])
-  defp empty_view("import"), do: entity_list_view("Import", "Import definitions", "import", [])
+
+  defp empty_view("chat"),
+    do:
+      entity_list_view(
+        dgettext("ui", "Chat"),
+        dgettext("ui", "AI conversations"),
+        "chat",
+        []
+      )
+
+  defp empty_view("import"),
+    do:
+      entity_list_view(
+        dgettext("ui", "Import"),
+        dgettext("ui", "Import definitions"),
+        "import",
+        []
+      )
+
   defp empty_view("git"), do: git_view()
   defp empty_view("settings"), do: settings_nav_view()
 
   defp empty_view(_other),
-    do: %{title: "", subtitle: "", layout: "entity_list", items: [], empty_message: "No items"}
+    do: %{
+      title: "",
+      subtitle: "",
+      layout: "entity_list",
+      items: [],
+      empty_message: dgettext("ui", "No items")
+    }
 
   defp posts_view(project_id, params, pages?) do
     posts = list_posts(project_id)
@@ -144,25 +221,32 @@ defmodule BDS.UI.Sidebar do
     available_categories = available_categories(base_posts, pages?)
 
     %{
-      title: if(pages?, do: "Pages", else: "Posts"),
+      title: if(pages?, do: dgettext("ui", "Pages"), else: dgettext("ui", "Posts")),
       subtitle:
-        if(pages?, do: "Standalone pages", else: "Drafts, published entries, and archive history"),
+        if(pages?,
+          do: dgettext("ui", "Standalone pages"),
+          else: dgettext("ui", "Drafts, published entries, and archive history")
+        ),
       layout: "post_list",
-      empty_message: if(pages?, do: "sidebar.noPagesYet", else: "sidebar.noPostsYet"),
+      empty_message:
+        if(pages?, do: dgettext("ui", "No pages yet"), else: dgettext("ui", "No posts yet")),
       filters: %{
         enabled: true,
         search_placeholder:
-          if(pages?, do: "sidebar.searchPagesPlaceholder", else: "sidebar.searchPostsPlaceholder"),
-        toggle_filters_label: "sidebar.toggleFilters",
-        archive_label: "render.archive",
-        tags_label: "sidebar.tags",
-        categories_label: "sidebar.categories",
-        clear_tags_label: "sidebar.clearTags",
-        clear_categories_label: "sidebar.clearCategories",
-        clear_filters_label: "sidebar.clearFilters",
-        results_label: "sidebar.results",
-        results_for_label: "sidebar.resultsFor",
-        no_results_label: "sidebar.noMatchingPosts",
+          if(pages?,
+            do: dgettext("ui", "Search pages..."),
+            else: dgettext("ui", "Search posts...")
+          ),
+        toggle_filters_label: dgettext("ui", "Toggle Filters"),
+        archive_label: dgettext("render", "Archive"),
+        tags_label: dgettext("ui", "Tags"),
+        categories_label: dgettext("ui", "Categories"),
+        clear_tags_label: dgettext("ui", "Clear tags"),
+        clear_categories_label: dgettext("ui", "Clear categories"),
+        clear_filters_label: dgettext("ui", "Clear filters"),
+        results_label: dgettext("ui", "results"),
+        results_for_label: dgettext("ui", "results for"),
+        no_results_label: dgettext("ui", "No matching posts"),
         year_month_counts: year_month_counts(base_posts, &post_filter_timestamp/1),
         available_tags: available_tags,
         available_tag_colors: Map.take(tag_colors, available_tags),
@@ -182,16 +266,22 @@ defmodule BDS.UI.Sidebar do
         }
       },
       sections: [
-        build_post_section("Drafts", :draft, grouped_posts.draft, translation_counts, false),
         build_post_section(
-          "Published",
+          dgettext("ui", "Drafts"),
+          :draft,
+          grouped_posts.draft,
+          translation_counts,
+          false
+        ),
+        build_post_section(
+          dgettext("ui", "Published"),
           :published,
           grouped_posts.published,
           translation_counts,
           true
         ),
         build_post_section(
-          "Archived",
+          dgettext("ui", "Archived"),
           :archived,
           grouped_posts.archived,
           translation_counts,
@@ -215,21 +305,21 @@ defmodule BDS.UI.Sidebar do
     available_tags = available_tags(base_media, & &1.tags)
 
     %{
-      title: "Media",
-      subtitle: "Images and files",
+      title: dgettext("ui", "Media"),
+      subtitle: dgettext("ui", "Images and files"),
       layout: "media_grid",
-      empty_message: "sidebar.noMediaFiles",
+      empty_message: dgettext("ui", "No media files"),
       filters: %{
         enabled: true,
-        search_placeholder: "sidebar.searchMediaPlaceholder",
-        toggle_filters_label: "sidebar.toggleFilters",
-        archive_label: "render.archive",
-        tags_label: "sidebar.tags",
-        clear_tags_label: "sidebar.clearTags",
-        clear_filters_label: "sidebar.clearFilters",
-        results_label: "sidebar.results",
-        results_for_label: "sidebar.resultsFor",
-        no_results_label: "sidebar.noMediaFiles",
+        search_placeholder: dgettext("ui", "Search media..."),
+        toggle_filters_label: dgettext("ui", "Toggle Filters"),
+        archive_label: dgettext("render", "Archive"),
+        tags_label: dgettext("ui", "Tags"),
+        clear_tags_label: dgettext("ui", "Clear tags"),
+        clear_filters_label: dgettext("ui", "Clear filters"),
+        results_label: dgettext("ui", "results"),
+        results_for_label: dgettext("ui", "results for"),
+        no_results_label: dgettext("ui", "No media files"),
         year_month_counts: year_month_counts(base_media, &Map.get(&1, :updated_at)),
         available_tags: available_tags,
         available_tag_colors: Map.take(tag_colors, available_tags),
@@ -266,13 +356,13 @@ defmodule BDS.UI.Sidebar do
 
   defp tags_nav_view(tags) do
     %{
-      title: "Tags",
-      subtitle: "Tag management",
+      title: dgettext("ui", "Tags"),
+      subtitle: dgettext("ui", "Tag management"),
       layout: "nav_list",
       items: [
-        %{id: "tags-cloud", title: "Tag Cloud", icon: "☁️", route: "tags"},
-        %{id: "tags-manage", title: "Create / Edit", icon: "✏️", route: "tags"},
-        %{id: "tags-merge", title: "Merge Tags", icon: "🔀", route: "tags"}
+        %{id: "tags-cloud", title: dgettext("ui", "Tag Cloud"), icon: "☁️", route: "tags"},
+        %{id: "tags-manage", title: dgettext("ui", "Create / Edit"), icon: "✏️", route: "tags"},
+        %{id: "tags-merge", title: dgettext("ui", "Merge Tags"), icon: "🔀", route: "tags"}
       ],
       summary_badge: length(tags)
     }
@@ -280,34 +370,44 @@ defmodule BDS.UI.Sidebar do
 
   defp settings_nav_view do
     %{
-      title: "Settings",
-      subtitle: "Project and publishing",
+      title: dgettext("ui", "Settings"),
+      subtitle: dgettext("ui", "Project and publishing"),
       layout: "nav_list",
       items: [
-        %{id: "settings-project", title: "Project", icon: "📁", route: "settings"},
-        %{id: "settings-editor", title: "Editor", icon: "📝", route: "settings"},
-        %{id: "settings-content", title: "Content", icon: "📋", route: "settings"},
-        %{id: "settings-ai", title: "AI", icon: "🤖", route: "settings"},
-        %{id: "settings-technology", title: "Technology", icon: "⚙️", route: "settings"},
-        %{id: "settings-publishing", title: "Publishing", icon: "🚀", route: "settings"},
-        %{id: "settings-data", title: "Data", icon: "🗄️", route: "settings"},
-        %{id: "settings-mcp", title: "MCP", icon: "🔌", route: "settings"},
-        %{id: "settings-style", title: "Style", icon: "🎨", route: "style"}
+        %{id: "settings-project", title: dgettext("ui", "Project"), icon: "📁", route: "settings"},
+        %{id: "settings-editor", title: dgettext("ui", "Editor"), icon: "📝", route: "settings"},
+        %{id: "settings-content", title: dgettext("ui", "Content"), icon: "📋", route: "settings"},
+        %{id: "settings-ai", title: dgettext("ui", "AI"), icon: "🤖", route: "settings"},
+        %{
+          id: "settings-technology",
+          title: dgettext("ui", "Technology"),
+          icon: "⚙️",
+          route: "settings"
+        },
+        %{
+          id: "settings-publishing",
+          title: dgettext("ui", "Publishing"),
+          icon: "🚀",
+          route: "settings"
+        },
+        %{id: "settings-data", title: dgettext("ui", "Data"), icon: "🗄️", route: "settings"},
+        %{id: "settings-mcp", title: dgettext("ui", "MCP"), icon: "🔌", route: "settings"},
+        %{id: "settings-style", title: dgettext("ui", "Style"), icon: "🎨", route: "style"}
       ]
     }
   end
 
   defp git_view do
     %{
-      title: "Git",
-      subtitle: "Working tree and history",
+      title: dgettext("ui", "Git"),
+      subtitle: dgettext("ui", "Working tree and history"),
       layout: "entity_list",
-      empty_message: "No items",
+      empty_message: dgettext("ui", "No items"),
       items: [
         %{
           id: "git-working-tree",
-          title: "Working tree",
-          meta: "Working tree and history",
+          title: dgettext("ui", "Working tree"),
+          meta: dgettext("ui", "Working tree and history"),
           route: "git_diff",
           updated_at: nil
         }
@@ -320,7 +420,7 @@ defmodule BDS.UI.Sidebar do
       title: title,
       subtitle: subtitle,
       layout: "entity_list",
-      empty_message: "No items",
+      empty_message: dgettext("ui", "No items"),
       items:
         Enum.map(items, fn item ->
           %{
@@ -350,7 +450,10 @@ defmodule BDS.UI.Sidebar do
             status: Atom.to_string(post.status),
             language_count: 1 + Map.get(translation_counts, post.id, 0),
             meta_timestamp:
-              if(published_meta?, do: post.published_at || post.updated_at, else: post.updated_at),
+              if(published_meta?,
+                do: post.published_at || post.updated_at,
+                else: post.updated_at
+              ),
             route: "post",
             search_blob: post_search_blob(post)
           }
@@ -651,7 +754,7 @@ defmodule BDS.UI.Sidebar do
     cond do
       present?(post.title) -> post.title
       present?(post.slug) -> post.slug
-      true -> "Untitled"
+      true -> dgettext("ui", "Untitled")
     end
   end
 

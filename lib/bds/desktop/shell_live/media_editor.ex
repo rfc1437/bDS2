@@ -5,12 +5,13 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
   import Ecto.Query
 
-  alias BDS.Desktop.{FilePicker, ShellData}
+  alias BDS.Desktop.{FilePicker}
   alias BDS.{AI, I18n, Media}
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Media.Translation
   alias BDS.Posts.Post
   alias BDS.Repo
+  use Gettext, backend: BDS.Gettext
 
   embed_templates("media_editor_html/*")
 
@@ -111,7 +112,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   def handle_event("replace_media_editor_file", _params, socket) do
     media = socket.assigns.media
 
-    case FilePicker.choose_file(translated("Replace Media File")) do
+    case FilePicker.choose_file(dgettext("ui", "Replace Media File")) do
       {:ok, source_path} ->
         case Media.replace_media_file(media.id, source_path) do
           {:ok, %MediaRecord{} = updated_media} ->
@@ -130,7 +131,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
             {:noreply, build_data(socket)}
 
           {:error, reason} ->
-            notify_output(socket, translated("Replace File"), inspect(reason), "error")
+            notify_output(socket, dgettext("ui", "Replace File"), inspect(reason), "error")
             {:noreply, build_data(socket)}
         end
 
@@ -138,7 +139,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
         {:noreply, socket}
 
       {:error, %{message: message}} ->
-        notify_output(socket, translated("Replace File"), message, "error")
+        notify_output(socket, dgettext("ui", "Replace File"), message, "error")
         {:noreply, build_data(socket)}
     end
   end
@@ -147,8 +148,8 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     if socket.assigns.offline_mode do
       notify_output(
         socket,
-        translated("Detect Language"),
-        translated("Automatic AI actions stay gated by airplane mode."),
+        dgettext("ui", "Detect Language"),
+        dgettext("ui", "Automatic AI actions stay gated by airplane mode."),
         "info"
       )
 
@@ -186,19 +187,19 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
               {:noreply, socket}
 
             {:error, reason} ->
-              notify_output(socket, translated("Detect Language"), inspect(reason), "error")
+              notify_output(socket, dgettext("ui", "Detect Language"), inspect(reason), "error")
               {:noreply, build_data(socket)}
           end
 
         {:error, reason} ->
-          notify_output(socket, translated("Detect Language"), inspect(reason), "error")
+          notify_output(socket, dgettext("ui", "Detect Language"), inspect(reason), "error")
           {:noreply, build_data(socket)}
 
         _other ->
           notify_output(
             socket,
-            translated("Detect Language"),
-            translated("Language detection failed."),
+            dgettext("ui", "Detect Language"),
+            dgettext("ui", "Language detection failed."),
             "error"
           )
 
@@ -240,7 +241,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
         {:noreply, socket}
 
       {:error, reason} ->
-        notify_output(socket, translated("Link to Post"), inspect(reason), "error")
+        notify_output(socket, dgettext("ui", "Link to Post"), inspect(reason), "error")
         {:noreply, build_data(socket)}
     end
   end
@@ -253,7 +254,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
         {:noreply, build_data(socket)}
 
       {:error, reason} ->
-        notify_output(socket, translated("Unlink from Post"), inspect(reason), "error")
+        notify_output(socket, dgettext("ui", "Unlink from Post"), inspect(reason), "error")
         {:noreply, build_data(socket)}
     end
   end
@@ -312,7 +313,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
             {:noreply, socket}
 
           {:error, reason} ->
-            notify_output(socket, translated("Save Translation"), inspect(reason), "error")
+            notify_output(socket, dgettext("ui", "Save Translation"), inspect(reason), "error")
             {:noreply, build_data(socket)}
         end
 
@@ -336,8 +337,8 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     if socket.assigns.offline_mode do
       notify_output(
         socket,
-        translated("Translate"),
-        translated("Automatic AI actions stay gated by airplane mode."),
+        dgettext("ui", "Translate"),
+        dgettext("ui", "Automatic AI actions stay gated by airplane mode."),
         "info"
       )
 
@@ -350,12 +351,12 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
               {:noreply, build_data(socket)}
 
             {:error, reason} ->
-              notify_output(socket, translated("Refresh Translation"), inspect(reason), "error")
+              notify_output(socket, dgettext("ui", "Refresh Translation"), inspect(reason), "error")
               {:noreply, build_data(socket)}
           end
 
         {:error, reason} ->
-          notify_output(socket, translated("Refresh Translation"), inspect(reason), "error")
+          notify_output(socket, dgettext("ui", "Refresh Translation"), inspect(reason), "error")
           {:noreply, build_data(socket)}
       end
     end
@@ -374,7 +375,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
         {:noreply, socket}
 
       {:error, reason} ->
-        notify_output(socket, translated("Delete Translation"), inspect(reason), "error")
+        notify_output(socket, dgettext("ui", "Delete Translation"), inspect(reason), "error")
         {:noreply, build_data(socket)}
     end
   end
@@ -469,11 +470,11 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
             notify_parent({:media_editor_dirty, media.id, false})
             notify_parent({:media_editor_tab_meta, media.id, display_title(updated_media), updated_media.original_name || updated_media.mime_type || ""})
-            notify_output(socket, translated("Media"), translated("Media saved"))
+            notify_output(socket, dgettext("ui", "Media"), dgettext("ui", "Media saved"))
             socket
 
           {:error, reason} ->
-            notify_output(socket, translated("Media"), inspect(reason), "error")
+            notify_output(socket, dgettext("ui", "Media"), inspect(reason), "error")
             |> build_data()
         end
     end
@@ -516,8 +517,8 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     if socket.assigns.offline_mode do
       notify_output(
         socket,
-        translated("Translate"),
-        translated("Automatic AI actions stay gated by airplane mode."),
+        dgettext("ui", "Translate"),
+        dgettext("ui", "Automatic AI actions stay gated by airplane mode."),
         "info"
       )
 
@@ -537,12 +538,12 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
               |> build_data()
 
             {:error, reason} ->
-              notify_output(socket, translated("Translate"), inspect(reason), "error")
+              notify_output(socket, dgettext("ui", "Translate"), inspect(reason), "error")
               |> build_data()
           end
 
         {:error, reason} ->
-          notify_output(socket, translated("Translate"), inspect(reason), "error")
+          notify_output(socket, dgettext("ui", "Translate"), inspect(reason), "error")
           |> build_data()
       end
     end
@@ -683,14 +684,11 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
-  @spec translated(term(), term()) :: term()
-  def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   @spec media_editor_save_state_label(term()) :: term()
-  def media_editor_save_state_label(:dirty), do: translated("Unsaved")
-  def media_editor_save_state_label(:saved), do: translated("Saved")
-  def media_editor_save_state_label(_state), do: translated("Idle")
+  def media_editor_save_state_label(:dirty), do: dgettext("ui", "Unsaved")
+  def media_editor_save_state_label(:saved), do: dgettext("ui", "Saved")
+  def media_editor_save_state_label(_state), do: dgettext("ui", "Idle")
 
   @spec language_label(term()) :: term()
   def language_label(code) do

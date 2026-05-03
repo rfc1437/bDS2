@@ -28,18 +28,6 @@ defmodule BDS.I18n do
 
   @default_language "en"
   @default_format_locale "en-US"
-  @locale_files Path.expand("../../priv/i18n/locales/*.json", __DIR__)
-                |> Path.wildcard()
-                |> Enum.sort()
-
-  for file <- @locale_files do
-    @external_resource file
-  end
-
-  @catalogs Enum.into(@locale_files, %{}, fn file ->
-              locale = file |> Path.basename(".json") |> String.downcase()
-              {locale, Jason.decode!(File.read!(file))}
-            end)
 
   def supported_languages, do: @supported_languages
 
@@ -80,33 +68,6 @@ defmodule BDS.I18n do
       format_locale: format_locale(ui_locale)
     }
   end
-
-  def get_render_translations(language) do
-    language
-    |> resolve_render_locale()
-    |> catalog_for_locale()
-  end
-
-  def get_ui_translations(locale) do
-    locale
-    |> resolve_ui_locale()
-    |> catalog_for_locale()
-  end
-
-  def translate(language, key) do
-    key = key |> to_string() |> String.trim()
-
-    case resolve_supported_locale(language) do
-      nil ->
-        Map.get(catalog_for_locale(@default_language), key, key)
-
-      locale ->
-        Map.get(catalog_for_locale(locale), key, key)
-    end
-  end
-
-  def translate_render(language, key), do: translate(language, key)
-  def translate_ui(locale, key), do: translate(locale, key)
 
   def flag(language) do
     language
@@ -150,9 +111,5 @@ defmodule BDS.I18n do
     |> String.downcase()
     |> String.split("-", parts: 2)
     |> List.first()
-  end
-
-  defp catalog_for_locale(locale) do
-    Map.get(@catalogs, locale, Map.get(@catalogs, @default_language, %{}))
   end
 end

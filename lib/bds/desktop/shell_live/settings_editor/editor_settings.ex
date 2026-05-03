@@ -4,7 +4,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.EditorSettings do
   use Phoenix.Component
 
   alias BDS.Settings
-  alias BDS.Desktop.ShellData
+  use Gettext, backend: BDS.Gettext
 
   @spec editor_form() :: term()
   def editor_form do
@@ -42,7 +42,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.EditorSettings do
     else
       {:error, reason} ->
         socket
-        |> append_output.(translated("Editor Settings"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "Editor Settings"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -80,7 +80,4 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.EditorSettings do
   defp truthy?(value), do: value in [true, "true", "on", "1", 1]
   defp boolean_string(true), do: "true"
   defp boolean_string(false), do: "false"
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

@@ -1,6 +1,8 @@
 defmodule BDS.UI.Workbench do
   @moduledoc false
 
+  use Gettext, backend: BDS.Gettext
+
   alias BDS.UI.Registry
 
   @singleton_tabs MapSet.new([
@@ -175,6 +177,9 @@ defmodule BDS.UI.Workbench do
   end
 
   def status_bar(state, opts) do
+    post_count = Keyword.get(opts, :post_count, 0)
+    media_count = Keyword.get(opts, :media_count, 0)
+
     %{
       left: %{
         running_task_message: Keyword.get(opts, :running_task_message),
@@ -182,10 +187,10 @@ defmodule BDS.UI.Workbench do
       },
       right: %{
         post_status: post_status(state, Keyword.get(opts, :active_post_status)),
-        post_count: "#{Keyword.get(opts, :post_count, 0)} posts",
-        post_count_value: Keyword.get(opts, :post_count, 0),
-        media_count: "#{Keyword.get(opts, :media_count, 0)} media",
-        media_count_value: Keyword.get(opts, :media_count, 0),
+        post_count: "#{post_count} #{dngettext("ui", "post", "posts", post_count)}",
+        post_count_value: post_count,
+        media_count: "#{media_count} #{dngettext("ui", "media", "media", media_count)}",
+        media_count_value: media_count,
         token_usage: token_usage(state, Keyword.get(opts, :token_usage)),
         theme_badge: Keyword.get(opts, :theme_badge, "default"),
         offline_mode: Keyword.get(opts, :offline_mode, false),

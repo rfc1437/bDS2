@@ -2,7 +2,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
   @moduledoc false
 
   alias BDS.{AI, ImportDefinitions, Metadata, Tags}
-  alias BDS.Desktop.ShellData
+  use Gettext, backend: BDS.Gettext
 
   @spec start_taxonomy_edit(term(), term(), term()) :: term()
   def start_taxonomy_edit(
@@ -85,12 +85,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
         socket.assigns.offline_mode ->
           socket
           |> append_output.(
-            translated("activity.import"),
-            ShellData.translate(
-              "Automatic AI actions stay gated by airplane mode.",
-              %{},
-              socket.assigns.page_language
-            ),
+            dgettext("ui", "Import"),
+            BDS.Gettext.lgettext(socket.assigns.page_language, "ui", "Automatic AI actions stay gated by airplane mode."),
             nil,
             "info"
           )
@@ -124,8 +120,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
 
               socket
               |> append_output.(
-                translated("activity.import"),
-                translated("importAnalysis.mappedCount", %{count: mapped_count}),
+                dgettext("ui", "Import"),
+                dgettext("ui", "%{count} mapped", count: mapped_count),
                 Map.get(socket.assigns.import_editor_selected_models, definition_id),
                 "info"
               )
@@ -134,7 +130,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
             {:error, reason} ->
               socket
               |> append_output.(
-                translated("activity.import"),
+                dgettext("ui", "Import"),
                 inspect(reason),
                 Map.get(socket.assigns.import_editor_selected_models, definition_id),
                 "error"
@@ -274,18 +270,15 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
   def taxonomy_mapping_tooltip(item) do
     action =
       if present?(item.mapped_to),
-        do: translated("importAnalysis.mappingActionEdit"),
-        else: translated("importAnalysis.mappingActionAdd")
+        do: dgettext("ui", "edit"),
+        else: dgettext("ui", "add")
 
-    translated("importAnalysis.mappingTooltip", %{action: action})
+    dgettext("ui", "Click to %{action} mapping", action: action)
   end
 
   @spec maybe_put_option(term(), term(), term()) :: term()
   def maybe_put_option(opts, _key, nil), do: opts
   def maybe_put_option(opts, key, value), do: Keyword.put(opts, key, value)
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   defp present?(value), do: value not in [nil, ""]
   defp blank_to_nil(""), do: nil

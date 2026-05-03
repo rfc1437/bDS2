@@ -77,8 +77,8 @@
           data-testid="toggle-sidebar"
           type="button"
           phx-click="toggle_sidebar"
-          aria-label={translated("Toggle sidebar")}
-          title={translated("Toggle sidebar")}
+          aria-label={dgettext("ui", "Toggle sidebar")}
+          title={dgettext("ui", "Toggle sidebar")}
         >
           <span class={["window-titlebar-sidebar-icon", if(@workbench.sidebar_visible, do: "is-active", else: "is-inactive")]}> 
             <span class="window-titlebar-sidebar-pane"></span>
@@ -89,8 +89,8 @@
           data-testid="toggle-panel"
           type="button"
           phx-click="toggle_panel"
-          aria-label={translated("Toggle panel")}
-          title={translated("Toggle panel")}
+          aria-label={dgettext("ui", "Toggle panel")}
+          title={dgettext("ui", "Toggle panel")}
         >
           <span class={["window-titlebar-panel-icon", if(@workbench.panel.visible, do: "is-active", else: "is-inactive")]}> 
             <span class="window-titlebar-panel-pane"></span>
@@ -101,8 +101,8 @@
           data-testid="toggle-assistant"
           type="button"
           phx-click="toggle_assistant_sidebar"
-          aria-label={translated("Toggle assistant")}
-          title={translated("Toggle assistant")}
+          aria-label={dgettext("ui", "Toggle assistant")}
+          title={dgettext("ui", "Toggle assistant")}
         >
           <span class={["window-titlebar-assistant-icon", if(@workbench.assistant_sidebar_visible, do: "is-active", else: "is-inactive")]}> 
             <span class="window-titlebar-assistant-pane"></span>
@@ -178,8 +178,8 @@
                       data-testid="sidebar-filter-toggle"
                       type="button"
                       phx-click="toggle_sidebar_filters"
-                      aria-label={translated(Map.get(@sidebar_data.filters, :toggle_filters_label))}
-                      title={translated(Map.get(@sidebar_data.filters, :toggle_filters_label))}
+                      aria-label={Map.get(@sidebar_data.filters, :toggle_filters_label)}
+                      title={Map.get(@sidebar_data.filters, :toggle_filters_label)}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M6 12v-1h4v1H6zM4 8v-1h8v1H4zm-2-4v-1h12v1H2z"/>
@@ -194,8 +194,8 @@
                       type="button"
                       phx-click="create_sidebar_item"
                       phx-value-kind={create_action.kind}
-                      aria-label={translated(create_action.label)}
-                      title={translated(create_action.label)}
+                      aria-label={create_action.label}
+                      title={create_action.label}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M14 7v1H8v6H7V8H1V7h6V1h1v6h6z"/>
@@ -215,7 +215,7 @@
     <main class="app-content" data-region="content">
       <div class="tab-bar" data-region="tab-bar">
         <%= if Enum.empty?(@workbench.tabs) do %>
-          <div class="tab-bar-empty"><%= translated("Dashboard") %></div>
+          <div class="tab-bar-empty"><%= dgettext("ui", "Dashboard") %></div>
         <% else %>
           <div class="tab-bar-tabs">
             <%= for tab <- @workbench.tabs do %>
@@ -253,8 +253,8 @@
                     phx-click="close_tab"
                     phx-value-type={tab.type}
                     phx-value-id={tab.id}
-                    aria-label={translated("Close tab")}
-                    title={translated("Close tab")}
+                    aria-label={dgettext("ui", "Close tab")}
+                    title={dgettext("ui", "Close tab")}
                   >
                     ×
                   </button>
@@ -269,41 +269,41 @@
         <%= if is_nil(@current_tab) do %>
           <div class="editor-empty">
             <div class="dashboard-content">
-              <h1 data-testid="editor-title"><%= translated("dashboard.title") %></h1>
-              <p class="text-muted"><%= translated("dashboard.subtitle") %></p>
+              <h1 data-testid="editor-title"><%= dgettext("ui", "Dashboard") %></h1>
+              <p class="text-muted"><%= dgettext("ui", "Overview of your blog database") %></p>
 
               <div class="dashboard-stats">
                 <div class="stat-card">
                   <div class="stat-number"><%= @dashboard.post_stats.total_posts || 0 %></div>
-                  <div class="stat-label"><%= translated("dashboard.stats.totalPosts") %></div>
+                  <div class="stat-label"><%= dgettext("ui", "Total Posts") %></div>
                   <div class="stat-breakdown">
-                    <span class="stat-tag stat-published"><%= translated("dashboard.stats.published", %{count: @dashboard.post_stats.published_count || 0}) %></span>
-                    <span class="stat-tag stat-draft"><%= translated("dashboard.stats.drafts", %{count: @dashboard.post_stats.draft_count || 0}) %></span>
+                    <span class="stat-tag stat-published"><%= dgettext("ui", "dashboard.stats.published", count: @dashboard.post_stats.published_count || 0) %></span>
+                    <span class="stat-tag stat-draft"><%= dgettext("ui", "dashboard.stats.drafts", count: @dashboard.post_stats.draft_count || 0) %></span>
                     <%= if (@dashboard.post_stats.archived_count || 0) > 0 do %>
-                      <span class="stat-tag stat-archived"><%= translated("dashboard.stats.archived", %{count: @dashboard.post_stats.archived_count || 0}) %></span>
+                      <span class="stat-tag stat-archived"><%= dgettext("ui", "dashboard.stats.archived", count: @dashboard.post_stats.archived_count || 0) %></span>
                     <% end %>
                   </div>
                 </div>
                 <div class="stat-card">
                   <div class="stat-number"><%= @dashboard.media_stats.media_count || 0 %></div>
-                  <div class="stat-label"><%= translated("dashboard.stats.mediaFiles") %></div>
+                  <div class="stat-label"><%= dgettext("ui", "Media Files") %></div>
                   <div class="stat-breakdown">
-                    <span class="stat-tag"><%= translated("dashboard.stats.images", %{count: @dashboard.media_stats.image_count || 0}) %></span>
+                    <span class="stat-tag"><%= dgettext("ui", "dashboard.stats.images", count: @dashboard.media_stats.image_count || 0) %></span>
                     <span class="stat-tag"><%= ShellData.format_bytes(@dashboard.media_stats.total_bytes || 0) %></span>
                   </div>
                 </div>
                 <div class="stat-card">
                   <div class="stat-number"><%= length(@dashboard_tag_cloud_items) %></div>
-                  <div class="stat-label"><%= translated("dashboard.stats.tags") %></div>
+                  <div class="stat-label"><%= dgettext("ui", "Tags") %></div>
                   <div class="stat-breakdown">
-                    <span class="stat-tag"><%= translated("dashboard.stats.categories", %{count: length(@dashboard_category_counts)}) %></span>
+                    <span class="stat-tag"><%= dgettext("ui", "dashboard.stats.categories", count: length(@dashboard_category_counts)) %></span>
                   </div>
                 </div>
               </div>
 
               <%= if Enum.any?(@dashboard_timeline_entries) do %>
                 <div class="dashboard-section">
-                  <h4><%= translated("dashboard.section.postsOverTime") %></h4>
+                  <h4><%= dgettext("ui", "Posts Over Time") %></h4>
                   <div class="timeline-chart">
                     <%= for entry <- @dashboard_timeline_entries do %>
                       <div class="timeline-bar-container">
@@ -322,7 +322,7 @@
 
               <%= if Enum.any?(@dashboard_tag_cloud_items) do %>
                 <div class="dashboard-section">
-                  <h4><%= translated("dashboard.section.tags") %></h4>
+                  <h4><%= dgettext("ui", "Tags") %></h4>
                   <div class="tag-cloud">
                     <%= for item <- @dashboard_tag_cloud_items do %>
                       <span class={["dashboard-tag", if(item.color, do: "has-color")]} style={ShellData.render_dashboard_tag_style(item)} title={ShellData.dashboard_post_count_label(item.count)}><%= item.tag %></span>
@@ -333,7 +333,7 @@
 
               <%= if Enum.any?(@dashboard_category_counts) do %>
                 <div class="dashboard-section">
-                  <h4><%= translated("dashboard.section.categories") %></h4>
+                  <h4><%= dgettext("ui", "Categories") %></h4>
                   <div class="tag-cloud">
                     <%= for category <- @dashboard_category_counts do %>
                       <span class="dashboard-tag dashboard-category" title={ShellData.dashboard_post_count_label(category.count || 0)}>
@@ -347,7 +347,7 @@
 
               <%= if Enum.any?(@dashboard_recent_posts) do %>
                 <div class="dashboard-section">
-                  <h4><%= translated("dashboard.section.recentlyUpdated") %></h4>
+                  <h4><%= dgettext("ui", "Recently Updated") %></h4>
                   <div class="recent-posts-list">
                     <%= for post <- @dashboard_recent_posts do %>
                       <button
@@ -373,8 +373,8 @@
               <div class="dashboard-inspector-meta" hidden>
                 <%= for item <- @editor_meta do %>
                   <section class="editor-meta-row">
-                    <strong data-testid="editor-meta-label"><%= translated(item.label) %></strong>
-                    <span><%= translated(item.value) %></span>
+                    <strong data-testid="editor-meta-label"><%= item.label %></strong>
+                    <span><%= item.value %></span>
                   </section>
                 <% end %>
               </div>
@@ -442,8 +442,8 @@
                 <aside class="editor-meta">
                   <%= for item <- @editor_meta do %>
                     <section class="editor-meta-row">
-                      <strong data-testid="editor-meta-label"><%= translated(item.label) %></strong>
-                      <span><%= translated(item.value) %></span>
+                      <strong data-testid="editor-meta-label"><%= item.label %></strong>
+                      <span><%= item.value %></span>
                     </section>
                   <% end %>
                 </aside>
@@ -471,8 +471,8 @@
             data-testid="panel-close"
             type="button"
             phx-click="toggle_panel"
-            aria-label={translated("Close panel")}
-            title={translated("Close panel")}
+            aria-label={dgettext("ui", "Close panel")}
+            title={dgettext("ui", "Close panel")}
           >
             ×
           </button>
@@ -493,24 +493,24 @@
         <div class="assistant-content">
           <header class="assistant-sidebar-header">
             <div class="assistant-sidebar-heading">
-              <strong><%= translated("AI Assistant") %></strong>
-              <span class="assistant-sidebar-description"><%= translated("AI conversations") %></span>
+              <strong><%= dgettext("ui", "AI Assistant") %></strong>
+              <span class="assistant-sidebar-description"><%= dgettext("ui", "AI conversations") %></span>
             </div>
             <span class={[
               "assistant-sidebar-status",
               if(@offline_mode, do: "is-offline", else: "is-online")
             ]}>
-              <%= if @offline_mode, do: translated("Offline"), else: translated("Chat") %>
+              <%= if @offline_mode, do: dgettext("ui", "Offline"), else: dgettext("ui", "Chat") %>
             </span>
           </header>
 
           <section class="assistant-sidebar-context" data-testid="assistant-context">
             <div class="assistant-sidebar-context-row">
-              <span class="assistant-sidebar-context-label"><%= translated("Project") %></span>
+              <span class="assistant-sidebar-context-label"><%= dgettext("ui", "Project") %></span>
               <span class="assistant-sidebar-context-value"><%= BDS.Desktop.ShellLive.ChatSurface.assistant_project_name(@current_project) %></span>
             </div>
             <div class="assistant-sidebar-context-row">
-              <span class="assistant-sidebar-context-label"><%= translated("Editor") %></span>
+              <span class="assistant-sidebar-context-label"><%= dgettext("ui", "Editor") %></span>
               <span class="assistant-sidebar-context-value"><%= BDS.Desktop.ShellLive.TabHelpers.tab_title(@current_tab, @tab_meta) %></span>
             </div>
             <p class="assistant-sidebar-context-text"><%= BDS.Desktop.ShellLive.TabHelpers.tab_subtitle(@current_tab, @tab_meta) %></p>
@@ -527,7 +527,7 @@
               data-testid="assistant-prompt-input"
               name="assistant[prompt]"
               rows="6"
-              placeholder={translated("Ask the assistant about the active project or editor.")}
+              placeholder={dgettext("ui", "Ask the assistant about the active project or editor.")}
             ><%= @assistant_prompt %></textarea>
 
             <button
@@ -536,7 +536,7 @@
               type="submit"
               disabled={String.trim(@assistant_prompt || "") == ""}
             >
-              <%= translated("Start chat") %>
+              <%= dgettext("ui", "Start chat") %>
             </button>
           </form>
 
@@ -544,8 +544,8 @@
             <div class="assistant-sidebar-welcome">
               <%= for card <- @assistant_cards do %>
                 <section class="assistant-card">
-                  <strong><%= translated(card.label) %></strong>
-                  <span><%= translated(card.text) %></span>
+                  <strong><%= card.label %></strong>
+                  <span><%= card.text %></span>
                 </section>
               <% end %>
             </div>
@@ -576,8 +576,8 @@
             data-testid="toggle-sidebar"
             type="button"
             phx-click="toggle_sidebar"
-            aria-label={translated("Toggle sidebar")}
-            title={translated("Toggle sidebar")}
+            aria-label={dgettext("ui", "Toggle sidebar")}
+            title={dgettext("ui", "Toggle sidebar")}
           >
             <span class={["window-titlebar-sidebar-icon", if(@workbench.sidebar_visible, do: "is-active", else: "is-inactive")]}> 
               <span class="window-titlebar-sidebar-pane"></span>
@@ -588,8 +588,8 @@
             data-testid="toggle-panel"
             type="button"
             phx-click="toggle_panel"
-            aria-label={translated("Toggle panel")}
-            title={translated("Toggle panel")}
+            aria-label={dgettext("ui", "Toggle panel")}
+            title={dgettext("ui", "Toggle panel")}
           >
             <span class={["window-titlebar-panel-icon", if(@workbench.panel.visible, do: "is-active", else: "is-inactive")]}> 
               <span class="window-titlebar-panel-pane"></span>
@@ -600,8 +600,8 @@
             data-testid="toggle-assistant"
             type="button"
             phx-click="toggle_assistant_sidebar"
-            aria-label={translated("Toggle assistant")}
-            title={translated("Toggle assistant")}
+            aria-label={dgettext("ui", "Toggle assistant")}
+            title={dgettext("ui", "Toggle assistant")}
           >
             <span class={["window-titlebar-assistant-icon", if(@workbench.assistant_sidebar_visible, do: "is-active", else: "is-inactive")]}> 
               <span class="window-titlebar-assistant-pane"></span>
@@ -614,7 +614,7 @@
           class="project-selector-trigger"
           data-testid="project-selector-trigger"
           type="button"
-          title={translated("Switch project")}
+          title={dgettext("ui", "Switch project")}
           phx-click="toggle_project_menu"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="project-icon">
@@ -629,7 +629,7 @@
         <%= if @project_menu_open do %>
           <div class="project-dropdown" data-testid="project-dropdown" phx-click-away="close_project_menu">
             <div class="project-dropdown-header">
-              <span><%= translated("Projects") %></span>
+              <span><%= dgettext("ui", "Projects") %></span>
             </div>
             <div class="project-list">
               <%= for project <- @projects.projects do %>
@@ -650,10 +650,10 @@
             </div>
             <div class="project-dropdown-footer">
               <button class="existing-project-btn" type="button" phx-click="import_project">
-                <span><%= translated("Open Existing Blog") %></span>
+                <span><%= dgettext("ui", "Open Existing Blog") %></span>
               </button>
               <button class="create-project-btn" type="button" phx-click="create_project">
-                <span><%= translated("New Project") %></span>
+                <span><%= dgettext("ui", "New Project") %></span>
               </button>
             </div>
           </div>
@@ -663,7 +663,7 @@
         <%= if @status.left.running_task_message do %>
           <span class="task-spinner"></span>
         <% end %>
-        <span class="task-message-text"><%= @status.left.running_task_message || translated("Idle") %></span>
+        <span class="task-message-text"><%= @status.left.running_task_message || dgettext("ui", "Idle") %></span>
         <%= if (@status.left.running_task_overflow || 0) > 0 do %>
           <span class="status-bar-count">+<%= @status.left.running_task_overflow %></span>
         <% end %>
@@ -673,9 +673,9 @@
       <span class="status-bar-item"><%= @status.right.post_count %></span>
       <span class="status-bar-item"><%= @status.right.media_count %></span>
       <span class="status-bar-item theme-badge"><%= @status.right.theme_badge %></span>
-      <button class={["status-bar-item", "offline-badge", if(@status.right.offline_mode, do: "active")]} data-testid="status-offline-button" type="button" phx-click="toggle_offline_mode" title={translated("Toggle offline mode")}>✈</button>
+      <button class={["status-bar-item", "offline-badge", if(@status.right.offline_mode, do: "active")]} data-testid="status-offline-button" type="button" phx-click="toggle_offline_mode" title={dgettext("ui", "Toggle offline mode")}>✈</button>
       <form class="status-bar-item language-badge" data-testid="status-language-form" phx-change="change_ui_language">
-        <span><%= translated("UI") %></span>
+        <span><%= dgettext("ui", "UI") %></span>
         <select class="status-bar-language-select" name="ui_language" data-testid="status-language-select">
           <%= for language <- @supported_ui_languages do %>
             <option selected={language.code == @page_language} value={language.code}><%= language.flag %></option>

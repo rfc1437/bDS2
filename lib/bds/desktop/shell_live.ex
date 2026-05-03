@@ -57,6 +57,7 @@ defmodule BDS.Desktop.ShellLive do
   alias BDS.UI.{Commands, MenuBar, Session, Workbench}
   alias Desktop.OS
   alias BDS.Desktop.Shutdown
+  use Gettext, backend: BDS.Gettext
 
   @refresh_interval 1_500
   @output_entry_limit 20
@@ -586,29 +587,26 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:current_tab, current_tab(workbench))
   end
 
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, UILocale.current())
-
   defp encoded_shortcuts(shortcuts), do: Jason.encode!(shortcuts)
 
   defp encoded_workbench_session(workbench), do: Jason.encode!(Session.serialize(workbench))
 
-  defp panel_tab_label(:tasks), do: translated("Tasks")
-  defp panel_tab_label(:output), do: translated("Output")
-  defp panel_tab_label(:git_log), do: translated("Git Log")
+  defp panel_tab_label(:tasks), do: dgettext("ui", "Tasks")
+  defp panel_tab_label(:output), do: dgettext("ui", "Output")
+  defp panel_tab_label(:git_log), do: dgettext("ui", "Git Log")
   defp panel_tab_label(tab), do: ShellData.route_label(tab)
 
-  defp activity_label("AI Assistant"), do: "Chat"
-  defp activity_label("Source Control"), do: "Git"
-  defp activity_label(label), do: translated(label)
+  defp activity_label("AI Assistant"), do: dgettext("ui", "Chat")
+  defp activity_label("Source Control"), do: dgettext("ui", "Git")
+  defp activity_label(label), do: label
 
   defp active_sidebar_label(activity_buttons, active_view, sidebar_data) do
-    Enum.find_value(activity_buttons, translated(Map.get(sidebar_data, :title, "")), fn button ->
+    Enum.find_value(activity_buttons, Map.get(sidebar_data, :title, ""), fn button ->
       if button.id == active_view, do: activity_label(button.label), else: nil
     end)
   end
 
-  defp sidebar_header_label(label), do: translated(label)
+  defp sidebar_header_label(label), do: label
 
   defp timeline_height(entry, entries) do
     max_count =
@@ -680,6 +678,8 @@ defmodule BDS.Desktop.ShellLive do
     if normalized == socket.assigns.page_language do
       socket
     else
+      UILocale.put(normalized)
+
       socket
       |> assign(:page_language, normalized)
       |> reload_shell(socket.assigns.workbench)

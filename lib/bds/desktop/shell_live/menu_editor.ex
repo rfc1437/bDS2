@@ -3,7 +3,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
   use Phoenix.LiveComponent
 
-  alias BDS.Desktop.ShellData
+
+  use Gettext, backend: BDS.Gettext
 
   alias BDS.Desktop.ShellLive.MenuEditor.{
     DraftManagement,
@@ -215,7 +216,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
         Enum.map(state.items, &TreeOps.persisted_item/1)
       )
 
-    notify_output(translated("menuEditor.tabTitle"), translated("menuEditor.saved"), "info")
+    notify_output(dgettext("ui", "Blog Menu"), dgettext("ui", "Blog menu saved"), "info")
     socket |> build_data()
   end
 
@@ -236,8 +237,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
     tab_meta =
       Map.put(socket.assigns.tab_meta, {:menu_editor, tab_id}, %{
-        title: translated("menuEditor.tabTitle"),
-        subtitle: translated("menuEditor.description")
+        title: dgettext("ui", "Blog Menu"),
+        subtitle: dgettext("ui", "Manage the central blog navigation outline and save it to meta/menu.opml.")
       })
 
     socket
@@ -284,7 +285,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
           phx-target={@myself}
           style={"--menu-editor-depth: #{@depth};"}
         >
-          <span class="menu-editor-row-handle" data-menu-drag-handle="true" title={translated("menuEditor.dragHandle")}>⋮⋮</span>
+          <span class="menu-editor-row-handle" data-menu-drag-handle="true" title={dgettext("ui", "Drag menu item")}>⋮⋮</span>
           <span class="menu-editor-row-kind" title={kind_label(item.kind)} aria-label={kind_label(item.kind)}>
             <.kind_icon kind={item.kind} />
           </span>
@@ -317,16 +318,16 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
                     <div class="menu-editor-inline-actions">
                       <%= if @menu_editor.draft.type == :page do %>
                         <button class="menu-editor-inline-action" data-testid="menu-editor-create-submenu" type="submit">
-                          <%= translated("menuEditor.addSubmenu") %>
+                          <%= dgettext("ui", "Add Submenu") %>
                         </button>
                       <% else %>
                         <button class="menu-editor-inline-action" type="submit">
-                          <%= translated("menuEditor.addCategoryArchive") %>
+                          <%= dgettext("ui", "Add Category Archive") %>
                         </button>
                       <% end %>
 
                       <button class="menu-editor-inline-action" type="button" phx-click="cancel_menu_editor_entry" phx-target={@myself}>
-                        <%= translated("Cancel") %>
+                        <%= dgettext("ui", "Cancel") %>
                       </button>
                     </div>
                   </div>
@@ -334,7 +335,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
                   <%= if @menu_editor.draft.type == :page do %>
                     <div class="menu-editor-picker-list">
                       <%= if @menu_editor.filtered_pages == [] do %>
-                        <div class="menu-editor-picker-state"><%= translated("menuEditor.pagePicker.empty") %></div>
+                        <div class="menu-editor-picker-state"><%= dgettext("ui", "No matching pages found.") %></div>
                       <% else %>
                         <%= for post <- @menu_editor.filtered_pages do %>
                           <button
@@ -353,7 +354,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
                   <% else %>
                     <div class="menu-editor-picker-list">
                       <%= if @menu_editor.filtered_categories == [] do %>
-                        <div class="menu-editor-picker-state"><%= translated("menuEditor.categoryPicker.empty") %></div>
+                        <div class="menu-editor-picker-state"><%= dgettext("ui", "No matching categories found.") %></div>
                       <% else %>
                         <%= for category <- @menu_editor.filtered_categories do %>
                           <button
@@ -406,9 +407,6 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     """
   end
 
-  @spec translated(term(), term()) :: term()
-  def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   @spec row_label(term(), term()) :: term()
   def row_label(item, category_titles) do
@@ -420,24 +418,24 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
   end
 
   @spec kind_label(term()) :: term()
-  def kind_label(:home), do: translated("menuEditor.type.home")
-  def kind_label(:page), do: translated("menuEditor.type.page")
-  def kind_label(:category_archive), do: translated("menuEditor.type.categoryArchive")
-  def kind_label(:submenu), do: translated("menuEditor.type.submenu")
+  def kind_label(:home), do: dgettext("ui", "Home")
+  def kind_label(:page), do: dgettext("ui", "Page")
+  def kind_label(:category_archive), do: dgettext("ui", "Category Archive")
+  def kind_label(:submenu), do: dgettext("ui", "Submenu")
 
   defdelegate draft_item?(menu_editor, item_id), to: TreePredicates
 
   @spec editing_title(term()) :: term()
-  def editing_title(%{draft: %{type: :category}}), do: translated("menuEditor.addCategoryArchive")
-  def editing_title(_menu_editor), do: translated("menuEditor.pagePicker.title")
+  def editing_title(%{draft: %{type: :category}}), do: dgettext("ui", "Add Category Archive")
+  def editing_title(_menu_editor), do: dgettext("ui", "Select Page")
 
   @spec editing_hint(term()) :: term()
-  def editing_hint(%{draft: %{type: :category}}), do: translated("menuEditor.categoryPicker.hint")
-  def editing_hint(_menu_editor), do: translated("menuEditor.createHint")
+  def editing_hint(%{draft: %{type: :category}}), do: dgettext("ui", "Select an existing category or press Enter to create a new archive entry")
+  def editing_hint(_menu_editor), do: dgettext("ui", "Select a page below or press Enter to create a submenu")
 
   @spec editing_placeholder(term()) :: term()
   def editing_placeholder(%{draft: %{type: :category}}),
-    do: translated("menuEditor.newCategoryPlaceholder")
+    do: dgettext("ui", "Type a category name")
 
-  def editing_placeholder(_menu_editor), do: translated("menuEditor.newEntryPlaceholder")
+  def editing_placeholder(_menu_editor), do: dgettext("ui", "Type a page title or submenu label")
 end

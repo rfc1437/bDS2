@@ -4,7 +4,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings do
   use Phoenix.Component
 
   alias BDS.Metadata
-  alias BDS.Desktop.ShellData
+  use Gettext, backend: BDS.Gettext
 
   @spec project_metadata(term()) :: term()
   def project_metadata(assigns) do
@@ -56,7 +56,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings do
 
       {:error, reason} ->
         socket
-        |> append_output.(translated("Settings"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "Settings"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -111,7 +111,4 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings do
       trimmed -> trimmed
     end
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

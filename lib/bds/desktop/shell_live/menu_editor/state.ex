@@ -3,9 +3,9 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.State do
 
   use Phoenix.Component
 
-  alias BDS.Desktop.ShellData
   alias BDS.Menu
   alias BDS.Desktop.ShellLive.MenuEditor.{PageCategory, TreeOps, TreePredicates}
+  use Gettext, backend: BDS.Gettext
 
   @spec ensure_state(term()) :: term()
   def ensure_state(assigns) do
@@ -30,8 +30,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.State do
     draft_query = Map.get(draft || %{}, :query, "")
 
     %{
-      title: translated("menuEditor.title"),
-      description: translated("menuEditor.description"),
+      title: dgettext("ui", "Blog Menu Editor"),
+      description: dgettext("ui", "Manage the central blog navigation outline and save it to meta/menu.opml."),
       items: state.items,
       selected_id: state.selected_id,
       draft: draft,
@@ -66,8 +66,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.State do
 
     socket
     |> append_output.(
-      translated("menuEditor.tabTitle"),
-      translated("menuEditor.saved"),
+      dgettext("ui", "Blog Menu"),
+      dgettext("ui", "Blog menu saved"),
       nil,
       "info"
     )
@@ -94,7 +94,4 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.State do
       draft: nil
     }
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

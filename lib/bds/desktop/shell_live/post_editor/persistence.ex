@@ -3,8 +3,8 @@ defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
 
   alias BDS.Posts
   alias BDS.Posts.Post
-  alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, PostMetadata}
+  use Gettext, backend: BDS.Gettext
 
   @spec persist(term(), term(), term(), term(), term()) :: term()
   def persist(%Post{} = post, draft, active_language, metadata, action) do
@@ -54,15 +54,15 @@ defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
   @spec discard_label(term()) :: term()
   def discard_label(%Post{} = post) do
     if has_published_version?(post),
-      do: translated("Discard Changes"),
-      else: translated("Discard Draft")
+      do: dgettext("ui", "Discard Changes"),
+      else: dgettext("ui", "Discard Draft")
   end
 
   @spec discard_title(term()) :: term()
   def discard_title(%Post{} = post) do
     if has_published_version?(post),
-      do: translated("Discard changes and restore the published version"),
-      else: translated("Delete this unpublished draft")
+      do: dgettext("ui", "Discard changes and restore the published version"),
+      else: dgettext("ui", "Delete this unpublished draft")
   end
 
   defp save_canonical_draft(%Post{id: post_id}, draft) do
@@ -112,7 +112,4 @@ defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

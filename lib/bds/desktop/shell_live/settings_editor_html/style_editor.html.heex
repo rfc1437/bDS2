@@ -1,10 +1,10 @@
 <div class="style-view" data-testid="style-editor">
   <div class="style-view-header">
-    <h2 data-testid="editor-title"><%= translated("Style") %></h2>
-    <p><%= translated("Theme preview and renderer theme selection") %></p>
+    <h2 data-testid="editor-title"><%= dgettext("ui", "Style") %></h2>
+    <p><%= dgettext("ui", "Theme preview and renderer theme selection") %></p>
   </div>
 
-  <div class="style-theme-picker" role="group" aria-label={translated("Theme picker")}>
+  <div class="style-theme-picker" role="group" aria-label={dgettext("ui", "Theme picker")}>
     <%= for theme <- @style_editor.themes do %>
       <button type="button" class={["style-theme-option", if(theme.name == @style_editor.selected_theme, do: "selected")]} phx-click="select_style_theme" phx-target={@myself} phx-value-theme={theme.name} aria-pressed={theme.name == @style_editor.selected_theme}>
         <span class="style-theme-swatch">
@@ -21,17 +21,17 @@
 
   <div class="style-apply-row">
     <label class="style-preview-mode-control">
-      <span><%= translated("Preview Mode") %></span>
+      <span><%= dgettext("ui", "Preview Mode") %></span>
       <select phx-change="change_style_preview_mode" phx-target={@myself} name="mode">
-        <option value="auto" selected={@style_editor.preview_mode == "auto"}><%= translated("Auto") %></option>
-        <option value="light" selected={@style_editor.preview_mode == "light"}><%= translated("Light") %></option>
-        <option value="dark" selected={@style_editor.preview_mode == "dark"}><%= translated("Dark") %></option>
+        <option value="auto" selected={@style_editor.preview_mode == "auto"}><%= dgettext("ui", "Auto") %></option>
+        <option value="light" selected={@style_editor.preview_mode == "light"}><%= dgettext("ui", "Light") %></option>
+        <option value="dark" selected={@style_editor.preview_mode == "dark"}><%= dgettext("ui", "Dark") %></option>
       </select>
     </label>
-    <button class="primary" type="button" phx-click="apply_style_theme" phx-target={@myself} disabled={@style_editor.selected_theme == @style_editor.applied_theme}><%= translated("Apply Theme") %></button>
+    <button class="primary" type="button" phx-click="apply_style_theme" phx-target={@myself} disabled={@style_editor.selected_theme == @style_editor.applied_theme}><%= dgettext("ui", "Apply Theme") %></button>
   </div>
 
   <div class="style-preview-container">
-    <iframe title={translated("Theme Preview")} class="style-preview-frame" src={@style_editor.preview_url}></iframe>
+    <iframe title={dgettext("ui", "Theme Preview")} class="style-preview-frame" src={@style_editor.preview_url}></iframe>
   </div>
 </div>

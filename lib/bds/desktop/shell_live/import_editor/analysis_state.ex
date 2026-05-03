@@ -2,7 +2,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
   @moduledoc false
 
   alias BDS.{ImportAnalysis, ImportDefinitions, Metadata}
-  alias BDS.Desktop.{FilePicker, FolderPicker, ShellData}
+  alias BDS.Desktop.{FilePicker, FolderPicker}
+  use Gettext, backend: BDS.Gettext
 
   @spec change_definition(term(), term(), term()) :: term()
   def change_definition(socket, params, reload) do
@@ -18,7 +19,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
   @spec select_uploads_folder(term(), term(), term()) :: term()
   def select_uploads_folder(socket, reload, append_output) do
     with %{id: definition_id} <- socket.assigns.current_tab do
-      case FolderPicker.choose_directory(translated("importAnalysis.uploadsFolder")) do
+      case FolderPicker.choose_directory(dgettext("ui", "Uploads Folder")) do
         {:ok, uploads_folder_path} ->
           {:ok, _definition} =
             ImportDefinitions.update_definition(definition_id, %{
@@ -32,7 +33,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
 
         {:error, %{message: message}} ->
           socket
-          |> append_output.(translated("activity.import"), message, nil, "error")
+          |> append_output.(dgettext("ui", "Import"), message, nil, "error")
           |> reload.(socket.assigns.workbench)
       end
     else
@@ -44,7 +45,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
   def select_and_analyze(socket, reload, append_output) do
     with %{id: definition_id} <- socket.assigns.current_tab,
          %{} = definition <- ImportDefinitions.get_definition(definition_id) do
-      case FilePicker.choose_file(translated("importAnalysis.wxrFile")) do
+      case FilePicker.choose_file(dgettext("ui", "WXR File")) do
         {:ok, wxr_file_path} ->
           project_id = socket.assigns.projects.active_project_id
 
@@ -78,7 +79,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
             :import_editor_analysis_states,
             Map.put(socket.assigns.import_editor_analysis_states, definition_id, %{
               loading: true,
-              step: translated("importAnalysis.analyzingWxr"),
+              step: dgettext("ui", "Analyzing WXR file..."),
               detail: Path.basename(wxr_file_path),
               file_path: wxr_file_path,
               ref: task.ref
@@ -99,7 +100,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
 
         {:error, %{message: message}} ->
           socket
-          |> append_output.(translated("activity.import"), message, nil, "error")
+          |> append_output.(dgettext("ui", "Import"), message, nil, "error")
           |> reload.(socket.assigns.workbench)
       end
     else
@@ -167,18 +168,18 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
 
               {:error, reason} ->
                 socket
-                |> append_output.(translated("activity.import"), inspect(reason), nil, "error")
+                |> append_output.(dgettext("ui", "Import"), inspect(reason), nil, "error")
                 |> reload.(socket.assigns.workbench)
             end
 
           {:error, %{message: message}} ->
             socket
-            |> append_output.(translated("activity.import"), message, nil, "error")
+            |> append_output.(dgettext("ui", "Import"), message, nil, "error")
             |> reload.(socket.assigns.workbench)
 
           {:error, reason} ->
             socket
-            |> append_output.(translated("activity.import"), inspect(reason), nil, "error")
+            |> append_output.(dgettext("ui", "Import"), inspect(reason), nil, "error")
             |> reload.(socket.assigns.workbench)
         end
     end
@@ -200,7 +201,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
           :import_editor_analysis_states,
           Map.delete(socket.assigns.import_editor_analysis_states, definition_id)
         )
-        |> append_output.(translated("activity.import"), message, nil, "error")
+        |> append_output.(dgettext("ui", "Import"), message, nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -294,21 +295,18 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
 
   def translate_phase(step) when is_binary(step) do
     case step do
-      "parsing" -> translated("importAnalysis.analysisPhase.parsing")
-      "scanning" -> translated("importAnalysis.analysisPhase.scanning")
-      "taxonomies" -> translated("importAnalysis.analysisPhase.taxonomies")
-      "posts" -> translated("importAnalysis.analysisPhase.posts")
-      "media" -> translated("importAnalysis.analysisPhase.media")
-      "complete" -> translated("importAnalysis.analysisPhase.complete")
+      "parsing" -> dgettext("ui", "Parsing WXR file...")
+      "scanning" -> dgettext("ui", "Scanning entries...")
+      "taxonomies" -> dgettext("ui", "Analyzing taxonomies...")
+      "posts" -> dgettext("ui", "Analyzing posts...")
+      "media" -> dgettext("ui", "Analyzing media...")
+      "complete" -> dgettext("ui", "Analysis complete")
       other -> other
     end
   end
 
   @spec translate_phase(term()) :: term()
   def translate_phase(other), do: other
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   defp present?(value), do: value not in [nil, ""]
 end

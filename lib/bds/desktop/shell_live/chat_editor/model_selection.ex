@@ -2,9 +2,9 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ModelSelection do
   @moduledoc false
 
   alias BDS.AI
-  alias BDS.Desktop.ShellData
 
   import Phoenix.Component, only: [assign: 3]
+  use Gettext, backend: BDS.Gettext
 
   @spec toggle_model_selector(term(), term()) :: term()
   def toggle_model_selector(socket, reload) do
@@ -34,7 +34,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ModelSelection do
 
       {:error, reason} ->
         socket
-        |> append_output.(translated("Chat"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "Chat"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -78,7 +78,4 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ModelSelection do
 
   defp blank?(value) when is_binary(value), do: String.trim(value) == ""
   defp blank?(nil), do: true
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

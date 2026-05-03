@@ -2,7 +2,7 @@
   <%= case @shell_overlay.kind do %>
     <% :ai_suggestions -> %>
       <div class="shell-overlay-backdrop ai-suggestions-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
+        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={dgettext("ui", "Cancel")}></button>
         <div class="ai-suggestions-modal" role="dialog" aria-modal="true">
           <div class="ai-suggestions-modal-header">
             <h2><%= @shell_overlay.title %></h2>
@@ -11,7 +11,7 @@
           <div class="ai-suggestions-modal-body">
             <%= if Map.get(@shell_overlay, :error) do %>
               <div class="ai-suggestions-error">
-                <strong><%= translated("Error") %></strong>
+                <strong><%= dgettext("ui", "Error") %></strong>
                 <span><%= @shell_overlay.error %></span>
               </div>
             <% end %>
@@ -39,27 +39,27 @@
             </div>
           </div>
           <div class="ai-suggestions-modal-footer">
-            <button class="button-cancel" type="button" phx-click="close_overlay"><%= translated("Cancel") %></button>
-            <button class="button-apply" type="button" phx-click="overlay_confirm"><%= translated("Apply Selected") %></button>
+            <button class="button-cancel" type="button" phx-click="close_overlay"><%= dgettext("ui", "Cancel") %></button>
+            <button class="button-apply" type="button" phx-click="overlay_confirm"><%= dgettext("ui", "Apply Selected") %></button>
           </div>
         </div>
       </div>
 
     <% :insert_link -> %>
       <div class="shell-overlay-backdrop insert-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
+        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={dgettext("ui", "Cancel")}></button>
         <div class="insert-modal" role="dialog" aria-modal="true">
           <div class="insert-modal-header">
             <h2 class="insert-modal-title"><%= @shell_overlay.title %></h2>
             <div class="insert-modal-tabs">
-              <button class={["insert-modal-tab", if(@shell_overlay.active_tab == :internal, do: "active")]} type="button" phx-click="overlay_set_tab" phx-value-tab="internal"><%= translated("Internal") %></button>
-              <button class={["insert-modal-tab", if(@shell_overlay.active_tab == :external, do: "active")]} type="button" phx-click="overlay_set_tab" phx-value-tab="external"><%= translated("External") %></button>
+              <button class={["insert-modal-tab", if(@shell_overlay.active_tab == :internal, do: "active")]} type="button" phx-click="overlay_set_tab" phx-value-tab="internal"><%= dgettext("ui", "Internal") %></button>
+              <button class={["insert-modal-tab", if(@shell_overlay.active_tab == :external, do: "active")]} type="button" phx-click="overlay_set_tab" phx-value-tab="external"><%= dgettext("ui", "External") %></button>
             </div>
           </div>
 
           <%= if @shell_overlay.active_tab == :internal do %>
             <form class="insert-modal-search" phx-change="overlay_set_search">
-              <input class="insert-modal-input" type="text" name="overlay[query]" value={@shell_overlay.search_query} placeholder={translated("sidebar.searchPostsPlaceholder")} />
+              <input class="insert-modal-input" type="text" name="overlay[query]" value={@shell_overlay.search_query} placeholder={dgettext("ui", "Search posts...")} />
             </form>
             <div class="insert-modal-results">
               <%= for result <- if(String.length(@shell_overlay.search_query) >= 2, do: @shell_overlay.results, else: @shell_overlay.related_posts) do %>
@@ -69,20 +69,20 @@
                 </button>
               <% end %>
               <%= if Enum.empty?(if(String.length(@shell_overlay.search_query) >= 2, do: @shell_overlay.results, else: @shell_overlay.related_posts)) do %>
-                <div class="insert-modal-status"><%= translated("No items") %></div>
+                <div class="insert-modal-status"><%= dgettext("ui", "No items") %></div>
               <% end %>
             </div>
           <% else %>
             <form class="insert-modal-external" phx-change="overlay_update_form">
               <label class="insert-modal-field">
-                <span class="insert-modal-label"><%= translated("URL") %></span>
+                <span class="insert-modal-label"><%= dgettext("ui", "URL") %></span>
                 <input class="insert-modal-input" type="text" name="overlay[url]" value={@shell_overlay.external_url} />
               </label>
               <label class="insert-modal-field">
-                <span class="insert-modal-label"><%= translated("Display Text") %></span>
+                <span class="insert-modal-label"><%= dgettext("ui", "Display Text") %></span>
                 <input class="insert-modal-input" type="text" name="overlay[text]" value={@shell_overlay.external_text} />
               </label>
-              <button class="insert-modal-submit" type="button" phx-click="overlay_insert_external"><%= translated("Insert") %></button>
+              <button class="insert-modal-submit" type="button" phx-click="overlay_insert_external"><%= dgettext("ui", "Insert") %></button>
             </form>
           <% end %>
         </div>
@@ -90,13 +90,13 @@
 
     <% :insert_media -> %>
       <div class="shell-overlay-backdrop insert-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
+        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={dgettext("ui", "Cancel")}></button>
         <div class="insert-modal" role="dialog" aria-modal="true">
           <div class="insert-modal-header">
             <h2 class="insert-modal-title"><%= @shell_overlay.title %></h2>
           </div>
           <form class="insert-modal-search" phx-change="overlay_set_search">
-            <input class="insert-modal-input" type="text" name="overlay[query]" value={@shell_overlay.search_query} placeholder={translated("sidebar.searchMediaPlaceholder")} />
+            <input class="insert-modal-input" type="text" name="overlay[query]" value={@shell_overlay.search_query} placeholder={dgettext("ui", "Search media...")} />
           </form>
           <div class="insert-modal-results insert-modal-media-grid">
             <%= for result <- @shell_overlay.results do %>
@@ -115,14 +115,14 @@
 
     <% :language_picker -> %>
       <div class="shell-overlay-backdrop language-picker-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
+        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={dgettext("ui", "Cancel")}></button>
         <div class="language-picker-modal" role="dialog" aria-modal="true">
           <div class="language-picker-modal-header">
             <h2><%= @shell_overlay.title %></h2>
             <button class="language-picker-modal-close" type="button" phx-click="close_overlay">×</button>
           </div>
           <div class="language-picker-modal-body">
-            <div class="language-picker-label"><%= translated("Available languages") %></div>
+            <div class="language-picker-label"><%= dgettext("ui", "Available languages") %></div>
             <div class="language-picker-options">
               <%= for target <- @shell_overlay.available_targets do %>
                 <button class="language-picker-option" type="button" phx-click="overlay_select_language" phx-value-code={target.code}>
@@ -140,7 +140,7 @@
 
     <% :confirm_delete -> %>
       <div class="shell-overlay-backdrop confirm-delete-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
+        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={dgettext("ui", "Cancel")}></button>
         <div class="confirm-delete-modal" role="dialog" aria-modal="true">
           <div class="confirm-delete-modal-header">
             <h2><%= @shell_overlay.title %></h2>
@@ -151,7 +151,7 @@
             <%= if @shell_overlay.reference_count > 0 do %>
               <div class="confirm-delete-warning">
                 <div class="warning-content">
-                  <strong><%= translated("This item is referenced by:") %></strong>
+                  <strong><%= dgettext("ui", "This item is referenced by:") %></strong>
                   <ul class="reference-list">
                     <%= for title <- @shell_overlay.reference_list do %>
                       <li><span class="reference-title"><%= title %></span></li>
@@ -162,15 +162,15 @@
             <% end %>
           </div>
           <div class="confirm-delete-modal-footer">
-            <button class="button-cancel" type="button" phx-click="close_overlay"><%= translated("Cancel") %></button>
-            <button class="button-delete" type="button" phx-click="overlay_confirm"><%= translated("Delete") %></button>
+            <button class="button-cancel" type="button" phx-click="close_overlay"><%= dgettext("ui", "Cancel") %></button>
+            <button class="button-delete" type="button" phx-click="overlay_confirm"><%= dgettext("ui", "Delete") %></button>
           </div>
         </div>
       </div>
 
     <% :confirm_dialog -> %>
       <div class="shell-overlay-backdrop confirm-delete-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
+        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={dgettext("ui", "Cancel")}></button>
         <div class="confirm-delete-modal" role="dialog" aria-modal="true">
           <div class="confirm-delete-modal-header">
             <h2><%= @shell_overlay.title %></h2>
@@ -180,18 +180,18 @@
             <div class="confirm-delete-message"><%= @shell_overlay.message %></div>
           </div>
           <div class="confirm-delete-modal-footer">
-            <button class="button-cancel" type="button" phx-click="close_overlay"><%= translated("Cancel") %></button>
-            <button class="button-apply" type="button" phx-click="overlay_confirm"><%= translated("Confirm") %></button>
+            <button class="button-cancel" type="button" phx-click="close_overlay"><%= dgettext("ui", "Cancel") %></button>
+            <button class="button-apply" type="button" phx-click="overlay_confirm"><%= dgettext("ui", "Confirm") %></button>
           </div>
         </div>
       </div>
 
     <% :gallery -> %>
       <div class="shell-overlay-backdrop gallery-overlay-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
-        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={translated("Cancel")}></button>
+        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={dgettext("ui", "Cancel")}></button>
         <div class="gallery-overlay" role="dialog" aria-modal="true">
           <div class="gallery-overlay-header">
-            <h2><%= translated("Gallery") %></h2>
+            <h2><%= dgettext("ui", "Gallery") %></h2>
             <button class="gallery-overlay-close" type="button" phx-click="close_overlay">×</button>
           </div>
           <div class="gallery-overlay-grid">
@@ -205,7 +205,7 @@
 
         <%= if @shell_overlay.lightbox do %>
           <div class="lightbox-overlay">
-            <button class="shell-overlay-dismiss" type="button" phx-click="overlay_close_lightbox" aria-label={translated("Cancel")}></button>
+            <button class="shell-overlay-dismiss" type="button" phx-click="overlay_close_lightbox" aria-label={dgettext("ui", "Cancel")}></button>
             <div class="lightbox-container">
               <button class="lightbox-close" type="button" phx-click="overlay_close_lightbox">×</button>
               <%= if @shell_overlay.lightbox.total_count > 1 do %>

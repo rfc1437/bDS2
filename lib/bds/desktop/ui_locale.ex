@@ -30,6 +30,7 @@ defmodule BDS.Desktop.UILocale do
   @spec put(locale()) :: :ok
   def put(locale) do
     Process.put(@key, locale)
+    BDS.Gettext.put_locale(locale)
     :ok
   end
 

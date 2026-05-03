@@ -2,6 +2,7 @@ defmodule BDS.Rendering.PostRendering do
   @moduledoc false
 
   alias BDS.Rendering.Filters
+  alias BDS.Rendering.Labels
   alias BDS.Rendering.LinksAndLanguages
   alias BDS.Rendering.Metadata, as: RenderMetadata
   alias BDS.Rendering.TemplateSelection
@@ -95,7 +96,8 @@ defmodule BDS.Rendering.PostRendering do
       canonical_post_path_by_slug: canonical_post_paths,
       canonical_media_path_by_source_path: canonical_media_paths,
       post_data_json_by_id: post_data_json(post_assigns, post_record),
-      post: build_post_context(post_assigns, post_record, incoming_links, outgoing_links)
+      post: build_post_context(post_assigns, post_record, incoming_links, outgoing_links),
+      labels: Labels.for_language(language)
     }
   end
 

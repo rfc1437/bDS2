@@ -8,17 +8,17 @@
 >
   <div class="tags-view">
     <div class="tags-view-header">
-      <h2><%= translated("Tags") %></h2>
+      <h2><%= dgettext("ui", "Tags") %></h2>
     </div>
 
     <div class="tags-view-content">
       <div class="tags-section" id="tags-section-cloud">
-        <div class="tags-section-header"><h3><%= translated("Tag Cloud") %></h3></div>
+        <div class="tags-section-header"><h3><%= dgettext("ui", "Tag Cloud") %></h3></div>
         <div class="tags-section-content">
           <%= if Enum.empty?(@tags_editor.tags) do %>
             <div class="tags-empty-state">
-              <p><%= translated("No tags found") %></p>
-              <button class="secondary" type="button" phx-click="sync_tags_editor" phx-target={@myself}><%= translated("Discover") %></button>
+              <p><%= dgettext("ui", "No tags found") %></p>
+              <button class="secondary" type="button" phx-click="sync_tags_editor" phx-target={@myself}><%= dgettext("ui", "Discover") %></button>
             </div>
           <% else %>
             <div class="tag-cloud">
@@ -33,13 +33,13 @@
       </div>
 
       <div class="tags-section" id="tags-section-manage">
-        <div class="tags-section-header"><h3><%= translated("Create / Edit") %></h3></div>
+        <div class="tags-section-header"><h3><%= dgettext("ui", "Create / Edit") %></h3></div>
         <div class="tags-section-content">
           <form class="tag-create-form" phx-change="change_new_tag_editor" phx-target={@myself}>
             <div class="tag-form-row">
-              <input type="text" name="new_tag[name]" value={@tags_editor.new_tag["name"]} placeholder={translated("Tag name")} />
+              <input type="text" name="new_tag[name]" value={@tags_editor.new_tag["name"]} placeholder={dgettext("ui", "Tag name")} />
               <input type="color" name="new_tag[color]" value={if(@tags_editor.new_tag["color"] in [nil, ""], do: "#3b82f6", else: @tags_editor.new_tag["color"])} />
-              <button class="primary" type="button" phx-click="create_tag_editor" phx-target={@myself}><%= translated("Create") %></button>
+              <button class="primary" type="button" phx-click="create_tag_editor" phx-target={@myself}><%= dgettext("ui", "Create") %></button>
             </div>
           </form>
 
@@ -49,13 +49,13 @@
                 <input type="text" name="edit_tag[name]" value={@tags_editor.edit_draft["name"]} />
                 <input type="color" name="edit_tag[color]" value={if(@tags_editor.edit_draft["color"] in [nil, ""], do: "#3b82f6", else: @tags_editor.edit_draft["color"])} />
                 <select name="edit_tag[post_template_slug]">
-                  <option value=""><%= translated("No Template") %></option>
+                  <option value=""><%= dgettext("ui", "No Template") %></option>
                   <%= for template <- @tags_editor.templates do %>
                     <option value={template.slug} selected={template.slug == @tags_editor.edit_draft["post_template_slug"]}><%= template.title %></option>
                   <% end %>
                 </select>
-                <button class="primary" type="button" phx-click="save_tag_editor" phx-target={@myself}><%= translated("Save") %></button>
-                <button class="danger" type="button" phx-click="delete_tag_editor" phx-target={@myself}><%= translated("Delete") %></button>
+                <button class="primary" type="button" phx-click="save_tag_editor" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
+                <button class="danger" type="button" phx-click="delete_tag_editor" phx-target={@myself}><%= dgettext("ui", "Delete") %></button>
               </div>
             </form>
           <% end %>
@@ -63,7 +63,7 @@
       </div>
 
       <div class="tags-section" id="tags-section-merge">
-        <div class="tags-section-header"><h3><%= translated("Merge Tags") %></h3></div>
+        <div class="tags-section-header"><h3><%= dgettext("ui", "Merge Tags") %></h3></div>
         <div class="tags-section-content">
           <div class="merge-form">
             <div class="tag-form-row">
@@ -72,16 +72,16 @@
                   <option value={tag_name} selected={tag_name == @tags_editor.merge_target}><%= tag_name %></option>
                 <% end %>
               </select>
-              <button class="primary" type="button" phx-click="merge_tags_editor" disabled={length(@tags_editor.selected) < 2} phx-target={@myself}><%= translated("Merge") %></button>
+              <button class="primary" type="button" phx-click="merge_tags_editor" disabled={length(@tags_editor.selected) < 2} phx-target={@myself}><%= dgettext("ui", "Merge") %></button>
             </div>
           </div>
         </div>
       </div>
 
       <div class="tags-section" id="tags-section-sync">
-        <div class="tags-section-header"><h3><%= translated("Sync") %></h3></div>
+        <div class="tags-section-header"><h3><%= dgettext("ui", "Sync") %></h3></div>
         <div class="tags-section-content">
-          <button class="secondary" type="button" phx-click="sync_tags_editor" phx-target={@myself}><%= translated("Discover") %></button>
+          <button class="secondary" type="button" phx-click="sync_tags_editor" phx-target={@myself}><%= dgettext("ui", "Discover") %></button>
         </div>
       </div>
     </div>

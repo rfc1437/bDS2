@@ -30,6 +30,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       translate_execution_phase: 1
     ]
 
+  use Gettext, backend: BDS.Gettext
   import TaxonomyEditing,
     only: [
       existing_taxonomy_terms: 1,
@@ -162,7 +163,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     definition_id = socket.assigns.definition_id
 
     socket =
-      case FolderPicker.choose_directory(translated("importAnalysis.uploadsFolder")) do
+      case FolderPicker.choose_directory(dgettext("ui", "Uploads Folder")) do
         {:ok, uploads_folder_path} ->
           {:ok, _definition} =
             ImportDefinitions.update_definition(definition_id, %{
@@ -175,7 +176,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           build_data(socket)
 
         {:error, %{message: message}} ->
-          notify_output(translated("activity.import"), message, "error")
+          notify_output(dgettext("ui", "Import"), message, "error")
           build_data(socket)
       end
 
@@ -187,7 +188,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     project_id = socket.assigns.project_id
 
     socket =
-      case FilePicker.choose_file(translated("importAnalysis.wxrFile")) do
+      case FilePicker.choose_file(dgettext("ui", "WXR File")) do
         {:ok, wxr_file_path} ->
           {:ok, definition} =
             ImportDefinitions.update_definition(definition_id, %{
@@ -214,7 +215,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           socket
           |> assign(:analysis_state, %{
             loading: true,
-            step: translated("importAnalysis.analyzingWxr"),
+            step: dgettext("ui", "Analyzing WXR file..."),
             detail: Path.basename(wxr_file_path),
             file_path: wxr_file_path,
             ref: task.ref
@@ -226,7 +227,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           build_data(socket)
 
         {:error, %{message: message}} ->
-          notify_output(translated("activity.import"), message, "error")
+          notify_output(dgettext("ui", "Import"), message, "error")
           build_data(socket)
       end
 
@@ -430,12 +431,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
            %{} = report <- ImportDefinitions.decode_analysis_result(definition) do
         if socket.assigns.offline_mode? do
           notify_output(
-            translated("activity.import"),
-            ShellData.translate(
-              "Automatic AI actions stay gated by airplane mode.",
-              %{},
-              socket.assigns[:page_language] || ShellData.ui_language()
-            ),
+            dgettext("ui", "Import"),
+            BDS.Gettext.lgettext(socket.assigns[:page_language] || ShellData.ui_language(), "ui", "Automatic AI actions stay gated by airplane mode."),
             "info"
           )
 
@@ -467,15 +464,15 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
               mapped_count = TaxonomyEditing.auto_mapped_count(report, updated_report)
 
               notify_output(
-                translated("activity.import"),
-                translated("importAnalysis.mappedCount", %{count: mapped_count}),
+                dgettext("ui", "Import"),
+                dgettext("ui", "%{count} mapped", count: mapped_count),
                 "info"
               )
 
               build_data(socket)
 
             {:error, reason} ->
-              notify_output(translated("activity.import"), inspect(reason), "error")
+              notify_output(dgettext("ui", "Import"), inspect(reason), "error")
               build_data(socket)
           end
         end
@@ -552,7 +549,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
           socket
           |> assign(:analysis_state, default_analysis_state())
-          |> notify_output(translated("activity.import"), message, "error")
+          |> notify_output(dgettext("ui", "Import"), message, "error")
 
         match?(%{ref: ^ref}, socket.assigns.execution_state) and reason not in [:normal, :shutdown] ->
           message = if is_binary(reason), do: reason, else: inspect(reason)
@@ -567,7 +564,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
               ref: nil
             })
           )
-          |> notify_output(translated("activity.import"), message, "error")
+          |> notify_output(dgettext("ui", "Import"), message, "error")
 
         true ->
           socket
@@ -630,11 +627,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   end
 
   defp maybe_update_tab_meta(socket, name) do
-    title = name || translated("importAnalysis.untitledImport")
+    title = name || dgettext("ui", "Untitled Import")
 
     notify_parent(
       {:import_editor_tab_meta, socket.assigns.definition_id, title,
-       translated("importAnalysis.headerDescription")}
+       dgettext("ui", "Select a WordPress export file (WXR) and an uploads folder to analyze what would be imported.")}
     )
 
     socket
@@ -653,7 +650,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     end
   end
 
-  defp selected_model_label(nil, []), do: translated("importAnalysis.analyzeWith")
+  defp selected_model_label(nil, []), do: dgettext("ui", "Analyze with...")
   defp selected_model_label(nil, [model | _rest]), do: model.name || model.id
 
   defp selected_model_label(model_id, available_models) do
@@ -685,14 +682,14 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
             socket
 
           {:error, reason} ->
-            notify_output(socket, translated("activity.import"), inspect(reason), "error")
+            notify_output(socket, dgettext("ui", "Import"), inspect(reason), "error")
         end
 
       {:error, %{message: message}} ->
-        notify_output(socket, translated("activity.import"), message, "error")
+        notify_output(socket, dgettext("ui", "Import"), message, "error")
 
       {:error, reason} ->
-        notify_output(socket, translated("activity.import"), inspect(reason), "error")
+        notify_output(socket, dgettext("ui", "Import"), inspect(reason), "error")
     end
   end
 
@@ -713,8 +710,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
               ref: nil
           })
           |> notify_output(
-            translated("activity.import"),
-            translated("importAnalysis.importComplete", %{count: previous_state.count}),
+            dgettext("ui", "Import"),
+            dgettext("ui", "Import completed successfully!", count: previous_state.count),
             "info"
           )
 
@@ -727,7 +724,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
               error: message,
               ref: nil
           })
-          |> notify_output(translated("activity.import"), message, "error")
+          |> notify_output(dgettext("ui", "Import"), message, "error")
 
         {:error, reason} ->
           message = inspect(reason)
@@ -740,7 +737,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
               error: message,
               ref: nil
           })
-          |> notify_output(translated("activity.import"), message, "error")
+          |> notify_output(dgettext("ui", "Import"), message, "error")
       end
 
     # Allow DB connections to settle before rebuilding
@@ -812,27 +809,27 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           class="import-definition-name"
           type="text"
           name="import_definition[name]"
-          value={@import_editor.definition_name || translated("importAnalysis.untitledImport")}
-          placeholder={translated("importAnalysis.namePlaceholder")}
+          value={@import_editor.definition_name || dgettext("ui", "Untitled Import")}
+          placeholder={dgettext("ui", "Import name...")}
         />
-        <p><%= translated("importAnalysis.headerDescription") %></p>
+        <p><%= dgettext("ui", "Select a WordPress export file (WXR) and an uploads folder to analyze what would be imported.") %></p>
       </form>
 
       <div class="import-file-selectors">
         <div class="import-file-row">
-          <label><%= translated("importAnalysis.uploadsFolder") %></label>
+          <label><%= dgettext("ui", "Uploads Folder") %></label>
           <div class={["import-file-path", if(blank?(@import_editor.uploads_folder_path), do: "placeholder")]}>
-            <%= @import_editor.uploads_folder_path || translated("importAnalysis.noFolderSelected") %>
+            <%= @import_editor.uploads_folder_path || dgettext("ui", "No folder selected") %>
           </div>
-          <button type="button" phx-click="select_import_uploads_folder" phx-target={@myself}><%= translated("Open") %></button>
+          <button type="button" phx-click="select_import_uploads_folder" phx-target={@myself}><%= dgettext("ui", "Open") %></button>
         </div>
 
         <div class="import-file-row">
-          <label><%= translated("importAnalysis.wxrFile") %></label>
+          <label><%= dgettext("ui", "WXR File") %></label>
           <div class={["import-file-path", if(blank?(@import_editor.wxr_file_path), do: "placeholder")]}>
-            <%= @import_editor.wxr_file_path || translated("importAnalysis.selectFileToAnalyze") %>
+            <%= @import_editor.wxr_file_path || dgettext("ui", "Select a file to analyze") %>
           </div>
-          <button class="import-analyze-btn" type="button" phx-click="select_import_wxr_file" phx-target={@myself}><%= translated("importAnalysis.selectAndAnalyze") %></button>
+          <button class="import-analyze-btn" type="button" phx-click="select_import_wxr_file" phx-target={@myself}><%= dgettext("ui", "Select & Analyze") %></button>
         </div>
       </div>
 
@@ -840,7 +837,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         <div class="import-loading">
           <div class="import-spinner"></div>
           <div class="import-progress">
-            <div class="import-progress-step"><%= @analysis_state.step || translated("importAnalysis.analyzingWxr") %></div>
+            <div class="import-progress-step"><%= @analysis_state.step || dgettext("ui", "Analyzing WXR file...") %></div>
             <%= if present?(@analysis_state.detail) do %>
               <div class="import-progress-detail"><%= @analysis_state.detail %></div>
             <% end %>
@@ -851,37 +848,37 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       <%= if not is_nil(@report) and not @import_editor.is_loading do %>
         <div class="import-site-info">
           <div class="import-site-info-item">
-            <span class="info-label"><%= translated("importAnalysis.site") %></span>
-            <span class="info-value"><%= get_in(@report, [:site_info, :title]) || translated("importAnalysis.untitled") %></span>
+            <span class="info-label"><%= dgettext("ui", "Site") %></span>
+            <span class="info-value"><%= get_in(@report, [:site_info, :title]) || dgettext("ui", "Untitled") %></span>
           </div>
           <div class="import-site-info-item">
-            <span class="info-label"><%= translated("importAnalysis.url") %></span>
-            <span class="info-value"><%= get_in(@report, [:site_info, :url]) || translated("importAnalysis.notAvailable") %></span>
+            <span class="info-label"><%= dgettext("ui", "URL") %></span>
+            <span class="info-value"><%= get_in(@report, [:site_info, :url]) || dgettext("ui", "N/A") %></span>
           </div>
           <div class="import-site-info-item">
-            <span class="info-label"><%= translated("importAnalysis.language") %></span>
-            <span class="info-value"><%= get_in(@report, [:site_info, :language]) || translated("importAnalysis.notAvailable") %></span>
+            <span class="info-label"><%= dgettext("ui", "Language") %></span>
+            <span class="info-value"><%= get_in(@report, [:site_info, :language]) || dgettext("ui", "N/A") %></span>
           </div>
           <div class="import-site-info-item">
-            <span class="info-label"><%= translated("importAnalysis.file") %></span>
+            <span class="info-label"><%= dgettext("ui", "File") %></span>
             <span class="info-value"><%= @import_editor.wxr_file_path |> to_string() |> Path.basename() %></span>
           </div>
         </div>
 
         <div class="import-stat-cards">
-          <.stat_card label={translated("importAnalysis.posts")} stats={@report.post_stats} />
+          <.stat_card label={dgettext("ui", "posts")} stats={@report.post_stats} />
           <%= if Map.get(@report, :other_stats) && Map.get(@report.other_stats, :total, 0) > 0 do %>
-            <.other_stat_card label={translated("importAnalysis.other")} stats={@report.other_stats} />
+            <.other_stat_card label={dgettext("ui", "Other")} stats={@report.other_stats} />
           <% end %>
-          <.stat_card label={translated("importAnalysis.pages")} stats={@report.page_stats} />
-          <.media_stat_card label={translated("importAnalysis.media")} stats={@report.media_stats} />
-          <.taxonomy_stat_card label={translated("importAnalysis.categories")} stats={@report.category_stats} />
-          <.taxonomy_stat_card label={translated("importAnalysis.tags")} stats={@report.tag_stats} />
+          <.stat_card label={dgettext("ui", "pages")} stats={@report.page_stats} />
+          <.media_stat_card label={dgettext("ui", "media")} stats={@report.media_stats} />
+          <.taxonomy_stat_card label={dgettext("ui", "Categories")} stats={@report.category_stats} />
+          <.taxonomy_stat_card label={dgettext("ui", "Tags")} stats={@report.tag_stats} />
         </div>
 
         <%= if Enum.any?(Map.get(@report, :date_distribution, [])) do %>
           <div class="import-date-distribution">
-            <h3><%= translated("importAnalysis.dateDistribution") %></h3>
+            <h3><%= dgettext("ui", "Date Distribution") %></h3>
             <div class="distribution-bars">
               <%= for row <- @report.date_distribution do %>
                 <div class="distribution-row">
@@ -900,13 +897,13 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         <%= if @execution_state.is_executing do %>
           <div class="import-execution-progress">
             <div class="import-execution-header">
-              <h3><%= translated("importAnalysis.importing") %></h3>
+              <h3><%= dgettext("ui", "Importing...") %></h3>
             </div>
             <div class="import-progress-bar">
               <div class="import-progress-fill" style={"width: #{execution_progress_width(@execution_state)}%;"}></div>
             </div>
             <div class="import-progress-info">
-              <span class="import-phase"><%= @execution_state.phase || translated("importAnalysis.executionStarting") %></span>
+              <span class="import-phase"><%= @execution_state.phase || dgettext("ui", "Starting...") %></span>
               <%= if present?(@execution_state.detail) do %>
                 <span class="import-detail"><%= @execution_state.detail %></span>
               <% end %>
@@ -921,18 +918,18 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         <%= if not @execution_state.is_executing and not @execution_state.completed do %>
           <div class="import-execute-section">
             <div class="import-execute-summary">
-              <%= translated("importAnalysis.readyToImport") %>
-              <%= if @counts.tags > 0 do %><span class="import-count-tag"><%= @counts.tags %> <%= translated("importAnalysis.tagsCategories") %></span><% end %>
-              <%= if @counts.posts > 0 do %><span class="import-count-tag"><%= @counts.posts %> <%= translated("importAnalysis.posts") %></span><% end %>
-              <%= if @counts.media > 0 do %><span class="import-count-tag"><%= @counts.media %> <%= translated("importAnalysis.media") %></span><% end %>
-              <%= if @counts.pages > 0 do %><span class="import-count-tag"><%= @counts.pages %> <%= translated("importAnalysis.pages") %></span><% end %>
+              <%= dgettext("ui", "Ready to import:") %>
+              <%= if @counts.tags > 0 do %><span class="import-count-tag"><%= @counts.tags %> <%= dgettext("ui", "tags/categories") %></span><% end %>
+              <%= if @counts.posts > 0 do %><span class="import-count-tag"><%= @counts.posts %> <%= dgettext("ui", "posts") %></span><% end %>
+              <%= if @counts.media > 0 do %><span class="import-count-tag"><%= @counts.media %> <%= dgettext("ui", "media") %></span><% end %>
+              <%= if @counts.pages > 0 do %><span class="import-count-tag"><%= @counts.pages %> <%= dgettext("ui", "pages") %></span><% end %>
             </div>
 
             <button class="import-execute-btn" type="button" phx-click="execute_import_editor" phx-target={@myself} disabled={@counts.total == 0}>
               <%= if @counts.total == 0 do %>
-                <%= translated("importAnalysis.nothingToImport") %>
+                <%= dgettext("ui", "Nothing to Import") %>
               <% else %>
-                <%= translated("importAnalysis.importItems", %{count: @counts.total}) %>
+                <%= dgettext("ui", "Import %{count} Items", count: @counts.total) %>
               <% end %>
             </button>
           </div>
@@ -940,56 +937,56 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
         <%= if @execution_state.completed do %>
           <div class="import-execution-complete">
-            <span><%= translated("importAnalysis.importComplete", %{count: @execution_state.count || @counts.total}) %></span>
+            <span><%= dgettext("ui", "Import completed successfully!", count: @execution_state.count || @counts.total) %></span>
           </div>
         <% end %>
 
         <%= if present?(@execution_state.error) do %>
           <div class="import-execution-error">
-            <span><%= translated("importAnalysis.importFailed", %{error: @execution_state.error}) %></span>
+            <span><%= dgettext("ui", "Import failed: %{error}", error: @execution_state.error) %></span>
           </div>
         <% end %>
 
         <%= if Enum.any?(@post_conflicts) do %>
-          <.conflict_section title={translated("importAnalysis.postSlugConflicts")} items={@post_conflicts} expanded={@sections.post_conflicts} section="post_conflicts" myself={@myself} />
+          <.conflict_section title={dgettext("ui", "Post Slug Conflicts")} items={@post_conflicts} expanded={@sections.post_conflicts} section="post_conflicts" myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(@page_conflicts) do %>
-          <.conflict_section title={translated("importAnalysis.pageSlugConflicts")} items={@page_conflicts} expanded={@sections.page_conflicts} section="page_conflicts" myself={@myself} />
+          <.conflict_section title={dgettext("ui", "Page Slug Conflicts")} items={@page_conflicts} expanded={@sections.page_conflicts} section="page_conflicts" myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(@post_items) do %>
-          <.post_detail_section title={translated("importAnalysis.postsWithCount", %{count: length(@post_items)})} items={@post_items} expanded={@sections.posts} section="posts" myself={@myself} />
+          <.post_detail_section title={dgettext("ui", "Posts (%{count})", count: length(@post_items))} items={@post_items} expanded={@sections.posts} section="posts" myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(@other_items) do %>
-          <.post_detail_section title={translated("importAnalysis.otherWithCount", %{count: length(@other_items)})} items={@other_items} expanded={@sections.other} section="other" show_type={true} myself={@myself} />
+          <.post_detail_section title={dgettext("ui", "Other (%{count})", count: length(@other_items))} items={@other_items} expanded={@sections.other} section="other" show_type={true} myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(@detail_pages) do %>
-          <.post_detail_section title={translated("importAnalysis.pagesWithCount", %{count: length(@detail_pages)})} items={@detail_pages} expanded={@sections.pages} section="pages" myself={@myself} />
+          <.post_detail_section title={dgettext("ui", "Pages (%{count})", count: length(@detail_pages))} items={@detail_pages} expanded={@sections.pages} section="pages" myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(@detail_media) do %>
-          <.media_detail_section title={translated("importAnalysis.mediaWithCount", %{count: length(@detail_media)})} items={@detail_media} expanded={@sections.media} section="media" myself={@myself} />
+          <.media_detail_section title={dgettext("ui", "Media (%{count})", count: length(@detail_media))} items={@detail_media} expanded={@sections.media} section="media" myself={@myself} />
         <% end %>
 
         <%= if Enum.any?(Map.get(@report.items, :categories, [])) or Enum.any?(Map.get(@report.items, :tags, [])) do %>
           <section class="import-detail-section">
             <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-target={@myself} phx-value-section="taxonomy">
-              <span><%= translated("importAnalysis.taxonomyTitle") %></span>
+              <span><%= dgettext("ui", "Categories & Tags") %></span>
               <span class="toggle-icon"><%= if @sections.taxonomy, do: "▾", else: "▸" %></span>
             </button>
 
             <%= if @sections.taxonomy do %>
               <div class="taxonomy-analyze-row">
                 <div class="taxonomy-analyze-dropdown">
-                  <button class="taxonomy-analyze-btn" type="button" phx-click="toggle_import_ai_model_selector" phx-target={@myself}><%= translated("importAnalysis.analyzeWith") %></button>
+                  <button class="taxonomy-analyze-btn" type="button" phx-click="toggle_import_ai_model_selector" phx-target={@myself}><%= dgettext("ui", "Analyze with...") %></button>
                   <%= if @import_editor.model_selector_open? do %>
                     <div class="taxonomy-model-dropdown">
                       <%= for model <- @import_editor.available_models do %>
                         <button class="taxonomy-model-option" type="button" phx-click="select_import_ai_model" phx-target={@myself} phx-value-model={model.id}>
-                          <%= model.provider_name || model.provider || translated("importAnalysis.unknown") %>: <%= model.name || model.id %>
+                          <%= model.provider_name || model.provider || dgettext("ui", "Unknown") %>: <%= model.name || model.id %>
                         </button>
                       <% end %>
                     </div>
@@ -1000,12 +997,12 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                   <%= @import_editor.selected_model_label %>
                 </button>
 
-                <span class="taxonomy-analyze-hint"><%= translated("importAnalysis.aiMappingHint") %></span>
+                <span class="taxonomy-analyze-hint"><%= dgettext("ui", "AI will suggest mappings from new to existing items to avoid duplicates") %></span>
               </div>
 
               <div class="import-taxonomy-groups">
                 <.taxonomy_group
-                  title={translated("importAnalysis.categories")}
+                  title={dgettext("ui", "Categories")}
                   items={Map.get(@report.items, :categories, [])}
                   suggestions={Map.get(@import_editor.taxonomy_terms, :categories, [])}
                   edit={@import_editor.taxonomy_edit}
@@ -1013,7 +1010,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                   myself={@myself}
                 />
                 <.taxonomy_group
-                  title={translated("importAnalysis.tags")}
+                  title={dgettext("ui", "Tags")}
                   items={Map.get(@report.items, :tags, [])}
                   suggestions={Map.get(@import_editor.taxonomy_terms, :tags, [])}
                   edit={@import_editor.taxonomy_edit}
@@ -1029,14 +1026,14 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         <%= if Enum.any?(Map.get(macros, :discovered, [])) do %>
           <section class="import-detail-section">
             <button class="import-section-toggle" type="button" phx-click="toggle_import_section" phx-target={@myself} phx-value-section="macros">
-              <span><%= translated("importAnalysis.macrosWithCount", %{count: macros.total || length(macros.discovered)}) %></span>
+              <span><%= dgettext("ui", "Macros (%{count})", count: macros.total || length(macros.discovered)) %></span>
               <span class="toggle-icon"><%= if @sections.macros, do: "▾", else: "▸" %></span>
             </button>
 
             <%= if @sections.macros do %>
               <div class="macros-summary">
-                <span class="macros-mapped"><%= translated("importAnalysis.mappedCount", %{count: macros.mapped_count || 0}) %></span>
-                <span class="macros-unmapped"><%= translated("importAnalysis.unmappedCount", %{count: macros.unmapped_count || 0}) %></span>
+                <span class="macros-mapped"><%= dgettext("ui", "%{count} mapped", count: macros.mapped_count || 0) %></span>
+                <span class="macros-unmapped"><%= dgettext("ui", "%{count} unmapped", count: macros.unmapped_count || 0) %></span>
               </div>
               <div class="macros-list">
                 <%= for macro <- macros.discovered do %>
@@ -1044,9 +1041,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                     <div class="macro-header">
                       <span class="macro-name"><%= macro.name %></span>
                       <span class={"macro-status-badge #{if macro.mapped, do: "mapped", else: "unmapped"}"}>
-                        <%= if macro.mapped, do: translated("importAnalysis.macroStatusMapped"), else: translated("importAnalysis.macroStatusUnknown") %>
+                        <%= if macro.mapped, do: dgettext("ui", "Mapped"), else: dgettext("ui", "Unknown") %>
                       </span>
-                      <span class="macro-count"><%= translated("importAnalysis.macroUses", %{count: macro.total_count}) %></span>
+                      <span class="macro-count"><%= dgettext("ui", "%{count} uses", count: macro.total_count) %></span>
                     </div>
                     <%= if Enum.any?(Map.get(macro, :usages, [])) do %>
                       <div class="macro-usages">
@@ -1058,17 +1055,17 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                                   <span class="macro-usage-param"><%= k %>=<%= v %></span>
                                 <% end %>
                               <% else %>
-                                <%= translated("importAnalysis.noParameters") %>
+                                <%= dgettext("ui", "(no parameters)") %>
                               <% end %>
                             </span>
-                            <span class="macro-usage-count"><%= translated("importAnalysis.macroUses", %{count: usage.count}) %></span>
+                            <span class="macro-usage-count"><%= dgettext("ui", "%{count} uses", count: usage.count) %></span>
                           </div>
                         <% end %>
                       </div>
                     <% end %>
                     <%= if Enum.any?(Map.get(macro, :post_slugs, [])) do %>
                       <div class="macro-post-slugs">
-                        <%= translated("importAnalysis.usedIn", %{items: Enum.join(Enum.take(macro.post_slugs, 5), ", "), more: if(length(macro.post_slugs) > 5, do: translated("importAnalysis.moreSuffix", %{count: length(macro.post_slugs) - 5}), else: "")}) %>
+                        <%= dgettext("ui", "Used in: %{items}%{more}", items: Enum.join(Enum.take(macro.post_slugs, 5), ", "), more: (if length(macro.post_slugs) > 5, do: dgettext("ui", ", +%{count} more", count: length(macro.post_slugs) - 5), else: "")) %>
                       </div>
                     <% end %>
                   </div>
@@ -1084,7 +1081,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
           </svg>
-          <p><%= translated("importAnalysis.emptyState") %></p>
+          <p><%= dgettext("ui", "Select a WordPress export file to begin analysis.") %></p>
         </div>
         <% end %>
       <% end %>
@@ -1111,10 +1108,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         <table class="import-detail-table conflicts-table">
           <thead>
             <tr>
-              <th><%= translated("importAnalysis.slug") %></th>
-              <th><%= translated("importAnalysis.newEntryWxr") %></th>
-              <th><%= translated("importAnalysis.existingEntry") %></th>
-              <th><%= translated("importAnalysis.resolution") %></th>
+              <th><%= dgettext("ui", "Slug") %></th>
+              <th><%= dgettext("ui", "New Entry (WXR)") %></th>
+              <th><%= dgettext("ui", "Existing Entry") %></th>
+              <th><%= dgettext("ui", "Resolution") %></th>
             </tr>
           </thead>
           <tbody>
@@ -1122,15 +1119,15 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
               <tr>
                 <td class="slug-cell"><%= Map.get(item, :slug) %></td>
                 <td><%= Map.get(item, :title) %></td>
-                <td><%= Map.get(item, :existing_title) || translated("importAnalysis.none") %></td>
+                <td><%= Map.get(item, :existing_title) || dgettext("ui", "--") %></td>
                 <td>
                   <form phx-change="change_import_conflict_resolution" phx-target={@myself}>
                     <input type="hidden" name="item_type" value={Map.get(item, :item_type)} />
                     <input type="hidden" name="item_name" value={Map.get(item, :slug)} />
                     <select class="resolution-select" name="resolution">
-                      <option value="ignore" selected={conflict_resolution_selected?(item, "ignore")}><%= translated("importAnalysis.ignore") %></option>
-                      <option value="overwrite" selected={conflict_resolution_selected?(item, "overwrite")}><%= translated("importAnalysis.overwrite") %></option>
-                      <option value="import" selected={Map.get(item, :resolution) == "import"}><%= translated("importAnalysis.importNewSlug") %></option>
+                      <option value="ignore" selected={conflict_resolution_selected?(item, "ignore")}><%= dgettext("ui", "Ignore") %></option>
+                      <option value="overwrite" selected={conflict_resolution_selected?(item, "overwrite")}><%= dgettext("ui", "Overwrite") %></option>
+                      <option value="import" selected={Map.get(item, :resolution) == "import"}><%= dgettext("ui", "Import (new slug)") %></option>
                     </select>
                   </form>
                 </td>
@@ -1163,15 +1160,15 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         <table class="import-detail-table">
           <thead>
             <tr>
-              <th><%= translated("importAnalysis.status") %></th>
+              <th><%= dgettext("ui", "Status") %></th>
               <%= if @show_type do %>
-                <th><%= translated("importAnalysis.type") %></th>
+                <th><%= dgettext("ui", "Type") %></th>
               <% end %>
-              <th><%= translated("importAnalysis.title") %></th>
-              <th><%= translated("importAnalysis.slug") %></th>
-              <th><%= translated("importAnalysis.categories") %></th>
-              <th><%= translated("importAnalysis.wpStatus") %></th>
-              <th><%= translated("importAnalysis.existingMatch") %></th>
+              <th><%= dgettext("ui", "Title") %></th>
+              <th><%= dgettext("ui", "Slug") %></th>
+              <th><%= dgettext("ui", "Categories") %></th>
+              <th><%= dgettext("ui", "WP Status") %></th>
+              <th><%= dgettext("ui", "Existing Match") %></th>
             </tr>
           </thead>
           <tbody>
@@ -1184,8 +1181,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                 <td><%= Map.get(item, :title) %></td>
                 <td class="slug-cell"><%= Map.get(item, :slug) %></td>
                 <td class="categories-cell"><%= joined_or_none(Map.get(item, :categories)) %></td>
-                <td><%= Map.get(item, :wp_status) || translated("importAnalysis.none") %></td>
-                <td class="existing-match"><%= Map.get(item, :existing_title) || translated("importAnalysis.none") %></td>
+                <td><%= Map.get(item, :wp_status) || dgettext("ui", "--") %></td>
+                <td class="existing-match"><%= Map.get(item, :existing_title) || dgettext("ui", "--") %></td>
               </tr>
             <% end %>
           </tbody>
@@ -1214,11 +1211,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         <table class="import-detail-table">
           <thead>
             <tr>
-              <th><%= translated("importAnalysis.status") %></th>
-              <th><%= translated("importAnalysis.filename") %></th>
-              <th><%= translated("importAnalysis.type") %></th>
-              <th><%= translated("importAnalysis.path") %></th>
-              <th><%= translated("importAnalysis.existingMatch") %></th>
+              <th><%= dgettext("ui", "Status") %></th>
+              <th><%= dgettext("ui", "Filename") %></th>
+              <th><%= dgettext("ui", "Type") %></th>
+              <th><%= dgettext("ui", "Path") %></th>
+              <th><%= dgettext("ui", "Existing Match") %></th>
             </tr>
           </thead>
           <tbody>
@@ -1226,9 +1223,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
               <tr>
                 <td><span class={status_badge_class(item.status)}><%= item.status %></span></td>
                 <td><%= Map.get(item, :filename) %></td>
-                <td class="mime-type-cell"><%= Map.get(item, :mime_type) || translated("importAnalysis.none") %></td>
+                <td class="mime-type-cell"><%= Map.get(item, :mime_type) || dgettext("ui", "--") %></td>
                 <td class="slug-cell"><%= Map.get(item, :relative_path) %></td>
-                <td class="existing-match"><%= Map.get(item, :existing_title) || translated("importAnalysis.none") %></td>
+                <td class="existing-match"><%= Map.get(item, :existing_title) || dgettext("ui", "--") %></td>
               </tr>
             <% end %>
           </tbody>
@@ -1248,10 +1245,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       <h3><%= @label %></h3>
       <div class="import-stat-number"><%= total_stats(@stats) %></div>
       <div class="import-stat-breakdown">
-        <%= if @stats.new_count > 0 do %><span class="import-stat-tag stat-new"><%= @stats.new_count %> <%= translated("importAnalysis.new") %></span><% end %>
-        <%= if @stats.update_count > 0 do %><span class="import-stat-tag stat-update"><%= @stats.update_count %> <%= translated("importAnalysis.update") %></span><% end %>
-        <%= if @stats.conflict_count > 0 do %><span class="import-stat-tag stat-conflict"><%= @stats.conflict_count %> <%= translated("importAnalysis.conflict") %></span><% end %>
-        <%= if @stats.duplicate_count > 0 do %><span class="import-stat-tag stat-duplicate"><%= @stats.duplicate_count %> <%= translated("importAnalysis.duplicate") %></span><% end %>
+        <%= if @stats.new_count > 0 do %><span class="import-stat-tag stat-new"><%= @stats.new_count %> <%= dgettext("ui", "new") %></span><% end %>
+        <%= if @stats.update_count > 0 do %><span class="import-stat-tag stat-update"><%= @stats.update_count %> <%= dgettext("ui", "update") %></span><% end %>
+        <%= if @stats.conflict_count > 0 do %><span class="import-stat-tag stat-conflict"><%= @stats.conflict_count %> <%= dgettext("ui", "conflict") %></span><% end %>
+        <%= if @stats.duplicate_count > 0 do %><span class="import-stat-tag stat-duplicate"><%= @stats.duplicate_count %> <%= dgettext("ui", "duplicate") %></span><% end %>
       </div>
     </div>
     """
@@ -1285,11 +1282,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       <h3><%= @label %></h3>
       <div class="import-stat-number"><%= total_media_stats(@stats) %></div>
       <div class="import-stat-breakdown">
-        <%= if @stats.new_count > 0 do %><span class="import-stat-tag stat-new"><%= @stats.new_count %> <%= translated("importAnalysis.new") %></span><% end %>
-        <%= if @stats.update_count > 0 do %><span class="import-stat-tag stat-update"><%= @stats.update_count %> <%= translated("importAnalysis.update") %></span><% end %>
-        <%= if @stats.conflict_count > 0 do %><span class="import-stat-tag stat-conflict"><%= @stats.conflict_count %> <%= translated("importAnalysis.conflict") %></span><% end %>
-        <%= if @stats.duplicate_count > 0 do %><span class="import-stat-tag stat-duplicate"><%= @stats.duplicate_count %> <%= translated("importAnalysis.duplicate") %></span><% end %>
-        <%= if @stats.missing_count > 0 do %><span class="import-stat-tag stat-missing"><%= @stats.missing_count %> <%= translated("importAnalysis.missing") %></span><% end %>
+        <%= if @stats.new_count > 0 do %><span class="import-stat-tag stat-new"><%= @stats.new_count %> <%= dgettext("ui", "new") %></span><% end %>
+        <%= if @stats.update_count > 0 do %><span class="import-stat-tag stat-update"><%= @stats.update_count %> <%= dgettext("ui", "update") %></span><% end %>
+        <%= if @stats.conflict_count > 0 do %><span class="import-stat-tag stat-conflict"><%= @stats.conflict_count %> <%= dgettext("ui", "conflict") %></span><% end %>
+        <%= if @stats.duplicate_count > 0 do %><span class="import-stat-tag stat-duplicate"><%= @stats.duplicate_count %> <%= dgettext("ui", "duplicate") %></span><% end %>
+        <%= if @stats.missing_count > 0 do %><span class="import-stat-tag stat-missing"><%= @stats.missing_count %> <%= dgettext("ui", "missing") %></span><% end %>
       </div>
     </div>
     """
@@ -1305,9 +1302,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       <h3><%= @label %></h3>
       <div class="import-stat-number"><%= @stats.existing_count + @stats.mapped_count + @stats.new_count %></div>
       <div class="import-stat-breakdown">
-        <%= if @stats.existing_count > 0 do %><span class="import-stat-tag stat-update"><%= @stats.existing_count %> <%= translated("importAnalysis.existing") %></span><% end %>
-        <%= if @stats.mapped_count > 0 do %><span class="import-stat-tag stat-mapped"><%= @stats.mapped_count %> <%= translated("importAnalysis.mapped") %></span><% end %>
-        <%= if @stats.new_count > 0 do %><span class="import-stat-tag stat-new"><%= @stats.new_count %> <%= translated("importAnalysis.new") %></span><% end %>
+        <%= if @stats.existing_count > 0 do %><span class="import-stat-tag stat-update"><%= @stats.existing_count %> <%= dgettext("ui", "existing") %></span><% end %>
+        <%= if @stats.mapped_count > 0 do %><span class="import-stat-tag stat-mapped"><%= @stats.mapped_count %> <%= dgettext("ui", "mapped") %></span><% end %>
+        <%= if @stats.new_count > 0 do %><span class="import-stat-tag stat-new"><%= @stats.new_count %> <%= dgettext("ui", "new") %></span><% end %>
       </div>
     </div>
     """
@@ -1342,14 +1339,14 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                 type="text"
                 name="mapped_to"
                 value={Map.get(@edit || %{}, :value, Map.get(item, :mapped_to) || "") || ""}
-                placeholder={translated("importAnalysis.mapToPlaceholder")}
+                placeholder={dgettext("ui", "Map to...")}
                 list={"taxonomy-suggestions-#{@type}"}
                 autocomplete="off"
               />
-              <button class="taxonomy-edit-btn" type="submit" title={translated("importAnalysis.mapToPlaceholder")}>✓</button>
-              <button class="taxonomy-edit-btn ghost" type="button" phx-click="cancel_import_taxonomy_edit" phx-target={@myself} title={translated("Cancel")}>×</button>
+              <button class="taxonomy-edit-btn" type="submit" title={dgettext("ui", "Map to...")}>✓</button>
+              <button class="taxonomy-edit-btn ghost" type="button" phx-click="cancel_import_taxonomy_edit" phx-target={@myself} title={dgettext("ui", "Cancel")}>×</button>
               <%= if present?(item.mapped_to) do %>
-                <button class="taxonomy-clear-btn" type="button" phx-click="clear_import_taxonomy_mapping" phx-target={@myself} phx-value-type={@type} phx-value-name={item.name} title={translated("importAnalysis.clearMapping")}>×</button>
+                <button class="taxonomy-clear-btn" type="button" phx-click="clear_import_taxonomy_mapping" phx-target={@myself} phx-value-type={@type} phx-value-name={item.name} title={dgettext("ui", "Clear mapping")}>×</button>
               <% end %>
             </form>
           <% else %>
@@ -1380,7 +1377,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                   phx-value-name={item.name}
                   phx-value-mapped_to={Map.get(item, :mapped_to) || ""}
                 ><%= item.mapped_to %></button>
-                <button class="taxonomy-clear-btn" type="button" phx-click="clear_import_taxonomy_mapping" phx-target={@myself} phx-value-type={@type} phx-value-name={item.name} title={translated("importAnalysis.clearMapping")}>×</button>
+                <button class="taxonomy-clear-btn" type="button" phx-click="clear_import_taxonomy_mapping" phx-target={@myself} phx-value-type={@type} phx-value-name={item.name} title={dgettext("ui", "Clear mapping")}>×</button>
               <% end %>
             </div>
           <% end %>
@@ -1416,7 +1413,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   end
 
   defp joined_or_none(values) when is_list(values) and values != [], do: Enum.join(values, ", ")
-  defp joined_or_none(_values), do: translated("importAnalysis.none")
+  defp joined_or_none(_values), do: dgettext("ui", "--")
 
   defp status_badge_class(status), do: ["status-badge", status]
 
@@ -1445,7 +1442,4 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

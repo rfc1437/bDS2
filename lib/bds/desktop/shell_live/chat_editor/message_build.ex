@@ -3,8 +3,8 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
 
   alias BDS.AI
   alias BDS.AI.ChatConversation
-  alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.ChatEditor.{ModelSelection, ToolSurfaces, ToolTracking}
+  use Gettext, backend: BDS.Gettext
 
   @spec build(term()) :: term()
   def build(%{current_tab: %{type: :chat, id: conversation_id}} = assigns) do
@@ -22,7 +22,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
 
         %{
           id: conversation.id,
-          title: conversation.title || translated("chat.newChat"),
+          title: conversation.title || dgettext("ui", "New Chat"),
           model: conversation.model,
           effective_model: effective_model,
           available_models: available_models,
@@ -268,7 +268,4 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
 
   defp request_started_at(%{started_at: started_at}) when is_integer(started_at), do: started_at
   defp request_started_at(_request), do: nil
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

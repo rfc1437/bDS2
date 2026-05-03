@@ -6,11 +6,10 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
   import Ecto.Query
 
   alias BDS.{Repo, Tags}
-  alias BDS.Desktop.ShellData
-  alias BDS.Desktop.UILocale
   alias BDS.Posts.Post
   alias BDS.Tags.Tag
   alias BDS.Templates.Template
+  use Gettext, backend: BDS.Gettext
 
   embed_templates("tags_editor_html/*")
 
@@ -91,7 +90,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
         |> noreply()
 
       {:error, reason} ->
-        notify_output(translated("Tags"), inspect(reason), "error")
+        notify_output(dgettext("ui", "Tags"), inspect(reason), "error")
         {:noreply, socket}
     end
   end
@@ -133,7 +132,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
                 |> noreply()
 
               {:error, reason} ->
-                notify_output(translated("Tags"), inspect(reason), "error")
+                notify_output(dgettext("ui", "Tags"), inspect(reason), "error")
                 {:noreply, socket}
             end
         end
@@ -186,7 +185,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
                 |> noreply()
 
               {:error, reason} ->
-                notify_output(translated("Tags"), inspect(reason), "error")
+                notify_output(dgettext("ui", "Tags"), inspect(reason), "error")
                 {:noreply, socket}
             end
         end
@@ -200,7 +199,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
         {:noreply, load_data(socket)}
 
       {:error, reason} ->
-        notify_output(translated("Tags"), inspect(reason), "error")
+        notify_output(dgettext("ui", "Tags"), inspect(reason), "error")
         {:noreply, socket}
     end
   end
@@ -231,7 +230,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
               |> load_data()
             else
               {:error, reason} ->
-                notify_output(translated("Tags"), inspect(reason), "error")
+                notify_output(dgettext("ui", "Tags"), inspect(reason), "error")
                 socket
             end
         end
@@ -383,7 +382,4 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
       trimmed -> trimmed
     end
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, UILocale.current())
 end

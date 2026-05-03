@@ -2,10 +2,10 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
   @moduledoc false
 
   use Phoenix.LiveComponent
+  use Gettext, backend: BDS.Gettext
 
   import Ecto.Query
 
-  alias BDS.Desktop.ShellData
   alias BDS.Repo
   alias BDS.Templates.Template
 
@@ -386,7 +386,4 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
   defp section_matches?(query, keywords),
     do: Enum.any?(keywords, &String.contains?(&1, String.downcase(query)))
 
-  @spec translated(term(), term()) :: term()
-  def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

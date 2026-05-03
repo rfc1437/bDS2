@@ -1,7 +1,6 @@
 defmodule BDS.Desktop.ShellLive.TaskLocalization do
   @moduledoc false
 
-  alias BDS.Desktop.ShellData
 
   def localize_task_status(task_status, locale) do
     tasks = Enum.map(Map.get(task_status, :tasks, []), &localize_task(&1, locale))
@@ -15,13 +14,13 @@ defmodule BDS.Desktop.ShellLive.TaskLocalization do
   def translate_editor_meta(items, locale) do
     Enum.map(items, fn item ->
       item
-      |> Map.update(:label, nil, &ShellData.translate(&1, %{}, locale))
+      |> Map.update(:label, nil, &BDS.Gettext.lgettext(locale, "ui", &1))
       |> Map.update(:value, nil, &translate_editor_meta_value(&1, locale))
     end)
   end
 
   def translate_for_socket(socket, text) when is_binary(text),
-    do: ShellData.translate(text, %{}, socket.assigns.page_language)
+    do: BDS.Gettext.lgettext(socket.assigns.page_language, "ui", text)
 
   def translate_for_socket(_socket, text), do: text
 
@@ -42,7 +41,7 @@ defmodule BDS.Desktop.ShellLive.TaskLocalization do
     progress = Map.get(task, :progress)
 
     task
-    |> Map.put(:name, ShellData.translate(task.name, %{}, locale))
+    |> Map.put(:name, BDS.Gettext.lgettext(locale, "ui", task.name))
     |> Map.put(:message, localize_task_message(Map.get(task, :message), locale))
     |> Map.put(:group_name, localize_task_group(Map.get(task, :group_name), locale))
     |> Map.put(:status_label, localize_task_status_label(task.status, locale))
@@ -54,30 +53,30 @@ defmodule BDS.Desktop.ShellLive.TaskLocalization do
 
   defp localize_task_message(nil, _locale), do: nil
   defp localize_task_message("", _locale), do: ""
-  defp localize_task_message(message, locale), do: ShellData.translate(message, %{}, locale)
+  defp localize_task_message(message, locale), do: BDS.Gettext.lgettext(locale, "ui", message)
 
   defp localize_task_group(nil, _locale), do: nil
-  defp localize_task_group(group, locale), do: ShellData.translate(group, %{}, locale)
+  defp localize_task_group(group, locale), do: BDS.Gettext.lgettext(locale, "ui", group)
 
   defp localize_task_status_label(status, locale) do
     status
     |> to_string()
     |> String.capitalize()
-    |> ShellData.translate(%{}, locale)
+    |> then(&BDS.Gettext.lgettext(locale, "ui", &1))
   end
 
   defp localized_running_task_message([], _locale), do: nil
 
   defp localized_running_task_message([task | _rest], locale) do
     cond do
-      task.status == :pending -> ShellData.translate("Queued", %{}, locale) <> ": " <> task.name
+      task.status == :pending -> BDS.Gettext.lgettext(locale, "ui", "Queued") <> ": " <> task.name
       is_binary(task.message) and task.message != "" -> task.name <> ": " <> task.message
       true -> task.name
     end
   end
 
   defp translate_editor_meta_value(value, locale) when is_binary(value),
-    do: ShellData.translate(value, %{}, locale)
+    do: BDS.Gettext.lgettext(locale, "ui", value)
 
   defp translate_editor_meta_value(value, _locale), do: value
 end

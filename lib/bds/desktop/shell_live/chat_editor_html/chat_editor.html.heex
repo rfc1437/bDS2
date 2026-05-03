@@ -3,7 +3,7 @@
     <div class="chat-panel-title">
       <span class="chat-panel-title-main">
         <%= if @chat_editor.needs_api_key? do %>
-          <%= translated("chat.setupTitle") %>
+          <%= dgettext("ui", "AI Chat Setup") %>
         <% else %>
           <%= @chat_editor.title %>
         <% end %>
@@ -18,7 +18,7 @@
             phx-target={@myself}
             data-testid="chat-model-selector-button"
           >
-            <span><%= @chat_editor.effective_model || translated("chat.modelUnavailable") %></span>
+            <span><%= @chat_editor.effective_model || dgettext("ui", "No model") %></span>
             <span class="chat-model-selector-caret">▾</span>
           </button>
 
@@ -59,24 +59,24 @@
     <%= if @chat_editor.needs_api_key? do %>
       <div class="chat-welcome chat-api-key-state" data-testid="chat-api-key-required">
         <div class="chat-welcome-icon">🔑</div>
-        <h2><%= translated("chat.apiKeyRequiredTitle") %></h2>
-        <p><%= translated("chat.apiKeyRequiredDescription") %></p>
+        <h2><%= dgettext("ui", "API Key Required") %></h2>
+        <p><%= dgettext("ui", "Configure an API key in Settings to enable AI chat.") %></p>
         <div class="api-key-form">
-          <button class="api-key-submit" type="button" phx-click="open_chat_settings" phx-target={@myself}><%= translated("chat.openSettings") %></button>
+          <button class="api-key-submit" type="button" phx-click="open_chat_settings" phx-target={@myself}><%= dgettext("ui", "Open Settings") %></button>
         </div>
       </div>
     <% else %>
     <%= if Enum.empty?(@chat_editor.messages) and not @chat_editor.is_streaming do %>
       <div class="chat-welcome">
         <div class="chat-welcome-icon">🤖</div>
-        <h2><%= translated("chat.welcomeTitle") %></h2>
-        <p><%= translated("chat.welcomeDescription") %></p>
+        <h2><%= dgettext("ui", "Welcome to the AI Assistant") %></h2>
+        <p><%= dgettext("ui", "I can help you manage your blog with rich visualizations. Try asking me to:") %></p>
         <ul>
-          <li><%= translated("chat.welcomeTipSearch") %></li>
-          <li><%= translated("chat.welcomeTipChart") %></li>
-          <li><%= translated("chat.welcomeTipTable") %></li>
-          <li><%= translated("chat.welcomeTipMetadata") %></li>
-          <li><%= translated("chat.welcomeTipTabs") %></li>
+          <li><%= dgettext("ui", "Search for posts about a specific topic") %></li>
+          <li><%= dgettext("ui", "Show a chart of posts published per month") %></li>
+          <li><%= dgettext("ui", "Compare my recent posts in a table") %></li>
+          <li><%= dgettext("ui", "Update metadata for posts or media") %></li>
+          <li><%= dgettext("ui", "Show post statistics by year in tabs with charts") %></li>
         </ul>
       </div>
     <% else %>
@@ -149,11 +149,11 @@
   <%= unless @chat_editor.needs_api_key? do %>
     <div class="chat-input-container" data-testid="chat-input-container">
       <%= if @chat_editor.is_streaming do %>
-        <button class="chat-abort-button" data-testid="chat-abort-button" type="button" phx-click="abort_chat_editor_message" phx-target={@myself}>◼ <%= translated("chat.stop") %></button>
+        <button class="chat-abort-button" data-testid="chat-abort-button" type="button" phx-click="abort_chat_editor_message" phx-target={@myself}>◼ <%= dgettext("ui", "Stop") %></button>
       <% end %>
 
       <form class="chat-input-wrapper" phx-change="change_chat_editor_input" phx-submit="send_chat_editor_message" phx-target={@myself}>
-        <textarea class="chat-input chat-surface-input" name="message" rows="1" placeholder={translated("chat.inputPlaceholder")} disabled={@chat_editor.is_streaming}><%= @chat_editor.input %></textarea>
+        <textarea class="chat-input chat-surface-input" name="message" rows="1" placeholder={dgettext("ui", "Type a message...")} disabled={@chat_editor.is_streaming}><%= @chat_editor.input %></textarea>
         <button class="chat-send-button" data-testid="chat-send-button" type="button" phx-click="send_chat_editor_message" phx-target={@myself} disabled={@chat_editor.send_disabled?}>↑</button>
       </form>
 

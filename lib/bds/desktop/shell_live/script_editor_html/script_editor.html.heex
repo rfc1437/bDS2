@@ -7,30 +7,30 @@
         "status-#{@script_editor.status}"
       ]} data-testid="script-status-badge"><%= BDS.Desktop.ShellData.dashboard_status_label(@script_editor.status) %></span>
       <%= if @script_editor.can_publish? do %>
-        <button class="success" data-testid="script-publish-button" type="button" phx-click="publish_script_editor" phx-target={@myself}><%= BDS.Desktop.ShellData.translate("Publish", %{}, BDS.Desktop.UILocale.current()) %></button>
+        <button class="success" data-testid="script-publish-button" type="button" phx-click="publish_script_editor" phx-target={@myself}><%= dgettext("ui", "Publish") %></button>
       <% end %>
-      <button class="secondary scripts-save-button" type="button" phx-click="save_script_editor" phx-target={@myself}><%= BDS.Desktop.ShellData.translate("Save", %{}, BDS.Desktop.UILocale.current()) %></button>
-      <button class="secondary scripts-run-button" type="button" phx-click="run_script_editor" phx-target={@myself}><%= BDS.Desktop.ShellData.translate("Run", %{}, BDS.Desktop.UILocale.current()) %></button>
-      <button class="secondary scripts-check-button" type="button" phx-click="check_script_editor" phx-target={@myself}><%= BDS.Desktop.ShellData.translate("Check Syntax", %{}, BDS.Desktop.UILocale.current()) %></button>
-      <button class="secondary danger" type="button" phx-click="delete_script_editor" phx-target={@myself}><%= BDS.Desktop.ShellData.translate("Delete", %{}, BDS.Desktop.UILocale.current()) %></button>
+      <button class="secondary scripts-save-button" type="button" phx-click="save_script_editor" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
+      <button class="secondary scripts-run-button" type="button" phx-click="run_script_editor" phx-target={@myself}><%= dgettext("ui", "Run") %></button>
+      <button class="secondary scripts-check-button" type="button" phx-click="check_script_editor" phx-target={@myself}><%= dgettext("ui", "Check Syntax") %></button>
+      <button class="secondary danger" type="button" phx-click="delete_script_editor" phx-target={@myself}><%= dgettext("ui", "Delete") %></button>
     </div>
   </div>
   <form class="editor-content scripts-view" phx-change="change_script_editor" phx-target={@myself}>
     <div class="editor-header-row scripts-meta-row">
       <div class="editor-meta">
         <div class="editor-field-row">
-          <div class="editor-field"><label><%= BDS.Desktop.ShellData.translate("Title", %{}, BDS.Desktop.UILocale.current()) %></label><input type="text" name="script_editor[title]" value={@script_editor.title} /></div>
-          <div class="editor-field"><label><%= BDS.Desktop.ShellData.translate("Slug", %{}, BDS.Desktop.UILocale.current()) %></label><input type="text" name="script_editor[slug]" value={@script_editor.slug} /></div>
+          <div class="editor-field"><label><%= dgettext("ui", "Title") %></label><input type="text" name="script_editor[title]" value={@script_editor.title} /></div>
+          <div class="editor-field"><label><%= dgettext("ui", "Slug") %></label><input type="text" name="script_editor[slug]" value={@script_editor.slug} /></div>
         </div>
         <div class="editor-field-row">
-          <div class="editor-field"><label><%= BDS.Desktop.ShellData.translate("Kind", %{}, BDS.Desktop.UILocale.current()) %></label><select name="script_editor[kind]"><option value="utility" selected={@script_editor.kind == "utility"}>utility</option><option value="macro" selected={@script_editor.kind == "macro"}>macro</option><option value="transform" selected={@script_editor.kind == "transform"}>transform</option></select></div>
-          <div class="editor-field"><label><%= BDS.Desktop.ShellData.translate("Entrypoint", %{}, BDS.Desktop.UILocale.current()) %></label><select name="script_editor[entrypoint]"><%= for entrypoint <- @script_editor.entrypoints do %><option value={entrypoint} selected={entrypoint == @script_editor.entrypoint}><%= entrypoint %></option><% end %></select></div>
-          <div class="editor-field scripts-enabled-field"><label><input type="checkbox" name="script_editor[enabled]" checked={@script_editor.enabled} /> <%= BDS.Desktop.ShellData.translate("Enabled", %{}, BDS.Desktop.UILocale.current()) %></label></div>
+          <div class="editor-field"><label><%= dgettext("ui", "Kind") %></label><select name="script_editor[kind]"><option value="utility" selected={@script_editor.kind == "utility"}>utility</option><option value="macro" selected={@script_editor.kind == "macro"}>macro</option><option value="transform" selected={@script_editor.kind == "transform"}>transform</option></select></div>
+          <div class="editor-field"><label><%= dgettext("ui", "Entrypoint") %></label><select name="script_editor[entrypoint]"><%= for entrypoint <- @script_editor.entrypoints do %><option value={entrypoint} selected={entrypoint == @script_editor.entrypoint}><%= entrypoint %></option><% end %></select></div>
+          <div class="editor-field scripts-enabled-field"><label><input type="checkbox" name="script_editor[enabled]" checked={@script_editor.enabled} /> <%= dgettext("ui", "Enabled") %></label></div>
         </div>
       </div>
     </div>
     <div class="editor-body scripts-editor">
-      <div class="editor-toolbar scripts-toolbar"><div class="editor-toolbar-left"><label><%= BDS.Desktop.ShellData.translate("Content", %{}, BDS.Desktop.UILocale.current()) %></label></div></div>
+      <div class="editor-toolbar scripts-toolbar"><div class="editor-toolbar-left"><label><%= dgettext("ui", "Content") %></label></div></div>
       <div
         id={"script-editor-monaco-shell-#{@script_editor.id}"}
         class="scripts-monaco monaco-editor-shell"
@@ -44,6 +44,6 @@
         <textarea id={"script-editor-content-#{@script_editor.id}"} class="monaco-editor-input code-editor-textarea" name="script_editor[content]" spellcheck="false"><%= @script_editor.content %></textarea>
       </div>
     </div>
-    <div class="editor-footer"><span class="text-muted text-small"><%= BDS.Desktop.ShellData.translate("Created", %{}, BDS.Desktop.UILocale.current()) %>: <%= BDS.Persistence.timestamp_to_iso8601(@script_editor.created_at) %></span><span class="text-muted text-small"><%= BDS.Desktop.ShellData.translate("Updated", %{}, BDS.Desktop.UILocale.current()) %>: <%= BDS.Persistence.timestamp_to_iso8601(@script_editor.updated_at) %></span></div>
+    <div class="editor-footer"><span class="text-muted text-small"><%= dgettext("ui", "Created") %>: <%= BDS.Persistence.timestamp_to_iso8601(@script_editor.created_at) %></span><span class="text-muted text-small"><%= dgettext("ui", "Updated") %>: <%= BDS.Persistence.timestamp_to_iso8601(@script_editor.updated_at) %></span></div>
   </form>
 </div>

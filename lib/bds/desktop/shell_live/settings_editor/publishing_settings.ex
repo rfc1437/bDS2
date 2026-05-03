@@ -4,7 +4,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.PublishingSettings do
   use Phoenix.Component
 
   alias BDS.Metadata
-  alias BDS.Desktop.ShellData
+  use Gettext, backend: BDS.Gettext
 
   @spec publishing_form(term()) :: term()
   def publishing_form(metadata) do
@@ -37,7 +37,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.PublishingSettings do
 
       {:error, reason} ->
         socket
-        |> append_output.(translated("Publishing"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "Publishing"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -54,7 +54,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.PublishingSettings do
 
       {:error, reason} ->
         socket
-        |> append_output.(translated("Publishing"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "Publishing"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -87,7 +87,4 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.PublishingSettings do
       trimmed -> trimmed
     end
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

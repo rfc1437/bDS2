@@ -6,7 +6,6 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   alias BDS.{AI, Posts, Preview}
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, ListValues, Persistence, PostMetadata}
-  alias BDS.Desktop.UILocale
   alias BDS.Posts.Post
   alias BDS.Tags
 
@@ -47,6 +46,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       persist: 5
     ]
 
+  use Gettext, backend: BDS.Gettext
   import PostMetadata,
     only: [
       blank?: 1,
@@ -461,11 +461,11 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
             )
 
             notify_parent({:post_editor_dirty, post.id, false})
-            notify_output(socket, translated("Post"), translated("Post saved"))
+            notify_output(socket, dgettext("ui", "Post"), dgettext("ui", "Post saved"))
             socket
 
           {:error, reason} ->
-            notify_output(socket, translated("Post"), inspect(reason), "error")
+            notify_output(socket, dgettext("ui", "Post"), inspect(reason), "error")
             |> build_data()
         end
     end
@@ -502,11 +502,11 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
             )
 
             notify_parent({:post_editor_dirty, post.id, false})
-            notify_output(socket, translated("Post"), translated("Post published"))
+            notify_output(socket, dgettext("ui", "Post"), dgettext("ui", "Post published"))
             socket
 
           {:error, reason} ->
-            notify_output(socket, translated("Post"), inspect(reason), "error")
+            notify_output(socket, dgettext("ui", "Post"), inspect(reason), "error")
             |> build_data()
         end
     end
@@ -543,7 +543,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
             socket
 
           {:error, reason} ->
-            notify_output(socket, translated("Post"), inspect(reason), "error")
+            notify_output(socket, dgettext("ui", "Post"), inspect(reason), "error")
             |> build_data()
         end
     end
@@ -558,7 +558,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
         socket
 
       {:error, reason} ->
-        notify_output(socket, translated("Post"), inspect(reason), "error")
+        notify_output(socket, dgettext("ui", "Post"), inspect(reason), "error")
         |> build_data()
     end
   end
@@ -567,8 +567,8 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     if Map.get(socket.assigns, :offline_mode, true) do
       notify_output(
         socket,
-        translated("Detect Language"),
-        translated("Automatic AI actions stay gated by airplane mode."),
+        dgettext("ui", "Detect Language"),
+        dgettext("ui", "Automatic AI actions stay gated by airplane mode."),
         "info"
       )
       |> build_data()
@@ -593,14 +593,14 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               |> build_data()
 
             {:error, reason} ->
-              notify_output(socket, translated("Detect Language"), inspect(reason), "error")
+              notify_output(socket, dgettext("ui", "Detect Language"), inspect(reason), "error")
               |> build_data()
 
             _other ->
               notify_output(
                 socket,
-                translated("Detect Language"),
-                translated("Language detection failed."),
+                dgettext("ui", "Detect Language"),
+                dgettext("ui", "Language detection failed."),
                 "error"
               )
               |> build_data()
@@ -613,8 +613,8 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     if Map.get(socket.assigns, :offline_mode, true) do
       notify_output(
         socket,
-        translated("Translate"),
-        translated("Automatic AI actions stay gated by airplane mode."),
+        dgettext("ui", "Translate"),
+        dgettext("ui", "Automatic AI actions stay gated by airplane mode."),
         "info"
       )
       |> build_data()
@@ -642,12 +642,12 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
             socket
           else
             {:error, reason} ->
-              notify_output(socket, translated("Translate"), inspect(reason), "error")
+              notify_output(socket, dgettext("ui", "Translate"), inspect(reason), "error")
               |> build_data()
           end
 
         {:error, reason} ->
-          notify_output(socket, translated("Translate"), inspect(reason), "error")
+          notify_output(socket, dgettext("ui", "Translate"), inspect(reason), "error")
           |> build_data()
       end
     end
@@ -695,7 +695,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               socket
 
             {:error, reason} ->
-              notify_output(socket, translated("AI Suggestions"), inspect(reason), "error")
+              notify_output(socket, dgettext("ui", "AI Suggestions"), inspect(reason), "error")
               |> build_data()
           end
         end
@@ -813,17 +813,14 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   def post_status_label(status), do: ShellData.dashboard_status_label(status)
 
   @spec post_editor_save_state_label(term()) :: term()
-  def post_editor_save_state_label(:dirty), do: translated("Unsaved")
-  def post_editor_save_state_label(:saved), do: translated("Saved")
-  def post_editor_save_state_label(:published), do: translated("Published")
-  def post_editor_save_state_label(:discarded), do: translated("Reverted")
-  def post_editor_save_state_label(_state), do: translated("Idle")
+  def post_editor_save_state_label(:dirty), do: dgettext("ui", "Unsaved")
+  def post_editor_save_state_label(:saved), do: dgettext("ui", "Saved")
+  def post_editor_save_state_label(:published), do: dgettext("ui", "Published")
+  def post_editor_save_state_label(:discarded), do: dgettext("ui", "Reverted")
+  def post_editor_save_state_label(_state), do: dgettext("ui", "Idle")
 
   @spec post_editor_mode_label(term()) :: term()
-  def post_editor_mode_label(:markdown), do: translated("Markdown")
-  def post_editor_mode_label(:preview), do: translated("Preview")
+  def post_editor_mode_label(:markdown), do: dgettext("ui", "Markdown")
+  def post_editor_mode_label(:preview), do: dgettext("ui", "Preview")
 
-  @spec translated(term(), term()) :: term()
-  def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, UILocale.current())
 end

@@ -1,7 +1,7 @@
 defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
   @moduledoc false
 
-  alias BDS.Desktop.ShellData
+  use Gettext, backend: BDS.Gettext
 
   @render_tool_names MapSet.new([
                        "render_card",
@@ -85,7 +85,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
       |> List.wrap()
       |> Enum.map(fn entry ->
         %{
-          label: map_value(entry, "label", translated("chat.role.assistant")),
+          label: map_value(entry, "label", dgettext("ui", "Assistant")),
           value: numeric_value(map_value(entry, "value", 0)),
           segments: List.wrap(map_value(entry, "segments", []))
         }
@@ -173,7 +173,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
       fields: fields,
       submit_label:
         map_value(arguments, "submitLabel") ||
-          map_value(arguments, "submit_label", translated("chat.stop")),
+          map_value(arguments, "submit_label", dgettext("ui", "Stop")),
       submit_action:
         map_value(arguments, "submitAction") ||
           map_value(arguments, "submit_action", "submitForm")
@@ -249,7 +249,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
   defp decode_surface_actions(actions) when is_list(actions) do
     Enum.map(actions, fn action ->
       %{
-        label: map_value(action, "label", translated("chat.openSettings")),
+        label: map_value(action, "label", dgettext("ui", "Open Settings")),
         action: map_value(action, "action", "openSettings"),
         payload: map_value(action, "payload", %{})
       }
@@ -296,7 +296,4 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
 
   defp truthy?(value) when value in [true, "true", 1, "1", "on"], do: true
   defp truthy?(_value), do: false
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

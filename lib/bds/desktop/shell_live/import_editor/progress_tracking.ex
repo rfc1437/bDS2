@@ -2,8 +2,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
   @moduledoc false
 
   alias BDS.{ImportDefinitions, ImportExecution}
-  alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.ImportEditor.AnalysisState
+  use Gettext, backend: BDS.Gettext
 
   @spec execute_import(term(), term(), term()) :: term()
   def execute_import(socket, reload, _append_output) do
@@ -129,8 +129,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
               })
             )
             |> append_output.(
-              translated("activity.import"),
-              translated("importAnalysis.importComplete", %{count: previous_state.count}),
+              dgettext("ui", "Import"),
+               dgettext("ui", "Import completed successfully!", count: previous_state.count),
               nil,
               "info"
             )
@@ -148,7 +148,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
                   ref: nil
               })
             )
-            |> append_output.(translated("activity.import"), message, nil, "error")
+            |> append_output.(dgettext("ui", "Import"), message, nil, "error")
             |> reload.(socket.assigns.workbench)
 
           {:error, reason} ->
@@ -165,7 +165,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
                   ref: nil
               })
             )
-            |> append_output.(translated("activity.import"), message, nil, "error")
+            |> append_output.(dgettext("ui", "Import"), message, nil, "error")
             |> reload.(socket.assigns.workbench)
         end
     end
@@ -208,7 +208,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
                   ref: nil
               })
             )
-            |> append_output.(translated("activity.import"), message, nil, "error")
+            |> append_output.(dgettext("ui", "Import"), message, nil, "error")
             |> reload.(socket.assigns.workbench)
         end
     end
@@ -265,16 +265,16 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
     seconds = div(ms, 1000)
 
     if seconds < 60 do
-      translated("importAnalysis.eta", %{
-        value: translated("importAnalysis.etaSeconds", %{count: seconds})
-      })
+      dgettext("ui", "ETA: %{value}",
+        value: dgettext("ui", "%{count}s", count: seconds)
+      )
     else
       m = div(seconds, 60)
       s = rem(seconds, 60)
 
-      translated("importAnalysis.eta", %{
-        value: translated("importAnalysis.etaMinutes", %{minutes: m, seconds: s})
-      })
+      dgettext("ui", "ETA: %{value}",
+        value: dgettext("ui", "%{minutes}m %{seconds}s", minutes: m, seconds: s)
+      )
     end
   end
 
@@ -282,18 +282,15 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
 
   def translate_execution_phase(phase) when is_binary(phase) do
     case phase do
-      "tags" -> translated("importAnalysis.phase.tags")
-      "posts" -> translated("importAnalysis.phase.posts")
-      "media" -> translated("importAnalysis.phase.media")
-      "pages" -> translated("importAnalysis.phase.pages")
-      "complete" -> translated("importAnalysis.phase.complete")
+      "tags" -> dgettext("ui", "Importing tags & categories...")
+      "posts" -> dgettext("ui", "Importing posts...")
+      "media" -> dgettext("ui", "Importing media...")
+      "pages" -> dgettext("ui", "Importing pages...")
+      "complete" -> dgettext("ui", "Import complete")
       other -> other
     end
   end
 
   @spec translate_execution_phase(term()) :: term()
   def translate_execution_phase(other), do: other
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

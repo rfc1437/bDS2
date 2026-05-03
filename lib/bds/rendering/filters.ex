@@ -3,7 +3,6 @@ defmodule BDS.Rendering.Filters do
 
   use Liquex.Filter
 
-  alias BDS.I18n
   alias BDS.Slug
 
   def i18n(value, language, _context) do
@@ -12,7 +11,7 @@ defmodule BDS.Rendering.Filters do
     if key == "" do
       ""
     else
-      I18n.translate(language, key)
+      BDS.Gettext.lgettext(language, "render", key)
     end
   end
 
@@ -59,7 +58,7 @@ defmodule BDS.Rendering.Filters do
                 default_macro_title(
                   Map.get(params, "title"),
                   language,
-                  "render.video.youtubeTitle"
+                  "YouTube video"
                 )
             },
             context
@@ -71,7 +70,7 @@ defmodule BDS.Rendering.Filters do
             %{
               "id" => Map.get(params, "id", ""),
               "title" =>
-                default_macro_title(Map.get(params, "title"), language, "render.video.vimeoTitle")
+                default_macro_title(Map.get(params, "title"), language, "Vimeo video")
             },
             context
           )
@@ -82,13 +81,17 @@ defmodule BDS.Rendering.Filters do
     end)
   end
 
-  defp default_macro_title(nil, language, translation_key),
-    do: I18n.translate(language, translation_key)
+  defp default_macro_title(nil, language, translation),
+    do: translated_macro_title(language, translation)
 
-  defp default_macro_title("", language, translation_key),
-    do: I18n.translate(language, translation_key)
+  defp default_macro_title("", language, translation),
+    do: translated_macro_title(language, translation)
 
-  defp default_macro_title(title, _language, _translation_key), do: title
+  defp default_macro_title(title, _language, _translation), do: title
+
+  defp translated_macro_title(language, translation) do
+    BDS.Gettext.lgettext(language, "render", translation)
+  end
 
   defp parse_macro_params(nil), do: %{}
   defp parse_macro_params(""), do: %{}

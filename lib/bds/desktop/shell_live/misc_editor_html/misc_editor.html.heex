@@ -5,12 +5,12 @@
       <p><%= @misc_editor.subtitle %></p>
     </div>
     <div class="misc-editor-actions">
-      <button class="secondary" type="button" phx-click="rerun_misc_editor" phx-target={@myself}><%= translated("Refresh") %></button>
+      <button class="secondary" type="button" phx-click="rerun_misc_editor" phx-target={@myself}><%= dgettext("ui", "Refresh") %></button>
       <%= if @misc_editor.kind == :site_validation do %>
-        <button class="primary" type="button" phx-click="apply_site_validation" phx-target={@myself} disabled={Enum.empty?(@misc_editor.missing_url_paths) and Enum.empty?(@misc_editor.extra_url_paths) and Enum.empty?(@misc_editor.updated_post_url_paths)}><%= translated("Apply") %></button>
+        <button class="primary" type="button" phx-click="apply_site_validation" phx-target={@myself} disabled={Enum.empty?(@misc_editor.missing_url_paths) and Enum.empty?(@misc_editor.extra_url_paths) and Enum.empty?(@misc_editor.updated_post_url_paths)}><%= dgettext("ui", "Apply") %></button>
       <% end %>
       <%= if @misc_editor.kind == :find_duplicates do %>
-        <button class="secondary" type="button" phx-click="dismiss_selected_duplicates" phx-target={@myself} disabled={MapSet.size(@misc_editor.selected_pairs) == 0}><%= translated("Dismiss Checked") %></button>
+        <button class="secondary" type="button" phx-click="dismiss_selected_duplicates" phx-target={@myself} disabled={MapSet.size(@misc_editor.selected_pairs) == 0}><%= dgettext("ui", "Dismiss Checked") %></button>
       <% end %>
     </div>
   </div>
@@ -25,9 +25,9 @@
     <%= case @misc_editor.kind do %>
       <% :site_validation -> %>
         <div class="misc-columns">
-          <section class="misc-card"><h3><%= translated("Missing URLs") %></h3><%= if Enum.empty?(@misc_editor.missing_url_paths) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.missing_url_paths do %><li><%= path %></li><% end %></ul></section>
-          <section class="misc-card"><h3><%= translated("Extra URLs") %></h3><%= if Enum.empty?(@misc_editor.extra_url_paths) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.extra_url_paths do %><li><%= path %></li><% end %></ul></section>
-          <section class="misc-card"><h3><%= translated("Updated URLs") %></h3><%= if Enum.empty?(@misc_editor.updated_post_url_paths) do %><p><%= translated("None found") %></p><% end %><ul><%= for path <- @misc_editor.updated_post_url_paths do %><li><%= path %></li><% end %></ul></section>
+          <section class="misc-card"><h3><%= dgettext("ui", "Missing URLs") %></h3><%= if Enum.empty?(@misc_editor.missing_url_paths) do %><p><%= dgettext("ui", "None found") %></p><% end %><ul><%= for path <- @misc_editor.missing_url_paths do %><li><%= path %></li><% end %></ul></section>
+          <section class="misc-card"><h3><%= dgettext("ui", "Extra URLs") %></h3><%= if Enum.empty?(@misc_editor.extra_url_paths) do %><p><%= dgettext("ui", "None found") %></p><% end %><ul><%= for path <- @misc_editor.extra_url_paths do %><li><%= path %></li><% end %></ul></section>
+          <section class="misc-card"><h3><%= dgettext("ui", "Updated URLs") %></h3><%= if Enum.empty?(@misc_editor.updated_post_url_paths) do %><p><%= dgettext("ui", "None found") %></p><% end %><ul><%= for path <- @misc_editor.updated_post_url_paths do %><li><%= path %></li><% end %></ul></section>
         </div>
 
       <% :metadata_diff -> %>
@@ -81,7 +81,7 @@
                         phx-value-direction="db_to_file"
                         phx-value-field={field.field_name}
                       >
-                        <%= translated("DB to File") %>
+                        <%= dgettext("ui", "DB to File") %>
                       </button>
 
                       <button
@@ -95,7 +95,7 @@
                         phx-value-direction="file_to_db"
                         phx-value-field={field.field_name}
                       >
-                        <%= translated("File to DB") %>
+                        <%= dgettext("ui", "File to DB") %>
                       </button>
                     </div>
                   <% end %>
@@ -130,7 +130,7 @@
                               <span><%= diff.db_value %></span>
                             </div>
                             <div class="diff-field-value file-value">
-                              <span class="diff-source-label"><%= translated("File") %></span>
+                              <span class="diff-source-label"><%= dgettext("ui", "File") %></span>
                               <span><%= diff.file_value %></span>
                             </div>
                           </div>
@@ -145,7 +145,7 @@
             <%= if @misc_editor.active_field == nil and @misc_editor.orphan_files != [] do %>
               <section class="orphan-files-section" data-testid="metadata-diff-orphans">
                 <div class="orphan-files-header">
-                  <h3><%= translated("Orphan Files") %></h3>
+                  <h3><%= dgettext("ui", "Orphan Files") %></h3>
                   <div class="orphan-files-actions">
                     <span class="misc-summary-pill"><%= length(@misc_editor.orphan_files) %></span>
                     <button
@@ -155,7 +155,7 @@
                       phx-click="import_metadata_diff_orphans"
                       phx-target={@myself}
                     >
-                      <%= translated("Import") %>
+                      <%= dgettext("ui", "Import") %>
                     </button>
                   </div>
                 </div>
@@ -165,13 +165,13 @@
                       <header class="diff-item-header">
                         <div>
                           <strong><%= orphan.slug %></strong>
-                          <div class="diff-item-meta"><%= translated("Orphan Files") %></div>
+                          <div class="diff-item-meta"><%= dgettext("ui", "Orphan Files") %></div>
                         </div>
                       </header>
 
                       <div class="diff-item-fields">
                         <div class="diff-field-row">
-                          <div class="diff-field-name"><%= translated("Path") %></div>
+                          <div class="diff-field-name"><%= dgettext("ui", "Path") %></div>
                           <div class="diff-field-values">
                             <div class="diff-field-value file-value orphan-path"><span><%= orphan.file_path %></span></div>
                           </div>
@@ -192,30 +192,30 @@
           </section>
 
           <section class="translation-validation-section">
-            <h3><%= translated("translationValidation.databaseTitle") %></h3>
+            <h3><%= dgettext("ui", "translationValidation.databaseTitle") %></h3>
 
             <%= if @misc_editor.invalid_database_rows == [] do %>
-              <p class="translation-validation-empty"><%= translated("translationValidation.noneDatabase") %></p>
+              <p class="translation-validation-empty"><%= dgettext("ui", "translationValidation.noneDatabase") %></p>
             <% else %>
               <div class="translation-validation-list">
                 <%= for issue <- @misc_editor.invalid_database_rows do %>
                   <article class="translation-validation-card translation-validation-card-db" data-testid="translation-validation-card">
                     <p class="translation-validation-card-title"><%= translation_issue_label(issue) %></p>
                     <dl class="translation-validation-card-meta">
-                      <dt><%= translated("translationValidation.field.translationFor") %></dt>
+                      <dt><%= dgettext("ui", "translationValidation.field.translationFor") %></dt>
                       <dd><%= translation_issue_value(issue, :translation_for) %></dd>
                       <%= if translation_issue_value(issue, :translation_id) do %>
-                        <dt><%= translated("translationValidation.field.translationId") %></dt>
+                        <dt><%= dgettext("ui", "translationValidation.field.translationId") %></dt>
                         <dd><%= translation_issue_value(issue, :translation_id) %></dd>
                       <% end %>
                       <%= if translation_issue_value(issue, :title) do %>
-                        <dt><%= translated("translationValidation.field.title") %></dt>
+                        <dt><%= dgettext("ui", "translationValidation.field.title") %></dt>
                         <dd><%= translation_issue_value(issue, :title) %></dd>
                       <% end %>
-                      <dt><%= translated("translationValidation.field.languages") %></dt>
+                      <dt><%= dgettext("ui", "translationValidation.field.languages") %></dt>
                       <dd><%= translation_issue_languages(issue) %></dd>
                       <%= if translation_issue_value(issue, :file_path) do %>
-                        <dt><%= translated("translationValidation.field.filePath") %></dt>
+                        <dt><%= dgettext("ui", "translationValidation.field.filePath") %></dt>
                         <dd><%= translation_issue_value(issue, :file_path) %></dd>
                       <% end %>
                     </dl>
@@ -226,26 +226,26 @@
           </section>
 
           <section class="translation-validation-section">
-            <h3><%= translated("translationValidation.filesystemTitle") %></h3>
+            <h3><%= dgettext("ui", "translationValidation.filesystemTitle") %></h3>
 
             <%= if @misc_editor.invalid_filesystem_files == [] do %>
-              <p class="translation-validation-empty"><%= translated("translationValidation.noneFilesystem") %></p>
+              <p class="translation-validation-empty"><%= dgettext("ui", "translationValidation.noneFilesystem") %></p>
             <% else %>
               <div class="translation-validation-list">
                 <%= for issue <- @misc_editor.invalid_filesystem_files do %>
                   <article class="translation-validation-card translation-validation-card-file" data-testid="translation-validation-card">
                     <p class="translation-validation-card-title"><%= translation_issue_label(issue) %></p>
                     <dl class="translation-validation-card-meta">
-                      <dt><%= translated("translationValidation.field.translationFor") %></dt>
+                      <dt><%= dgettext("ui", "translationValidation.field.translationFor") %></dt>
                       <dd><%= translation_issue_value(issue, :translation_for) %></dd>
                       <%= if translation_issue_value(issue, :title) do %>
-                        <dt><%= translated("translationValidation.field.title") %></dt>
+                        <dt><%= dgettext("ui", "translationValidation.field.title") %></dt>
                         <dd><%= translation_issue_value(issue, :title) %></dd>
                       <% end %>
-                      <dt><%= translated("translationValidation.field.languages") %></dt>
+                      <dt><%= dgettext("ui", "translationValidation.field.languages") %></dt>
                       <dd><%= translation_issue_languages(issue) %></dd>
                       <%= if translation_issue_value(issue, :file_path) do %>
-                        <dt><%= translated("translationValidation.field.filePath") %></dt>
+                        <dt><%= dgettext("ui", "translationValidation.field.filePath") %></dt>
                         <dd><%= translation_issue_value(issue, :file_path) %></dd>
                       <% end %>
                     </dl>
@@ -256,8 +256,8 @@
           </section>
 
           <div class="translation-validation-actions">
-            <button class="secondary" type="button" phx-click="rerun_misc_editor" phx-target={@myself} data-testid="translation-validation-revalidate"><%= translated("translationValidation.revalidate") %></button>
-            <button class="primary" type="button" phx-click="fix_translation_validation" phx-target={@myself} data-testid="translation-validation-fix" disabled={not @misc_editor.can_fix?}><%= translated("translationValidation.fix") %></button>
+            <button class="secondary" type="button" phx-click="rerun_misc_editor" phx-target={@myself} data-testid="translation-validation-revalidate"><%= dgettext("ui", "translationValidation.revalidate") %></button>
+            <button class="primary" type="button" phx-click="fix_translation_validation" phx-target={@myself} data-testid="translation-validation-fix" disabled={not @misc_editor.can_fix?}><%= dgettext("ui", "translationValidation.fix") %></button>
           </div>
         </div>
 
@@ -269,8 +269,8 @@
               <button class="linkish" type="button" phx-click="open_duplicate_post" phx-target={@myself} phx-value-id={BDS.MapUtils.attr(pair, :post_id_a)} phx-value-title={BDS.MapUtils.attr(pair, :title_a)}><%= BDS.MapUtils.attr(pair, :title_a) %></button>
               <span>→</span>
               <button class="linkish" type="button" phx-click="open_duplicate_post" phx-target={@myself} phx-value-id={BDS.MapUtils.attr(pair, :post_id_b)} phx-value-title={BDS.MapUtils.attr(pair, :title_b)}><%= BDS.MapUtils.attr(pair, :title_b) %></button>
-              <span class="misc-summary-pill"><%= if(BDS.MapUtils.attr(pair, :exact_match), do: translated("Exact Match"), else: "#{Float.round((BDS.MapUtils.attr(pair, :similarity) || 0.0) * 100, 1)}%") %></span>
-              <button class="secondary" type="button" phx-click="dismiss_duplicate_pair" phx-target={@myself} phx-value-post-id-a={BDS.MapUtils.attr(pair, :post_id_a)} phx-value-post-id-b={BDS.MapUtils.attr(pair, :post_id_b)}><%= translated("Dismiss") %></button>
+              <span class="misc-summary-pill"><%= if(BDS.MapUtils.attr(pair, :exact_match), do: dgettext("ui", "Exact Match"), else: "#{Float.round((BDS.MapUtils.attr(pair, :similarity) || 0.0) * 100, 1)}%") %></span>
+              <button class="secondary" type="button" phx-click="dismiss_duplicate_pair" phx-target={@myself} phx-value-post-id-a={BDS.MapUtils.attr(pair, :post_id_a)} phx-value-post-id-b={BDS.MapUtils.attr(pair, :post_id_b)}><%= dgettext("ui", "Dismiss") %></button>
             </article>
           <% end %>
         </div>
@@ -281,7 +281,7 @@
             <p class="git-diff-empty"><%= @misc_editor.empty_message %></p>
           <% else %>
             <form class="git-diff-toolbar" phx-change="select_git_diff_file" phx-target={@myself}>
-              <label for="git-diff-file-select"><%= translated("gitDiff.changedFiles") %></label>
+              <label for="git-diff-file-select"><%= dgettext("ui", "gitDiff.changedFiles") %></label>
               <select id="git-diff-file-select" data-testid="git-diff-file-select" name="path">
                 <%= for file_path <- @misc_editor.files do %>
                   <option value={file_path} selected={file_path == @misc_editor.selected_file_path}><%= file_path %></option>

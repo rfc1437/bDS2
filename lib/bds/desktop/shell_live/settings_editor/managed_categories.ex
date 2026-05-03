@@ -4,7 +4,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
   use Phoenix.Component
 
   alias BDS.Metadata
-  alias BDS.Desktop.ShellData
+  use Gettext, backend: BDS.Gettext
 
   @protected_categories MapSet.new(["article", "aside", "page", "picture"])
   @default_category_settings %{
@@ -56,8 +56,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
       name == "" ->
         socket
         |> append_output.(
-          translated("Categories"),
-          translated("Category name is required"),
+          dgettext("ui", "Categories"),
+          dgettext("ui", "Category name is required"),
           nil,
           "error"
         )
@@ -72,7 +72,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
 
           {:error, reason} ->
             socket
-            |> append_output.(translated("Categories"), inspect(reason), nil, "error")
+            |> append_output.(dgettext("ui", "Categories"), inspect(reason), nil, "error")
             |> reload.(socket.assigns.workbench)
         end
     end
@@ -104,7 +104,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
     else
       {:error, reason} ->
         socket
-        |> append_output.(translated("Categories"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "Categories"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -128,7 +128,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
 
       {:error, reason} ->
         socket
-        |> append_output.(translated("Categories"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "Categories"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -141,8 +141,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
       MapSet.member?(@protected_categories, category) ->
         socket
         |> append_output.(
-          translated("Categories"),
-          translated("Protected categories cannot be removed"),
+          dgettext("ui", "Categories"),
+          dgettext("ui", "Protected categories cannot be removed"),
           nil,
           "error"
         )
@@ -155,7 +155,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
 
           {:error, reason} ->
             socket
-            |> append_output.(translated("Categories"), inspect(reason), nil, "error")
+            |> append_output.(dgettext("ui", "Categories"), inspect(reason), nil, "error")
             |> reload.(socket.assigns.workbench)
         end
     end
@@ -197,7 +197,4 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
       trimmed -> trimmed
     end
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

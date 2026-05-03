@@ -1,10 +1,10 @@
 defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
   @moduledoc false
 
-  alias BDS.Desktop.ShellData
   alias BDS.Metadata
   alias BDS.Desktop.ShellLive.MenuEditor.PageCategory
   alias BDS.Desktop.ShellLive.MenuEditor.TreeOps
+  use Gettext, backend: BDS.Gettext
 
   @spec current_draft(term()) :: term()
   def current_draft(assigns), do: Map.get(assigns.menu_editor_state || %{}, :draft)
@@ -14,7 +14,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
     item = %{
       item_id: Ecto.UUID.generate(),
       kind: :page,
-      label: translated("menuEditor.newPage"),
+      label: dgettext("ui", "New Page"),
       slug: nil,
       children: [],
       is_home: false
@@ -57,7 +57,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
   def finalize_submenu_draft(%{draft: %{item_id: item_id, query: query}} = state) do
     label =
       if(String.trim(query) == "",
-        do: translated("menuEditor.newSubmenu"),
+        do: dgettext("ui", "New Submenu"),
         else: String.trim(query)
       )
 
@@ -144,7 +144,4 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.DraftManagement do
 
     update_state_fun.(socket, &assign_category_to_draft(&1, category))
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

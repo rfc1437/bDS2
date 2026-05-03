@@ -6,9 +6,9 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   import Phoenix.HTML, only: [raw: 1]
 
   alias BDS.{AI, BoundedAtoms, MapUtils, Persistence}
-  alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.ChatEditor.{MessageBuild, ModelSelection, ToolTracking}
   alias BDS.Desktop.ShellLive.TabHelpers
+  use Gettext, backend: BDS.Gettext
 
   embed_templates("chat_editor_html/*")
 
@@ -72,7 +72,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         {:noreply, assign(socket, :model_selector_open?, false) |> build_data()}
 
       {:error, reason} ->
-        notify_parent({:chat_editor_output, translated("Chat"), inspect(reason), "error"})
+        notify_parent({:chat_editor_output, dgettext("ui", "Chat"), inspect(reason), "error"})
         {:noreply, assign(socket, :model_selector_open?, false) |> build_data()}
     end
   end
@@ -196,8 +196,8 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
       socket.assigns.offline_mode ->
         notify_parent(
-          {:chat_editor_output, translated("Chat"),
-           translated("Automatic AI actions stay gated by airplane mode."), "info"}
+          {:chat_editor_output, dgettext("ui", "Chat"),
+           dgettext("ui", "Automatic AI actions stay gated by airplane mode."), "info"}
         )
 
         build_data(socket)
@@ -272,7 +272,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         assign(socket, :request, nil) |> build_data()
 
       {:error, reason} ->
-        notify_parent({:chat_editor_output, translated("Chat"), format_error(reason), "error"})
+        notify_parent({:chat_editor_output, dgettext("ui", "Chat"), format_error(reason), "error"})
         assign(socket, :request, nil) |> build_data()
     end
   end
@@ -483,8 +483,8 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   # ── HEEx-callable helpers ─────────────────────────────────────────────────
 
   @spec message_role_label(atom()) :: String.t()
-  def message_role_label(:user), do: translated("chat.role.you")
-  def message_role_label(_role), do: translated("chat.role.assistant")
+  def message_role_label(:user), do: dgettext("ui", "You")
+  def message_role_label(_role), do: dgettext("ui", "Assistant")
 
   defdelegate tool_call_name(tool_call), to: ToolTracking
   defdelegate tool_call_arguments(tool_call), to: ToolTracking
@@ -547,10 +547,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
               <% end %>
             </summary>
             <div class="chat-tool-marker-details" data-testid="chat-tool-marker-details">
-              <div class="chat-tool-marker-detail-label"><%= translated("chat.toolArguments") %></div>
+              <div class="chat-tool-marker-detail-label"><%= dgettext("ui", "Arguments") %></div>
               <pre><%= Jason.encode!(marker.arguments || %{}, pretty: true) %></pre>
               <%= if marker.result not in [nil, ""] do %>
-                <div class="chat-tool-marker-detail-label"><%= translated("chat.toolResult") %></div>
+                <div class="chat-tool-marker-detail-label"><%= dgettext("ui", "Result") %></div>
                 <pre><%= marker.result %></pre>
               <% end %>
             </div>
@@ -571,7 +571,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
       <summary class="chat-inline-surface-header">
         <span class="chat-inline-surface-icon"><%= surface_icon(@surface.type) %></span>
         <span class="chat-inline-surface-title"><%= surface_title(@surface) %></span>
-        <button class="chat-inline-surface-dismiss" type="button" phx-click="dismiss_chat_surface" phx-target={@myself} phx-value-surface-id={@surface.id} aria-label={translated("chat.dismissSurface")} data-testid="chat-inline-surface-dismiss">×</button>
+        <button class="chat-inline-surface-dismiss" type="button" phx-click="dismiss_chat_surface" phx-target={@myself} phx-value-surface-id={@surface.id} aria-label={dgettext("ui", "Dismiss surface")} data-testid="chat-inline-surface-dismiss">×</button>
       </summary>
       <div class="chat-inline-surface-body">
       <%= case @surface.type do %>
@@ -848,7 +848,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   defp present?(value), do: not is_nil(value)
 
   defp format_error(%{kind: :endpoint_not_configured}),
-    do: translated("chat.apiKeyRequiredDescription")
+    do: dgettext("ui", "Configure an API key in Settings to enable AI chat.")
 
   defp format_error(reason), do: inspect(reason)
 
@@ -860,7 +860,4 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
       :error -> 0
     end
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

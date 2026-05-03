@@ -6,8 +6,9 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Posts.Post
   alias BDS.UI.Registry
+  use Gettext, backend: BDS.Gettext
 
-  def tab_title(nil, _tab_meta), do: translated("Dashboard")
+  def tab_title(nil, _tab_meta), do: dgettext("ui", "Dashboard")
 
   def tab_title(tab, tab_meta) do
     case Map.get(tab_meta, {tab.type, tab.id}) do
@@ -16,7 +17,7 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     end
   end
 
-  def tab_subtitle(nil, _tab_meta), do: translated("dashboard.subtitle")
+  def tab_subtitle(nil, _tab_meta), do: dgettext("ui", "Overview of your blog database")
 
   def tab_subtitle(tab, tab_meta) do
     case Map.get(tab_meta, {tab.type, tab.id}) do
@@ -50,7 +51,7 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
 
   defp default_tab_subtitle(_tab), do: "Desktop workbench content routed through the Elixir shell."
 
-  def tab_route_label(nil), do: translated("Dashboard")
+  def tab_route_label(nil), do: dgettext("ui", "Dashboard")
   def tab_route_label(%{type: type}), do: ShellData.route_label(type)
 
   def tab_icon_id(nil), do: "posts"
@@ -135,7 +136,7 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   defp derived_tab_meta(%{type: :scripts, id: script_id}) do
     case Scripts.get_script(script_id) do
       %{title: title, id: id} ->
-        %{title: blank_to_nil(title) || id, subtitle: translated("Automation helpers")}
+        %{title: blank_to_nil(title) || id, subtitle: dgettext("ui", "Automation helpers")}
 
       _other ->
         %{}
@@ -145,7 +146,7 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   defp derived_tab_meta(%{type: :templates, id: template_id}) do
     case Templates.get_template(template_id) do
       %{title: title, id: id} ->
-        %{title: blank_to_nil(title) || id, subtitle: translated("Site rendering")}
+        %{title: blank_to_nil(title) || id, subtitle: dgettext("ui", "Site rendering")}
 
       _other ->
         %{}
@@ -155,7 +156,7 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   defp derived_tab_meta(%{type: :chat, id: conversation_id}) do
     case AI.get_chat_conversation(conversation_id) do
       conversation when is_map(conversation) ->
-        %{title: chat_record_title(conversation), subtitle: translated("AI conversations")}
+        %{title: chat_record_title(conversation), subtitle: dgettext("ui", "AI conversations")}
 
       _other ->
         %{}
@@ -166,8 +167,8 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     case ImportDefinitions.get_definition(definition_id) do
       %{name: name} ->
         %{
-          title: blank_to_nil(name) || translated("importAnalysis.untitledImport"),
-          subtitle: translated("importAnalysis.headerDescription")
+          title: blank_to_nil(name) || dgettext("ui", "Untitled Import"),
+          subtitle: dgettext("ui", "Select a WordPress export file (WXR) and an uploads folder to analyze what would be imported.")
         }
 
       _other ->
@@ -176,13 +177,13 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   end
 
   defp derived_tab_meta(%{type: :git_diff, id: "git-working-tree"}) do
-    %{title: translated("Working tree"), subtitle: translated("Working tree and history")}
+    %{title: dgettext("ui", "Working tree"), subtitle: dgettext("ui", "Working tree and history")}
   end
 
   defp derived_tab_meta(%{type: :menu_editor}) do
     %{
-      title: translated("menuEditor.tabTitle"),
-      subtitle: translated("menuEditor.description")
+      title: dgettext("ui", "Blog Menu"),
+      subtitle: dgettext("ui", "Manage the central blog navigation outline and save it to meta/menu.opml.")
     }
   end
 
@@ -234,6 +235,4 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
       trimmed -> trimmed
     end
   end
-
-  defp translated(text), do: ShellData.translate(text, %{}, BDS.Desktop.UILocale.current())
 end

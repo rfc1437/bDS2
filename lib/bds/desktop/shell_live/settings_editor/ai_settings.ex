@@ -4,8 +4,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
   use Phoenix.Component
 
   alias BDS.AI
-  alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.SettingsEditor.EditorSettings
+  use Gettext, backend: BDS.Gettext
 
   @spec ai_form(term()) :: term()
   def ai_form(assigns) do
@@ -88,7 +88,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
     else
       {:error, reason} ->
         socket
-        |> append_output.(translated("AI Settings"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "AI Settings"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -153,7 +153,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
     else
       {:error, reason} ->
         socket
-        |> append_output.(translated("AI Settings"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "AI Settings"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -168,7 +168,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
 
       {:error, reason} ->
         socket
-        |> append_output.(translated("AI Settings"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "AI Settings"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
@@ -315,7 +315,4 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
       trimmed -> trimmed
     end
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

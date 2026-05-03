@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.UILocale
   alias BDS.UI.Registry
+  use Gettext, backend: BDS.Gettext
 
   def sidebar_content(assigns) do
     UILocale.put(assigns.page_language)
@@ -60,9 +61,9 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
           type="text"
           name="sidebar_filters[search]"
           value={Map.get(@selected_filters, :search) || ""}
-          placeholder={translated(@sidebar_filters_config.search_placeholder)}
+          placeholder={@sidebar_filters_config.search_placeholder}
         />
-        <button type="submit" title={translated("sidebar.search")}>
+        <button type="submit" title={dgettext("ui", "Search")}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
             <path d="M15.7 14.3l-4.2-4.2c-.2-.2-.5-.3-.8-.3.9-1.1 1.5-2.5 1.5-4C12.2 2.6 9.6 0 6.4 0S.6 2.6.6 5.8s2.6 5.8 5.8 5.8c1.5 0 2.9-.5 4-1.4 0 .3.1.6.3.8l4.2 4.2c.2.2.5.3.7.3s.5-.1.7-.3c.4-.4.4-1 0-1.4zm-9.3-4c-2.5 0-4.5-2-4.5-4.5s2-4.5 4.5-4.5 4.5 2 4.5 4.5-2 4.5-4.5 4.5z"/>
           </svg>
@@ -75,10 +76,10 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
       <%= if Map.get(@sidebar_filters_config, :has_active_filters) do %>
         <div class="filter-status">
           <span>
-            <%= translated(@sidebar_filters_config.results_label) %>: <%= @sidebar_filters_config.loaded_count %>/<%= @sidebar_filters_config.total_count %>
+            <%= @sidebar_filters_config.results_label %>: <%= @sidebar_filters_config.loaded_count %>/<%= @sidebar_filters_config.total_count %>
           </span>
           <button data-testid="sidebar-clear-filters" type="button" phx-click="clear_sidebar_filters">
-            <%= translated(@sidebar_filters_config.clear_filters_label) %>
+            <%= @sidebar_filters_config.clear_filters_label %>
           </button>
         </div>
       <% end %>
@@ -96,7 +97,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
               phx-click="toggle_sidebar_archive"
             >
               <span class="collapse-icon"><%= if @archive_collapsed, do: "▶", else: "▼" %></span>
-              <span><%= translated(@sidebar_filters_config.archive_label) %></span>
+              <span><%= @sidebar_filters_config.archive_label %></span>
               <%= if Map.get(@selected_filters, :year) do %>
                 <button class="clear-filter" type="button" phx-click="clear_sidebar_month" phx-stop-propagation>✕</button>
               <% end %>
@@ -157,9 +158,9 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
                 phx-click="toggle_sidebar_tags"
               >
                 <span class="collapse-icon"><%= if @tags_collapsed, do: "▶", else: "▼" %></span>
-                <span><%= translated(@sidebar_filters_config.tags_label) %></span>
+                <span><%= @sidebar_filters_config.tags_label %></span>
                 <%= if Enum.any?(Map.get(@selected_filters, :tags, [])) do %>
-                  <button class="clear-filter" type="button" phx-click="clear_sidebar_tags" phx-stop-propagation title={translated(@sidebar_filters_config.clear_tags_label)}>✕</button>
+                  <button class="clear-filter" type="button" phx-click="clear_sidebar_tags" phx-stop-propagation title={@sidebar_filters_config.clear_tags_label}>✕</button>
                 <% end %>
               </div>
               <%= unless @tags_collapsed do %>
@@ -198,9 +199,9 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
                 phx-click="toggle_sidebar_categories"
               >
                 <span class="collapse-icon"><%= if @categories_collapsed, do: "▶", else: "▼" %></span>
-                <span><%= translated(@sidebar_filters_config.categories_label) %></span>
+                <span><%= @sidebar_filters_config.categories_label %></span>
                 <%= if Enum.any?(Map.get(@selected_filters, :categories, [])) do %>
-                  <button class="clear-filter" type="button" phx-click="clear_sidebar_categories" phx-stop-propagation title={translated(@sidebar_filters_config.clear_categories_label)}>✕</button>
+                  <button class="clear-filter" type="button" phx-click="clear_sidebar_categories" phx-stop-propagation title={@sidebar_filters_config.clear_categories_label}>✕</button>
                 <% end %>
               </div>
               <%= unless @categories_collapsed do %>
@@ -240,7 +241,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
       ~H"""
       <div class="sidebar-load-more">
         <button class="load-more-button" data-testid="sidebar-load-more" type="button" phx-click="load_more_sidebar">
-          <%= translated("Load more") %>
+          <%= dgettext("ui", "Load more") %>
         </button>
       </div>
       """
@@ -266,7 +267,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
       <section class="sidebar-section">
         <div class="sidebar-section-title">
           <span class={"section-icon status-#{Map.get(section, :status, "draft")}"}>●</span>
-          <span data-testid="sidebar-section-title"><%= translated(section.title) %></span>
+          <span data-testid="sidebar-section-title"><%= section.title %></span>
           <span class="sidebar-section-count"><%= Map.get(section, :count, length(Map.get(section, :items, []))) %></span>
         </div>
         <div class="sidebar-list">
@@ -316,7 +317,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
     <% end %>
     <%= if Enum.empty?(Map.get(@sidebar_data, :sections, [])) do %>
       <div class="sidebar-empty">
-        <p><%= translated(Map.get(@sidebar_data, :empty_message, "No items")) %></p>
+        <p><%= Map.get(@sidebar_data, :empty_message, dgettext("ui", "No items")) %></p>
       </div>
     <% end %>
     """
@@ -376,7 +377,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
       </div>
     <% else %>
       <div class="sidebar-empty">
-        <p><%= translated(Map.get(@sidebar_data, :empty_message, "No items")) %></p>
+        <p><%= Map.get(@sidebar_data, :empty_message, dgettext("ui", "No items")) %></p>
       </div>
     <% end %>
     """
@@ -398,17 +399,17 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
                 data-route={item.route}
                 data-item-id={item.id}
                 data-open-title={item.title}
-                data-open-subtitle={translated(item.meta || "")}
+                data-open-subtitle={item.meta || ""}
                 type="button"
                 phx-click="open_sidebar_item"
                 phx-value-route={item.route}
                 phx-value-id={item.id}
                 phx-value-title={item.title}
-                phx-value-subtitle={translated(item.meta || "")}
+                phx-value-subtitle={item.meta || ""}
               >
                 <span class="chat-item-content">
                   <span class="chat-item-title"><%= item.title %></span>
-                  <span class="chat-item-date"><%= translated(item.meta || "") %></span>
+                  <span class="chat-item-date"><%= item.meta || "" %></span>
                 </span>
               </button>
               <button
@@ -432,17 +433,17 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
               data-route={item.route}
               data-item-id={item.id}
               data-open-title={item.title}
-              data-open-subtitle={translated(item.meta || "")}
+              data-open-subtitle={item.meta || ""}
               type="button"
               phx-click="open_sidebar_item"
               phx-value-route={item.route}
               phx-value-id={item.id}
               phx-value-title={item.title}
-              phx-value-subtitle={translated(item.meta || "")}
+              phx-value-subtitle={item.meta || ""}
             >
               <span class="chat-item-content">
                 <span class="chat-item-title"><%= item.title %></span>
-                <span class="chat-item-date"><%= translated(item.meta || "") %></span>
+                <span class="chat-item-date"><%= item.meta || "" %></span>
               </span>
             </button>
           <% end %>
@@ -450,7 +451,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
       </div>
     <% else %>
       <div class="sidebar-empty">
-        <p><%= translated(Map.get(@sidebar_data, :empty_message, "No items")) %></p>
+        <p><%= Map.get(@sidebar_data, :empty_message, dgettext("ui", "No items")) %></p>
       </div>
     <% end %>
     """
@@ -465,17 +466,17 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
           data-testid="sidebar-open-item"
           data-route={item.route}
           data-item-id={item.id}
-          data-open-title={translated(item.title)}
-          data-open-subtitle={translated(Map.get(@sidebar_data, :subtitle, ""))}
+          data-open-title={item.title}
+          data-open-subtitle={Map.get(@sidebar_data, :subtitle, "")}
           type="button"
           phx-click="open_sidebar_item"
           phx-value-route={item.route}
           phx-value-id={item.id}
-          phx-value-title={translated(item.title)}
-          phx-value-subtitle={translated(Map.get(@sidebar_data, :subtitle, ""))}
+          phx-value-title={item.title}
+          phx-value-subtitle={Map.get(@sidebar_data, :subtitle, "")}
         >
           <span class="settings-nav-entry-icon"><%= Map.get(item, :icon, "") %></span>
-          <span><%= translated(item.title) %></span>
+          <span><%= item.title %></span>
         </button>
       <% end %>
     </div>
@@ -487,7 +488,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
     <%= for section <- Map.get(@sidebar_data, :sections, []) do %>
       <section class="sidebar-section">
         <div class="sidebar-section-header">
-          <span data-testid="sidebar-section-title"><%= translated(section.title) %></span>
+          <span data-testid="sidebar-section-title"><%= section.title %></span>
         </div>
         <div class="sidebar-section-items">
           <%= for item <- Map.get(section, :items, []) do %>
@@ -499,8 +500,6 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
     """
   end
 
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   defp sidebar_deletable?(route), do: route in ["post", "media", "scripts", "templates", "chat", "import"]
 
@@ -512,13 +511,13 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
   defp sidebar_delete_testid("import"), do: "sidebar-delete-import"
   defp sidebar_delete_testid(route), do: "sidebar-delete-#{route}"
 
-  defp sidebar_delete_title("chat"), do: translated("sidebar.chat.deleteConversation")
-  defp sidebar_delete_title("post"), do: translated("Delete") <> " " <> translated("Post")
-  defp sidebar_delete_title("media"), do: translated("Delete") <> " " <> translated("Media")
-  defp sidebar_delete_title("scripts"), do: translated("Delete") <> " " <> translated("Script")
-  defp sidebar_delete_title("templates"), do: translated("Delete") <> " " <> translated("Template")
-  defp sidebar_delete_title("import"), do: translated("Delete") <> " " <> translated("Import")
-  defp sidebar_delete_title(_route), do: translated("Delete")
+  defp sidebar_delete_title("chat"), do: dgettext("ui", "Delete conversation")
+  defp sidebar_delete_title("post"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Post")
+  defp sidebar_delete_title("media"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Media")
+  defp sidebar_delete_title("scripts"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Script")
+  defp sidebar_delete_title("templates"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Template")
+  defp sidebar_delete_title("import"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Import")
+  defp sidebar_delete_title(_route), do: dgettext("ui", "Delete")
 
   defp template_sidebar?(sidebar_data), do: Map.get(sidebar_data, :title) == "Templates"
 

@@ -2,10 +2,10 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   @moduledoc false
 
   use Phoenix.Component
+  use Gettext, backend: BDS.Gettext
 
   import Ecto.Query
 
-  alias BDS.Desktop.ShellData
   alias BDS.{I18n, Media, Metadata, Posts, Repo}
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Media.Translation, as: MediaTranslation
@@ -38,10 +38,10 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       language_names: language_names(),
       language_flags: language_flags(),
       existing_translations: existing_translations(current_tab),
-      ai_title: ShellData.translate("AI Suggestions", %{}, page_language),
-      insert_link_title: ShellData.translate("Insert Link", %{}, page_language),
-      insert_media_title: ShellData.translate("Insert Media", %{}, page_language),
-      language_picker_title: ShellData.translate("Translate", %{}, page_language),
+      ai_title: BDS.Gettext.lgettext(page_language, "ui", "AI Suggestions"),
+      insert_link_title: BDS.Gettext.lgettext(page_language, "ui", "Insert Link"),
+      insert_media_title: BDS.Gettext.lgettext(page_language, "ui", "Insert Media"),
+      language_picker_title: BDS.Gettext.lgettext(page_language, "ui", "Translate"),
       gallery_title: tab_title,
       ai_fields: ai_fields(current_tab, tab_title, tab_subtitle, page_language),
       delete_details: delete_details(current_tab, page_language),
@@ -64,8 +64,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
 
   def markdown_link(text, url), do: "[#{text}](#{url})"
 
-  def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
+
 
   def project_metadata(nil), do: %{main_language: "en", blog_languages: []}
 
@@ -217,7 +216,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
         [
           %{
             key: "title",
-            label: ShellData.translate("Title", %{}, page_language),
+            label: BDS.Gettext.lgettext(page_language, "ui", "Title"),
             current_value: post.title || title,
             suggested_value: "",
             locked: false,
@@ -225,7 +224,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
           },
           %{
             key: "excerpt",
-            label: ShellData.translate("Excerpt", %{}, page_language),
+            label: BDS.Gettext.lgettext(page_language, "ui", "Excerpt"),
             current_value: post.excerpt || subtitle,
             suggested_value: "",
             locked: false,
@@ -233,7 +232,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
           },
           %{
             key: "slug",
-            label: ShellData.translate("Slug", %{}, page_language),
+            label: BDS.Gettext.lgettext(page_language, "ui", "Slug"),
             current_value: post.slug || slugify(post.title || title),
             suggested_value: "",
             locked: post.status == :published,
@@ -254,7 +253,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
         [
           %{
             key: "title",
-            label: ShellData.translate("Title", %{}, page_language),
+            label: BDS.Gettext.lgettext(page_language, "ui", "Title"),
             current_value: media.title || title,
             suggested_value: "",
             locked: false,
@@ -262,7 +261,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
           },
           %{
             key: "alt",
-            label: ShellData.translate("Alt Text", %{}, page_language),
+            label: BDS.Gettext.lgettext(page_language, "ui", "Alt Text"),
             current_value: media.alt || "",
             suggested_value: "",
             locked: false,
@@ -270,7 +269,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
           },
           %{
             key: "caption",
-            label: ShellData.translate("Caption", %{}, page_language),
+            label: BDS.Gettext.lgettext(page_language, "ui", "Caption"),
             current_value: media.caption || "",
             suggested_value: "",
             locked: false,
@@ -306,7 +305,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       |> Enum.map(&(&1 || media_id))
 
     %{
-      title: ShellData.translate("Delete Media", %{}, page_language),
+      title: BDS.Gettext.lgettext(page_language, "ui", "Delete Media"),
       entity_name: entity_name,
       entity_type: "media",
       reference_list: reference_list
@@ -314,7 +313,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   rescue
     _error ->
       %{
-        title: ShellData.translate("Delete Media", %{}, page_language),
+        title: BDS.Gettext.lgettext(page_language, "ui", "Delete Media"),
         entity_name: media_id,
         entity_type: "media",
         reference_list: []
@@ -327,7 +326,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       |> Kernel.||("tag")
 
     %{
-      title: ShellData.translate("Delete Tag", %{}, page_language),
+      title: BDS.Gettext.lgettext(page_language, "ui", "Delete Tag"),
       entity_name: tag_name,
       entity_type: "tag",
       reference_list: []
@@ -335,7 +334,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   rescue
     _error ->
       %{
-        title: ShellData.translate("Delete Tag", %{}, page_language),
+        title: BDS.Gettext.lgettext(page_language, "ui", "Delete Tag"),
         entity_name: "tag",
         entity_type: "tag",
         reference_list: []
@@ -344,7 +343,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
 
   defp delete_details(_tab, page_language) do
     %{
-      title: ShellData.translate("Delete", %{}, page_language),
+      title: BDS.Gettext.lgettext(page_language, "ui", "Delete"),
       entity_name: "",
       entity_type: "item",
       reference_list: []
@@ -366,16 +365,16 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     %{
       target: target,
       count: max(length(tags), 1),
-      title: ShellData.translate("Merge Tags", %{}, page_language),
-      message: ShellData.translate("Cannot be undone.", %{}, page_language)
+      title: BDS.Gettext.lgettext(page_language, "ui", "Merge Tags"),
+      message: BDS.Gettext.lgettext(page_language, "ui", "Cannot be undone.")
     }
   rescue
     _error ->
       %{
         target: "tag",
         count: 1,
-        title: ShellData.translate("Merge Tags", %{}, page_language),
-        message: ShellData.translate("Cannot be undone.", %{}, page_language)
+        title: BDS.Gettext.lgettext(page_language, "ui", "Merge Tags"),
+        message: BDS.Gettext.lgettext(page_language, "ui", "Cannot be undone.")
       }
   end
 

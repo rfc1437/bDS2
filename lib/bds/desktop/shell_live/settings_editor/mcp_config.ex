@@ -3,8 +3,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
 
   use Phoenix.Component
 
-  alias BDS.Desktop.ShellData
   alias BDS.MCP.AgentConfig
+  use Gettext, backend: BDS.Gettext
 
   @mcp_agents [
     %{id: :claude_code, label: "Claude Code", supported?: true},
@@ -47,15 +47,15 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
 
           {:error, reason} ->
             socket
-            |> append_output.(translated("MCP"), format_config_error(reason), nil, "error")
+            |> append_output.(dgettext("ui", "MCP"), format_config_error(reason), nil, "error")
             |> reload.(socket.assigns.workbench)
         end
 
       _other ->
         socket
         |> append_output.(
-          translated("MCP"),
-          translated("This MCP agent is not supported in the rewrite yet"),
+          dgettext("ui", "MCP"),
+          dgettext("ui", "This MCP agent is not supported in the rewrite yet"),
           nil,
           "error"
         )
@@ -70,28 +70,28 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
   end
 
   defp format_config_error({:read_config, path, reason}) do
-    translated("Could not read MCP config %{path}: %{reason}",
+    dgettext("ui", "Could not read MCP config %{path}: %{reason}",
       path: path,
       reason: inspect(reason)
     )
   end
 
   defp format_config_error({:write_config, path, reason}) do
-    translated("Could not write MCP config %{path}: %{reason}",
+    dgettext("ui", "Could not write MCP config %{path}: %{reason}",
       path: path,
       reason: inspect(reason)
     )
   end
 
   defp format_config_error({:create_config_dir, path, reason}) do
-    translated("Could not create MCP config folder %{path}: %{reason}",
+    dgettext("ui", "Could not create MCP config folder %{path}: %{reason}",
       path: path,
       reason: inspect(reason)
     )
   end
 
   defp format_config_error({:decode_config, path, _reason}) do
-    translated("Could not parse MCP config %{path}", path: path)
+    dgettext("ui", "Could not parse MCP config %{path}", path: path)
   end
 
   defp mcp_configured?(%{supported?: false}), do: false
@@ -124,7 +124,4 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.MCPConfig do
     |> Map.get("mcpServers", %{})
     |> Map.has_key?("bDS")
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

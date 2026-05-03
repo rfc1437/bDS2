@@ -4,8 +4,8 @@ defmodule BDS.Desktop.ShellLive.TemplateEditor do
   use Phoenix.LiveComponent
 
   alias BDS.{MCP, Templates}
-  alias BDS.Desktop.ShellData
   alias BDS.Templates.Template
+  use Gettext, backend: BDS.Gettext
 
   embed_templates("template_editor_html/*")
 
@@ -107,17 +107,17 @@ defmodule BDS.Desktop.ShellLive.TemplateEditor do
           socket
           |> assign(:draft, nil)
           |> build_data()
-          |> notify_output(translated("Templates"), translated("Template saved"))
+          |> notify_output(dgettext("ui", "Templates"), dgettext("ui", "Template saved"))
           |> notify_reload()
         else
           {:ok, %{valid: false, errors: errors}} ->
             socket
-            |> notify_output(translated("Templates"), Enum.join(errors, "; "), "error")
+            |> notify_output(dgettext("ui", "Templates"), Enum.join(errors, "; "), "error")
             |> notify_reload()
 
           {:error, reason} ->
             socket
-            |> notify_output(translated("Templates"), inspect(reason), "error")
+            |> notify_output(dgettext("ui", "Templates"), inspect(reason), "error")
             |> notify_reload()
         end
     end
@@ -139,17 +139,17 @@ defmodule BDS.Desktop.ShellLive.TemplateEditor do
           socket
           |> assign(:draft, nil)
           |> build_data()
-          |> notify_output(translated("Templates"), translated("Template published"))
+          |> notify_output(dgettext("ui", "Templates"), dgettext("ui", "Template published"))
           |> notify_reload()
         else
           {:ok, %{valid: false, errors: errors}} ->
             socket
-            |> notify_output(translated("Templates"), Enum.join(errors, "; "), "error")
+            |> notify_output(dgettext("ui", "Templates"), Enum.join(errors, "; "), "error")
             |> notify_reload()
 
           {:error, reason} ->
             socket
-            |> notify_output(translated("Templates"), inspect(reason), "error")
+            |> notify_output(dgettext("ui", "Templates"), inspect(reason), "error")
             |> notify_reload()
         end
     end
@@ -165,10 +165,10 @@ defmodule BDS.Desktop.ShellLive.TemplateEditor do
       %Template{} = template ->
         case MCP.validate_template(current_draft(socket.assigns, template)["content"] || "") do
           {:ok, %{valid: true}} ->
-            notify_output(socket, translated("Templates"), translated("Template syntax is valid"))
+            notify_output(socket, dgettext("ui", "Templates"), dgettext("ui", "Template syntax is valid"))
 
           {:ok, %{valid: false, errors: errors}} ->
-            notify_output(socket, translated("Templates"), Enum.join(errors, "; "), "error")
+            notify_output(socket, dgettext("ui", "Templates"), Enum.join(errors, "; "), "error")
         end
     end
   end
@@ -183,7 +183,7 @@ defmodule BDS.Desktop.ShellLive.TemplateEditor do
 
       {:error, reason} ->
         socket
-        |> notify_output(translated("Templates"), inspect(reason), "error")
+        |> notify_output(dgettext("ui", "Templates"), inspect(reason), "error")
         |> notify_reload()
     end
   end
@@ -235,7 +235,4 @@ defmodule BDS.Desktop.ShellLive.TemplateEditor do
     send(self(), :reload_shell)
     socket
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

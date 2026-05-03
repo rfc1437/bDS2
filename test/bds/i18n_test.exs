@@ -25,60 +25,34 @@ defmodule BDS.I18nTest do
     assert BDS.I18n.format_locale("pt-BR") == "en-US"
   end
 
-  test "render translations are loaded from locale json files with unsupported-locale fallback" do
-    locale_dir = Application.app_dir(:bds, "priv/i18n/locales")
-
-    assert File.exists?(Path.join(locale_dir, "en.json"))
-    assert File.exists?(Path.join(locale_dir, "de.json"))
-    assert File.exists?(Path.join(locale_dir, "fr.json"))
-    assert File.exists?(Path.join(locale_dir, "it.json"))
-    assert File.exists?(Path.join(locale_dir, "es.json"))
-
-    assert BDS.I18n.get_render_translations("de") ==
-             Jason.decode!(File.read!(Path.join(locale_dir, "de.json")))
-
-    assert BDS.I18n.translate("de", "render.notFound.back") ==
+  test "gettext render translations resolve for supported locales" do
+    assert BDS.Gettext.lgettext("de", "render", "Back to preview home") ==
              "Zurück zur Vorschau-Startseite"
 
-    assert BDS.I18n.translate("pt-BR", "render.notFound.back") == "Back to preview home"
+    assert BDS.Gettext.lgettext("pt-BR", "render", "Back to preview home") ==
+             "Back to preview home"
   end
 
-  test "supported locales do not silently fall back to english per key" do
-    assert BDS.I18n.translate("de", "missing.key") == "missing.key"
+  test "gettext ui translations resolve for supported locales" do
+    BDS.Gettext.put_locale("de")
+    assert Gettext.dgettext(BDS.Gettext, "ui", "Posts") == "Beiträge"
+    BDS.Gettext.put_locale("en")
   end
 
-  test "supported locale files expose the same translation keys" do
-    catalogs = locale_catalogs()
-    english_keys = catalogs["en"] |> Map.keys() |> Enum.sort()
-
-    for {locale, catalog} <- catalogs, locale != "en" do
-      assert Map.keys(catalog) |> Enum.sort() == english_keys
-    end
+  test "gettext falls back to the msgid for missing translations" do
+    assert BDS.Gettext.lgettext("de", "ui", "totally.missing.key.12345") ==
+             "totally.missing.key.12345"
   end
 
   test "supported non-english locales translate representative keys differently from english" do
-    catalogs = locale_catalogs()
-
-    representative_keys = [
-      "activity.posts",
-      "common.settings",
-      "render.calendar.title",
-      "render.notFound.back",
-      "render.search.ariaLabel"
+    representative = [
+      {"ui", "Posts"},
+      {"render", "Back to preview home"},
+      {"render", "Archive"}
     ]
 
-    for locale <- ["de", "fr", "it", "es"], key <- representative_keys do
-      assert Map.fetch!(catalogs, locale)[key] != Map.fetch!(catalogs, "en")[key]
+    for locale <- ["de", "fr", "it", "es"], {domain, msgid} <- representative do
+      assert BDS.Gettext.lgettext(locale, domain, msgid) != msgid
     end
-  end
-
-  defp locale_catalogs do
-    locale_dir = Application.app_dir(:bds, "priv/i18n/locales")
-
-    Path.wildcard(Path.join(locale_dir, "*.json"))
-    |> Enum.sort()
-    |> Enum.into(%{}, fn path ->
-      {Path.basename(path, ".json"), Jason.decode!(File.read!(path))}
-    end)
   end
 end

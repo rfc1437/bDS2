@@ -263,7 +263,7 @@ defmodule BDS.UI.ShellTest do
     assert css =~ "opacity: 1;"
 
     assert Regex.match?(
-             ~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= translated\("Quick Actions"\) %><\/span>/s,
+             ~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= dgettext\("ui", "Quick Actions"\) %><\/span>/s,
              template
            )
 
@@ -271,7 +271,7 @@ defmodule BDS.UI.ShellTest do
     assert template =~ ~s(class="quick-action-icon">🤖</span>)
 
     assert Regex.match?(
-             ~r/class="quick-action-text">\s*<strong><%= translated\("AI Suggestions"\) %><\/strong>.*?<\/span>\s*<span class="quick-action-icon">🤖<\/span>/s,
+             ~r/class="quick-action-text">\s*<strong><%= dgettext\("ui", "AI Suggestions"\) %><\/strong>.*?<\/span>\s*<span class="quick-action-icon">🤖<\/span>/s,
              template
            )
 
@@ -383,7 +383,7 @@ defmodule BDS.UI.ShellTest do
     assert post_editor_ex =~ "defp build_data(socket)"
 
     assert Regex.match?(
-             ~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= translated\("Quick Actions"\) %><\/span>/s,
+             ~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= dgettext\("ui", "Quick Actions"\) %><\/span>/s,
              post_template
            )
 

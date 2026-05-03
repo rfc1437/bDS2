@@ -4,8 +4,7 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
   import Phoenix.Component, only: [assign: 3]
 
   alias BDS.{AI, ImportDefinitions, Media, Posts, Scripts, Templates}
-  alias BDS.Desktop.ShellData
-  alias BDS.Desktop.UILocale
+  use Gettext, backend: BDS.Gettext
 
   @spec request_delete(Phoenix.LiveView.Socket.t(), String.t(), String.t(), String.t() | nil, map()) ::
           Phoenix.LiveView.Socket.t()
@@ -57,7 +56,7 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
       _other ->
         socket
         |> assign(:shell_overlay, nil)
-        |> callbacks.append_output.(translated("Delete"), inspect(:unsupported_route), nil, "error")
+        |> callbacks.append_output.(dgettext("ui", "Delete"), inspect(:unsupported_route), nil, "error")
         |> callbacks.reload.(socket.assigns.workbench)
     end
   end
@@ -152,13 +151,13 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
   end
 
   @spec delete_title(String.t()) :: String.t()
-  defp delete_title("chat"), do: translated("sidebar.chat.deleteConversation")
-  defp delete_title("post"), do: translated("Delete") <> " " <> translated("Post")
-  defp delete_title("media"), do: translated("Delete") <> " " <> translated("Media")
-  defp delete_title("scripts"), do: translated("Delete") <> " " <> translated("Script")
-  defp delete_title("templates"), do: translated("Delete") <> " " <> translated("Template")
-  defp delete_title("import"), do: translated("Delete") <> " " <> translated("Import")
-  defp delete_title(_route), do: translated("Delete")
+  defp delete_title("chat"), do: dgettext("ui", "Delete conversation")
+  defp delete_title("post"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Post")
+  defp delete_title("media"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Media")
+  defp delete_title("scripts"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Script")
+  defp delete_title("templates"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Template")
+  defp delete_title("import"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Import")
+  defp delete_title(_route), do: dgettext("ui", "Delete")
 
   @spec present_title(String.t() | nil) :: String.t() | nil
   defp present_title(value) when is_binary(value) do
@@ -170,7 +169,4 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
 
   defp present_title(_value), do: nil
 
-  @spec translated(String.t(), map()) :: String.t()
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, UILocale.current())
 end

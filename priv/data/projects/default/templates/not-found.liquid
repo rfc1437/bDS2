@@ -14,10 +14,8 @@ version: 1
       <section class="not-found" data-template="not-found">
         <article>
           <h1>404</h1>
-          {% assign default_not_found_message = 'render.notFound.message' | i18n: language %}
-          {% assign default_not_found_back = 'render.notFound.back' | i18n: language %}
-          <p>{{ not_found_message | default: default_not_found_message }}</p>
-          <p><a href="/" role="button">{{ not_found_back_label | default: default_not_found_back }}</a></p>
+          <p>{{ not_found_message }}</p>
+          <p><a href="/" role="button">{{ not_found_back_label }}</a></p>
         </article>
       </section>
     </main>

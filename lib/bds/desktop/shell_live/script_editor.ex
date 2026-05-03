@@ -4,8 +4,8 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
   use Phoenix.LiveComponent
 
   alias BDS.{Scripts, Scripting}
-  alias BDS.Desktop.ShellData
   alias BDS.Scripts.Script
+  use Gettext, backend: BDS.Gettext
 
   embed_templates("script_editor_html/*")
 
@@ -115,18 +115,18 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
                 socket
                 |> assign(:draft, nil)
                 |> build_data()
-                |> notify_output(translated("Scripts"), translated("Script saved"))
+                |> notify_output(dgettext("ui", "Scripts"), dgettext("ui", "Script saved"))
                 |> notify_reload()
 
               {:error, reason} ->
                 socket
-                |> notify_output(translated("Scripts"), inspect(reason), "error")
+                |> notify_output(dgettext("ui", "Scripts"), inspect(reason), "error")
                 |> notify_reload()
             end
 
           {:error, reason} ->
             socket
-            |> notify_output(translated("Scripts"), inspect(reason), "error")
+            |> notify_output(dgettext("ui", "Scripts"), inspect(reason), "error")
             |> notify_reload()
         end
     end
@@ -151,24 +151,24 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
                     socket
                     |> assign(:draft, nil)
                     |> build_data()
-                    |> notify_output(translated("Scripts"), translated("Script published"))
+                    |> notify_output(dgettext("ui", "Scripts"), dgettext("ui", "Script published"))
                     |> notify_reload()
 
                   {:error, reason} ->
                     socket
-                    |> notify_output(translated("Scripts"), inspect(reason), "error")
+                    |> notify_output(dgettext("ui", "Scripts"), inspect(reason), "error")
                     |> notify_reload()
                 end
 
               {:error, reason} ->
                 socket
-                |> notify_output(translated("Scripts"), inspect(reason), "error")
+                |> notify_output(dgettext("ui", "Scripts"), inspect(reason), "error")
                 |> notify_reload()
             end
 
           {:error, reason} ->
             socket
-            |> notify_output(translated("Scripts"), inspect(reason), "error")
+            |> notify_output(dgettext("ui", "Scripts"), inspect(reason), "error")
             |> notify_reload()
         end
     end
@@ -184,10 +184,10 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
       %Script{} = script ->
         case Scripting.validate(current_draft(socket.assigns, script)["content"] || "") do
           :ok ->
-            notify_output(socket, translated("Scripts"), translated("Syntax is valid"))
+            notify_output(socket, dgettext("ui", "Scripts"), dgettext("ui", "Syntax is valid"))
 
           {:error, reason} ->
-            notify_output(socket, translated("Scripts"), inspect(reason), "error")
+            notify_output(socket, dgettext("ui", "Scripts"), inspect(reason), "error")
         end
     end
   end
@@ -209,10 +209,10 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
                []
              ) do
           {:ok, result} ->
-            notify_output(socket, translated("Scripts"), inspect(result))
+            notify_output(socket, dgettext("ui", "Scripts"), inspect(result))
 
           {:error, reason} ->
-            notify_output(socket, translated("Scripts"), inspect(reason), "error")
+            notify_output(socket, dgettext("ui", "Scripts"), inspect(reason), "error")
         end
     end
   end
@@ -227,7 +227,7 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
 
       {:error, reason} ->
         socket
-        |> notify_output(translated("Scripts"), inspect(reason), "error")
+        |> notify_output(dgettext("ui", "Scripts"), inspect(reason), "error")
         |> notify_reload()
     end
   end
@@ -287,7 +287,4 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
     send(self(), :reload_shell)
     socket
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

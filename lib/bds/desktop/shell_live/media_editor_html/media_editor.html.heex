@@ -8,7 +8,7 @@
       ]}>
         <span class="editor-tab-title" data-testid="editor-title"><%= @media_editor.display_title %></span>
         <%= if @media_editor.dirty? do %>
-          <span class="editor-tab-dirty" title={translated("Unsaved")}>●</span>
+          <span class="editor-tab-dirty" title={dgettext("ui", "Unsaved")}>●</span>
         <% end %>
       </div>
     </div>
@@ -26,7 +26,7 @@
           phx-target={@myself}
         >
           <span class="quick-actions-btn-icon">⚡</span>
-          <span class="quick-actions-btn-label"><%= translated("Quick Actions") %></span>
+          <span class="quick-actions-btn-label"><%= dgettext("ui", "Quick Actions") %></span>
         </button>
 
         <%= if @media_editor.quick_actions_open? do %>
@@ -40,8 +40,8 @@
                 phx-value-kind="ai_suggestions"
               >
                 <span class="quick-action-text">
-                  <strong><%= translated("AI Suggestions") %></strong>
-                  <small><%= translated("Review title, alt text, and caption suggestions") %></small>
+                  <strong><%= dgettext("ui", "AI Suggestions") %></strong>
+                  <small><%= dgettext("ui", "Review title, alt text, and caption suggestions") %></small>
                 </span>
                 <span class="quick-action-icon">🤖</span>
               </button>
@@ -57,8 +57,8 @@
               disabled={not @media_editor.can_detect_language?}
             >
               <span class="quick-action-text">
-                <strong><%= translated("Detect Language") %></strong>
-                <small><%= translated("Persist the detected language for this media item") %></small>
+                <strong><%= dgettext("ui", "Detect Language") %></strong>
+                <small><%= dgettext("ui", "Persist the detected language for this media item") %></small>
               </span>
               <span class="quick-action-icon">🔍</span>
             </button>
@@ -74,8 +74,8 @@
               disabled={not @media_editor.can_translate?}
             >
               <span class="quick-action-text">
-                <strong><%= translated("Translate") %></strong>
-                <small><%= translated("Select a target language for this media item") %></small>
+                <strong><%= dgettext("ui", "Translate") %></strong>
+                <small><%= dgettext("ui", "Select a target language for this media item") %></small>
               </span>
               <span class="quick-action-icon">🌍</span>
             </button>
@@ -84,10 +84,10 @@
       </div>
 
       <button class="secondary" type="button" phx-click="replace_media_editor_file" phx-target={@myself}>
-        <%= translated("Replace File") %>
+        <%= dgettext("ui", "Replace File") %>
       </button>
       <button data-testid="media-save-button" type="button" phx-click="save_media_editor" phx-target={@myself}>
-        <%= translated("Save") %>
+        <%= dgettext("ui", "Save") %>
       </button>
       <button
         class="secondary danger"
@@ -96,7 +96,7 @@
         phx-click="open_overlay"
         phx-value-kind="confirm_delete"
       >
-        <%= translated("Delete") %>
+        <%= dgettext("ui", "Delete") %>
       </button>
     </div>
   </div>
@@ -120,58 +120,58 @@
     <div class="media-details">
       <form class="media-editor-details-form" data-testid="media-editor-form" phx-change="change_media_editor" phx-target={@myself}>
         <div class="editor-field">
-          <label><%= translated("File Name") %></label>
+          <label><%= dgettext("ui", "File Name") %></label>
           <input class="post-editor-input disabled" type="text" value={@media_editor.original_name} disabled />
         </div>
 
         <div class="editor-field">
-          <label><%= translated("MIME Type") %></label>
+          <label><%= dgettext("ui", "MIME Type") %></label>
           <input class="post-editor-input disabled" type="text" value={@media_editor.mime_type} disabled />
         </div>
 
         <div class="editor-field-row">
           <div class="editor-field">
-            <label><%= translated("Size") %></label>
+            <label><%= dgettext("ui", "Size") %></label>
             <input class="post-editor-input disabled" type="text" value={@media_editor.file_size} disabled />
           </div>
 
           <%= if @media_editor.dimensions do %>
             <div class="editor-field">
-              <label><%= translated("Dimensions") %></label>
+              <label><%= dgettext("ui", "Dimensions") %></label>
               <input class="post-editor-input disabled" type="text" value={@media_editor.dimensions} disabled />
             </div>
           <% end %>
         </div>
 
         <div class="editor-field">
-          <label><%= translated("Title") %></label>
+          <label><%= dgettext("ui", "Title") %></label>
           <input class="post-editor-input" type="text" name="media_editor[title]" value={@media_editor.form["title"]} />
         </div>
 
         <div class="editor-field">
-          <label><%= translated("Alt Text") %></label>
+          <label><%= dgettext("ui", "Alt Text") %></label>
           <input class="post-editor-input" type="text" name="media_editor[alt]" value={@media_editor.form["alt"]} />
         </div>
 
         <div class="editor-field">
-          <label><%= translated("Caption") %></label>
+          <label><%= dgettext("ui", "Caption") %></label>
           <textarea class="post-editor-textarea" name="media_editor[caption]" rows="3"><%= @media_editor.form["caption"] %></textarea>
         </div>
 
         <div class="editor-field">
-          <label><%= translated("Tags") %></label>
+          <label><%= dgettext("ui", "Tags") %></label>
           <input class="post-editor-input" type="text" name="media_editor[tags]" value={@media_editor.form["tags"]} />
         </div>
 
         <div class="editor-field">
-          <label><%= translated("Author") %></label>
+          <label><%= dgettext("ui", "Author") %></label>
           <input class="post-editor-input" type="text" name="media_editor[author]" value={@media_editor.form["author"]} />
         </div>
 
         <div class="editor-field">
-          <label><%= translated("Language") %></label>
+          <label><%= dgettext("ui", "Language") %></label>
           <select class="post-editor-input" name="media_editor[language]">
-            <option value=""><%= translated("None") %></option>
+            <option value=""><%= dgettext("ui", "None") %></option>
             <%= for language <- @media_editor.languages do %>
               <option value={language} selected={language == @media_editor.form["language"]}><%= language_label(language) %></option>
             <% end %>
@@ -181,10 +181,10 @@
 
       <%= if @media_editor.form["language"] not in [nil, ""] do %>
         <div class="editor-field media-translations-section">
-          <label><%= translated("Translations") %></label>
+          <label><%= dgettext("ui", "Translations") %></label>
 
           <%= if Enum.empty?(@media_editor.translations) do %>
-            <div class="no-linked-posts"><%= translated("No translations") %></div>
+            <div class="no-linked-posts"><%= dgettext("ui", "No translations") %></div>
           <% else %>
             <div class="linked-posts-list">
               <%= for translation <- @media_editor.translations do %>
@@ -199,7 +199,7 @@
                     <%= translation.flag %> <%= language_label(translation.language) %><%= if translation.title, do: " — #{translation.title}" %>
                   </button>
                   <button class="secondary compact" type="button" phx-click="refresh_media_translation" phx-target={@myself} phx-value-language={translation.language}>
-                    <%= translated("Refresh") %>
+                    <%= dgettext("ui", "Refresh") %>
                   </button>
                   <button class="unlink-btn" type="button" phx-click="delete_media_translation" phx-target={@myself} phx-value-language={translation.language}>×</button>
                 </div>
@@ -211,9 +211,9 @@
 
       <div class="editor-field linked-posts-section">
         <label>
-          <%= translated("Linked Posts") %>
+          <%= dgettext("ui", "Linked Posts") %>
           <button class="add-link-btn" type="button" phx-click="toggle_media_post_picker" phx-target={@myself}>
-            <%= translated("Link to Post") %>
+            <%= dgettext("ui", "Link to Post") %>
           </button>
         </label>
 
@@ -224,14 +224,14 @@
                 type="text"
                 name="media_post_picker[query]"
                 value={@media_editor.post_picker_query}
-                placeholder={translated("Search posts")}
+                placeholder={dgettext("ui", "Search posts")}
                 phx-change="change_media_post_picker"
                 phx-target={@myself}
               />
             </div>
 
             <%= if Enum.empty?(@media_editor.post_picker_results) do %>
-              <div class="no-posts"><%= translated("No posts to link") %></div>
+              <div class="no-posts"><%= dgettext("ui", "No posts to link") %></div>
             <% else %>
               <div class="post-picker-list">
                 <%= for result <- @media_editor.post_picker_results do %>
@@ -240,7 +240,7 @@
                   </button>
                 <% end %>
                 <%= if @media_editor.post_picker_overflow_count > 0 do %>
-                  <div class="post-picker-more"><%= translated("and %{count} more", %{count: @media_editor.post_picker_overflow_count}) %></div>
+                  <div class="post-picker-more"><%= dgettext("ui", "and %{count} more", count: @media_editor.post_picker_overflow_count) %></div>
                 <% end %>
               </div>
             <% end %>
@@ -248,7 +248,7 @@
         <% end %>
 
         <%= if Enum.empty?(@media_editor.linked_posts) do %>
-          <div class="no-linked-posts"><%= translated("Not linked to any posts") %></div>
+          <div class="no-linked-posts"><%= dgettext("ui", "Not linked to any posts") %></div>
         <% else %>
           <div class="linked-posts-list">
             <%= for linked_post <- @media_editor.linked_posts do %>
@@ -277,27 +277,27 @@
     <div class="translation-modal-backdrop">
       <div class="translation-modal">
         <div class="translation-modal-header">
-          <h2><%= translated("Edit Translation") %></h2>
+          <h2><%= dgettext("ui", "Edit Translation") %></h2>
           <button class="translation-modal-close" type="button" phx-click="close_media_translation_editor" phx-target={@myself}>×</button>
         </div>
         <form class="translation-modal-body" phx-change="change_media_translation" phx-target={@myself}>
           <input type="hidden" name="media_translation[language]" value={@media_editor.editing_translation["language"]} />
           <div class="editor-field">
-            <label><%= translated("Title") %></label>
+            <label><%= dgettext("ui", "Title") %></label>
             <input class="post-editor-input" type="text" name="media_translation[title]" value={@media_editor.editing_translation["title"]} />
           </div>
           <div class="editor-field">
-            <label><%= translated("Alt Text") %></label>
+            <label><%= dgettext("ui", "Alt Text") %></label>
             <input class="post-editor-input" type="text" name="media_translation[alt]" value={@media_editor.editing_translation["alt"]} />
           </div>
           <div class="editor-field">
-            <label><%= translated("Caption") %></label>
+            <label><%= dgettext("ui", "Caption") %></label>
             <textarea class="post-editor-textarea" name="media_translation[caption]" rows="3"><%= @media_editor.editing_translation["caption"] %></textarea>
           </div>
         </form>
         <div class="translation-modal-footer">
-          <button class="secondary" type="button" phx-click="close_media_translation_editor" phx-target={@myself}><%= translated("Cancel") %></button>
-          <button type="button" phx-click="save_media_translation" phx-target={@myself}><%= translated("Save") %></button>
+          <button class="secondary" type="button" phx-click="close_media_translation_editor" phx-target={@myself}><%= dgettext("ui", "Cancel") %></button>
+          <button type="button" phx-click="save_media_translation" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
         </div>
       </div>
     </div>

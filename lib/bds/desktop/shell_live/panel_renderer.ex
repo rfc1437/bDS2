@@ -10,6 +10,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
   alias BDS.PostLinks
   alias BDS.Posts
   alias BDS.Posts.Post
+  use Gettext, backend: BDS.Gettext
 
   @doc "Render the active panel tab body."
   def render_panel_body(assigns) do
@@ -38,7 +39,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
             phx-click="open_overlay"
             phx-value-kind={button.kind}
           >
-            <%= translated(button.label) %>
+            <%= button.label %>
           </button>
         <% end %>
       </div>
@@ -50,8 +51,8 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     ~H"""
     <%= if Enum.empty?(Map.get(@task_status, :tasks, [])) do %>
       <div class="panel-entry panel-empty-state">
-        <strong><%= translated("Tasks") %></strong>
-        <span><%= translated("No background tasks running") %></span>
+        <strong><%= dgettext("ui", "Tasks") %></strong>
+        <span><%= dgettext("ui", "No background tasks running") %></span>
       </div>
     <% else %>
       <div class="task-list">
@@ -79,8 +80,8 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     ~H"""
     <%= if Enum.empty?(@output_entries) do %>
       <div class="panel-entry panel-empty-state output-list">
-        <strong><%= translated("Output") %></strong>
-        <span><%= translated("No shell output yet") %></span>
+        <strong><%= dgettext("ui", "Output") %></strong>
+        <span><%= dgettext("ui", "No shell output yet") %></span>
       </div>
     <% else %>
       <div class="output-list">
@@ -113,13 +114,13 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     ~H"""
     <%= if Enum.empty?(@backlinks) and Enum.empty?(@outlinks) do %>
       <div class="panel-entry panel-empty-state">
-        <strong><%= translated("Post Links") %></strong>
-        <span><%= translated("No post links yet") %></span>
+        <strong><%= dgettext("ui", "Post Links") %></strong>
+        <span><%= dgettext("ui", "No post links yet") %></span>
       </div>
     <% else %>
       <div class="git-log-list">
         <%= if Enum.any?(@backlinks) do %>
-          <div class="panel-entry"><strong><%= translated("Backlinks") %></strong></div>
+          <div class="panel-entry"><strong><%= dgettext("ui", "Backlinks") %></strong></div>
           <%= for entry <- @backlinks do %>
             <button
               class="panel-entry task-entry"
@@ -137,7 +138,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
         <% end %>
 
         <%= if Enum.any?(@outlinks) do %>
-          <div class="panel-entry"><strong><%= translated("Links To") %></strong></div>
+          <div class="panel-entry"><strong><%= dgettext("ui", "Links To") %></strong></div>
           <%= for entry <- @outlinks do %>
             <button
               class="panel-entry task-entry"
@@ -166,15 +167,15 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     <%= if Enum.empty?(@git_entries) do %>
       <div class="git-log-list">
         <div class="panel-entry panel-empty-state">
-          <strong><%= translated("Git Log") %></strong>
-          <span><%= translated("No git history yet") %></span>
+          <strong><%= dgettext("ui", "Git Log") %></strong>
+          <span><%= dgettext("ui", "No git history yet") %></span>
         </div>
       </div>
     <% else %>
       <div class="git-log-list">
         <%= for entry <- @git_entries do %>
           <div class="panel-entry task-entry">
-            <strong><%= short_commit_hash(entry.hash) %> <%= entry.subject || translated("No commit subject") %></strong>
+            <strong><%= short_commit_hash(entry.hash) %> <%= entry.subject || dgettext("ui", "No commit subject") %></strong>
             <span><%= entry.hash %></span>
           </div>
         <% end %>
@@ -189,7 +190,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     ~H"""
     <div class="panel-entry">
       <strong><%= @panel_label %></strong>
-      <span><%= translated("The shared lower panel is available for tasks, output, git details, and editor-specific diagnostics.") %></span>
+      <span><%= dgettext("ui", "The shared lower panel is available for tasks, output, git details, and editor-specific diagnostics.") %></span>
     </div>
     """
   end
@@ -300,7 +301,4 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
   defp progress_percent(_), do: ""
 
   defp present?(value), do: value not in [nil, ""]
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

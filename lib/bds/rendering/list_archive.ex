@@ -1,13 +1,14 @@
 defmodule BDS.Rendering.ListArchive do
   @moduledoc false
 
-  alias BDS.I18n
   alias BDS.MapUtils
   alias BDS.Persistence
+  alias BDS.Rendering.Labels
   alias BDS.Rendering.LinksAndLanguages
   alias BDS.Rendering.Metadata, as: RenderMetadata
   alias BDS.Rendering.PostRendering
   alias BDS.Rendering.TemplateSelection
+  use Gettext, backend: BDS.Gettext
 
   def list_assigns(project_id, assigns) do
     metadata = RenderMetadata.project_metadata(project_id)
@@ -95,7 +96,9 @@ defmodule BDS.Rendering.ListArchive do
       canonical_media_path_by_source_path: canonical_media_paths,
       post_data_json_by_id:
         Enum.into(posts, %{}, fn post -> {post.id, PostRendering.post_data_json_value(post)} end),
-      day_blocks: day_blocks
+      day_blocks: day_blocks,
+      archive_month_name: Labels.month_name(Map.get(normalized_archive_context, :month), language),
+      labels: Labels.for_language(language)
     }
   end
 
@@ -145,7 +148,7 @@ defmodule BDS.Rendering.ListArchive do
           Map.get(
             assigns,
             "not_found_message",
-            I18n.translate(language, "render.notFound.message")
+            BDS.Gettext.lgettext(language, "render", "The requested preview page could not be found.")
           )
         ),
       not_found_back_label:
@@ -155,9 +158,10 @@ defmodule BDS.Rendering.ListArchive do
           Map.get(
             assigns,
             "not_found_back_label",
-            I18n.translate(language, "render.notFound.back")
+            BDS.Gettext.lgettext(language, "render", "Back to preview home")
           )
-        )
+        ),
+      labels: Labels.for_language(language)
     }
   end
 

@@ -6,9 +6,9 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   import Ecto.Query
 
   alias BDS.{Embeddings, Generation, Git, Posts, Repo}
-  alias BDS.Desktop.ShellData
   alias BDS.MapUtils
   alias BDS.Settings.Setting
+  use Gettext, backend: BDS.Gettext
 
   embed_templates("misc_editor_html/*")
 
@@ -87,13 +87,13 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
     case Generation.apply_validation(project_id, report) do
       {:ok, result} ->
-        notify_output(translated("Site Validation"), translated("Validation changes applied"), inspect(result))
+        notify_output(dgettext("ui", "Site Validation"), dgettext("ui", "Validation changes applied"), inspect(result))
         notify_command("validate_site")
         {:noreply, socket}
     end
   rescue
     error ->
-      notify_output(translated("Site Validation"), inspect(error), nil, "error")
+      notify_output(dgettext("ui", "Site Validation"), inspect(error), nil, "error")
       {:noreply, socket}
   end
 
@@ -107,19 +107,19 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     {:ok, result} = Posts.fix_invalid_translations(report)
 
     notify_output(
-      translated("Translation Validation"),
-      translated("translationValidation.toast.fixSuccess", %{
+      dgettext("ui", "Translation Validation"),
+      dgettext("ui", "Deleted %{dbRows} DB rows and %{files} files, flushed %{flushed} translations to disk",
         dbRows: result.deleted_database_rows,
         files: result.deleted_files,
         flushed: result.flushed_translations
-      })
+      )
     )
 
     notify_command("validate_translations")
     {:noreply, socket}
   rescue
     error ->
-      notify_output(translated("Translation Validation"), inspect(error), nil, "error")
+      notify_output(dgettext("ui", "Translation Validation"), inspect(error), nil, "error")
       {:noreply, socket}
   end
 
@@ -162,13 +162,13 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
         next_payload = Map.put(payload, :pairs, next_pairs)
         notify_tab_meta(tab_type, tab_id, %{payload: next_payload})
-        notify_output(translated("Find Duplicates"), translated("Pair dismissed"))
+        notify_output(dgettext("ui", "Find Duplicates"), dgettext("ui", "Pair dismissed"))
 
         selected = MapSet.delete(socket.assigns.selected_pairs, pair_id)
         {:noreply, assign(socket, :selected_pairs, selected) |> build_data()}
 
       {:error, reason} ->
-        notify_output(translated("Find Duplicates"), inspect(reason), nil, "error")
+        notify_output(dgettext("ui", "Find Duplicates"), inspect(reason), nil, "error")
         {:noreply, socket}
     end
   end
@@ -193,12 +193,12 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
         next_payload = Map.put(payload, :pairs, next_pairs)
         notify_tab_meta(tab_type, tab_id, %{payload: next_payload})
-        notify_output(translated("Find Duplicates"), translated("Selected pairs dismissed"))
+        notify_output(dgettext("ui", "Find Duplicates"), dgettext("ui", "Selected pairs dismissed"))
 
         {:noreply, assign(socket, :selected_pairs, MapSet.new()) |> build_data()}
 
       {:error, reason} ->
-        notify_output(translated("Find Duplicates"), inspect(reason), nil, "error")
+        notify_output(dgettext("ui", "Find Duplicates"), inspect(reason), nil, "error")
         {:noreply, socket}
     end
   end
@@ -210,7 +210,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
         {:noreply, socket}
 
       {:error, message} ->
-        notify_output(translated("Metadata Diff"), message, nil, "error")
+        notify_output(dgettext("ui", "Metadata Diff"), message, nil, "error")
         {:noreply, socket}
     end
   end
@@ -222,7 +222,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
         {:noreply, socket}
 
       {:error, message} ->
-        notify_output(translated("Metadata Diff"), message, nil, "error")
+        notify_output(dgettext("ui", "Metadata Diff"), message, nil, "error")
         {:noreply, socket}
     end
   end
@@ -248,9 +248,6 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   # ── Public helper functions (used by template) ─────────────────────────────
 
-  @spec translated(String.t(), map()) :: String.t()
-  def translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 
   @spec misc_class(atom()) :: String.t()
   def misc_class(:site_validation), do: "site-validation-view"
@@ -273,16 +270,16 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   def translation_issue_label(issue) do
     case issue_value(issue, :issue) do
       "same-language-as-canonical" ->
-        translated("translationValidation.issue.sameLanguage")
+        dgettext("ui", "Translation language matches canonical post language")
 
       "do-not-translate-has-translations" ->
-        translated("translationValidation.issue.doNotTranslate")
+        dgettext("ui", "Post is marked as do-not-translate but has translations")
 
       "content-in-database" ->
-        translated("translationValidation.issue.contentInDatabase")
+        dgettext("ui", "Published translation has content stuck in DB instead of filesystem")
 
       _other ->
-        translated("translationValidation.issue.missingSource")
+        dgettext("ui", "Translation points to a missing source post")
     end
   end
 
@@ -294,10 +291,10 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     if canonical_language in [nil, ""] do
       translation_language
     else
-      translated("translationValidation.languagesWithCanonical", %{
+      dgettext("ui", "%{canonical} = %{translation}",
         canonical: canonical_language,
         translation: translation_language
-      })
+      )
     end
   end
 
@@ -373,7 +370,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
     %{
       kind: :site_validation,
-      title: Map.get(meta, :title, translated("Site Validation")),
+      title: Map.get(meta, :title, dgettext("ui", "Site Validation")),
       subtitle: Map.get(meta, :subtitle, ""),
       summary: %{
         expected: Map.get(summary, :expected_count, 0),
@@ -409,7 +406,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
     %{
       kind: :metadata_diff,
-      title: Map.get(meta, :title, translated("Metadata Diff")),
+      title: Map.get(meta, :title, dgettext("ui", "Metadata Diff")),
       subtitle: Map.get(meta, :subtitle, ""),
       summary: Map.get(payload, :summary, %{}),
       tabs:
@@ -420,7 +417,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
       field_summaries: field_summaries(current_tab.items),
       items: filtered_items,
       orphan_files: if(is_nil(active_field), do: current_tab.orphan_files, else: []),
-      empty_message: translated("No items")
+      empty_message: dgettext("ui", "No items")
     }
   end
 
@@ -429,16 +426,16 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
     %{
       kind: :translation_validation,
-      title: Map.get(meta, :title, translated("Translation Validation")),
+      title: Map.get(meta, :title, dgettext("ui", "Translation Validation")),
       subtitle: Map.get(meta, :subtitle, ""),
       summary: %{},
       summary_text:
-        translated("translationValidation.summary", %{
+        dgettext("ui", "Checked DB rows: %{dbRows} · Checked files: %{files} · Invalid DB rows: %{invalidDb} · Invalid files: %{invalidFiles}",
           dbRows: report.checked_database_row_count,
           files: report.checked_filesystem_file_count,
           invalidDb: length(report.invalid_database_rows),
           invalidFiles: length(report.invalid_filesystem_files)
-        }),
+        ),
       invalid_database_rows: report.invalid_database_rows,
       invalid_filesystem_files: report.invalid_filesystem_files,
       can_fix?: report.invalid_database_rows != [] or report.invalid_filesystem_files != []
@@ -448,7 +445,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   defp build_duplicates(assigns, meta, payload) do
     %{
       kind: :find_duplicates,
-      title: Map.get(meta, :title, translated("Find Duplicates")),
+      title: Map.get(meta, :title, dgettext("ui", "Find Duplicates")),
       subtitle: Map.get(meta, :subtitle, ""),
       summary: Map.get(payload, :summary, %{}),
       pairs: Map.get(payload, :pairs, []),
@@ -505,14 +502,14 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
     %{
       kind: :git_diff,
-      title: Map.get(meta, :title, translated("Git Diff")),
+      title: Map.get(meta, :title, dgettext("ui", "Git Diff")),
       subtitle: Map.get(meta, :subtitle, ""),
       summary: %{},
       files: files,
       selected_file_path: diff.file_path,
       active_diff: Map.put(diff, :language, git_diff_language(diff.file_path)),
       preferences: preferences,
-      empty_message: error_message || translated("No unstaged changes")
+      empty_message: error_message || dgettext("ui", "No unstaged changes")
     }
   end
 
@@ -534,10 +531,10 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
     cond do
       not metadata_diff_repairable_tab?(active_tab) ->
-        {:error, translated("No repair action available")}
+        {:error, dgettext("ui", "No repair action available")}
 
       repair_items == [] ->
-        {:error, translated("No metadata diff items selected")}
+        {:error, dgettext("ui", "No metadata diff items selected")}
 
       true ->
         {:ok,
@@ -566,7 +563,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
       |> Enum.map(&%{"file_path" => &1.file_path})
 
     if selected_orphans == [] do
-      {:error, translated("No orphan files selected")}
+      {:error, dgettext("ui", "No orphan files selected")}
     else
       {:ok, %{"tab" => active_tab, "orphans" => selected_orphans}}
     end
@@ -623,7 +620,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   defp empty_metadata_diff_tab do
     %{
       id: "posts",
-      label: translated("Posts"),
+      label: dgettext("ui", "Posts"),
       items: [],
       orphan_files: [],
       diff_count: 0,
@@ -692,17 +689,17 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     MapUtils.attr(item, :meta_label) || entity_id
   end
 
-  defp metadata_diff_item_type_label("post"), do: translated("Post")
-  defp metadata_diff_item_type_label("post_translation"), do: translated("Translations")
-  defp metadata_diff_item_type_label("media"), do: translated("Media")
-  defp metadata_diff_item_type_label("media_translation"), do: translated("Translations")
-  defp metadata_diff_item_type_label("script"), do: translated("Script")
-  defp metadata_diff_item_type_label("template"), do: translated("Template")
-  defp metadata_diff_item_type_label("project"), do: translated("Project")
-  defp metadata_diff_item_type_label("publishing"), do: translated("Publishing")
-  defp metadata_diff_item_type_label("categories"), do: translated("Categories")
-  defp metadata_diff_item_type_label("category_meta"), do: translated("Categories")
-  defp metadata_diff_item_type_label("embedding"), do: translated("Embeddings")
+  defp metadata_diff_item_type_label("post"), do: dgettext("ui", "Post")
+  defp metadata_diff_item_type_label("post_translation"), do: dgettext("ui", "Translations")
+  defp metadata_diff_item_type_label("media"), do: dgettext("ui", "Media")
+  defp metadata_diff_item_type_label("media_translation"), do: dgettext("ui", "Translations")
+  defp metadata_diff_item_type_label("script"), do: dgettext("ui", "Script")
+  defp metadata_diff_item_type_label("template"), do: dgettext("ui", "Template")
+  defp metadata_diff_item_type_label("project"), do: dgettext("ui", "Project")
+  defp metadata_diff_item_type_label("publishing"), do: dgettext("ui", "Publishing")
+  defp metadata_diff_item_type_label("categories"), do: dgettext("ui", "Categories")
+  defp metadata_diff_item_type_label("category_meta"), do: dgettext("ui", "Categories")
+  defp metadata_diff_item_type_label("embedding"), do: dgettext("ui", "Embeddings")
 
   defp metadata_diff_item_type_label(entity_type),
     do: entity_type |> String.replace("_", " ") |> String.capitalize()
@@ -720,12 +717,12 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   defp metadata_diff_tab_id("embedding"), do: "embeddings"
   defp metadata_diff_tab_id(_entity_type), do: "project"
 
-  defp metadata_diff_tab_label("posts"), do: translated("Posts")
-  defp metadata_diff_tab_label("media"), do: translated("Media")
-  defp metadata_diff_tab_label("scripts"), do: translated("Scripts")
-  defp metadata_diff_tab_label("templates"), do: translated("Templates")
-  defp metadata_diff_tab_label("project"), do: translated("Project")
-  defp metadata_diff_tab_label("embeddings"), do: translated("Embeddings")
+  defp metadata_diff_tab_label("posts"), do: dgettext("ui", "Posts")
+  defp metadata_diff_tab_label("media"), do: dgettext("ui", "Media")
+  defp metadata_diff_tab_label("scripts"), do: dgettext("ui", "Scripts")
+  defp metadata_diff_tab_label("templates"), do: dgettext("ui", "Templates")
+  defp metadata_diff_tab_label("project"), do: dgettext("ui", "Project")
+  defp metadata_diff_tab_label("embeddings"), do: dgettext("ui", "Embeddings")
 
   defp metadata_diff_tab_label(tab_id),
     do: tab_id |> String.replace("_", " ") |> String.capitalize()

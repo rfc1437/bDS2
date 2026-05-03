@@ -4,9 +4,9 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
   import Ecto.Query
 
   alias BDS.{I18n, Media, Metadata, PostLinks, Posts, Preview, Repo, Templates}
-  alias BDS.Desktop.ShellData
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Posts.{Post, PostMedia}
+  use Gettext, backend: BDS.Gettext
 
   @spec project_metadata(term()) :: term()
   def project_metadata(nil), do: %{main_language: "en", blog_languages: []}
@@ -163,7 +163,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
 
   @spec display_title(term(), term(), term()) :: term()
   def display_title(title, slug, fallback_id) do
-    blank_to_nil(title) || blank_to_nil(slug) || fallback_id || translated("Untitled")
+    blank_to_nil(title) || blank_to_nil(slug) || fallback_id || dgettext("ui", "Untitled")
   end
 
   @spec gallery_count(term()) :: term()
@@ -219,7 +219,4 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
       trimmed -> trimmed
     end
   end
-
-  defp translated(text, bindings \\ %{}),
-    do: ShellData.translate(text, bindings, BDS.Desktop.UILocale.current())
 end

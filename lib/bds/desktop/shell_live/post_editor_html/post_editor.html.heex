@@ -4,7 +4,7 @@
       <div class={["editor-tab", "active", if(@post_editor.dirty?, do: "dirty")]}> 
         <span class="editor-tab-title" data-testid="editor-title"><%= @post_editor.display_title %></span>
         <%= if @post_editor.dirty? do %>
-          <span class="editor-tab-dirty" title={translated("Unsaved")}>●</span>
+          <span class="editor-tab-dirty" title={dgettext("ui", "Unsaved")}>●</span>
         <% end %>
       </div>
     </div>
@@ -25,7 +25,7 @@
           phx-target={@myself}
         >
           <span class="quick-actions-btn-icon">⚡</span>
-          <span class="quick-actions-btn-label"><%= translated("Quick Actions") %></span>
+          <span class="quick-actions-btn-label"><%= dgettext("ui", "Quick Actions") %></span>
         </button>
 
         <%= if @post_editor.quick_actions_open? do %>
@@ -40,8 +40,8 @@
             >
               <span class="quick-action-icon">🤖</span>
               <span class="quick-action-text">
-                <strong><%= translated("AI Suggestions") %></strong>
-                <small><%= translated("Review title, excerpt, and content suggestions") %></small>
+                <strong><%= dgettext("ui", "AI Suggestions") %></strong>
+                <small><%= dgettext("ui", "Review title, excerpt, and content suggestions") %></small>
               </span>
             </button>
 
@@ -57,8 +57,8 @@
             >
               <span class="quick-action-icon">🌍</span>
               <span class="quick-action-text">
-                <strong><%= translated("Translate") %></strong>
-                <small><%= translated("Select a target language for this post") %></small>
+                <strong><%= dgettext("ui", "Translate") %></strong>
+                <small><%= dgettext("ui", "Select a target language for this post") %></small>
               </span>
             </button>
           </div>
@@ -67,7 +67,7 @@
 
       <%= if @post_editor.can_publish? do %>
         <button class="success" data-testid="post-publish-button" type="button" phx-click="publish_post_editor" phx-target={@myself}>
-          <%= translated("Publish") %>
+          <%= dgettext("ui", "Publish") %>
         </button>
       <% end %>
       <%= if @post_editor.can_publish? do %>
@@ -77,7 +77,7 @@
       <% end %>
       <%= if @post_editor.can_delete? do %>
         <button class="secondary danger" data-testid="post-delete-button" type="button" phx-click="delete_post_editor" phx-target={@myself}>
-          <%= translated("Delete") %>
+          <%= dgettext("ui", "Delete") %>
         </button>
       <% end %>
     </div>
@@ -87,10 +87,10 @@
     <div class="metadata-toggle-header">
       <button class={["metadata-toggle", if(@post_editor.metadata_expanded, do: "expanded")]} type="button" phx-click="toggle_post_metadata" phx-target={@myself}>
         <span class="metadata-toggle-chevron"><%= if @post_editor.metadata_expanded, do: "▼", else: "▶" %></span>
-        <span><%= translated("Metadata") %></span>
+        <span><%= dgettext("ui", "Metadata") %></span>
       </button>
 
-      <div class="editor-translations-flags" aria-label={translated("Translations")}>
+      <div class="editor-translations-flags" aria-label={dgettext("ui", "Translations")}>
         <%= for flag <- @post_editor.translation_flags do %>
           <button
             class={[
@@ -114,19 +114,19 @@
     <div class={["editor-header-row", if(not @post_editor.metadata_expanded, do: "is-collapsed")]}> 
         <div class="editor-meta">
           <div class="editor-field">
-            <label><%= translated("Title") %></label>
+            <label><%= dgettext("ui", "Title") %></label>
             <input class="post-editor-input" type="text" name="post_editor[title]" value={@post_editor.form["title"]} />
           </div>
 
           <div class="editor-field">
-            <label><%= translated("Tags") %></label>
+            <label><%= dgettext("ui", "Tags") %></label>
             <div class="tag-input-container"> 
               <input type="hidden" name="post_editor[tags]" value={@post_editor.form["tags"]} />
               <div class="tag-input-wrapper">
                 <%= for tag <- @post_editor.tag_chips do %>
                   <span class={["tag-chip", if(tag.color, do: "has-color")]} style={tag_chip_style(tag.color)}>
                     <span><%= tag.name %></span>
-                    <button class="tag-chip-remove" type="button" phx-click="remove_post_editor_tag" phx-value-tag={tag.name} phx-target={@myself} aria-label={translated("Remove tag")}>×</button>
+                    <button class="tag-chip-remove" type="button" phx-click="remove_post_editor_tag" phx-value-tag={tag.name} phx-target={@myself} aria-label={dgettext("ui", "Remove tag")}>×</button>
                   </span>
                 <% end %>
 
@@ -135,7 +135,7 @@
                   type="text"
                   name="post_editor[tag_query]"
                   value={@post_editor.tag_query}
-                  placeholder={translated("Add tag")}
+                  placeholder={dgettext("ui", "Add tag")}
                   autocomplete="off"
                 />
               </div>
@@ -154,7 +154,7 @@
                   <%= if @post_editor.tag_query_addable? do %>
                     <button class="tag-suggestion create-new" type="button" phx-click="add_post_editor_tag" phx-value-tag={@post_editor.tag_query} phx-target={@myself}>
                       <span class="tag-suggestion-icon">+</span>
-                      <span><%= translated("Create tag") %>: <strong><%= @post_editor.tag_query %></strong></span>
+                      <span><%= dgettext("ui", "Create tag") %>: <strong><%= @post_editor.tag_query %></strong></span>
                     </button>
                   <% end %>
                 </div>
@@ -163,12 +163,12 @@
           </div>
 
           <div class="editor-field">
-            <label><%= translated("Author") %></label>
+            <label><%= dgettext("ui", "Author") %></label>
             <input class="post-editor-input" type="text" name="post_editor[author]" value={@post_editor.form["author"]} />
           </div>
 
           <div class="editor-field">
-            <label><%= translated("Language") %></label>
+            <label><%= dgettext("ui", "Language") %></label>
             <div class="editor-language-row">
               <select class="post-editor-input" name="post_editor[language]">
                 <%= for language <- @post_editor.languages do %>
@@ -184,7 +184,7 @@
                 phx-target={@myself}
                 disabled={not @post_editor.detect_language_enabled?}
               >
-                <%= translated("Detect") %>
+                <%= dgettext("ui", "Detect") %>
               </button>
             </div>
           </div>
@@ -193,25 +193,25 @@
             <label class="editor-checkbox-label">
               <input type="hidden" name="post_editor[do_not_translate]" value="false" />
               <input type="checkbox" name="post_editor[do_not_translate]" value="true" checked={@post_editor.form["do_not_translate"]} />
-              <span><%= translated("Do Not Translate") %></span>
+              <span><%= dgettext("ui", "Do Not Translate") %></span>
             </label>
           </div>
 
           <div class="editor-field-row">
             <div class="editor-field">
-              <label><%= translated("Slug") %></label>
+              <label><%= dgettext("ui", "Slug") %></label>
               <input class="post-editor-input is-readonly" type="text" readonly value={@post_editor.slug} />
             </div>
 
             <div class="editor-field">
-              <label><%= translated("Categories") %></label>
+              <label><%= dgettext("ui", "Categories") %></label>
               <div class="tag-input-container"> 
                 <input type="hidden" name="post_editor[categories]" value={@post_editor.form["categories"]} />
                 <div class="tag-input-wrapper">
                   <%= for category <- @post_editor.category_values do %>
                     <span class="tag-chip">
                       <span><%= category %></span>
-                      <button class="tag-chip-remove" type="button" phx-click="remove_post_editor_category" phx-value-category={category} phx-target={@myself} aria-label={translated("Remove category")}>×</button>
+                      <button class="tag-chip-remove" type="button" phx-click="remove_post_editor_category" phx-value-category={category} phx-target={@myself} aria-label={dgettext("ui", "Remove category")}>×</button>
                     </span>
                   <% end %>
 
@@ -220,7 +220,7 @@
                     type="text"
                     name="post_editor[category_query]"
                     value={@post_editor.category_query}
-                    placeholder={translated("Add category")}
+                    placeholder={dgettext("ui", "Add category")}
                     autocomplete="off"
                   />
                 </div>
@@ -236,7 +236,7 @@
                     <%= if @post_editor.category_query_addable? do %>
                       <button class="tag-suggestion create-new" type="button" phx-click="add_post_editor_category" phx-value-category={@post_editor.category_query} phx-target={@myself}>
                         <span class="tag-suggestion-icon">+</span>
-                        <span><%= translated("Create category") %>: <strong><%= @post_editor.category_query %></strong></span>
+                        <span><%= dgettext("ui", "Create category") %>: <strong><%= @post_editor.category_query %></strong></span>
                       </button>
                     <% end %>
                   </div>
@@ -247,9 +247,9 @@
 
           <%= if @post_editor.show_template_selector? do %>
             <div class="editor-field">
-              <label><%= translated("Template") %></label>
+              <label><%= dgettext("ui", "Template") %></label>
               <select class="post-editor-input" name="post_editor[template_slug]">
-                <option value=""><%= translated("Default") %></option>
+                <option value=""><%= dgettext("ui", "Default") %></option>
                 <%= for template <- @post_editor.template_options do %>
                   <option value={template.slug} selected={template.slug == @post_editor.form["template_slug"]}><%= template.title %></option>
                 <% end %>
@@ -258,10 +258,10 @@
           <% end %>
 
           <div class="post-editor-links-panel">
-            <strong><%= translated("Post Links") %></strong>
+            <strong><%= dgettext("ui", "Post Links") %></strong>
             <div class="post-editor-links-columns">
               <div>
-                <span class="post-editor-links-label"><%= translated("Backlinks") %></span>
+                <span class="post-editor-links-label"><%= dgettext("ui", "Backlinks") %></span>
                 <%= if Enum.any?(@post_editor.post_links.backlinks) do %>
                   <ul class="editor-list compact">
                     <%= for item <- @post_editor.post_links.backlinks do %>
@@ -269,11 +269,11 @@
                     <% end %>
                   </ul>
                 <% else %>
-                  <span class="post-editor-empty"><%= translated("No items") %></span>
+                  <span class="post-editor-empty"><%= dgettext("ui", "No items") %></span>
                 <% end %>
               </div>
               <div>
-                <span class="post-editor-links-label"><%= translated("Links To") %></span>
+                <span class="post-editor-links-label"><%= dgettext("ui", "Links To") %></span>
                 <%= if Enum.any?(@post_editor.post_links.outlinks) do %>
                   <ul class="editor-list compact">
                     <%= for item <- @post_editor.post_links.outlinks do %>
@@ -281,7 +281,7 @@
                     <% end %>
                   </ul>
                 <% else %>
-                  <span class="post-editor-empty"><%= translated("No items") %></span>
+                  <span class="post-editor-empty"><%= dgettext("ui", "No items") %></span>
                 <% end %>
               </div>
             </div>
@@ -290,7 +290,7 @@
 
         <aside class="editor-media-panel post-editor-side-panel">
           <div class="post-editor-side-panel-header">
-            <strong><%= translated("Linked Media") %></strong>
+            <strong><%= dgettext("ui", "Linked Media") %></strong>
           </div>
 
           <%= if Enum.any?(@post_editor.linked_media) do %>
@@ -298,24 +298,24 @@
               <%= for item <- @post_editor.linked_media do %>
                 <li class="post-editor-media-item">
                   <span class="post-editor-media-title"><%= item.name %></span>
-                  <span class="post-editor-media-meta"><%= translated("Order") %>: <%= item.sort_order %></span>
+                  <span class="post-editor-media-meta"><%= dgettext("ui", "Order") %>: <%= item.sort_order %></span>
                 </li>
               <% end %>
             </ul>
           <% else %>
-            <div class="post-editor-empty"><%= translated("No linked media") %></div>
+            <div class="post-editor-empty"><%= dgettext("ui", "No linked media") %></div>
           <% end %>
         </aside>
       </div>
 
     <button class={["metadata-toggle", if(@post_editor.excerpt_expanded, do: "expanded")]} type="button" phx-click="toggle_post_excerpt" phx-target={@myself}>
       <span class="metadata-toggle-chevron"><%= if @post_editor.excerpt_expanded, do: "▼", else: "▶" %></span>
-      <span><%= translated("Excerpt") %></span>
+      <span><%= dgettext("ui", "Excerpt") %></span>
     </button>
 
     <div class={["editor-excerpt-panel", if(not @post_editor.excerpt_expanded, do: "is-collapsed")]}> 
       <div class="editor-field">
-        <label><%= translated("Excerpt") %></label>
+        <label><%= dgettext("ui", "Excerpt") %></label>
         <textarea class="post-editor-textarea post-editor-excerpt" name="post_editor[excerpt]" rows="4"><%= @post_editor.form["excerpt"] %></textarea>
       </div>
     </div>
@@ -323,7 +323,7 @@
     <div class="editor-body">
       <div class="editor-toolbar">
         <div class="editor-toolbar-left">
-          <label><%= translated("Content") %></label>
+          <label><%= dgettext("ui", "Content") %></label>
         </div>
 
         <div class="editor-toolbar-center">
@@ -351,7 +351,7 @@
               phx-click="open_overlay"
               phx-value-kind="insert_link"
             >
-              <%= translated("Insert Link") %>
+              <%= dgettext("ui", "Insert Link") %>
             </button>
             <button
               class="insert-media-button"
@@ -360,7 +360,7 @@
               phx-click="open_overlay"
               phx-value-kind="insert_media"
             >
-              <%= translated("Insert Media") %>
+              <%= dgettext("ui", "Insert Media") %>
             </button>
           <% end %>
 
@@ -372,7 +372,7 @@
               phx-click="open_overlay"
               phx-value-kind="gallery"
             >
-              <%= translated("Gallery") %> (<%= @post_editor.gallery_count %>)
+              <%= dgettext("ui", "Gallery") %> (<%= @post_editor.gallery_count %>)
             </button>
           <% end %>
         </div>
@@ -383,7 +383,7 @@
           <%= if @post_editor.preview_url do %>
             <iframe class="editor-preview-frame" src={@post_editor.preview_url}></iframe>
           <% else %>
-            <div class="post-editor-empty"><%= translated("Preview unavailable") %></div>
+            <div class="post-editor-empty"><%= dgettext("ui", "Preview unavailable") %></div>
           <% end %>
         </div>
       <% else %>
@@ -406,10 +406,10 @@
   </form>
 
   <div class="editor-footer">
-    <span><strong><%= translated("Created") %>:</strong> <%= @post_editor.footer.created_at %></span>
-    <span><strong><%= translated("Updated") %>:</strong> <%= @post_editor.footer.updated_at %></span>
+    <span><strong><%= dgettext("ui", "Created") %>:</strong> <%= @post_editor.footer.created_at %></span>
+    <span><strong><%= dgettext("ui", "Updated") %>:</strong> <%= @post_editor.footer.updated_at %></span>
     <%= if @post_editor.footer.published_at do %>
-      <span><strong><%= translated("Published") %>:</strong> <%= @post_editor.footer.published_at %></span>
+      <span><strong><%= dgettext("ui", "Published") %>:</strong> <%= @post_editor.footer.published_at %></span>
     <% end %>
   </div>
 </div>
