@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLiveTest do
   import Phoenix.LiveViewTest
 
   @shell_live_source_root Path.expand("../../../lib/bds/desktop/shell_live", __DIR__)
+  @endpoint BDS.Desktop.Endpoint
   @css_source_files [
     "tokens.css",
     "shell.css",
@@ -26,6 +27,210 @@ defmodule BDS.Desktop.ShellLiveTest do
     @css_source_files
     |> Enum.map(&File.read!(Path.expand("../../../assets/css/#{&1}", __DIR__)))
     |> Enum.join("\n")
+  end
+
+  defp phase3_post_editor_assigns do
+    %{
+      myself: nil,
+      post_editor: %{
+        id: 42,
+        dirty?: true,
+        display_title: "Phase 3 Post",
+        status: :draft,
+        save_state: :saving,
+        quick_actions_open?: false,
+        can_publish?: true,
+        discard_title: "Discard draft",
+        discard_label: "Discard",
+        can_delete?: true,
+        metadata_expanded: true,
+        translation_flags: [
+          %{language: "en", status: :draft, active: true, label: "English", flag: "EN"}
+        ],
+        form: %{
+          "title" => "Phase 3 Post",
+          "author" => "Author",
+          "language" => "en",
+          "do_not_translate" => false,
+          "template_slug" => "",
+          "excerpt" => "Excerpt",
+          "content" => "# Hello",
+          "tags" => "elixir",
+          "categories" => "news"
+        },
+        tag_chips: [%{name: "elixir", color: "#3b82f6"}],
+        tag_query: "",
+        tag_suggestions: [],
+        tag_query_addable?: false,
+        languages: ["en", "de"],
+        detect_language_enabled?: true,
+        slug: "phase-3-post",
+        category_values: ["news"],
+        category_query: "",
+        category_suggestions: [],
+        category_query_addable?: false,
+        show_template_selector?: true,
+        template_options: [%{slug: "default", title: "Default"}],
+        post_links: %{backlinks: [], outlinks: []},
+        linked_media: [],
+        excerpt_expanded: true,
+        mode: :markdown,
+        gallery_count: 1,
+        preview_url: nil,
+        footer: %{created_at: "2026-05-04", updated_at: "2026-05-04", published_at: nil},
+        can_translate?: true
+      }
+    }
+  end
+
+  defp phase3_media_editor_assigns do
+    %{
+      myself: nil,
+      media_editor: %{
+        dirty?: true,
+        display_title: "Hero Image",
+        save_state: :saved,
+        quick_actions_open?: false,
+        is_image: true,
+        can_detect_language?: true,
+        can_translate?: true,
+        preview_url: "/media/hero.jpg",
+        form: %{
+          "title" => "Hero Image",
+          "alt" => "Hero alt",
+          "caption" => "Caption",
+          "tags" => "cover",
+          "author" => "Author",
+          "language" => "en"
+        },
+        original_name: "hero.jpg",
+        mime_type: "image/jpeg",
+        file_size: "42 KB",
+        dimensions: "1200x800",
+        languages: ["en", "de"],
+        translations: [],
+        post_picker_open?: false,
+        post_picker_query: "",
+        post_picker_results: [],
+        post_picker_overflow_count: 0,
+        linked_posts: [],
+        editing_translation: nil
+      }
+    }
+  end
+
+  defp phase3_script_editor_assigns do
+    %{
+      myself: nil,
+      script_editor: %{
+        id: 7,
+        title: "Build Feed",
+        slug: "build-feed",
+        kind: "utility",
+        entrypoint: "run",
+        enabled: true,
+        content: "print('ok')",
+        entrypoints: ["run"],
+        status: :draft,
+        can_publish?: true,
+        created_at: 1_714_816_000,
+        updated_at: 1_714_816_000
+      }
+    }
+  end
+
+  defp phase3_template_editor_assigns do
+    %{
+      myself: nil,
+      template_editor: %{
+        id: 9,
+        title: "Post Template",
+        slug: "post-template",
+        kind: :post,
+        enabled: true,
+        content: "{{ content }}",
+        status: :draft,
+        can_publish?: true,
+        created_at: 1_714_816_000,
+        updated_at: 1_714_816_000
+      }
+    }
+  end
+
+  defp phase3_chat_editor_assigns do
+    %{
+      myself: nil,
+      chat_editor: %{
+        id: 5,
+        needs_api_key?: false,
+        title: "AI Assistant",
+        effective_model: "gpt-4.1",
+        model_selector_open?: false,
+        available_models: [],
+        available_model_groups: [],
+        messages: [],
+        is_streaming: false,
+        pending_user_message: nil,
+        streaming_content: "",
+        streaming_tool_markers: [],
+        streaming_inline_surfaces: [],
+        input: "",
+        send_disabled?: true,
+        action_error: nil
+      }
+    }
+  end
+
+  defp phase3_menu_editor_assigns do
+    %{
+      myself: nil,
+      menu_editor: %{
+        draft: nil,
+        title: "Navigation",
+        description: "Manage site navigation",
+        can_move_up?: false,
+        can_move_down?: false,
+        can_indent?: false,
+        can_unindent?: false,
+        can_delete?: false,
+        items: []
+      }
+    }
+  end
+
+  defp phase3_settings_editor_assigns do
+    %{
+      myself: nil,
+      current_tab: %{type: :settings, id: "settings"},
+      settings_editor: %{
+        selected_section: "project",
+        search_query: "",
+        active_sections: [],
+        project_visible?: false,
+        editor_visible?: false,
+        content_visible?: false,
+        ai_visible?: false,
+        publishing_visible?: false,
+        data_visible?: false,
+        technology_visible?: false,
+        mcp_visible?: false
+      }
+    }
+  end
+
+  defp phase3_tags_editor_assigns do
+    %{
+      myself: nil,
+      tags_editor: %{
+        selected_section: "cloud",
+        tags: [],
+        new_tag: %{"name" => "", "color" => "#3b82f6"},
+        edit_draft: %{},
+        selected: [],
+        merge_target: nil,
+        templates: []
+      }
+    }
   end
 
   test "shell live modules use contexts instead of direct Repo.get calls" do
@@ -49,6 +254,56 @@ defmodule BDS.Desktop.ShellLiveTest do
       end)
 
     assert offenders == []
+  end
+
+  @tag :phase3
+  test "phase 3 shell chrome renders utility-owned layout classes" do
+    conn = Plug.Conn.put_private(build_conn(), :phoenix_endpoint, BDS.Desktop.Endpoint)
+    {:ok, _view, html} = live_isolated(conn, BDS.Desktop.ShellLive)
+
+    assert html =~ "activity-bar flex h-full shrink-0 flex-col items-center"
+    assert html =~ "sidebar-shell flex min-w-0 shrink-0 overflow-hidden"
+    assert html =~ "tab-bar-empty flex h-full items-center px-3 text-sm"
+    assert html =~ "assistant-sidebar-shell flex min-w-0 shrink-0 overflow-hidden"
+    assert html =~ "status-bar flex h-[22px] shrink-0 items-center justify-between"
+  end
+
+  @tag :phase3
+  test "phase 3 editors and shared surfaces render utility-owned layouts" do
+    post_html = render_component(&BDS.Desktop.ShellLive.PostEditor.render/1, phase3_post_editor_assigns())
+    media_html = render_component(&BDS.Desktop.ShellLive.MediaEditor.render/1, phase3_media_editor_assigns())
+    script_html = render_component(&BDS.Desktop.ShellLive.ScriptEditor.render/1, phase3_script_editor_assigns())
+    template_html = render_component(&BDS.Desktop.ShellLive.TemplateEditor.render/1, phase3_template_editor_assigns())
+    chat_html = render_component(&BDS.Desktop.ShellLive.ChatEditor.render/1, phase3_chat_editor_assigns())
+    menu_html = render_component(&BDS.Desktop.ShellLive.MenuEditor.render/1, phase3_menu_editor_assigns())
+    settings_html = render_component(&BDS.Desktop.ShellLive.SettingsEditor.render/1, phase3_settings_editor_assigns())
+    tags_html = render_component(&BDS.Desktop.ShellLive.TagsEditor.render/1, phase3_tags_editor_assigns())
+
+    assert post_html =~ "post-editor editor flex h-full min-h-0 flex-col"
+    assert post_html =~ "editor-header flex shrink-0 items-start justify-between gap-3"
+    assert post_html =~ "editor-field flex flex-col gap-1.5"
+    assert post_html =~ "editor-toolbar flex items-center gap-3"
+
+    assert media_html =~ "media-editor editor flex h-full min-h-0 flex-col"
+    assert media_html =~ "editor-content media-editor grid min-h-0 flex-1 gap-4"
+
+    assert script_html =~ "scripts-view-shell editor flex h-full min-h-0 flex-col"
+    assert script_html =~ "editor-content scripts-view flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
+
+    assert template_html =~ "templates-view-shell editor flex h-full min-h-0 flex-col"
+    assert template_html =~ "editor-content templates-view flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
+
+    assert chat_html =~ "chat-panel flex h-full min-h-0 flex-col"
+    assert chat_html =~ "chat-panel-header flex shrink-0 items-center justify-between gap-3"
+
+    assert menu_html =~ "menu-editor-view flex h-full min-h-0 flex-col"
+    assert menu_html =~ "menu-editor-toolbar flex flex-wrap items-center gap-2"
+
+    assert settings_html =~ "settings-view-shell flex h-full min-h-0 flex-col overflow-hidden"
+    assert settings_html =~ "settings-header flex shrink-0 items-center justify-between gap-3"
+
+    assert tags_html =~ "tags-view-shell flex h-full min-h-0 flex-col overflow-hidden"
+    assert tags_html =~ "tag-form-row flex flex-wrap items-center gap-3"
   end
 
   alias BDS.Persistence
@@ -190,8 +445,6 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> send_resp(200, body)
     end
   end
-
-  @endpoint BDS.Desktop.Endpoint
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
@@ -694,7 +947,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-testid="sidebar-shell")
     assert html =~ ~s(data-testid="status-bar")
     assert html =~ ~s(data-testid="status-task-button")
-    assert html =~ ~s(class="panel-shell is-hidden")
+    assert html =~ ~s(class="panel-shell flex min-h-0 shrink-0 flex-col overflow-hidden is-hidden")
     assert html =~ ~s(data-testid="activity-button")
     assert html =~ ~s(data-view="posts")
     assert html =~ ~s(data-view="media")
@@ -711,14 +964,14 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element("[data-testid='toggle-sidebar']")
       |> render_click()
 
-    assert html =~ ~s(class="sidebar-shell is-hidden")
+    assert html =~ ~s(class="sidebar-shell flex min-w-0 shrink-0 overflow-hidden is-hidden")
 
     html =
       view
       |> element("[data-testid='toggle-sidebar']")
       |> render_click()
 
-    refute html =~ ~s(class="sidebar-shell is-hidden")
+    refute html =~ ~s(class="sidebar-shell flex min-w-0 shrink-0 overflow-hidden is-hidden")
 
     html =
       view
@@ -726,7 +979,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> render_click()
 
     assert html =~ ~s(data-region="panel")
-    refute html =~ ~s(class="panel-shell is-hidden")
+    refute html =~ ~s(class="panel-shell flex min-h-0 shrink-0 flex-col overflow-hidden is-hidden")
     assert html =~ ~s(data-testid="panel-close")
 
     html =
@@ -734,7 +987,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element("[data-testid='panel-close']")
       |> render_click()
 
-    assert html =~ ~s(class="panel-shell is-hidden")
+    assert html =~ ~s(class="panel-shell flex min-h-0 shrink-0 flex-col overflow-hidden is-hidden")
 
     html =
       view
@@ -765,7 +1018,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> render_click()
 
     refute html =~ ~s(data-tab-type="settings")
-    assert html =~ ~s(class="tab-bar-empty")
+    assert html =~ ~s(class="tab-bar-empty flex h-full items-center px-3 text-sm")
   end
 
   test "macos hides the custom titlebar and moves shell toggles into the status bar" do
@@ -785,7 +1038,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element("[data-testid='toggle-sidebar']")
       |> render_click()
 
-    assert html =~ ~s(class="sidebar-shell is-hidden")
+    assert html =~ ~s(class="sidebar-shell flex min-w-0 shrink-0 overflow-hidden is-hidden")
 
     html =
       render_hook(view, "native_menu_action", %{"action" => "edit_preferences"})
@@ -1053,7 +1306,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-tab-id="post-1")
     assert html =~ ~s(data-tab-type="media")
     assert html =~ ~s(data-tab-id="media-1")
-    assert html =~ ~s(class="tab active transient")
+    assert Regex.match?(~r/class="tab [^"]*active[^"]*transient/, html)
   end
 
   test "workbench session restore renders documentation tab content" do
@@ -1469,7 +1722,7 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ ~s(data-tab-type="post")
     assert html =~ ~s(data-tab-id="post-1")
-    assert html =~ ~s(class="tab active transient")
+    assert Regex.match?(~r/class="tab [^"]*active[^"]*transient/, html)
 
     html =
       render_click(view, "pin_sidebar_item", %{
@@ -1480,7 +1733,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       })
 
     assert html =~ ~s(data-tab-id="post-1")
-    refute html =~ ~s(class="tab active transient")
+    refute Regex.match?(~r/class="tab [^"]*active[^"]*transient/, html)
 
     html =
       render_click(view, "open_sidebar_item", %{
@@ -1521,13 +1774,13 @@ defmodule BDS.Desktop.ShellLiveTest do
     {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
     assert html =~ ~s(data-testid="sidebar-shell")
-    assert html =~ ~s(class="panel-shell is-hidden")
+    assert html =~ ~s(class="panel-shell flex min-h-0 shrink-0 flex-col overflow-hidden is-hidden")
 
     html = render_keydown(view, "shortcut", %{key: "b", meta: true})
-    assert html =~ ~s(class="sidebar-shell is-hidden")
+    assert html =~ ~s(class="sidebar-shell flex min-w-0 shrink-0 overflow-hidden is-hidden")
 
     html = render_keydown(view, "shortcut", %{key: "j", meta: true})
-    refute html =~ ~s(class="panel-shell is-hidden")
+    refute html =~ ~s(class="panel-shell flex min-h-0 shrink-0 flex-col overflow-hidden is-hidden")
 
     html = render_keydown(view, "shortcut", %{key: "2", meta: true})
     assert html =~ ~s(data-view="media")
@@ -1557,7 +1810,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element("[data-testid='toggle-sidebar']")
       |> render_click()
 
-    assert html =~ ~s(class="sidebar-shell is-hidden")
+    assert html =~ ~s(class="sidebar-shell flex min-w-0 shrink-0 overflow-hidden is-hidden")
     assert html =~ ~s(style="width: 0px;")
   end
 
@@ -1596,8 +1849,8 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ ~s(data-testid="sidebar-search-form")
     assert html =~ ~s(data-testid="sidebar-filter-toggle")
-    assert html =~ ~s(class="sidebar-section-header")
-    assert html =~ ~s(class="sidebar-actions")
+    assert html =~ ~s(class="sidebar-section-header flex items-center justify-between gap-2")
+    assert html =~ ~s(class="sidebar-actions flex items-center gap-1")
     assert html =~ ~s(data-testid="sidebar-load-more")
 
     assert html_position(html, ~s(data-testid="sidebar-load-more")) >
@@ -1762,19 +2015,22 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Add published posts"
 
     html = render_click(view, "select_panel_tab", %{"tab" => "output"})
-    refute html =~ ~s(class="panel-shell is-hidden")
+    refute html =~ ~s(class="panel-shell flex min-h-0 shrink-0 flex-col overflow-hidden is-hidden")
 
     html =
       view
       |> element("[data-testid='status-task-button']")
       |> render_click()
 
-    refute html =~ ~s(class="panel-shell is-hidden")
+    refute html =~ ~s(class="panel-shell flex min-h-0 shrink-0 flex-col overflow-hidden is-hidden")
 
-    assert html =~
-             ~s(<button class="panel-tab active" type="button" phx-click="select_panel_tab" phx-value-tab="tasks">)
+    assert Regex.match?(
+             ~r/<button class="panel-tab [^"]*active" type="button" phx-click="select_panel_tab" phx-value-tab="tasks">/,
+             html
+           )
 
-    assert html =~ ~s(class="task-list") or html =~ "No background tasks running"
+    assert html =~ ~s(class="task-list flex flex-col gap-2") or
+             html =~ ~s(class="panel-entry panel-empty-state")
   end
 
   test "metadata diff tasks localize task text, show progress, and open the diff result in the UI" do
@@ -2273,7 +2529,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> render_change()
 
     html = render(view)
-    assert html =~ ~s(class="tab active dirty")
+    assert Regex.match?(~r/class="tab [^"]*active[^"]*dirty/, html)
     assert html =~ "Updated Shell Post"
 
     _html = render_hook(view, "native_menu_action", %{"action" => "save"})
@@ -2868,7 +3124,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => "published"
       })
 
-    assert published_script_html =~ ~s(class="scripts-view-shell editor")
+    assert published_script_html =~ ~s(class="scripts-view-shell editor flex h-full min-h-0 flex-col")
     assert published_script_html =~ ~s(data-testid="script-editor")
     assert published_script_html =~ ~s(data-testid="script-status-badge")
     assert published_script_html =~ ~s(class="status-badge status-published")
@@ -2889,7 +3145,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => "published"
       })
 
-    assert published_template_html =~ ~s(class="templates-view-shell editor")
+    assert published_template_html =~ ~s(class="templates-view-shell editor flex h-full min-h-0 flex-col")
     assert published_template_html =~ ~s(data-testid="template-editor")
     assert published_template_html =~ ~s(data-testid="template-status-badge")
     assert published_template_html =~ ~s(class="status-badge status-published")
@@ -3082,8 +3338,9 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => media.original_name
       })
 
-    assert html =~ ~s(class="editor-content media-editor")
-    assert html =~ ~s(class="quick-actions-wrapper")
+    assert html =~
+         "class=\"editor-content media-editor grid min-h-0 flex-1 gap-4 overflow-auto xl:grid-cols-[minmax(320px,1fr)_minmax(0,1.2fr)]\""
+    assert html =~ ~s(class="quick-actions-wrapper relative")
     refute html =~ ~s(class="media-editor-form")
 
     assert has_element?(
@@ -3107,7 +3364,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> render_click()
 
     assert html =~ ~s(class="translation-modal-backdrop")
-    assert html =~ ~s(class="translation-modal")
+    assert html =~ ~s(class="translation-modal flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden")
     assert html =~ ~s(name="media_translation[title]")
     assert html =~ ~s(name="media_translation[alt]")
     assert html =~ ~s(name="media_translation[caption]")
@@ -3195,7 +3452,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => "Project settings"
       })
 
-    assert settings_html =~ ~s(class="settings-view-shell")
+    assert settings_html =~ ~s(class="settings-view-shell flex h-full min-h-0 flex-col overflow-hidden")
     assert settings_html =~ ~s(class="setting-section")
     refute settings_html =~ "Desktop workbench content routed through the Elixir shell."
 
@@ -3207,7 +3464,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => "Manage tags"
       })
 
-    assert tags_html =~ ~s(class="tags-view-shell")
+    assert tags_html =~ ~s(class="tags-view-shell flex h-full min-h-0 flex-col overflow-hidden")
     assert tags_html =~ ~s(class="tags-section")
     refute tags_html =~ "Desktop workbench content routed through the Elixir shell."
 
@@ -3231,7 +3488,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => script.slug
       })
 
-    assert script_html =~ ~s(class="scripts-view-shell editor")
+    assert script_html =~ ~s(class="scripts-view-shell editor flex h-full min-h-0 flex-col")
     assert script_html =~ "scripts-monaco"
     assert script_html =~ ~s(data-monaco-language="lua")
     assert script_html =~ ~s(data-monaco-word-wrap="on")
@@ -3246,7 +3503,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => template.slug
       })
 
-    assert template_html =~ ~s(class="templates-view-shell editor")
+    assert template_html =~ ~s(class="templates-view-shell editor flex h-full min-h-0 flex-col")
     assert template_html =~ "templates-monaco"
     assert template_html =~ ~s(data-monaco-language="liquid")
     assert template_html =~ ~s(data-monaco-word-wrap="on")
@@ -3261,8 +3518,8 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => conversation.model || "chat"
       })
 
-    assert chat_html =~ ~s(class="chat-panel")
-    assert chat_html =~ ~s(class="chat-input-container")
+    assert chat_html =~ ~s(class="chat-panel flex h-full min-h-0 flex-col")
+    assert chat_html =~ ~s(class="chat-input-container flex shrink-0 flex-col gap-3")
     refute chat_html =~ "Desktop workbench content routed through the Elixir shell."
   end
 
@@ -3281,8 +3538,8 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ ~s(data-testid="chat-model-selector-button")
     assert html =~ ~s(class="chat-panel-title-main")
-    assert html =~ ~s(class="chat-model-selector-wrap")
-    assert html =~ ~s(class="chat-model-selector-button chat-model-selector-inline")
+    assert html =~ ~s(class="chat-model-selector-wrap relative shrink-0")
+    assert html =~ ~s(class="chat-model-selector-button chat-model-selector-inline inline-flex items-center gap-2")
     refute html =~ ~s(class="chat-panel-header-actions")
 
     css = desktop_css_source()
@@ -3330,7 +3587,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element("[data-testid='chat-model-selector-button']")
       |> render_click()
 
-    assert selector_html =~ ~s(class="chat-model-selector-menu")
+    assert selector_html =~ ~s(class="chat-model-selector-menu absolute right-0 top-full z-10 mt-2 flex min-w-56 flex-col")
     assert selector_html =~ ~s(data-testid="chat-model-selector-option")
     assert selector_html =~ "llama-current"
 
@@ -3380,7 +3637,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => conversation.model || "chat"
       })
 
-    assert html =~ ~s(<span class="tab-title">New Chat</span>)
+    assert html =~ ~s(<span class="tab-title truncate">New Chat</span>)
 
     _html =
       view
@@ -3408,10 +3665,10 @@ defmodule BDS.Desktop.ShellLiveTest do
            end)
 
     assert AI.get_chat_conversation(conversation.id).title == "Posts 2026"
-    assert html =~ ~s(<span class="tab-title">Posts 2026</span>)
+    assert html =~ ~s(<span class="tab-title truncate">Posts 2026</span>)
     assert html =~ ~r/<span class="chat-panel-title-main">\s*Posts 2026\s*<\/span>/
     assert html =~ ~s(<span class="chat-item-title">Posts 2026</span>)
-    refute html =~ ~s(<span class="tab-title">New Chat</span>)
+    refute html =~ ~s(<span class="tab-title truncate">New Chat</span>)
     refute html =~ ~s(<span class="chat-item-title">New Chat</span>)
   end
 

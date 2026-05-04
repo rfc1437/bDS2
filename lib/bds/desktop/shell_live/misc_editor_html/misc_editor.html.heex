@@ -1,10 +1,10 @@
-<div class={["misc-editor-shell", misc_class(@misc_editor.kind)]} data-testid="misc-editor">
-  <div class="misc-editor-header">
+<div class={["misc-editor-shell flex h-full min-h-0 flex-col overflow-hidden", misc_class(@misc_editor.kind)]} data-testid="misc-editor">
+  <div class="misc-editor-header flex shrink-0 items-start justify-between gap-3">
     <div>
       <h2><%= @misc_editor.title %></h2>
       <p><%= @misc_editor.subtitle %></p>
     </div>
-    <div class="misc-editor-actions">
+    <div class="misc-editor-actions flex flex-wrap items-center justify-end gap-2">
       <%= if refreshable?(@misc_editor.kind) do %>
         <button class="secondary" type="button" phx-click="rerun_misc_editor" phx-target={@myself}><%= dgettext("ui", "Refresh") %></button>
       <% end %>
@@ -17,13 +17,13 @@
     </div>
   </div>
 
-  <div class="misc-editor-summary">
+  <div class="misc-editor-summary flex flex-wrap gap-2">
     <%= for {label, value} <- summary_items(@misc_editor) do %>
       <div class="misc-summary-pill"><span><%= label %></span><strong><%= value %></strong></div>
     <% end %>
   </div>
 
-  <div class="misc-editor-content">
+  <div class="misc-editor-content min-h-0 flex-1 overflow-auto">
     <%= case @misc_editor.kind do %>
       <% :documentation -> %>
         <div class="documentation-view">

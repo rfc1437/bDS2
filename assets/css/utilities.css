@@ -1,0 +1,47 @@
+@layer components {
+	.btn-base {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		min-height: 28px;
+		padding: 4px 10px;
+		border: 1px solid transparent;
+		border-radius: 4px;
+		font: inherit;
+		line-height: 1.2;
+		cursor: pointer;
+		user-select: none;
+	}
+
+	.btn-theme-primary {
+		color: var(--vscode-button-foreground, #ffffff);
+		background: var(--vscode-button-background, var(--vscode-focusBorder));
+	}
+
+	.btn-theme-primary:hover {
+		background: var(--vscode-button-hoverBackground, #0e639c);
+	}
+
+	.btn-theme-danger {
+		color: var(--vscode-errorForeground, #f48771);
+		background: transparent;
+		border-color: color-mix(in srgb, var(--vscode-errorForeground, #f48771) 45%, transparent);
+	}
+
+	.btn-theme-danger:hover {
+		background: color-mix(in srgb, var(--vscode-errorForeground, #f48771) 14%, transparent);
+	}
+
+	.panel-entry {
+		border: 1px solid var(--vscode-panel-border);
+		border-radius: 4px;
+		background-color: var(--vscode-sideBar-background);
+	}
+
+	.monaco-host {
+		min-width: 0;
+		min-height: 0;
+		overflow: hidden;
+	}
+}

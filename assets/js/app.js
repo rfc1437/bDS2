@@ -1,6 +1,10 @@
 import { Socket } from "phoenix";
 import { LiveSocket } from "phoenix_live_view";
 import "phoenix_html";
+import { syncTitlebarOverlayInsets } from "./bridges/titlebar_overlay.js";
+import { createMenuRuntimeCommandRunner } from "./bridges/menu_runtime.js";
+import { createHooks } from "./hooks/index.js";
+import { createMonacoServices } from "./monaco/services.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const csrfToken = document
@@ -119,46 +123,6 @@ document.addEventListener("DOMContentLoaded", () => {
     window.localStorage.setItem(key, String(width));
   };
 
-  const syncTitlebarOverlayInsets = () => {
-    const rootStyle = document.documentElement.style;
-    const setInsets = (left, right) => {
-      rootStyle.setProperty("--bds-titlebar-overlay-left", `${left}px`);
-      rootStyle.setProperty("--bds-titlebar-overlay-right", `${right}px`);
-    };
-
-    const overlay = navigator.windowControlsOverlay;
-
-    if (!overlay) {
-      setInsets(0, 0);
-      return () => {};
-    }
-
-    const updateInsets = () => {
-      if (!overlay.visible) {
-        setInsets(0, 0);
-        return;
-      }
-
-      const titlebarRect = overlay.getTitlebarAreaRect();
-      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || titlebarRect.right;
-      const leftInset = Math.max(0, Math.round(titlebarRect.left));
-      const rightInset = Math.max(0, Math.round(viewportWidth - titlebarRect.right));
-      setInsets(leftInset, rightInset);
-    };
-
-    const onGeometryChange = () => updateInsets();
-    const onResize = () => updateInsets();
-
-    updateInsets();
-    overlay.addEventListener("geometrychange", onGeometryChange);
-    window.addEventListener("resize", onResize);
-
-    return () => {
-      overlay.removeEventListener("geometrychange", onGeometryChange);
-      window.removeEventListener("resize", onResize);
-    };
-  };
-
   let monacoLoaderPromise;
   let liquidLanguageRegistered = false;
   let markdownWithMacrosRegistered = false;
@@ -213,61 +177,12 @@ document.addEventListener("DOMContentLoaded", () => {
     document.documentElement.style.zoom = String(zoom);
   };
 
-  const runMenuRuntimeCommand = (action) => {
-    const editor = activeMonacoEditor();
-
-    switch (action) {
-      case "undo":
-        return editor ? runMonacoEditorAction(editor, "undo") : runDocumentCommand("undo");
-      case "redo":
-        return editor ? runMonacoEditorAction(editor, "redo") : runDocumentCommand("redo");
-      case "cut":
-        return editor
-          ? runMonacoEditorAction(editor, "editor.action.clipboardCutAction")
-          : runDocumentCommand("cut");
-      case "copy":
-        return editor
-          ? runMonacoEditorAction(editor, "editor.action.clipboardCopyAction")
-          : runDocumentCommand("copy");
-      case "paste":
-        return editor
-          ? runMonacoEditorAction(editor, "editor.action.clipboardPasteAction")
-          : runDocumentCommand("paste");
-      case "delete":
-        return editor ? runMonacoEditorAction(editor, "deleteLeft") : runDocumentCommand("delete");
-      case "select_all":
-        return editor
-          ? runMonacoEditorAction(editor, "editor.action.selectAll")
-          : runDocumentCommand("selectAll");
-      case "find":
-        return editor ? runMonacoEditorAction(editor, "actions.find") : false;
-      case "replace":
-        return editor ? runMonacoEditorAction(editor, "editor.action.startFindReplaceAction") : false;
-      case "reload":
-      case "force_reload":
-        window.location.reload();
-        return true;
-      case "reset_zoom":
-        applyAppZoom(1);
-        return true;
-      case "zoom_in":
-        applyAppZoom((window.__bdsAppZoom || 1) + 0.1);
-        return true;
-      case "zoom_out":
-        applyAppZoom((window.__bdsAppZoom || 1) - 0.1);
-        return true;
-      case "toggle_full_screen":
-        if (document.fullscreenElement) {
-          document.exitFullscreen?.();
-        } else {
-          document.documentElement.requestFullscreen?.();
-        }
-
-        return true;
-      default:
-        return false;
-    }
-  };
+  const menuRuntimeCommandRunner = createMenuRuntimeCommandRunner({
+    activeMonacoEditor,
+    runMonacoEditorAction,
+    runDocumentCommand,
+    applyAppZoom
+  });
 
   const cssVar = (name, fallback) => {
     const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -588,6 +503,8 @@ document.addEventListener("DOMContentLoaded", () => {
     return monacoLoaderPromise;
   };
 
+  const monacoServices = createMonacoServices({ loadMonaco, ensureMonacoTheme });
+
   const Hooks = {
     AppShell: {
       mounted() {
@@ -738,7 +655,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         this.handleEvent("menu-runtime-command", ({ action }) => {
           if (action) {
-            runMenuRuntimeCommand(String(action));
+            menuRuntimeCommandRunner(String(action));
           }
         });
 
@@ -1295,7 +1212,7 @@ document.addEventListener("DOMContentLoaded", () => {
           this.editor.focus();
         };
 
-        loadMonaco()
+        monacoServices.loadMonaco()
           .then(async (monaco) => {
             if (!this.host || !this.textarea) {
               return;
@@ -1303,7 +1220,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             await this.waitForMonacoVisibleSize();
 
-            ensureMonacoTheme(monaco);
+            monacoServices.ensureMonacoTheme(monaco);
 
             this.editor = monaco.editor.create(this.host, {
               value: this.textarea.value || "",
@@ -1360,8 +1277,8 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        loadMonaco().then((monaco) => {
-          ensureMonacoTheme(monaco);
+        monacoServices.loadMonaco().then((monaco) => {
+          monacoServices.ensureMonacoTheme(monaco);
           monaco.editor.setTheme("bds-theme");
 
           if (this.editor.getModel()?.getLanguageId() !== this.language) {
@@ -1430,13 +1347,13 @@ document.addEventListener("DOMContentLoaded", () => {
           this.lastFilePath = this.filePath;
         };
 
-        loadMonaco()
+        monacoServices.loadMonaco()
           .then((monaco) => {
             if (!this.host) {
               return;
             }
 
-            ensureMonacoTheme(monaco);
+            monacoServices.ensureMonacoTheme(monaco);
 
             this.editor = monaco.editor.createDiffEditor(this.host, {
               theme: "bds-theme",
@@ -1470,8 +1387,8 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        loadMonaco().then((monaco) => {
-          ensureMonacoTheme(monaco);
+        monacoServices.loadMonaco().then((monaco) => {
+          monacoServices.ensureMonacoTheme(monaco);
           monaco.editor.setTheme("bds-theme");
 
           this.editor.updateOptions({
@@ -1515,7 +1432,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const liveSocket = new LiveSocket("/live", Socket, {
     params: { _csrf_token: csrfToken },
-    hooks: Hooks,
+    hooks: createHooks(Hooks),
     metadata: {
       keydown: (event) => ({
         key: event.key,

@@ -1,7 +1,7 @@
-<div class="templates-view-shell editor" data-testid="template-editor">
-  <div class="editor-header templates-header">
-    <div class="editor-tabs"><div class="editor-tab active"><span class="editor-tab-title"><%= @template_editor.title %></span></div></div>
-    <div class="editor-actions">
+<div class="templates-view-shell editor flex h-full min-h-0 flex-col" data-testid="template-editor">
+  <div class="editor-header templates-header flex shrink-0 items-start justify-between gap-3">
+    <div class="editor-tabs flex min-w-0 flex-1 overflow-hidden"><div class="editor-tab active inline-flex max-w-full items-center overflow-hidden px-3 py-2"><span class="editor-tab-title truncate"><%= @template_editor.title %></span></div></div>
+    <div class="editor-actions flex flex-wrap items-center justify-end gap-2">
       <span class={[
         "status-badge",
         "status-#{@template_editor.status}"
@@ -14,34 +14,34 @@
       <button class="secondary danger" type="button" phx-click="delete_template_editor" phx-target={@myself}><%= dgettext("ui", "Delete") %></button>
     </div>
   </div>
-  <form class="editor-content templates-view" phx-change="change_template_editor" phx-target={@myself}>
-    <div class="editor-header-row templates-meta-row">
-      <div class="editor-meta">
-        <div class="editor-field-row">
-          <div class="editor-field"><label><%= dgettext("ui", "Title") %></label><input type="text" name="template_editor[title]" value={@template_editor.title} /></div>
-          <div class="editor-field"><label><%= dgettext("ui", "Slug") %></label><input type="text" name="template_editor[slug]" value={@template_editor.slug} /></div>
+  <form class="editor-content templates-view flex min-h-0 flex-1 flex-col gap-4 overflow-hidden" phx-change="change_template_editor" phx-target={@myself}>
+    <div class="editor-header-row templates-meta-row grid gap-4">
+      <div class="editor-meta flex min-w-0 flex-col gap-4">
+        <div class="editor-field-row grid gap-4 md:grid-cols-2">
+          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Title") %></label><input type="text" name="template_editor[title]" value={@template_editor.title} /></div>
+          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Slug") %></label><input type="text" name="template_editor[slug]" value={@template_editor.slug} /></div>
         </div>
-        <div class="editor-field-row">
-          <div class="editor-field"><label><%= dgettext("ui", "Kind") %></label><select name="template_editor[kind]"><option value="post" selected={@template_editor.kind == :post or @template_editor.kind == "post"}>post</option><option value="list" selected={@template_editor.kind == :list or @template_editor.kind == "list"}>list</option><option value="not-found" selected={@template_editor.kind == :"not-found" or @template_editor.kind == "not-found"}>not-found</option><option value="partial" selected={@template_editor.kind == :partial or @template_editor.kind == "partial"}>partial</option></select></div>
-          <div class="editor-field templates-enabled-field"><label><input type="checkbox" name="template_editor[enabled]" checked={@template_editor.enabled} /> <%= dgettext("ui", "Enabled") %></label></div>
+        <div class="editor-field-row grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Kind") %></label><select name="template_editor[kind]"><option value="post" selected={@template_editor.kind == :post or @template_editor.kind == "post"}>post</option><option value="list" selected={@template_editor.kind == :list or @template_editor.kind == "list"}>list</option><option value="not-found" selected={@template_editor.kind == :"not-found" or @template_editor.kind == "not-found"}>not-found</option><option value="partial" selected={@template_editor.kind == :partial or @template_editor.kind == "partial"}>partial</option></select></div>
+          <div class="editor-field templates-enabled-field flex flex-col justify-end gap-1.5"><label><input type="checkbox" name="template_editor[enabled]" checked={@template_editor.enabled} /> <%= dgettext("ui", "Enabled") %></label></div>
         </div>
       </div>
     </div>
-    <div class="editor-body templates-editor">
-      <div class="editor-toolbar templates-toolbar"><div class="editor-toolbar-left"><label><%= dgettext("ui", "Content") %></label></div></div>
+    <div class="editor-body templates-editor flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div class="editor-toolbar templates-toolbar flex items-center gap-3"><div class="editor-toolbar-left flex items-center gap-2"><label><%= dgettext("ui", "Content") %></label></div></div>
       <div
         id={"template-editor-monaco-shell-#{@template_editor.id}"}
-        class="templates-monaco monaco-editor-shell"
+        class="templates-monaco monaco-editor-shell min-h-0 flex-1 overflow-hidden"
         phx-hook="MonacoEditor"
         data-monaco-editor-id={@template_editor.id}
         data-monaco-input-id={"template-editor-content-#{@template_editor.id}"}
         data-monaco-language="liquid"
         data-monaco-word-wrap="on"
       >
-        <div id={"template-editor-monaco-#{@template_editor.id}"} class="monaco-editor-instance" phx-update="ignore"></div>
+        <div id={"template-editor-monaco-#{@template_editor.id}"} class="monaco-editor-instance min-h-0 flex-1" phx-update="ignore"></div>
         <textarea id={"template-editor-content-#{@template_editor.id}"} class="monaco-editor-input code-editor-textarea" name="template_editor[content]" spellcheck="false"><%= @template_editor.content %></textarea>
       </div>
     </div>
-    <div class="editor-footer"><span class="text-muted text-small"><%= dgettext("ui", "Created") %>: <%= BDS.Persistence.timestamp_to_iso8601(@template_editor.created_at) %></span><span class="text-muted text-small"><%= dgettext("ui", "Updated") %>: <%= BDS.Persistence.timestamp_to_iso8601(@template_editor.updated_at) %></span></div>
+    <div class="editor-footer flex shrink-0 flex-wrap gap-4"><span class="text-muted text-small"><%= dgettext("ui", "Created") %>: <%= BDS.Persistence.timestamp_to_iso8601(@template_editor.created_at) %></span><span class="text-muted text-small"><%= dgettext("ui", "Updated") %>: <%= BDS.Persistence.timestamp_to_iso8601(@template_editor.updated_at) %></span></div>
   </form>
 </div>

@@ -1,22 +1,22 @@
 <div
   id="settings-editor-shell"
-  class="settings-view-shell"
+  class="settings-view-shell flex h-full min-h-0 flex-col overflow-hidden"
   data-testid="settings-editor"
   phx-hook="SettingsSectionScroll"
   data-selected-settings-section={@settings_editor.selected_section}
   data-settings-scroll-target={"settings-section-#{@settings_editor.selected_section}"}
 >
-  <div class="settings-view">
-    <div class="settings-header">
+  <div class="settings-view flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div class="settings-header flex shrink-0 items-center justify-between gap-3">
       <h2 data-testid="editor-title"><%= dgettext("ui", "Settings") %></h2>
-      <form class="settings-search" phx-change="change_settings_search" phx-target={@myself}>
+      <form class="settings-search w-full max-w-xs" phx-change="change_settings_search" phx-target={@myself}>
         <input type="text" name="query" value={@settings_editor.search_query} placeholder={dgettext("ui", "Search settings")} />
       </form>
     </div>
 
-    <div class="settings-content">
+    <div class="settings-content min-h-0 flex-1 overflow-auto">
       <%= if Enum.empty?(@settings_editor.active_sections) do %>
-        <div class="settings-no-results">
+        <div class="settings-no-results flex items-center justify-center py-6">
           <p><%= dgettext("ui", "No settings match the current search") %></p>
         </div>
       <% end %>

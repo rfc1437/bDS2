@@ -140,6 +140,44 @@ defmodule BDS.UI.ShellTest do
     assert template =~ "data-workbench-session={encoded_workbench_session(@workbench)}"
   end
 
+  test "tailwind source keeps theme tokens and shared component primitives" do
+    css = css_source()
+    app_css = File.read!("/Users/gb/Projects/bDS2/assets/css/app.css")
+
+    assert app_css =~ ~s|@import "tailwindcss" source(none);|
+    assert css =~ "@theme"
+    assert css =~ "--color-shell-bg:"
+    assert css =~ "--font-sans:"
+    assert css =~ "@layer components"
+    assert css =~ ".btn-base"
+    assert css =~ ".btn-theme-primary"
+    assert css =~ ".btn-theme-danger"
+    assert css =~ ".panel-entry"
+    assert css =~ ".monaco-host"
+  end
+
+  test "live javascript is split into focused Phoenix asset modules" do
+    app_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+
+    assert app_js =~ ~s(import { createHooks } from "./hooks/index.js";)
+    assert app_js =~ ~s(import { syncTitlebarOverlayInsets } from "./bridges/titlebar_overlay.js";)
+    assert app_js =~ ~s(import { createMenuRuntimeCommandRunner } from "./bridges/menu_runtime.js";)
+    assert app_js =~ ~s(import { createMonacoServices } from "./monaco/services.js";)
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/hooks/index.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/bridges/titlebar_overlay.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/bridges/menu_runtime.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/monaco/services.js")
+  end
+
+  test "top level shell render uses utility classes for common layout" do
+    template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
+
+    assert template =~ ~s(class="app flex h-full w-full flex-col")
+    assert template =~ ~s(class="app-main flex min-h-0 flex-1 overflow-hidden")
+    assert template =~ ~s(class="app-content flex min-w-0 flex-1 flex-col overflow-hidden")
+    assert template =~ ~s(class="tab-bar flex h-[35px] shrink-0 items-center overflow-hidden")
+  end
+
   test "desktop shell css keeps editor and help docs on the VS Code dark surface" do
     css = css_source()
 
@@ -261,6 +299,7 @@ defmodule BDS.UI.ShellTest do
   test "desktop shell assets keep old activity, tab, focus, and titlebar overlay parity rules" do
     css = css_source()
     live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    titlebar_js = File.read!("/Users/gb/Projects/bDS2/assets/js/bridges/titlebar_overlay.js")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
     assert css =~ "color: var(--vscode-activityBar-foreground)"
@@ -276,9 +315,9 @@ defmodule BDS.UI.ShellTest do
     assert css =~ "justify-content: space-between"
     assert css =~ "align-items: center"
     assert css =~ "padding-right: calc(10px + var(--bds-titlebar-overlay-right, 0px));"
-    assert live_js =~ "windowControlsOverlay"
-    assert live_js =~ "geometrychange"
-    assert live_js =~ "--bds-titlebar-overlay-left"
+    assert titlebar_js =~ "windowControlsOverlay"
+    assert titlebar_js =~ "geometrychange"
+    assert titlebar_js =~ "--bds-titlebar-overlay-left"
     assert live_js =~ "dataset.shortcuts"
     assert live_js =~ "addEventListener(\"keydown\", this.handleShortcutKeyDown, true)"
     assert live_js =~ "event.preventDefault()"
@@ -360,15 +399,15 @@ defmodule BDS.UI.ShellTest do
     assert css =~ "opacity: 1;"
 
     assert Regex.match?(
-             ~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= dgettext\("ui", "Quick Actions"\) %><\/span>/s,
+             ~r/class="secondary quick-actions-btn inline-flex items-center gap-2".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= dgettext\("ui", "Quick Actions"\) %><\/span>/s,
              template
            )
 
-    assert template =~ ~s(class="quick-action-text")
+    assert template =~ ~s(class="quick-action-text flex min-w-0 flex-1 flex-col")
     assert template =~ ~s(class="quick-action-icon">🤖</span>)
 
     assert Regex.match?(
-             ~r/class="quick-action-text">\s*<strong><%= dgettext\("ui", "AI Suggestions"\) %><\/strong>.*?<\/span>\s*<span class="quick-action-icon">🤖<\/span>/s,
+             ~r/class="quick-action-text[^"]*">\s*<strong><%= dgettext\("ui", "AI Suggestions"\) %><\/strong>.*?<\/span>\s*<span class="quick-action-icon">🤖<\/span>/s,
              template
            )
 
@@ -480,7 +519,7 @@ defmodule BDS.UI.ShellTest do
     assert post_editor_ex =~ "defp build_data(socket)"
 
     assert Regex.match?(
-             ~r/class="secondary quick-actions-btn".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= dgettext\("ui", "Quick Actions"\) %><\/span>/s,
+             ~r/class="secondary quick-actions-btn inline-flex items-center gap-2".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= dgettext\("ui", "Quick Actions"\) %><\/span>/s,
              post_template
            )
 

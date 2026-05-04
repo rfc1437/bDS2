@@ -1,15 +1,15 @@
-<div class="post-editor editor" data-testid="post-editor">
-  <div class="editor-header">
-    <div class="editor-tabs">
-      <div class={["editor-tab", "active", if(@post_editor.dirty?, do: "dirty")]}> 
-        <span class="editor-tab-title" data-testid="editor-title"><%= @post_editor.display_title %></span>
+<div class="post-editor editor flex h-full min-h-0 flex-col" data-testid="post-editor">
+  <div class="editor-header flex shrink-0 items-start justify-between gap-3">
+    <div class="editor-tabs flex min-w-0 flex-1 overflow-hidden">
+      <div class={["editor-tab active inline-flex max-w-full items-center gap-2 overflow-hidden px-3 py-2", if(@post_editor.dirty?, do: "dirty")]}> 
+        <span class="editor-tab-title truncate" data-testid="editor-title"><%= @post_editor.display_title %></span>
         <%= if @post_editor.dirty? do %>
           <span class="editor-tab-dirty" title={dgettext("ui", "Unsaved")}>●</span>
         <% end %>
       </div>
     </div>
 
-    <div class="editor-actions">
+    <div class="editor-actions flex flex-wrap items-center justify-end gap-2">
       <span class={["status-badge", "status-#{@post_editor.status}"]} data-testid="post-status-badge">
         <%= post_status_label(@post_editor.status) %>
       </span>
@@ -17,9 +17,9 @@
         <span class="auto-save-indicator"><%= post_editor_save_state_label(@post_editor.save_state) %></span>
       <% end %>
 
-      <div class="quick-actions-wrapper">
+      <div class="quick-actions-wrapper relative">
         <button
-          class="secondary quick-actions-btn"
+          class="secondary quick-actions-btn inline-flex items-center gap-2"
           type="button"
           phx-click="toggle_post_editor_quick_actions"
           phx-target={@myself}
@@ -29,9 +29,9 @@
         </button>
 
         <%= if @post_editor.quick_actions_open? do %>
-          <div class="quick-actions-menu">
+          <div class="quick-actions-menu absolute right-0 top-full z-10 mt-2 flex min-w-72 flex-col">
             <button
-              class="quick-action-item"
+              class="quick-action-item flex items-start gap-3 text-left"
               data-testid="editor-toolbar-overlay-button"
               type="button"
               phx-click="open_overlay"
@@ -39,7 +39,7 @@
               disabled={not @post_editor.detect_language_enabled?}
             >
               <span class="quick-action-icon">🤖</span>
-              <span class="quick-action-text">
+              <span class="quick-action-text flex min-w-0 flex-1 flex-col">
                 <strong><%= dgettext("ui", "AI Suggestions") %></strong>
                 <small><%= dgettext("ui", "Review title, excerpt, and content suggestions") %></small>
               </span>
@@ -48,7 +48,7 @@
             <div class="quick-actions-divider"></div>
 
             <button
-              class="quick-action-item"
+              class="quick-action-item flex items-start gap-3 text-left"
               data-testid="editor-toolbar-overlay-button"
               type="button"
               phx-click="open_overlay"
@@ -56,7 +56,7 @@
               disabled={not @post_editor.can_translate?}
             >
               <span class="quick-action-icon">🌍</span>
-              <span class="quick-action-text">
+              <span class="quick-action-text flex min-w-0 flex-1 flex-col">
                 <strong><%= dgettext("ui", "Translate") %></strong>
                 <small><%= dgettext("ui", "Select a target language for this post") %></small>
               </span>
@@ -83,14 +83,14 @@
     </div>
   </div>
 
-  <form class="post-editor-form editor-content" data-testid="post-editor-form" phx-change="change_post_editor" phx-target={@myself}>
-    <div class="metadata-toggle-header">
+  <form class="post-editor-form editor-content flex min-h-0 flex-1 flex-col gap-4 overflow-auto" data-testid="post-editor-form" phx-change="change_post_editor" phx-target={@myself}>
+    <div class="metadata-toggle-header flex items-center justify-between gap-3">
       <button class={["metadata-toggle", if(@post_editor.metadata_expanded, do: "expanded")]} type="button" phx-click="toggle_post_metadata" phx-target={@myself}>
         <span class="metadata-toggle-chevron"><%= if @post_editor.metadata_expanded, do: "▼", else: "▶" %></span>
         <span><%= dgettext("ui", "Metadata") %></span>
       </button>
 
-      <div class="editor-translations-flags" aria-label={dgettext("ui", "Translations")}>
+      <div class="editor-translations-flags flex flex-wrap items-center gap-2" aria-label={dgettext("ui", "Translations")}>
         <%= for flag <- @post_editor.translation_flags do %>
           <button
             class={[
@@ -111,18 +111,18 @@
       </div>
     </div>
 
-    <div class={["editor-header-row", if(not @post_editor.metadata_expanded, do: "is-collapsed")]}> 
-        <div class="editor-meta">
-          <div class="editor-field">
+    <div class={["editor-header-row grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]", if(not @post_editor.metadata_expanded, do: "is-collapsed")]}> 
+        <div class="editor-meta flex min-w-0 flex-col gap-4">
+          <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Title") %></label>
             <input class="post-editor-input" type="text" name="post_editor[title]" value={@post_editor.form["title"]} />
           </div>
 
-          <div class="editor-field">
+          <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Tags") %></label>
-            <div class="tag-input-container"> 
+            <div class="tag-input-container relative"> 
               <input type="hidden" name="post_editor[tags]" value={@post_editor.form["tags"]} />
-              <div class="tag-input-wrapper">
+              <div class="tag-input-wrapper flex flex-wrap items-center gap-2">
                 <%= for tag <- @post_editor.tag_chips do %>
                   <span class={["tag-chip", if(tag.color, do: "has-color")]} style={tag_chip_style(tag.color)}>
                     <span><%= tag.name %></span>
@@ -141,7 +141,7 @@
               </div>
 
               <%= if String.trim(@post_editor.tag_query || "") != "" and (Enum.any?(@post_editor.tag_suggestions) or @post_editor.tag_query_addable?) do %>
-                <div class="tag-suggestions">
+                <div class="tag-suggestions mt-2 flex flex-col">
                   <%= for tag <- @post_editor.tag_suggestions do %>
                     <button class="tag-suggestion" type="button" phx-click="add_post_editor_tag" phx-value-tag={tag.name} phx-target={@myself}>
                       <%= if tag.color do %>
@@ -162,14 +162,14 @@
             </div>
           </div>
 
-          <div class="editor-field">
+          <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Author") %></label>
             <input class="post-editor-input" type="text" name="post_editor[author]" value={@post_editor.form["author"]} />
           </div>
 
-          <div class="editor-field">
+          <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Language") %></label>
-            <div class="editor-language-row">
+            <div class="editor-language-row flex items-center gap-2">
               <select class="post-editor-input" name="post_editor[language]">
                 <%= for language <- @post_editor.languages do %>
                   <option value={language} selected={language == @post_editor.form["language"]}><%= String.upcase(language) %></option>
@@ -189,7 +189,7 @@
             </div>
           </div>
 
-          <div class="editor-field">
+          <div class="editor-field flex flex-col gap-1.5">
             <label class="editor-checkbox-label">
               <input type="hidden" name="post_editor[do_not_translate]" value="false" />
               <input type="checkbox" name="post_editor[do_not_translate]" value="true" checked={@post_editor.form["do_not_translate"]} />
@@ -197,17 +197,17 @@
             </label>
           </div>
 
-          <div class="editor-field-row">
-            <div class="editor-field">
+          <div class="editor-field-row grid gap-4 md:grid-cols-2">
+            <div class="editor-field flex flex-col gap-1.5">
               <label><%= dgettext("ui", "Slug") %></label>
               <input class="post-editor-input is-readonly" type="text" readonly value={@post_editor.slug} />
             </div>
 
-            <div class="editor-field">
+            <div class="editor-field flex flex-col gap-1.5">
               <label><%= dgettext("ui", "Categories") %></label>
-              <div class="tag-input-container"> 
+              <div class="tag-input-container relative"> 
                 <input type="hidden" name="post_editor[categories]" value={@post_editor.form["categories"]} />
-                <div class="tag-input-wrapper">
+                <div class="tag-input-wrapper flex flex-wrap items-center gap-2">
                   <%= for category <- @post_editor.category_values do %>
                     <span class="tag-chip">
                       <span><%= category %></span>
@@ -226,7 +226,7 @@
                 </div>
 
                 <%= if String.trim(@post_editor.category_query || "") != "" and (Enum.any?(@post_editor.category_suggestions) or @post_editor.category_query_addable?) do %>
-                  <div class="tag-suggestions">
+                  <div class="tag-suggestions mt-2 flex flex-col">
                     <%= for category <- @post_editor.category_suggestions do %>
                       <button class="tag-suggestion" type="button" phx-click="add_post_editor_category" phx-value-category={category} phx-target={@myself}>
                         <span class="tag-suggestion-name"><%= category %></span>
@@ -246,7 +246,7 @@
           </div>
 
           <%= if @post_editor.show_template_selector? do %>
-            <div class="editor-field">
+            <div class="editor-field flex flex-col gap-1.5">
               <label><%= dgettext("ui", "Template") %></label>
               <select class="post-editor-input" name="post_editor[template_slug]">
                 <option value=""><%= dgettext("ui", "Default") %></option>
@@ -257,9 +257,9 @@
             </div>
           <% end %>
 
-          <div class="post-editor-links-panel">
+          <div class="post-editor-links-panel flex flex-col gap-3">
             <strong><%= dgettext("ui", "Post Links") %></strong>
-            <div class="post-editor-links-columns">
+            <div class="post-editor-links-columns grid gap-4 md:grid-cols-2">
               <div>
                 <span class="post-editor-links-label"><%= dgettext("ui", "Backlinks") %></span>
                 <%= if Enum.any?(@post_editor.post_links.backlinks) do %>
@@ -288,15 +288,15 @@
           </div>
         </div>
 
-        <aside class="editor-media-panel post-editor-side-panel">
+        <aside class="editor-media-panel post-editor-side-panel flex flex-col gap-3">
           <div class="post-editor-side-panel-header">
             <strong><%= dgettext("ui", "Linked Media") %></strong>
           </div>
 
           <%= if Enum.any?(@post_editor.linked_media) do %>
-            <ul class="post-editor-media-list">
+            <ul class="post-editor-media-list flex flex-col gap-2">
               <%= for item <- @post_editor.linked_media do %>
-                <li class="post-editor-media-item">
+                <li class="post-editor-media-item flex flex-col gap-1">
                   <span class="post-editor-media-title"><%= item.name %></span>
                   <span class="post-editor-media-meta"><%= dgettext("ui", "Order") %>: <%= item.sort_order %></span>
                 </li>
@@ -314,19 +314,19 @@
     </button>
 
     <div class={["editor-excerpt-panel", if(not @post_editor.excerpt_expanded, do: "is-collapsed")]}> 
-      <div class="editor-field">
+      <div class="editor-field flex flex-col gap-1.5">
         <label><%= dgettext("ui", "Excerpt") %></label>
         <textarea class="post-editor-textarea post-editor-excerpt" name="post_editor[excerpt]" rows="4"><%= @post_editor.form["excerpt"] %></textarea>
       </div>
     </div>
 
-    <div class="editor-body">
-      <div class="editor-toolbar">
-        <div class="editor-toolbar-left">
+    <div class="editor-body flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div class="editor-toolbar flex items-center gap-3">
+        <div class="editor-toolbar-left flex items-center gap-2">
           <label><%= dgettext("ui", "Content") %></label>
         </div>
 
-        <div class="editor-toolbar-center">
+        <div class="editor-toolbar-center flex flex-1 justify-center">
           <div class="editor-mode-toggle">
             <%= for mode <- [:markdown, :preview] do %>
               <button
@@ -342,7 +342,7 @@
           </div>
         </div>
 
-        <div class="editor-toolbar-right">
+        <div class="editor-toolbar-right flex items-center gap-2">
           <%= if @post_editor.mode == :markdown do %>
             <button
               class="insert-post-link-button"
@@ -379,7 +379,7 @@
       </div>
 
       <%= if @post_editor.mode == :preview do %>
-        <div class="editor-preview post-editor-preview" data-testid="post-editor-preview">
+        <div class="editor-preview post-editor-preview flex min-h-0 flex-1" data-testid="post-editor-preview">
           <%= if @post_editor.preview_url do %>
             <iframe class="editor-preview-frame" src={@post_editor.preview_url}></iframe>
           <% else %>
@@ -398,14 +398,14 @@
           data-monaco-word-wrap="on"
           data-monaco-insert-event="post-editor-insert-content"
         >
-          <div id={"post-editor-monaco-#{@post_editor.id}"} class="monaco-editor-instance" phx-update="ignore"></div>
+          <div id={"post-editor-monaco-#{@post_editor.id}"} class="monaco-editor-instance min-h-0 flex-1" phx-update="ignore"></div>
           <textarea id={"post-editor-content-#{@post_editor.id}"} class="monaco-editor-input post-editor-content" data-testid="post-editor-content" data-post-editor-id={@post_editor.id} name="post_editor[content]" rows="18" spellcheck="false"><%= @post_editor.form["content"] %></textarea>
         </div>
       <% end %>
     </div>
   </form>
 
-  <div class="editor-footer">
+  <div class="editor-footer flex shrink-0 flex-wrap gap-4">
     <span><strong><%= dgettext("ui", "Created") %>:</strong> <%= @post_editor.footer.created_at %></span>
     <span><strong><%= dgettext("ui", "Updated") %>:</strong> <%= @post_editor.footer.updated_at %></span>
     <%= if @post_editor.footer.published_at do %>

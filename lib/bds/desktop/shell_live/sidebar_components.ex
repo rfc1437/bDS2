@@ -56,25 +56,25 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
 
     if is_map(filters) and Map.get(filters, :enabled) do
       ~H"""
-      <form class="search-box" data-testid="sidebar-search-form" phx-change="update_sidebar_search" phx-submit="update_sidebar_search">
+      <form class="search-box flex items-center gap-2" data-testid="sidebar-search-form" phx-change="update_sidebar_search" phx-submit="update_sidebar_search">
         <input
           type="text"
           name="sidebar_filters[search]"
           value={Map.get(@selected_filters, :search) || ""}
           placeholder={@sidebar_filters_config.search_placeholder}
         />
-        <button type="submit" title={dgettext("ui", "Search")}>
+        <button class="inline-flex h-8 w-8 items-center justify-center" type="submit" title={dgettext("ui", "Search")}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
             <path d="M15.7 14.3l-4.2-4.2c-.2-.2-.5-.3-.8-.3.9-1.1 1.5-2.5 1.5-4C12.2 2.6 9.6 0 6.4 0S.6 2.6.6 5.8s2.6 5.8 5.8 5.8c1.5 0 2.9-.5 4-1.4 0 .3.1.6.3.8l4.2 4.2c.2.2.5.3.7.3s.5-.1.7-.3c.4-.4.4-1 0-1.4zm-9.3-4c-2.5 0-4.5-2-4.5-4.5s2-4.5 4.5-4.5 4.5 2 4.5 4.5-2 4.5-4.5 4.5z"/>
           </svg>
         </button>
         <%= if Map.get(@selected_filters, :search) do %>
-          <button class="clear-search" data-testid="sidebar-clear-search" type="button" phx-click="clear_sidebar_search">×</button>
+          <button class="clear-search inline-flex h-8 w-8 items-center justify-center" data-testid="sidebar-clear-search" type="button" phx-click="clear_sidebar_search">×</button>
         <% end %>
       </form>
 
       <%= if Map.get(@sidebar_filters_config, :has_active_filters) do %>
-        <div class="filter-status">
+        <div class="filter-status flex items-center justify-between gap-2">
           <span>
             <%= @sidebar_filters_config.results_label %>: <%= @sidebar_filters_config.loaded_count %>/<%= @sidebar_filters_config.total_count %>
           </span>
@@ -239,7 +239,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
 
     if Map.get(filters, :has_more) do
       ~H"""
-      <div class="sidebar-load-more">
+      <div class="sidebar-load-more flex justify-center pt-2">
         <button class="load-more-button" data-testid="sidebar-load-more" type="button" phx-click="load_more_sidebar">
           <%= dgettext("ui", "Load more") %>
         </button>
@@ -270,9 +270,9 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
           <span data-testid="sidebar-section-title"><%= section.title %></span>
           <span class="sidebar-section-count"><%= Map.get(section, :count, length(Map.get(section, :items, []))) %></span>
         </div>
-        <div class="sidebar-list">
+        <div class="sidebar-list flex flex-col">
           <%= for item <- Map.get(section, :items, []) do %>
-            <div class="sidebar-item-row" data-item-id={item.id}>
+            <div class="sidebar-item-row flex items-center gap-2" data-item-id={item.id}>
               <button
                 class={["sidebar-item", "sidebar-post-item", "post-type-post", if(sidebar_item_selected?(@workbench, item.route, item.id), do: "selected")]}
                 data-testid="sidebar-open-item"

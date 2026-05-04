@@ -1,27 +1,27 @@
 <div
   id="tags-editor-shell"
-  class="tags-view-shell"
+  class="tags-view-shell flex h-full min-h-0 flex-col overflow-hidden"
   data-testid="tags-editor"
   phx-hook="TagsSectionScroll"
   data-selected-tags-section={@tags_editor.selected_section}
   data-tags-scroll-target={"tags-section-#{@tags_editor.selected_section}"}
 >
-  <div class="tags-view">
-    <div class="tags-view-header">
+  <div class="tags-view flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div class="tags-view-header flex shrink-0 items-center justify-between gap-3">
       <h2><%= dgettext("ui", "Tags") %></h2>
     </div>
 
-    <div class="tags-view-content">
+    <div class="tags-view-content flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
       <div class="tags-section" id="tags-section-cloud">
         <div class="tags-section-header"><h3><%= dgettext("ui", "Tag Cloud") %></h3></div>
         <div class="tags-section-content">
           <%= if Enum.empty?(@tags_editor.tags) do %>
-            <div class="tags-empty-state">
+            <div class="tags-empty-state flex flex-col gap-3">
               <p><%= dgettext("ui", "No tags found") %></p>
               <button class="secondary" type="button" phx-click="sync_tags_editor" phx-target={@myself}><%= dgettext("ui", "Discover") %></button>
             </div>
           <% else %>
-            <div class="tag-cloud">
+            <div class="tag-cloud flex flex-wrap gap-2">
               <%= for tag <- @tags_editor.tags do %>
                 <button class={["tag-cloud-item", if(tag.name in @tags_editor.selected, do: "selected"), if(tag.color, do: "has-color")]} style={tag_style(tag, @tags_editor.tags)} type="button" phx-click="toggle_tag_selection" phx-value-name={tag.name} phx-target={@myself}>
                   <%= tag.name %><span class="tag-count"><%= tag.count %></span>
@@ -36,7 +36,7 @@
         <div class="tags-section-header"><h3><%= dgettext("ui", "Create / Edit") %></h3></div>
         <div class="tags-section-content">
           <form class="tag-create-form" phx-change="change_new_tag_editor" phx-target={@myself}>
-            <div class="tag-form-row">
+            <div class="tag-form-row flex flex-wrap items-center gap-3">
               <input type="text" name="new_tag[name]" value={@tags_editor.new_tag["name"]} placeholder={dgettext("ui", "Tag name")} />
               <input type="color" name="new_tag[color]" value={if(@tags_editor.new_tag["color"] in [nil, ""], do: "#3b82f6", else: @tags_editor.new_tag["color"])} />
               <button class="primary" type="button" phx-click="create_tag_editor" phx-target={@myself}><%= dgettext("ui", "Create") %></button>
@@ -45,7 +45,7 @@
 
           <%= if @tags_editor.edit_draft != %{} do %>
             <form class="tag-edit-form" phx-change="change_edit_tag_editor" phx-target={@myself}>
-              <div class="tag-form-row">
+              <div class="tag-form-row flex flex-wrap items-center gap-3">
                 <input type="text" name="edit_tag[name]" value={@tags_editor.edit_draft["name"]} />
                 <input type="color" name="edit_tag[color]" value={if(@tags_editor.edit_draft["color"] in [nil, ""], do: "#3b82f6", else: @tags_editor.edit_draft["color"])} />
                 <select name="edit_tag[post_template_slug]">
@@ -65,8 +65,8 @@
       <div class="tags-section" id="tags-section-merge">
         <div class="tags-section-header"><h3><%= dgettext("ui", "Merge Tags") %></h3></div>
         <div class="tags-section-content">
-          <div class="merge-form">
-            <div class="tag-form-row">
+          <div class="merge-form flex flex-col gap-3">
+            <div class="tag-form-row flex flex-wrap items-center gap-3">
               <select phx-change="change_merge_target" name="target" phx-target={@myself}>
                 <%= for tag_name <- @tags_editor.selected do %>
                   <option value={tag_name} selected={tag_name == @tags_editor.merge_target}><%= tag_name %></option>

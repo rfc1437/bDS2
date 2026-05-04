@@ -1,26 +1,25 @@
-<div class="media-editor editor" data-testid="media-editor">
-  <div class="editor-header">
-    <div class="editor-tabs">
+<div class="media-editor editor flex h-full min-h-0 flex-col" data-testid="media-editor">
+  <div class="editor-header flex shrink-0 items-start justify-between gap-3">
+    <div class="editor-tabs flex min-w-0 flex-1 overflow-hidden">
       <div class={[
-        "editor-tab",
-        "active",
+        "editor-tab active inline-flex max-w-full items-center gap-2 overflow-hidden px-3 py-2",
         if(@media_editor.dirty?, do: "dirty")
       ]}>
-        <span class="editor-tab-title" data-testid="editor-title"><%= @media_editor.display_title %></span>
+        <span class="editor-tab-title truncate" data-testid="editor-title"><%= @media_editor.display_title %></span>
         <%= if @media_editor.dirty? do %>
           <span class="editor-tab-dirty" title={dgettext("ui", "Unsaved")}>●</span>
         <% end %>
       </div>
     </div>
 
-    <div class="editor-actions">
+    <div class="editor-actions flex flex-wrap items-center justify-end gap-2">
       <%= if @media_editor.save_state in [:dirty, :saved] do %>
         <span class="auto-save-indicator"><%= media_editor_save_state_label(@media_editor.save_state) %></span>
       <% end %>
 
-      <div class="quick-actions-wrapper">
+      <div class="quick-actions-wrapper relative">
         <button
-          class="secondary quick-actions-btn"
+          class="secondary quick-actions-btn inline-flex items-center gap-2"
           type="button"
           phx-click="toggle_media_editor_quick_actions"
           phx-target={@myself}
@@ -30,16 +29,16 @@
         </button>
 
         <%= if @media_editor.quick_actions_open? do %>
-          <div class="quick-actions-menu">
+          <div class="quick-actions-menu absolute right-0 top-full z-10 mt-2 flex min-w-72 flex-col">
             <%= if @media_editor.is_image do %>
               <button
-                class="quick-action-item"
+                class="quick-action-item flex items-start gap-3 text-left"
                 data-testid="editor-toolbar-overlay-button"
                 type="button"
                 phx-click="open_overlay"
                 phx-value-kind="ai_suggestions"
               >
-                <span class="quick-action-text">
+                <span class="quick-action-text flex min-w-0 flex-1 flex-col">
                   <strong><%= dgettext("ui", "AI Suggestions") %></strong>
                   <small><%= dgettext("ui", "Review title, alt text, and caption suggestions") %></small>
                 </span>
@@ -50,13 +49,13 @@
             <% end %>
 
             <button
-              class="quick-action-item"
+              class="quick-action-item flex items-start gap-3 text-left"
               type="button"
               phx-click="detect_media_editor_language"
               phx-target={@myself}
               disabled={not @media_editor.can_detect_language?}
             >
-              <span class="quick-action-text">
+              <span class="quick-action-text flex min-w-0 flex-1 flex-col">
                 <strong><%= dgettext("ui", "Detect Language") %></strong>
                 <small><%= dgettext("ui", "Persist the detected language for this media item") %></small>
               </span>
@@ -66,14 +65,14 @@
             <div class="quick-actions-divider"></div>
 
             <button
-              class="quick-action-item"
+              class="quick-action-item flex items-start gap-3 text-left"
               data-testid="editor-toolbar-overlay-button"
               type="button"
               phx-click="open_overlay"
               phx-value-kind="language_picker"
               disabled={not @media_editor.can_translate?}
             >
-              <span class="quick-action-text">
+              <span class="quick-action-text flex min-w-0 flex-1 flex-col">
                 <strong><%= dgettext("ui", "Translate") %></strong>
                 <small><%= dgettext("ui", "Select a target language for this media item") %></small>
               </span>
@@ -101,14 +100,14 @@
     </div>
   </div>
 
-  <div class="editor-content media-editor">
-    <div class="media-preview">
+  <div class="editor-content media-editor grid min-h-0 flex-1 gap-4 overflow-auto xl:grid-cols-[minmax(320px,1fr)_minmax(0,1.2fr)]">
+    <div class="media-preview flex min-h-[16rem] items-center justify-center">
       <%= if @media_editor.is_image and @media_editor.preview_url do %>
         <div class="media-preview-image">
           <img src={@media_editor.preview_url} alt={@media_editor.form["alt"] || @media_editor.original_name} />
         </div>
       <% else %>
-        <div class="media-preview-placeholder">
+        <div class="media-preview-placeholder flex h-full w-full flex-col items-center justify-center gap-3">
           <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"></path>
           </svg>
@@ -117,58 +116,58 @@
       <% end %>
     </div>
 
-    <div class="media-details">
-      <form class="media-editor-details-form" data-testid="media-editor-form" phx-change="change_media_editor" phx-target={@myself}>
-        <div class="editor-field">
+    <div class="media-details min-w-0">
+      <form class="media-editor-details-form flex flex-col gap-4" data-testid="media-editor-form" phx-change="change_media_editor" phx-target={@myself}>
+        <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "File Name") %></label>
           <input class="post-editor-input disabled" type="text" value={@media_editor.original_name} disabled />
         </div>
 
-        <div class="editor-field">
+        <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "MIME Type") %></label>
           <input class="post-editor-input disabled" type="text" value={@media_editor.mime_type} disabled />
         </div>
 
-        <div class="editor-field-row">
-          <div class="editor-field">
+        <div class="editor-field-row grid gap-4 md:grid-cols-2">
+          <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Size") %></label>
             <input class="post-editor-input disabled" type="text" value={@media_editor.file_size} disabled />
           </div>
 
           <%= if @media_editor.dimensions do %>
-            <div class="editor-field">
+            <div class="editor-field flex flex-col gap-1.5">
               <label><%= dgettext("ui", "Dimensions") %></label>
               <input class="post-editor-input disabled" type="text" value={@media_editor.dimensions} disabled />
             </div>
           <% end %>
         </div>
 
-        <div class="editor-field">
+        <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Title") %></label>
           <input class="post-editor-input" type="text" name="media_editor[title]" value={@media_editor.form["title"]} />
         </div>
 
-        <div class="editor-field">
+        <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Alt Text") %></label>
           <input class="post-editor-input" type="text" name="media_editor[alt]" value={@media_editor.form["alt"]} />
         </div>
 
-        <div class="editor-field">
+        <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Caption") %></label>
           <textarea class="post-editor-textarea" name="media_editor[caption]" rows="3"><%= @media_editor.form["caption"] %></textarea>
         </div>
 
-        <div class="editor-field">
+        <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Tags") %></label>
           <input class="post-editor-input" type="text" name="media_editor[tags]" value={@media_editor.form["tags"]} />
         </div>
 
-        <div class="editor-field">
+        <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Author") %></label>
           <input class="post-editor-input" type="text" name="media_editor[author]" value={@media_editor.form["author"]} />
         </div>
 
-        <div class="editor-field">
+        <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Language") %></label>
           <select class="post-editor-input" name="media_editor[language]">
             <option value=""><%= dgettext("ui", "None") %></option>
@@ -180,15 +179,15 @@
       </form>
 
       <%= if @media_editor.form["language"] not in [nil, ""] do %>
-        <div class="editor-field media-translations-section">
+        <div class="editor-field media-translations-section flex flex-col gap-2">
           <label><%= dgettext("ui", "Translations") %></label>
 
           <%= if Enum.empty?(@media_editor.translations) do %>
             <div class="no-linked-posts"><%= dgettext("ui", "No translations") %></div>
           <% else %>
-            <div class="linked-posts-list">
+            <div class="linked-posts-list flex flex-col gap-2">
               <%= for translation <- @media_editor.translations do %>
-                <div class="linked-post-item">
+                <div class="linked-post-item flex items-center justify-between gap-2">
                   <button
                     class="linked-post-title linked-post-link"
                     type="button"
@@ -209,7 +208,7 @@
         </div>
       <% end %>
 
-      <div class="editor-field linked-posts-section">
+      <div class="editor-field linked-posts-section flex flex-col gap-2">
         <label>
           <%= dgettext("ui", "Linked Posts") %>
           <button class="add-link-btn" type="button" phx-click="toggle_media_post_picker" phx-target={@myself}>
@@ -218,7 +217,7 @@
         </label>
 
         <%= if @media_editor.post_picker_open? do %>
-          <div class="post-picker">
+          <div class="post-picker flex flex-col gap-3">
             <div class="post-picker-search">
               <input
                 type="text"
@@ -233,7 +232,7 @@
             <%= if Enum.empty?(@media_editor.post_picker_results) do %>
               <div class="no-posts"><%= dgettext("ui", "No posts to link") %></div>
             <% else %>
-              <div class="post-picker-list">
+              <div class="post-picker-list flex flex-col gap-2">
                 <%= for result <- @media_editor.post_picker_results do %>
                   <button class="post-picker-item" type="button" phx-click="link_media_to_post" phx-target={@myself} phx-value-post-id={result.post_id}>
                     <%= result.title %>
@@ -250,9 +249,9 @@
         <%= if Enum.empty?(@media_editor.linked_posts) do %>
           <div class="no-linked-posts"><%= dgettext("ui", "Not linked to any posts") %></div>
         <% else %>
-          <div class="linked-posts-list">
+          <div class="linked-posts-list flex flex-col gap-2">
             <%= for linked_post <- @media_editor.linked_posts do %>
-              <div class="linked-post-item">
+              <div class="linked-post-item flex items-center justify-between gap-2">
                 <button
                   class="linked-post-title linked-post-link"
                   type="button"
@@ -275,27 +274,27 @@
 
   <%= if @media_editor.editing_translation do %>
     <div class="translation-modal-backdrop">
-      <div class="translation-modal">
-        <div class="translation-modal-header">
+      <div class="translation-modal flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden">
+        <div class="translation-modal-header flex items-center justify-between gap-3">
           <h2><%= dgettext("ui", "Edit Translation") %></h2>
           <button class="translation-modal-close" type="button" phx-click="close_media_translation_editor" phx-target={@myself}>×</button>
         </div>
-        <form class="translation-modal-body" phx-change="change_media_translation" phx-target={@myself}>
+        <form class="translation-modal-body flex flex-col gap-4 overflow-auto" phx-change="change_media_translation" phx-target={@myself}>
           <input type="hidden" name="media_translation[language]" value={@media_editor.editing_translation["language"]} />
-          <div class="editor-field">
+          <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Title") %></label>
             <input class="post-editor-input" type="text" name="media_translation[title]" value={@media_editor.editing_translation["title"]} />
           </div>
-          <div class="editor-field">
+          <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Alt Text") %></label>
             <input class="post-editor-input" type="text" name="media_translation[alt]" value={@media_editor.editing_translation["alt"]} />
           </div>
-          <div class="editor-field">
+          <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Caption") %></label>
             <textarea class="post-editor-textarea" name="media_translation[caption]" rows="3"><%= @media_editor.editing_translation["caption"] %></textarea>
           </div>
         </form>
-        <div class="translation-modal-footer">
+        <div class="translation-modal-footer flex items-center justify-end gap-2">
           <button class="secondary" type="button" phx-click="close_media_translation_editor" phx-target={@myself}><%= dgettext("ui", "Cancel") %></button>
           <button type="button" phx-click="save_media_translation" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
         </div>

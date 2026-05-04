@@ -1,5 +1,5 @@
 <div
-  class="app"
+  class="app flex h-full w-full flex-col"
   id="bds-shell-app"
   phx-hook="AppShell"
   data-shortcuts={encoded_shortcuts(@client_shortcuts)}
@@ -112,12 +112,12 @@
     </div>
   <% end %>
 
-  <div class="app-main">
-    <aside class="activity-bar" data-region="activity-bar">
-      <div class="activity-bar-top">
+  <div class="app-main flex min-h-0 flex-1 overflow-hidden">
+    <aside class="activity-bar flex h-full shrink-0 flex-col items-center justify-between" data-region="activity-bar">
+      <div class="activity-bar-top flex flex-col items-center gap-1">
         <%= for button <- Enum.filter(@activity_buttons, &(&1.activity_group == :top)) do %>
           <button
-            class={["activity-bar-item", if(button.active, do: "active")]}
+            class={["activity-bar-item inline-flex h-12 w-12 items-center justify-center", if(button.active, do: "active")]}
             data-testid="activity-button"
             data-view={button.id}
             data-active={to_string(button.active)}
@@ -134,10 +134,10 @@
           </button>
         <% end %>
       </div>
-      <div class="activity-bar-bottom">
+      <div class="activity-bar-bottom flex flex-col items-center gap-1">
         <%= for button <- Enum.filter(@activity_buttons, &(&1.activity_group == :bottom)) do %>
           <button
-            class={["activity-bar-item", if(button.active, do: "active")]}
+            class={["activity-bar-item inline-flex h-12 w-12 items-center justify-center", if(button.active, do: "active")]}
             data-testid="activity-button"
             data-view={button.id}
             data-active={to_string(button.active)}
@@ -157,22 +157,22 @@
     </aside>
 
     <section
-      class={["sidebar-shell", if(not @workbench.sidebar_visible, do: "is-hidden")]}
+      class={["sidebar-shell flex min-w-0 shrink-0 overflow-hidden", if(not @workbench.sidebar_visible, do: "is-hidden")]}
       data-testid="sidebar-shell"
       style={"width: #{if(@workbench.sidebar_visible, do: @workbench.sidebar_width, else: 0)}px;"}
     >
-      <div class="sidebar" data-region="sidebar">
-        <div id="sidebar-content" class="sidebar-content sidebar-body" phx-hook="SidebarInteractions">
+      <div class="sidebar flex min-w-0 flex-1 overflow-hidden" data-region="sidebar">
+        <div id="sidebar-content" class="sidebar-content sidebar-body flex min-h-0 flex-1 flex-col overflow-y-auto" phx-hook="SidebarInteractions">
           <div class="sidebar-section">
             <% create_action = sidebar_create_action(@workbench.active_view) %>
-            <div class="sidebar-section-header">
+            <div class="sidebar-section-header flex items-center justify-between gap-2">
               <span><%= String.upcase(sidebar_header_label(@sidebar_header)) %></span>
               <%= if create_action || ShellSidebarComponents.filters_enabled?(@sidebar_data) do %>
-                <div class="sidebar-actions">
+                <div class="sidebar-actions flex items-center gap-1">
                   <%= if ShellSidebarComponents.filters_enabled?(@sidebar_data) do %>
                     <button
                       class={[
-                        "sidebar-action",
+                        "sidebar-action inline-flex h-8 w-8 items-center justify-center",
                         if(ShellSidebarComponents.filters_visible?(@sidebar_data), do: "active")
                       ]}
                       data-testid="sidebar-filter-toggle"
@@ -188,7 +188,7 @@
                   <% end %>
                   <%= if create_action do %>
                     <button
-                      class="sidebar-action"
+                      class="sidebar-action inline-flex h-8 w-8 items-center justify-center"
                       data-testid="sidebar-create-action"
                       data-sidebar-action={create_action.kind}
                       type="button"
@@ -212,16 +212,16 @@
       <div class="resizable-panel-divider sidebar-divider" data-resize="sidebar" data-role="resize-handle"></div>
     </section>
 
-    <main class="app-content" data-region="content">
-      <div class="tab-bar" data-region="tab-bar">
+    <main class="app-content flex min-w-0 flex-1 flex-col overflow-hidden" data-region="content">
+      <div class="tab-bar flex h-[35px] shrink-0 items-center overflow-hidden" data-region="tab-bar">
         <%= if Enum.empty?(@workbench.tabs) do %>
-          <div class="tab-bar-empty"><%= dgettext("ui", "Dashboard") %></div>
+          <div class="tab-bar-empty flex h-full items-center px-3 text-sm"><%= dgettext("ui", "Dashboard") %></div>
         <% else %>
-          <div class="tab-bar-tabs">
+          <div class="tab-bar-tabs flex min-w-0 flex-1 items-stretch overflow-x-auto">
             <%= for tab <- @workbench.tabs do %>
               <div
                 class={[
-                  "tab",
+                  "tab flex min-w-0 max-w-[240px] shrink-0 items-stretch",
                   if(@workbench.active_tab == {tab.type, tab.id}, do: "active"),
                   if(tab.is_transient, do: "transient"),
                   if(Workbench.dirty?(@workbench, tab.type, tab.id), do: "dirty")
@@ -231,21 +231,21 @@
                 tabindex="0"
               >
                 <button
-                  class="tab-select"
+                  class="tab-select flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-3 text-sm"
                   type="button"
                   phx-click="select_tab"
                   phx-value-type={tab.type}
                   phx-value-id={tab.id}
                 >
-                  <span class="tab-icon"><%= raw(ShellData.activity_icon(BDS.Desktop.ShellLive.TabHelpers.tab_icon_id(tab))) %></span>
-                  <span class="tab-title"><%= BDS.Desktop.ShellLive.TabHelpers.tab_title(tab, @tab_meta) %></span>
+                  <span class="tab-icon shrink-0"><%= raw(ShellData.activity_icon(BDS.Desktop.ShellLive.TabHelpers.tab_icon_id(tab))) %></span>
+                  <span class="tab-title truncate"><%= BDS.Desktop.ShellLive.TabHelpers.tab_title(tab, @tab_meta) %></span>
                 </button>
-                <div class="tab-actions">
+                <div class="tab-actions flex items-center gap-1 pr-2">
                   <%= if Workbench.dirty?(@workbench, tab.type, tab.id) do %>
                     <span class="tab-dirty-indicator">●</span>
                   <% end %>
                   <button
-                    class="tab-close"
+                    class="tab-close inline-flex h-6 w-6 items-center justify-center"
                     data-testid="tab-close"
                     data-tab-type={tab.type}
                     data-tab-id={tab.id}
@@ -265,7 +265,7 @@
         <% end %>
       </div>
 
-      <section class="editor-shell" data-region="editor">
+      <section class="editor-shell flex min-h-0 flex-1 flex-col overflow-hidden" data-region="editor">
         <%= if is_nil(@current_tab) do %>
           <div class="editor-empty">
             <div class="dashboard-content">
@@ -452,12 +452,12 @@
         <% end %>
       </section>
 
-      <section class={["panel-shell", if(not @workbench.panel.visible, do: "is-hidden")]} data-region="panel">
-        <div class="panel-header">
-          <div class="panel-tabs">
+      <section class={["panel-shell flex min-h-0 shrink-0 flex-col overflow-hidden", if(not @workbench.panel.visible, do: "is-hidden")]} data-region="panel">
+        <div class="panel-header flex items-center justify-between gap-2">
+          <div class="panel-tabs flex min-w-0 items-center overflow-x-auto">
             <%= for tab <- @panel_tabs do %>
               <button
-                class={["panel-tab", if(@workbench.panel.active_tab == tab, do: "active")]}
+                class={["panel-tab inline-flex h-9 items-center px-3 text-xs uppercase tracking-wide", if(@workbench.panel.active_tab == tab, do: "active")]}
                 type="button"
                 phx-click="select_panel_tab"
                 phx-value-tab={tab}
@@ -467,7 +467,7 @@
             <% end %>
           </div>
           <button
-            class="panel-close"
+            class="panel-close inline-flex h-8 w-8 items-center justify-center"
             data-testid="panel-close"
             type="button"
             phx-click="toggle_panel"
@@ -477,21 +477,21 @@
             ×
           </button>
         </div>
-        <div class="panel-content">
+        <div class="panel-content min-h-0 flex-1 overflow-auto">
           <%= BDS.Desktop.ShellLive.PanelRenderer.render_panel_body(assigns) %>
         </div>
       </section>
     </main>
 
     <section
-      class={["assistant-sidebar-shell", if(not @workbench.assistant_sidebar_visible, do: "is-hidden")]}
+      class={["assistant-sidebar-shell flex min-w-0 shrink-0 overflow-hidden", if(not @workbench.assistant_sidebar_visible, do: "is-hidden")]}
       data-testid="assistant-shell"
       style={"width: #{if(@workbench.assistant_sidebar_visible, do: @workbench.assistant_sidebar_width, else: 0)}px;"}
     >
       <div class="resizable-panel-divider assistant-divider" data-resize="assistant" data-role="resize-handle"></div>
-      <aside class="assistant-sidebar" data-region="assistant-sidebar">
-        <div class="assistant-content">
-          <header class="assistant-sidebar-header">
+      <aside class="assistant-sidebar flex min-w-0 flex-1 overflow-hidden" data-region="assistant-sidebar">
+        <div class="assistant-content flex min-h-0 flex-1 flex-col">
+          <header class="assistant-sidebar-header flex items-start justify-between gap-3">
             <div class="assistant-sidebar-heading">
               <strong><%= dgettext("ui", "AI Assistant") %></strong>
               <span class="assistant-sidebar-description"><%= dgettext("ui", "AI conversations") %></span>
@@ -504,12 +504,12 @@
             </span>
           </header>
 
-          <section class="assistant-sidebar-context" data-testid="assistant-context">
-            <div class="assistant-sidebar-context-row">
+          <section class="assistant-sidebar-context flex shrink-0 flex-col gap-2" data-testid="assistant-context">
+            <div class="assistant-sidebar-context-row flex items-center justify-between gap-2">
               <span class="assistant-sidebar-context-label"><%= dgettext("ui", "Project") %></span>
               <span class="assistant-sidebar-context-value"><%= BDS.Desktop.ShellLive.ChatSurface.assistant_project_name(@current_project) %></span>
             </div>
-            <div class="assistant-sidebar-context-row">
+            <div class="assistant-sidebar-context-row flex items-center justify-between gap-2">
               <span class="assistant-sidebar-context-label"><%= dgettext("ui", "Editor") %></span>
               <span class="assistant-sidebar-context-value"><%= BDS.Desktop.ShellLive.TabHelpers.tab_title(@current_tab, @tab_meta) %></span>
             </div>
@@ -517,13 +517,13 @@
           </section>
 
           <form
-            class="assistant-sidebar-prompt-form"
+            class="assistant-sidebar-prompt-form flex shrink-0 flex-col gap-3"
             data-testid="assistant-prompt-form"
             phx-change="update_assistant_prompt"
             phx-submit="submit_assistant_prompt"
           >
             <textarea
-              class="assistant-sidebar-prompt"
+              class="assistant-sidebar-prompt min-h-[8rem] w-full resize-y"
               data-testid="assistant-prompt-input"
               name="assistant[prompt]"
               rows="6"
@@ -541,19 +541,19 @@
           </form>
 
           <%= if Enum.empty?(@assistant_messages) do %>
-            <div class="assistant-sidebar-welcome">
+            <div class="assistant-sidebar-welcome min-h-0 flex-1 overflow-auto">
               <%= for card <- @assistant_cards do %>
-                <section class="assistant-card">
+                <section class="assistant-card flex flex-col gap-1">
                   <strong><%= card.label %></strong>
                   <span><%= card.text %></span>
                 </section>
               <% end %>
             </div>
           <% else %>
-            <div class="assistant-sidebar-transcript">
+            <div class="assistant-sidebar-transcript min-h-0 flex-1 overflow-auto">
               <%= for message <- @assistant_messages do %>
                 <article
-                  class={["assistant-sidebar-message", message.role]}
+                  class={["assistant-sidebar-message flex flex-col gap-1", message.role]}
                   data-testid={BDS.Desktop.ShellLive.ChatSurface.assistant_message_testid(message.role)}
                 >
                   <span class="assistant-sidebar-message-role"><%= BDS.Desktop.ShellLive.ChatSurface.assistant_message_label(message.role) %></span>
@@ -567,12 +567,12 @@
     </section>
   </div>
 
-  <footer class="status-bar" data-region="status-bar" data-testid="status-bar">
-    <div class="status-bar-left">
+  <footer class="status-bar flex h-[22px] shrink-0 items-center justify-between gap-2" data-region="status-bar" data-testid="status-bar">
+    <div class="status-bar-left flex min-w-0 items-center gap-2 overflow-hidden">
       <%= if @is_mac_ui do %>
-        <div class="status-shell-controls" data-testid="status-shell-controls">
+        <div class="status-shell-controls flex items-center gap-1" data-testid="status-shell-controls">
           <button
-            class="status-shell-toggle-button"
+            class="status-shell-toggle-button inline-flex h-6 w-6 items-center justify-center"
             data-testid="toggle-sidebar"
             type="button"
             phx-click="toggle_sidebar"
@@ -584,7 +584,7 @@
             </span>
           </button>
           <button
-            class="status-shell-toggle-button"
+            class="status-shell-toggle-button inline-flex h-6 w-6 items-center justify-center"
             data-testid="toggle-panel"
             type="button"
             phx-click="toggle_panel"
@@ -596,7 +596,7 @@
             </span>
           </button>
           <button
-            class="status-shell-toggle-button"
+            class="status-shell-toggle-button inline-flex h-6 w-6 items-center justify-center"
             data-testid="toggle-assistant"
             type="button"
             phx-click="toggle_assistant_sidebar"
@@ -609,9 +609,9 @@
           </button>
         </div>
       <% end %>
-      <div class="project-selector">
+      <div class="project-selector relative shrink-0">
         <button
-          class="project-selector-trigger"
+          class="project-selector-trigger inline-flex items-center gap-2"
           data-testid="project-selector-trigger"
           type="button"
           title={dgettext("ui", "Switch project")}
@@ -659,7 +659,7 @@
           </div>
         <% end %>
       </div>
-      <button class="status-bar-item status-bar-task-button" data-testid="status-task-button" type="button" phx-click="open_tasks_panel">
+      <button class="status-bar-item status-bar-task-button inline-flex items-center gap-2" data-testid="status-task-button" type="button" phx-click="open_tasks_panel">
         <%= if @status.left.running_task_message do %>
           <span class="task-spinner"></span>
         <% end %>
@@ -669,12 +669,12 @@
         <% end %>
       </button>
     </div>
-    <div class="status-bar-right">
+    <div class="status-bar-right flex items-center gap-2 overflow-hidden">
       <span class="status-bar-item"><%= @status.right.post_count %></span>
       <span class="status-bar-item"><%= @status.right.media_count %></span>
       <span class="status-bar-item theme-badge"><%= @status.right.theme_badge %></span>
       <button class={["status-bar-item", "offline-badge", if(@status.right.offline_mode, do: "active")]} data-testid="status-offline-button" type="button" phx-click="toggle_offline_mode" title={dgettext("ui", "Toggle offline mode")}>✈</button>
-      <form class="status-bar-item language-badge" data-testid="status-language-form" phx-change="change_ui_language">
+      <form class="status-bar-item language-badge flex items-center gap-1" data-testid="status-language-form" phx-change="change_ui_language">
         <span><%= dgettext("ui", "UI") %></span>
         <select class="status-bar-language-select" name="ui_language" data-testid="status-language-select">
           <%= for language <- @supported_ui_languages do %>
