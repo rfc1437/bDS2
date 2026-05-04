@@ -1,20 +1,4 @@
-.menu-editor-view {
-  padding: 1rem;
-  height: 100%;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  overflow: hidden;
-  background: var(--vscode-editor-background);
-}
-
 .menu-editor-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
 }
 
 .menu-editor-header h2 {
@@ -26,18 +10,7 @@
   color: var(--vscode-descriptionForeground);
 }
 
-.menu-editor-main {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
-  overflow: hidden;
-}
-
 .menu-editor-tree-wrap {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 6px;
   background: var(--vscode-editor-background);
@@ -46,9 +19,6 @@
 }
 
 .menu-editor-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
   margin-bottom: 0.5rem;
   padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--vscode-panel-border);

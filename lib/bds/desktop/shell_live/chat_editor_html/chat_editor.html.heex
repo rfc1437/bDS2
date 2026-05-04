@@ -1,5 +1,5 @@
-<div id={"chat-editor-#{@chat_editor.id}"} class="chat-panel flex h-full min-h-0 flex-col" data-testid="chat-editor" phx-hook="ChatSurface">
-  <div class="chat-panel-header flex shrink-0 items-center justify-between gap-3">
+<div id={"chat-editor-#{@chat_editor.id}"} class="chat-panel ui-editor-shell flex h-full min-h-0 flex-col" data-testid="chat-editor" phx-hook="ChatSurface">
+  <div class="chat-panel-header flex shrink-0 items-center justify-between gap-3 px-4 py-3">
     <div class="chat-panel-title flex min-w-0 flex-1 items-center justify-between gap-3">
       <span class="chat-panel-title-main">
         <%= if @chat_editor.needs_api_key? do %>
@@ -23,7 +23,7 @@
           </button>
 
           <%= if @chat_editor.model_selector_open? and @chat_editor.available_models != [] do %>
-            <div class="chat-model-selector-menu absolute right-0 top-full z-10 mt-2 flex min-w-56 flex-col">
+            <div class="chat-model-selector-menu ui-dropdown-menu absolute right-0 top-full z-10 mt-2 flex min-w-56 flex-col">
               <%= for group <- @chat_editor.available_model_groups do %>
                 <section class="chat-model-provider-group" data-testid="chat-model-provider-group" data-provider={group.provider}>
                   <%= if length(@chat_editor.available_model_groups) > 1 do %>
@@ -33,7 +33,7 @@
                   <%= for model <- group.models do %>
                     <button
                       class={[
-                        "chat-model-selector-option flex items-center justify-between gap-2 text-left",
+                        "chat-model-selector-option ui-dropdown-item flex items-center justify-between gap-2 text-left",
                         if(model.id == @chat_editor.effective_model, do: "active")
                       ]}
                       type="button"
@@ -57,7 +57,7 @@
 
   <div class="chat-messages chat-surface-scroll min-h-0 flex-1 overflow-auto">
     <%= if @chat_editor.needs_api_key? do %>
-      <div class="chat-welcome chat-api-key-state flex flex-col items-start gap-3" data-testid="chat-api-key-required">
+      <div class="chat-welcome chat-api-key-state ui-section-card flex flex-col items-start gap-3 p-4" data-testid="chat-api-key-required">
         <div class="chat-welcome-icon">🔑</div>
         <h2><%= dgettext("ui", "API Key Required") %></h2>
         <p><%= dgettext("ui", "Configure an API key in Settings to enable AI chat.") %></p>
@@ -67,7 +67,7 @@
       </div>
     <% else %>
     <%= if Enum.empty?(@chat_editor.messages) and not @chat_editor.is_streaming do %>
-      <div class="chat-welcome flex flex-col items-start gap-3">
+      <div class="chat-welcome ui-section-card flex flex-col items-start gap-3 p-4">
         <div class="chat-welcome-icon">🤖</div>
         <h2><%= dgettext("ui", "Welcome to the AI Assistant") %></h2>
         <p><%= dgettext("ui", "I can help you manage your blog with rich visualizations. Try asking me to:") %></p>
@@ -83,7 +83,7 @@
       <%= for message <- @chat_editor.messages do %>
         <div class={["chat-message flex items-start gap-3", to_string(message.role || "assistant")]}> 
           <div class="chat-message-avatar"><%= if message.role == :user, do: "👤", else: "🤖" %></div>
-          <div class="chat-message-content">
+          <div class="chat-message-content ui-section-card">
             <div class="chat-message-header"><span class="chat-message-role"><%= message_role_label(message.role) %></span></div>
             <.chat_tool_markers markers={message.tool_markers} />
 
@@ -103,7 +103,7 @@
       <%= if @chat_editor.pending_user_message do %>
         <div class="chat-message user pending flex items-start gap-3" data-testid="chat-pending-user-message">
           <div class="chat-message-avatar">👤</div>
-          <div class="chat-message-content">
+          <div class="chat-message-content ui-section-card">
             <div class="chat-message-header">
               <span class="chat-message-role"><%= message_role_label(:user) %></span>
             </div>
@@ -115,7 +115,7 @@
       <%= if @chat_editor.is_streaming and (@chat_editor.streaming_content != "" or @chat_editor.streaming_tool_markers != []) do %>
         <div class="chat-message assistant streaming flex items-start gap-3" data-testid="chat-streaming-message">
           <div class="chat-message-avatar">🤖</div>
-          <div class="chat-message-content">
+          <div class="chat-message-content ui-section-card">
             <div class="chat-message-header">
               <span class="chat-message-role"><%= message_role_label(:assistant) %></span>
               <span class="streaming-indicator">●</span>
@@ -147,7 +147,7 @@
   </div>
 
   <%= unless @chat_editor.needs_api_key? do %>
-    <div class="chat-input-container flex shrink-0 flex-col gap-3" data-testid="chat-input-container">
+    <div class="chat-input-container ui-field-stack flex shrink-0 flex-col gap-3" data-testid="chat-input-container">
       <%= if @chat_editor.is_streaming do %>
         <button class="chat-abort-button ui-button ui-button-secondary" data-testid="chat-abort-button" type="button" phx-click="abort_chat_editor_message" phx-target={@myself}>◼ <%= dgettext("ui", "Stop") %></button>
       <% end %>

@@ -152,6 +152,138 @@ defmodule BDS.UI.ShellTest do
     assert css =~ ".ui-badge {"
     assert css =~ ".ui-panel-entry {"
     assert css =~ ".ui-empty-state {"
+    assert css =~ ".ui-editor-shell {"
+    assert css =~ ".ui-editor-header {"
+    assert css =~ ".ui-editor-tab-current {"
+    assert css =~ ".ui-editor-actions {"
+    assert css =~ ".ui-toolbar {"
+    assert css =~ ".ui-toolbar-group {"
+    assert css =~ ".ui-field-stack {"
+    assert css =~ ".ui-field-grid-2 {"
+    assert css =~ ".ui-field-grid-3 {"
+    assert css =~ ".ui-dropdown-menu {"
+    assert css =~ ".ui-dropdown-item {"
+    assert css =~ ".ui-section-card {"
+  end
+
+  test "phase 3 templates use shared shell and form primitives for common layout" do
+    post_template =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex")
+
+    media_template =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex")
+
+    script_template =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex")
+
+    template_template =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex")
+
+    chat_template =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/chat_editor_html/chat_editor.html.heex")
+
+    menu_template =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/menu_editor_html/menu_editor.html.heex")
+
+    settings_template =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex")
+
+    assert post_template =~ "ui-editor-shell"
+    assert post_template =~ "ui-editor-header"
+    assert post_template =~ "ui-editor-tab-current"
+    assert post_template =~ "ui-editor-actions"
+    assert post_template =~ "ui-field-stack"
+    assert post_template =~ "ui-field-grid-2"
+    assert post_template =~ "ui-toolbar"
+    assert post_template =~ "ui-toolbar-group"
+    assert post_template =~ "ui-dropdown-menu"
+    assert post_template =~ "ui-dropdown-item"
+
+    assert media_template =~ "ui-editor-shell"
+    assert media_template =~ "ui-editor-header"
+    assert media_template =~ "ui-editor-tab-current"
+    assert media_template =~ "ui-editor-actions"
+    assert media_template =~ "ui-field-stack"
+    assert media_template =~ "ui-field-grid-2"
+    assert media_template =~ "ui-dropdown-menu"
+    assert media_template =~ "ui-dropdown-item"
+
+    assert script_template =~ "ui-editor-shell"
+    assert script_template =~ "ui-editor-header"
+    assert script_template =~ "ui-editor-tab-current"
+    assert script_template =~ "ui-editor-actions"
+    assert script_template =~ "ui-field-stack"
+
+    assert template_template =~ "ui-editor-shell"
+    assert template_template =~ "ui-editor-header"
+    assert template_template =~ "ui-editor-tab-current"
+    assert template_template =~ "ui-editor-actions"
+    assert template_template =~ "ui-field-stack"
+
+    assert chat_template =~ "ui-editor-shell"
+    assert chat_template =~ "ui-section-card"
+    assert chat_template =~ "ui-dropdown-menu"
+    assert chat_template =~ "ui-dropdown-item"
+    assert chat_template =~ "ui-field-stack"
+
+    assert menu_template =~ "ui-editor-shell"
+    assert menu_template =~ "ui-section-card"
+    assert menu_template =~ "ui-toolbar"
+
+    assert settings_template =~ "ui-editor-shell"
+    assert settings_template =~ "ui-field-stack"
+    assert settings_template =~ "ui-section-card"
+  end
+
+  test "phase 3 trims redundant common-case layout rules from authored css slices" do
+    editor_css = File.read!("/Users/gb/Projects/bDS2/assets/css/editor.css")
+    media_css = File.read!("/Users/gb/Projects/bDS2/assets/css/media_editor.css")
+    assistant_css = File.read!("/Users/gb/Projects/bDS2/assets/css/assistant.css")
+    menu_css = File.read!("/Users/gb/Projects/bDS2/assets/css/menu_editor.css")
+
+    refute editor_css =~ ".post-editor .editor-header,\n.scripts-view-shell.editor .editor-header,\n.templates-view-shell.editor .editor-header {\n  display: flex;"
+    refute editor_css =~ ".post-editor .editor-actions,\n.scripts-view-shell.editor .editor-actions,\n.templates-view-shell.editor .editor-actions {\n  display: flex;"
+    refute editor_css =~ ".post-editor .quick-actions-menu {"
+    refute media_css =~ "[data-testid=\"media-editor\"] .editor-header {"
+    refute media_css =~ "[data-testid=\"media-editor\"] .editor-actions {"
+    refute media_css =~ "[data-testid=\"media-editor\"] .quick-actions-menu {"
+    refute assistant_css =~ ".chat-panel-header {\n  display: flex;"
+    refute assistant_css =~ ".chat-panel .chat-input-wrapper {\n  display: flex;"
+    refute menu_css =~ ".menu-editor-view {\n  padding: 1rem;"
+    refute menu_css =~ ".menu-editor-toolbar {\n  display: flex;"
+  end
+
+  test "phase 5 desktop-specific surfaces stay in source modules with responsive behavior" do
+    css = css_source()
+    app_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+
+    assert css =~ ".ai-suggestions-modal-backdrop"
+    assert css =~ ".gallery-overlay"
+    assert css =~ ".lightbox-overlay"
+
+    assert css =~ ".menu-editor-row.is-dragging"
+    assert css =~ ".menu-editor-row.is-drop-before::before"
+    assert css =~ ".menu-editor-row.is-drop-after::after"
+    assert css =~ ".menu-editor-row.is-drop-inside"
+    assert app_js =~ "MenuEditorTree"
+    assert app_js =~ "classList.add(\"is-dragging\")"
+    assert app_js =~ "pushEvent(\"menu_editor_drop_item\""
+
+    assert css =~ ".media-preview {"
+    assert css =~ ".media-preview-image img {"
+    assert css =~ "object-fit: contain;"
+    assert css =~ ".media-details {"
+    assert css =~ "width: 320px;"
+
+    assert css =~ ".assistant-sidebar-context {"
+    assert css =~ ".assistant-sidebar-message {"
+    assert css =~ ".chat-panel .chat-input-container"
+    assert css =~ ".chat-model-selector-menu"
+
+    assert css =~ "@media (max-width: 720px) {\n  .chat-panel-header {\n    align-items: stretch;\n    flex-direction: column;"
+    assert css =~ ".chat-model-selector-wrap {\n    width: 100%;"
+    assert css =~ ".chat-panel .chat-model-selector-button.chat-model-selector-inline {\n    justify-content: space-between;\n    width: 100%;"
+    assert css =~ ".chat-panel .chat-input-container {\n    padding: 8px 12px;"
   end
 
   test "tailwind source keeps theme tokens and shared component primitives" do

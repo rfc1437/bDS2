@@ -1,6 +1,6 @@
 <div
   id="settings-editor-shell"
-  class="settings-view-shell flex h-full min-h-0 flex-col overflow-hidden"
+  class="settings-view-shell ui-editor-shell flex h-full min-h-0 flex-col overflow-hidden"
   data-testid="settings-editor"
   phx-hook="SettingsSectionScroll"
   data-selected-settings-section={@settings_editor.selected_section}
@@ -22,8 +22,8 @@
       <% end %>
 
       <%= if @settings_editor.project_visible? do %>
-        <div class="setting-section" id="settings-section-project">
-          <div class="setting-section-header">
+        <div class="setting-section ui-section-card" id="settings-section-project">
+          <div class="setting-section-header ui-field-stack">
             <h3><%= dgettext("ui", "Project") %></h3>
             <p class="setting-section-description"><%= dgettext("ui", "Blog identity, URLs, authoring defaults, and bookmarklet setup") %></p>
           </div>
@@ -102,8 +102,8 @@
       <% end %>
 
       <%= if @settings_editor.editor_visible? do %>
-        <div class="setting-section" id="settings-section-editor">
-          <div class="setting-section-header">
+        <div class="setting-section ui-section-card" id="settings-section-editor">
+          <div class="setting-section-header ui-field-stack">
             <h3><%= dgettext("ui", "Editor") %></h3>
             <p class="setting-section-description"><%= dgettext("ui", "Default editing mode and diff presentation") %></p>
           </div>
@@ -141,8 +141,8 @@
       <% end %>
 
       <%= if @settings_editor.content_visible? do %>
-        <div class="setting-section" id="settings-section-content">
-          <div class="setting-section-header"><h3><%= dgettext("ui", "Content Categories") %></h3><p class="setting-section-description"><%= dgettext("ui", "Category defaults, rendering flags, and template wiring") %></p></div>
+        <div class="setting-section ui-section-card" id="settings-section-content">
+          <div class="setting-section-header ui-field-stack"><h3><%= dgettext("ui", "Content Categories") %></h3><p class="setting-section-description"><%= dgettext("ui", "Category defaults, rendering flags, and template wiring") %></p></div>
           <div class="setting-section-content">
             <table class="categories-table">
               <thead>
@@ -209,8 +209,8 @@
       <% end %>
 
       <%= if @settings_editor.ai_visible? do %>
-        <div class="setting-section" id="settings-section-ai">
-          <div class="setting-section-header"><h3><%= dgettext("ui", "AI") %></h3><p class="setting-section-description"><%= dgettext("ui", "OpenAI-compatible endpoints, model routing, airplane mode, and system prompt") %></p></div>
+        <div class="setting-section ui-section-card" id="settings-section-ai">
+          <div class="setting-section-header ui-field-stack"><h3><%= dgettext("ui", "AI") %></h3><p class="setting-section-description"><%= dgettext("ui", "OpenAI-compatible endpoints, model routing, airplane mode, and system prompt") %></p></div>
           <form class="setting-section-content" phx-change="change_settings_ai" phx-target={@myself}>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Online Endpoint URL") %></label></div>
@@ -310,8 +310,8 @@
       <% end %>
 
       <%= if @settings_editor.technology_visible? do %>
-        <div class="setting-section" id="settings-section-technology">
-          <div class="setting-section-header"><h3><%= dgettext("ui", "Technology") %></h3><p class="setting-section-description"><%= dgettext("ui", "Application-level runtime behavior and semantic indexing") %></p></div>
+        <div class="setting-section ui-section-card" id="settings-section-technology">
+          <div class="setting-section-header ui-field-stack"><h3><%= dgettext("ui", "Technology") %></h3><p class="setting-section-description"><%= dgettext("ui", "Application-level runtime behavior and semantic indexing") %></p></div>
           <form class="setting-section-content" phx-change="change_settings_project" phx-target={@myself}>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Semantic Similarity") %></label></div>
@@ -327,8 +327,8 @@
       <% end %>
 
       <%= if @settings_editor.publishing_visible? do %>
-        <div class="setting-section" id="settings-section-publishing">
-          <div class="setting-section-header"><h3><%= dgettext("ui", "Publishing") %></h3><p class="setting-section-description"><%= dgettext("ui", "Deployment credentials for upload tasks") %></p></div>
+        <div class="setting-section ui-section-card" id="settings-section-publishing">
+          <div class="setting-section-header ui-field-stack"><h3><%= dgettext("ui", "Publishing") %></h3><p class="setting-section-description"><%= dgettext("ui", "Deployment credentials for upload tasks") %></p></div>
           <form class="setting-section-content" phx-change="change_settings_publishing" phx-target={@myself}>
             <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= dgettext("ui", "SSH Mode") %></label></div><div class="setting-control"><select class="ui-input" name="settings_publishing[ssh_mode]"><option value="scp" selected={@settings_editor.publishing["ssh_mode"] == "scp"}>scp</option><option value="rsync" selected={@settings_editor.publishing["ssh_mode"] == "rsync"}>rsync</option></select></div></div>
             <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Host") %></label></div><div class="setting-control"><input class="ui-input" type="text" name="settings_publishing[ssh_host]" value={@settings_editor.publishing["ssh_host"]} /></div></div>
@@ -340,8 +340,8 @@
       <% end %>
 
       <%= if @settings_editor.mcp_visible? do %>
-        <div class="setting-section" id="settings-section-mcp">
-          <div class="setting-section-header"><h3><%= dgettext("ui", "MCP") %></h3><p class="setting-section-description"><%= dgettext("ui", "Agent configuration files for the built-in bDS MCP server") %></p></div>
+        <div class="setting-section ui-section-card" id="settings-section-mcp">
+          <div class="setting-section-header ui-field-stack"><h3><%= dgettext("ui", "MCP") %></h3><p class="setting-section-description"><%= dgettext("ui", "Agent configuration files for the built-in bDS MCP server") %></p></div>
           <div class="setting-section-content">
             <%= for agent <- @settings_editor.mcp do %>
               <div class="setting-row">
@@ -361,8 +361,8 @@
       <% end %>
 
       <%= if @settings_editor.data_visible? do %>
-        <div class="setting-section" id="settings-section-data">
-          <div class="setting-section-header"><h3><%= dgettext("ui", "Data Maintenance") %></h3><p class="setting-section-description"><%= dgettext("ui", "Rebuild filesystem-backed records and thumbnails") %></p></div>
+        <div class="setting-section ui-section-card" id="settings-section-data">
+          <div class="setting-section-header ui-field-stack"><h3><%= dgettext("ui", "Data Maintenance") %></h3><p class="setting-section-description"><%= dgettext("ui", "Rebuild filesystem-backed records and thumbnails") %></p></div>
           <div class="setting-actions">
             <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_posts_from_files"><%= dgettext("ui", "Rebuild Posts From Files") %></button>
             <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_media_from_files"><%= dgettext("ui", "Rebuild Media From Files") %></button>

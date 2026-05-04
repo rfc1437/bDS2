@@ -292,27 +292,27 @@ defmodule BDS.Desktop.ShellLiveTest do
     settings_html = render_component(&BDS.Desktop.ShellLive.SettingsEditor.render/1, phase3_settings_editor_assigns())
     tags_html = render_component(&BDS.Desktop.ShellLive.TagsEditor.render/1, phase3_tags_editor_assigns())
 
-    assert post_html =~ "post-editor editor flex h-full min-h-0 flex-col"
-    assert post_html =~ "editor-header flex shrink-0 items-start justify-between gap-3"
-    assert post_html =~ "editor-field flex flex-col gap-1.5"
-    assert post_html =~ "editor-toolbar flex items-center gap-3"
+    assert post_html =~ "post-editor editor ui-editor-shell flex h-full min-h-0 flex-col"
+    assert post_html =~ "editor-header ui-editor-header flex shrink-0 items-start justify-between gap-3"
+    assert post_html =~ "editor-field ui-field-stack flex flex-col gap-1.5"
+    assert post_html =~ "editor-toolbar ui-toolbar flex items-center gap-3"
 
-    assert media_html =~ "media-editor editor flex h-full min-h-0 flex-col"
-    assert media_html =~ "editor-content media-editor grid min-h-0 flex-1 gap-4"
+    assert media_html =~ "media-editor editor ui-editor-shell flex h-full min-h-0 flex-col"
+    assert media_html =~ "editor-content media-editor grid min-h-0 flex-1 gap-4 overflow-auto p-4"
 
-    assert script_html =~ "scripts-view-shell editor flex h-full min-h-0 flex-col"
-    assert script_html =~ "editor-content scripts-view flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
+    assert script_html =~ "scripts-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col"
+    assert script_html =~ "editor-content scripts-view flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4"
 
-    assert template_html =~ "templates-view-shell editor flex h-full min-h-0 flex-col"
-    assert template_html =~ "editor-content templates-view flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
+    assert template_html =~ "templates-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col"
+    assert template_html =~ "editor-content templates-view flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4"
 
-    assert chat_html =~ "chat-panel flex h-full min-h-0 flex-col"
+    assert chat_html =~ "chat-panel ui-editor-shell flex h-full min-h-0 flex-col"
     assert chat_html =~ "chat-panel-header flex shrink-0 items-center justify-between gap-3"
 
-    assert menu_html =~ "menu-editor-view flex h-full min-h-0 flex-col"
-    assert menu_html =~ "menu-editor-toolbar flex flex-wrap items-center gap-2"
+    assert menu_html =~ "menu-editor-view ui-editor-shell flex h-full min-h-0 flex-col p-4"
+    assert menu_html =~ "menu-editor-toolbar ui-toolbar flex flex-wrap items-center gap-2"
 
-    assert settings_html =~ "settings-view-shell flex h-full min-h-0 flex-col overflow-hidden"
+    assert settings_html =~ "settings-view-shell ui-editor-shell flex h-full min-h-0 flex-col overflow-hidden"
     assert settings_html =~ "settings-header flex shrink-0 items-center justify-between gap-3"
 
     assert tags_html =~ "tags-view-shell flex h-full min-h-0 flex-col overflow-hidden"
@@ -375,6 +375,34 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert shell_html =~ ~s(class="panel-tab ui-tab ui-tab-active)
     assert panel_html =~ ~s(class="panel-entry ui-panel-entry panel-empty-state ui-empty-state)
+  end
+
+  @tag :phase5
+  test "phase 5 desktop-specific surfaces keep shell, media, menu, and chat contracts" do
+    conn = Plug.Conn.put_private(build_conn(), :phoenix_endpoint, BDS.Desktop.Endpoint)
+    {:ok, _view, shell_html} = live_isolated(conn, BDS.Desktop.ShellLive)
+
+    media_html = render_component(&BDS.Desktop.ShellLive.MediaEditor.render/1, phase3_media_editor_assigns())
+    chat_html = render_component(&BDS.Desktop.ShellLive.ChatEditor.render/1, phase3_chat_editor_assigns())
+    menu_html = render_component(&BDS.Desktop.ShellLive.MenuEditor.render/1, phase3_menu_editor_assigns())
+
+    assert shell_html =~ ~s(class="assistant-sidebar-context flex shrink-0 flex-col gap-2")
+    assert shell_html =~ ~s(class="assistant-sidebar-prompt min-h-[8rem] w-full resize-y")
+    assert shell_html =~ ~s(class="assistant-sidebar-start-button ui-button ui-button-primary")
+    assert shell_html =~ ~s(class="assistant-sidebar-welcome min-h-0 flex-1 overflow-auto")
+
+    assert media_html =~ "class=\"editor-content media-editor grid min-h-0 flex-1 gap-4 overflow-auto p-4 xl:grid-cols-[minmax(320px,1fr)_minmax(0,1.2fr)]\""
+    assert media_html =~ "class=\"media-preview flex min-h-[16rem] items-center justify-center\""
+    assert media_html =~ ~s(class="media-details min-w-0")
+
+    assert chat_html =~ ~s(class="chat-panel ui-editor-shell flex h-full min-h-0 flex-col")
+    assert chat_html =~ ~s(class="chat-model-selector-button chat-model-selector-inline ui-button ui-button-secondary inline-flex items-center gap-2")
+    assert chat_html =~ ~s(class="chat-input-container ui-field-stack flex shrink-0 flex-col gap-3")
+    assert chat_html =~ ~s(class="chat-input-wrapper flex items-end gap-2")
+
+    assert menu_html =~ ~s(class="menu-editor-view ui-editor-shell flex h-full min-h-0 flex-col p-4")
+    assert menu_html =~ ~s(class="menu-editor-toolbar ui-toolbar flex flex-wrap items-center gap-2")
+    assert menu_html =~ ~s(class="menu-editor-empty flex min-h-0 flex-1 items-center justify-center")
   end
 
   alias BDS.Persistence
@@ -3195,7 +3223,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => "published"
       })
 
-    assert published_script_html =~ ~s(class="scripts-view-shell editor flex h-full min-h-0 flex-col")
+    assert published_script_html =~ ~s(class="scripts-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col")
     assert published_script_html =~ ~s(data-testid="script-editor")
     assert published_script_html =~ ~s(data-testid="script-status-badge")
     assert published_script_html =~ ~s(class="status-badge ui-badge status-published")
@@ -3216,7 +3244,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => "published"
       })
 
-    assert published_template_html =~ ~s(class="templates-view-shell editor flex h-full min-h-0 flex-col")
+    assert published_template_html =~ ~s(class="templates-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col")
     assert published_template_html =~ ~s(data-testid="template-editor")
     assert published_template_html =~ ~s(data-testid="template-status-badge")
     assert published_template_html =~ ~s(class="status-badge ui-badge status-published")
@@ -3410,7 +3438,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       })
 
     assert html =~
-         "class=\"editor-content media-editor grid min-h-0 flex-1 gap-4 overflow-auto xl:grid-cols-[minmax(320px,1fr)_minmax(0,1.2fr)]\""
+         "class=\"editor-content media-editor grid min-h-0 flex-1 gap-4 overflow-auto p-4 xl:grid-cols-[minmax(320px,1fr)_minmax(0,1.2fr)]\""
     assert html =~ ~s(class="quick-actions-wrapper relative")
     refute html =~ ~s(class="media-editor-form")
 
@@ -3523,8 +3551,8 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => "Project settings"
       })
 
-    assert settings_html =~ ~s(class="settings-view-shell flex h-full min-h-0 flex-col overflow-hidden")
-    assert settings_html =~ ~s(class="setting-section")
+    assert settings_html =~ ~s(class="settings-view-shell ui-editor-shell flex h-full min-h-0 flex-col overflow-hidden")
+    assert settings_html =~ ~s(class="setting-section ui-section-card")
     refute settings_html =~ "Desktop workbench content routed through the Elixir shell."
 
     tags_html =
@@ -3559,7 +3587,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => script.slug
       })
 
-    assert script_html =~ ~s(class="scripts-view-shell editor flex h-full min-h-0 flex-col")
+    assert script_html =~ ~s(class="scripts-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col")
     assert script_html =~ "scripts-monaco"
     assert script_html =~ ~s(data-monaco-language="lua")
     assert script_html =~ ~s(data-monaco-word-wrap="on")
@@ -3574,7 +3602,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => template.slug
       })
 
-    assert template_html =~ ~s(class="templates-view-shell editor flex h-full min-h-0 flex-col")
+    assert template_html =~ ~s(class="templates-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col")
     assert template_html =~ "templates-monaco"
     assert template_html =~ ~s(data-monaco-language="liquid")
     assert template_html =~ ~s(data-monaco-word-wrap="on")
@@ -3589,8 +3617,8 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => conversation.model || "chat"
       })
 
-    assert chat_html =~ ~s(class="chat-panel flex h-full min-h-0 flex-col")
-    assert chat_html =~ ~s(class="chat-input-container flex shrink-0 flex-col gap-3")
+    assert chat_html =~ ~s(class="chat-panel ui-editor-shell flex h-full min-h-0 flex-col")
+    assert chat_html =~ ~s(class="chat-input-container ui-field-stack flex shrink-0 flex-col gap-3")
     refute chat_html =~ "Desktop workbench content routed through the Elixir shell."
   end
 
@@ -3658,7 +3686,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element("[data-testid='chat-model-selector-button']")
       |> render_click()
 
-    assert selector_html =~ ~s(class="chat-model-selector-menu absolute right-0 top-full z-10 mt-2 flex min-w-56 flex-col")
+    assert selector_html =~ ~s(class="chat-model-selector-menu ui-dropdown-menu absolute right-0 top-full z-10 mt-2 flex min-w-56 flex-col")
     assert selector_html =~ ~s(data-testid="chat-model-selector-option")
     assert selector_html =~ "llama-current"
 

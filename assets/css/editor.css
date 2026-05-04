@@ -321,58 +321,6 @@
   overflow: hidden;
 }
 
-.post-editor .editor-header,
-.scripts-view-shell.editor .editor-header,
-.templates-view-shell.editor .editor-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 12px;
-  min-height: 35px;
-  background-color: var(--vscode-tab-activeBackground);
-  border-bottom: 1px solid var(--vscode-panel-border);
-}
-
-.post-editor .editor-tabs,
-.scripts-view-shell.editor .editor-tabs,
-.templates-view-shell.editor .editor-tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-}
-
-.post-editor .editor-tab,
-.scripts-view-shell.editor .editor-tab,
-.templates-view-shell.editor .editor-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 6px 12px;
-  background-color: var(--vscode-tab-inactiveBackground);
-  color: var(--vscode-tab-inactiveForeground);
-  font-size: 13px;
-  border-radius: 4px 4px 0 0;
-}
-
-.post-editor .editor-tab.active,
-.scripts-view-shell.editor .editor-tab.active,
-.templates-view-shell.editor .editor-tab.active {
-  background-color: var(--vscode-tab-activeBackground);
-  color: var(--vscode-tab-activeForeground);
-}
-
-.post-editor .editor-tab-title,
-.scripts-view-shell.editor .editor-tab-title,
-.templates-view-shell.editor .editor-tab-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .post-editor .editor-tab-dirty {
   color: var(--vscode-notificationsWarningIcon-foreground, var(--vscode-editorWarning-foreground));
   font-size: 10px;
@@ -382,14 +330,6 @@
   color: var(--vscode-descriptionForeground);
   font-size: 11px;
   white-space: nowrap;
-}
-
-.post-editor .editor-actions,
-.scripts-view-shell.editor .editor-actions,
-.templates-view-shell.editor .editor-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .post-editor .quick-actions-wrapper {
@@ -409,58 +349,15 @@
   line-height: 1;
 }
 
-.post-editor .quick-actions-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
-  min-width: 280px;
-  background: var(--vscode-dropdown-background, #3c3c3c);
-  border: 1px solid var(--vscode-dropdown-border, #454545);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  overflow: hidden;
-}
-
 .post-editor .quick-actions-divider {
   height: 1px;
   background: var(--vscode-dropdown-border, #454545);
-}
-
-.post-editor .quick-action-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 12px;
-  background: none;
-  border: none;
-  color: var(--vscode-dropdown-foreground, #ccc);
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.1s;
-}
-
-.post-editor .quick-action-item:hover:not(:disabled) {
-  background: var(--vscode-list-hoverBackground, #2a2d2e);
-}
-
-.post-editor .quick-action-item:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .post-editor .quick-action-icon {
   font-size: 16px;
   flex-shrink: 0;
   margin-top: 2px;
-}
-
-.post-editor .quick-action-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .post-editor .quick-action-text strong {
@@ -510,19 +407,7 @@
   font-style: italic;
 }
 
-.post-editor .editor-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-  overflow-y: auto;
-}
-
 .post-editor .metadata-toggle-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .post-editor .metadata-toggle {
@@ -550,35 +435,13 @@
   font-size: 10px;
 }
 
-.post-editor .editor-header-row {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-
 .post-editor .editor-header-row.is-collapsed {
   display: none;
-}
-
-.post-editor .editor-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
 }
 
 .post-editor .editor-media-panel {
   width: 200px;
   flex-shrink: 0;
-}
-
-.post-editor .editor-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  min-width: 200px;
 }
 
 .post-editor .editor-field label,
@@ -600,25 +463,9 @@
   color: var(--vscode-foreground);
 }
 
-.post-editor .post-editor-input,
-.post-editor .post-editor-textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
-  border-radius: 4px;
-  background: var(--vscode-input-background, rgba(255, 255, 255, 0.06));
-  color: var(--vscode-input-foreground, var(--vscode-foreground));
-  font: inherit;
-}
-
 .post-editor .post-editor-input.is-readonly {
   opacity: 0.7;
   cursor: not-allowed;
-}
-
-.post-editor .post-editor-textarea {
-  line-height: 1.5;
-  resize: vertical;
 }
 
 .post-editor .post-editor-excerpt {
@@ -796,31 +643,9 @@
   font-weight: 600;
 }
 
-.post-editor .editor-field-row {
-  display: flex;
-  gap: 12px;
-  width: 100%;
-}
-
-.post-editor .editor-language-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex-wrap: nowrap;
-}
-
 .post-editor .editor-language-row select {
   flex: 1;
   min-width: 0;
-}
-
-.post-editor .editor-translations-flags {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
 }
 
 .post-editor .editor-translation-flag {

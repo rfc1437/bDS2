@@ -1,14 +1,14 @@
-<div class="menu-editor-view flex h-full min-h-0 flex-col" data-testid="menu-editor" phx-window-keydown={if(@menu_editor.draft, do: "menu_editor_keydown")} phx-target={@myself}>
+<div class="menu-editor-view ui-editor-shell flex h-full min-h-0 flex-col p-4" data-testid="menu-editor" phx-window-keydown={if(@menu_editor.draft, do: "menu_editor_keydown")} phx-target={@myself}>
   <div class="menu-editor-header flex shrink-0 items-start justify-between gap-3">
-    <div>
+    <div class="ui-field-stack">
       <h2><%= @menu_editor.title %></h2>
       <p><%= @menu_editor.description %></p>
     </div>
   </div>
 
   <div class="menu-editor-main min-h-0 flex-1 overflow-hidden">
-    <div class="menu-editor-tree-wrap flex h-full min-h-0 flex-col">
-      <div class="menu-editor-toolbar flex flex-wrap items-center gap-2" data-testid="menu-editor-toolbar" role="toolbar" aria-label={@menu_editor.title}>
+    <div class="menu-editor-tree-wrap ui-section-card flex h-full min-h-0 flex-col">
+      <div class="menu-editor-toolbar ui-toolbar flex flex-wrap items-center gap-2" data-testid="menu-editor-toolbar" role="toolbar" aria-label={@menu_editor.title}>
         <button class="menu-editor-tool inline-flex h-9 min-w-9 items-center justify-center" data-testid="menu-editor-toolbar-button" data-action="add-entry" type="button" phx-click="menu_editor_toolbar_action" phx-value-action="add-entry" phx-target={@myself} title={dgettext("ui", "menuEditor.addEntry")}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7 2h2v5h5v2H9v5H7V9H2V7h5V2z" /></svg>
         </button>
