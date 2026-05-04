@@ -1035,6 +1035,42 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="tab active transient")
   end
 
+  test "workbench session restore renders documentation tab content" do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    session_payload =
+      Workbench.new()
+      |> Workbench.open_tab(:documentation, "documentation", :pin)
+      |> Session.serialize()
+
+    _html = render_hook(view, "restore_workbench_session", %{"session" => session_payload})
+
+    assert has_element?(view, ".tab[data-tab-type='documentation'] .tab-title", "Documentation")
+    assert has_element?(view, "[data-testid='help-documentation']")
+    assert render(view) =~ "bDS2 User Guide"
+  end
+
+  test "workbench session restore renders api documentation tab content" do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    session_payload =
+      Workbench.new()
+      |> Workbench.open_tab(:api_documentation, "api_documentation", :pin)
+      |> Session.serialize()
+
+    _html = render_hook(view, "restore_workbench_session", %{"session" => session_payload})
+
+    assert has_element?(
+             view,
+             ".tab[data-tab-type='api_documentation'] .tab-title",
+             "Api Documentation"
+           )
+
+    assert has_element?(view, "[data-testid='help-api-documentation']")
+    assert render(view) =~ "API Documentation"
+    assert render(view) =~ "local result = bds.posts.get"
+  end
+
   test "workbench session restore rehydrates chat tab titles from stored conversations" do
     assert {:ok, conversation} = AI.start_chat(%{title: "Editorial Plan"})
 

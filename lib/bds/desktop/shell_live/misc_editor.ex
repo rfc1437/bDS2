@@ -3,9 +3,10 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   use Phoenix.LiveComponent
 
+  import Phoenix.HTML, only: [raw: 1]
   import Ecto.Query
 
-  alias BDS.{Embeddings, Generation, Git, Posts, Repo}
+  alias BDS.{Embeddings, Generation, Git, HelpDocs, Posts, Repo}
   alias BDS.MapUtils
   alias BDS.Settings.Setting
   use Gettext, backend: BDS.Gettext
@@ -13,6 +14,8 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   embed_templates("misc_editor_html/*")
 
   @misc_routes [
+    :documentation,
+    :api_documentation,
     :site_validation,
     :metadata_diff,
     :translation_validation,
@@ -264,11 +267,27 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   # ── Public helper functions (used by template) ─────────────────────────────
 
   @spec misc_class(atom()) :: String.t()
+  def misc_class(:documentation), do: "help-doc-view"
+  def misc_class(:api_documentation), do: "help-doc-view"
   def misc_class(:site_validation), do: "site-validation-view"
   def misc_class(:metadata_diff), do: "metadata-diff-view"
   def misc_class(:translation_validation), do: "translation-validation-view"
   def misc_class(:find_duplicates), do: "duplicates-view"
   def misc_class(:git_diff), do: "git-diff-view"
+
+  @spec markdown_html(String.t()) :: Phoenix.HTML.safe()
+  def markdown_html(content) do
+    html =
+      case Earmark.as_html(content || "", escape: true) do
+        {:ok, rendered, _messages} -> rendered
+        {:error, rendered, _messages} -> rendered
+      end
+
+    raw(html)
+  end
+
+  @spec refreshable?(atom()) :: boolean()
+  def refreshable?(kind), do: kind not in [:documentation, :api_documentation]
 
   @spec summary_items(map()) :: [{String.t(), any()}]
   def summary_items(%{summary: summary}) when is_map(summary), do: Enum.to_list(summary)
@@ -369,6 +388,8 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
     payload = Map.get(meta, :payload, %{})
 
     case type do
+      :documentation -> build_help_doc(type, meta)
+      :api_documentation -> build_help_doc(type, meta)
       :site_validation -> build_site_validation(meta, payload)
       :metadata_diff -> build_metadata_diff(assigns, meta, payload)
       :translation_validation -> build_translation_validation(meta, payload)
@@ -378,6 +399,18 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   end
 
   defp do_build(_assigns), do: nil
+
+  defp build_help_doc(type, meta) do
+    help_doc = HelpDocs.fetch(type)
+
+    %{
+      kind: type,
+      title: Map.get(meta, :title, help_doc.title),
+      subtitle: Map.get(meta, :subtitle, help_doc.subtitle),
+      summary: %{},
+      markdown: help_doc.markdown
+    }
+  end
 
   defp build_site_validation(meta, payload) do
     summary = Map.get(payload, :summary, %{})

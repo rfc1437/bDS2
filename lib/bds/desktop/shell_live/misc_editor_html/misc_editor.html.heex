@@ -5,7 +5,9 @@
       <p><%= @misc_editor.subtitle %></p>
     </div>
     <div class="misc-editor-actions">
-      <button class="secondary" type="button" phx-click="rerun_misc_editor" phx-target={@myself}><%= dgettext("ui", "Refresh") %></button>
+      <%= if refreshable?(@misc_editor.kind) do %>
+        <button class="secondary" type="button" phx-click="rerun_misc_editor" phx-target={@myself}><%= dgettext("ui", "Refresh") %></button>
+      <% end %>
       <%= if @misc_editor.kind == :site_validation do %>
         <button class="primary" type="button" phx-click="apply_site_validation" phx-target={@myself} disabled={Enum.empty?(@misc_editor.missing_url_paths) and Enum.empty?(@misc_editor.extra_url_paths) and Enum.empty?(@misc_editor.updated_post_url_paths)}><%= dgettext("ui", "Apply") %></button>
       <% end %>
@@ -23,6 +25,16 @@
 
   <div class="misc-editor-content">
     <%= case @misc_editor.kind do %>
+      <% :documentation -> %>
+        <article class="misc-card help-doc-markdown" data-testid="help-documentation">
+          <%= markdown_html(@misc_editor.markdown) %>
+        </article>
+
+      <% :api_documentation -> %>
+        <article class="misc-card help-doc-markdown" data-testid="help-api-documentation">
+          <%= markdown_html(@misc_editor.markdown) %>
+        </article>
+
       <% :site_validation -> %>
         <div class="misc-columns">
           <section class="misc-card"><h3><%= dgettext("ui", "Missing URLs") %></h3><%= if Enum.empty?(@misc_editor.missing_url_paths) do %><p><%= dgettext("ui", "None found") %></p><% end %><ul><%= for path <- @misc_editor.missing_url_paths do %><li><%= path %></li><% end %></ul></section>
