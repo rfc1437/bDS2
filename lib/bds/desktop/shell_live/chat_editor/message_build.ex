@@ -215,7 +215,8 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
     persisted_markers = persisted_tool_markers_for_request(messages, request)
 
     {remaining, _persisted_markers} =
-      Enum.reduce(tool_markers, {[], persisted_markers}, fn marker, {remaining, persisted_markers} ->
+      Enum.reduce(tool_markers, {[], persisted_markers}, fn marker,
+                                                            {remaining, persisted_markers} ->
         case pop_matching_tool_marker(persisted_markers, marker) do
           {nil, persisted_markers} -> {remaining ++ [marker], persisted_markers}
           {_matched, persisted_markers} -> {remaining, persisted_markers}

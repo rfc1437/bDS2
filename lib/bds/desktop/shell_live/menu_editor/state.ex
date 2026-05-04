@@ -31,7 +31,11 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.State do
 
     %{
       title: dgettext("ui", "Blog Menu Editor"),
-      description: dgettext("ui", "Manage the central blog navigation outline and save it to meta/menu.opml."),
+      description:
+        dgettext(
+          "ui",
+          "Manage the central blog navigation outline and save it to meta/menu.opml."
+        ),
       items: state.items,
       selected_id: state.selected_id,
       draft: draft,

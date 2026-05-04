@@ -98,6 +98,7 @@ defmodule BDS.Scripts do
 
         content_changed? =
           has_attr?(attrs, :content) and attr(attrs, :content) != effective_script_content(script)
+
         now = Persistence.now_ms()
 
         updates =
@@ -309,7 +310,9 @@ defmodule BDS.Scripts do
 
   defp hydrate_script_content(%Script{} = script) do
     case script do
-      %Script{content: content} when is_binary(content) -> script
+      %Script{content: content} when is_binary(content) ->
+        script
+
       %Script{status: :published, file_path: file_path} when file_path not in [nil, ""] ->
         %{script | content: published_script_body(script)}
 

@@ -13,6 +13,26 @@ defmodule BDS.Desktop.ImportShellLiveTest do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
 
+    Enum.each(BDS.Tasks.list_running_tasks(), fn task ->
+      BDS.Tasks.cancel_task(task.id)
+    end)
+
+    if :ets.whereis(:bds_ai_in_flight) != :undefined do
+      Enum.each(:ets.tab2list(:bds_ai_in_flight), fn {_conversation_id, pid} ->
+        Process.exit(pid, :kill)
+      end)
+    end
+
+    for {_, pid, _, _} <- DynamicSupervisor.which_children(BDS.TCP.TaskSupervisor) do
+      DynamicSupervisor.terminate_child(BDS.TCP.TaskSupervisor, pid)
+    end
+
+    for {_, pid, _, _} <- DynamicSupervisor.which_children(BDS.Tasks.TaskSupervisor) do
+      DynamicSupervisor.terminate_child(BDS.Tasks.TaskSupervisor, pid)
+    end
+
+    Process.sleep(100)
+
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-import-shell-live-#{System.unique_integer([:positive])}")
 

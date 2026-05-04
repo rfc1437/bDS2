@@ -53,7 +53,7 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
 
         case result do
           {:ok, %{json: nil, content: content}} when is_binary(content) ->
-            Logger.warning(
+            Logger.debug(
               "AI OpenAI-compatible response parsed but content is not valid JSON. Content: #{String.slice(content, 0, 500)}"
             )
 

@@ -500,8 +500,8 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
     """
   end
 
-
-  defp sidebar_deletable?(route), do: route in ["post", "media", "scripts", "templates", "chat", "import"]
+  defp sidebar_deletable?(route),
+    do: route in ["post", "media", "scripts", "templates", "chat", "import"]
 
   defp sidebar_delete_testid("post"), do: "sidebar-delete-post"
   defp sidebar_delete_testid("media"), do: "sidebar-delete-media"
@@ -513,10 +513,19 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
 
   defp sidebar_delete_title("chat"), do: dgettext("ui", "Delete conversation")
   defp sidebar_delete_title("post"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Post")
-  defp sidebar_delete_title("media"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Media")
-  defp sidebar_delete_title("scripts"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Script")
-  defp sidebar_delete_title("templates"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Template")
-  defp sidebar_delete_title("import"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Import")
+
+  defp sidebar_delete_title("media"),
+    do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Media")
+
+  defp sidebar_delete_title("scripts"),
+    do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Script")
+
+  defp sidebar_delete_title("templates"),
+    do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Template")
+
+  defp sidebar_delete_title("import"),
+    do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Import")
+
   defp sidebar_delete_title(_route), do: dgettext("ui", "Delete")
 
   defp template_sidebar?(sidebar_data), do: Map.get(sidebar_data, :title) == "Templates"

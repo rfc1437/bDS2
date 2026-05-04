@@ -165,7 +165,11 @@ defmodule BDS.Desktop.ShellLive.TemplateEditor do
       %Template{} = template ->
         case MCP.validate_template(current_draft(socket.assigns, template)["content"] || "") do
           {:ok, %{valid: true}} ->
-            notify_output(socket, dgettext("ui", "Templates"), dgettext("ui", "Template syntax is valid"))
+            notify_output(
+              socket,
+              dgettext("ui", "Templates"),
+              dgettext("ui", "Template syntax is valid")
+            )
 
           {:ok, %{valid: false, errors: errors}} ->
             notify_output(socket, dgettext("ui", "Templates"), Enum.join(errors, "; "), "error")

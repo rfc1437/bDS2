@@ -113,7 +113,10 @@ defmodule BDS.Posts.AutoTranslation do
           )
 
           {summary, completed} =
-            Enum.reduce(post_items, {empty_fill_summary(), 0}, fn %{post: post, language: language},
+            Enum.reduce(post_items, {empty_fill_summary(), 0}, fn %{
+                                                                    post: post,
+                                                                    language: language
+                                                                  },
                                                                   {summary, completed} ->
               report_fill_item_progress(
                 on_progress,
@@ -132,7 +135,10 @@ defmodule BDS.Posts.AutoTranslation do
             end)
 
           {summary, _completed} =
-            Enum.reduce(media_items, {summary, completed}, fn %{media_id: media_id, language: language},
+            Enum.reduce(media_items, {summary, completed}, fn %{
+                                                                media_id: media_id,
+                                                                language: language
+                                                              },
                                                               {summary, completed} ->
               report_fill_item_progress(
                 on_progress,
@@ -392,7 +398,11 @@ defmodule BDS.Posts.AutoTranslation do
       end
 
     with {:ok, translation} <-
-           AI.translate_media(media_id, language, Keyword.put(ai_opts(), :source_language, source_language)),
+           AI.translate_media(
+             media_id,
+             language,
+             Keyword.put(ai_opts(), :source_language, source_language)
+           ),
          {:ok, saved_translation} <-
            Media.upsert_media_translation(media_id, language, %{
              title: translation.title,

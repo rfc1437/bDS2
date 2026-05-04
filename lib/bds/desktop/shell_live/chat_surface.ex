@@ -30,9 +30,17 @@ defmodule BDS.Desktop.ShellLive.ChatSurface do
 
   defp assistant_reply(socket) do
     if socket.assigns.offline_mode do
-      BDS.Gettext.lgettext(socket.assigns.page_language, "ui", "Automatic AI actions stay gated by airplane mode.")
+      BDS.Gettext.lgettext(
+        socket.assigns.page_language,
+        "ui",
+        "Automatic AI actions stay gated by airplane mode."
+      )
     else
-      BDS.Gettext.lgettext(socket.assigns.page_language, "ui", "The assistant sidebar chat surface is ready, but model execution is not connected yet.")
+      BDS.Gettext.lgettext(
+        socket.assigns.page_language,
+        "ui",
+        "The assistant sidebar chat surface is ready, but model execution is not connected yet."
+      )
     end
   end
 end

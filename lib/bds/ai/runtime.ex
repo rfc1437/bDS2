@@ -39,7 +39,8 @@ defmodule BDS.AI.Runtime do
         :ok
 
       capabilities.supports_attachment == false ->
-        {:error, %{kind: :model_capability_missing, capability: :supports_attachment, model: model}}
+        {:error,
+         %{kind: :model_capability_missing, capability: :supports_attachment, model: model}}
 
       true ->
         :ok

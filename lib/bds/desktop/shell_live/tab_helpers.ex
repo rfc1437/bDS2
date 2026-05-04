@@ -49,7 +49,8 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     end
   end
 
-  defp default_tab_subtitle(_tab), do: "Desktop workbench content routed through the Elixir shell."
+  defp default_tab_subtitle(_tab),
+    do: "Desktop workbench content routed through the Elixir shell."
 
   def tab_route_label(nil), do: dgettext("ui", "Dashboard")
   def tab_route_label(%{type: type}), do: ShellData.route_label(type)
@@ -168,7 +169,11 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
       %{name: name} ->
         %{
           title: blank_to_nil(name) || dgettext("ui", "Untitled Import"),
-          subtitle: dgettext("ui", "Select a WordPress export file (WXR) and an uploads folder to analyze what would be imported.")
+          subtitle:
+            dgettext(
+              "ui",
+              "Select a WordPress export file (WXR) and an uploads folder to analyze what would be imported."
+            )
         }
 
       _other ->
@@ -183,7 +188,11 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   defp derived_tab_meta(%{type: :menu_editor}) do
     %{
       title: dgettext("ui", "Blog Menu"),
-      subtitle: dgettext("ui", "Manage the central blog navigation outline and save it to meta/menu.opml.")
+      subtitle:
+        dgettext(
+          "ui",
+          "Manage the central blog navigation outline and save it to meta/menu.opml."
+        )
     }
   end
 
@@ -212,7 +221,8 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     if is_binary(value), do: String.trim(value) != "", else: false
   end
 
-  defp post_record_title(%Post{} = post), do: blank_to_nil(post.title) || blank_to_nil(post.slug) || post.id
+  defp post_record_title(%Post{} = post),
+    do: blank_to_nil(post.title) || blank_to_nil(post.slug) || post.id
 
   defp post_record_subtitle(%Post{} = post), do: Atom.to_string(post.status)
 

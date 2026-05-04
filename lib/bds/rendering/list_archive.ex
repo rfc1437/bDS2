@@ -97,7 +97,8 @@ defmodule BDS.Rendering.ListArchive do
       post_data_json_by_id:
         Enum.into(posts, %{}, fn post -> {post.id, PostRendering.post_data_json_value(post)} end),
       day_blocks: day_blocks,
-      archive_month_name: Labels.month_name(Map.get(normalized_archive_context, :month), language),
+      archive_month_name:
+        Labels.month_name(Map.get(normalized_archive_context, :month), language),
       labels: Labels.for_language(language)
     }
   end
@@ -148,7 +149,11 @@ defmodule BDS.Rendering.ListArchive do
           Map.get(
             assigns,
             "not_found_message",
-            BDS.Gettext.lgettext(language, "render", "The requested preview page could not be found.")
+            BDS.Gettext.lgettext(
+              language,
+              "render",
+              "The requested preview page could not be found."
+            )
           )
         ),
       not_found_back_label:

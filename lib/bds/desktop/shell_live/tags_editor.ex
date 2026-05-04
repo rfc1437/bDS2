@@ -272,11 +272,13 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
         end),
       selected: selected,
       new_tag:
-        Map.get(socket.assigns, :tags_editor, %{}) |> Map.get(:new_tag, %{"name" => "", "color" => ""}),
+        Map.get(socket.assigns, :tags_editor, %{})
+        |> Map.get(:new_tag, %{"name" => "", "color" => ""}),
       edit_draft: edit_draft,
       templates: templates,
       merge_target:
-        Map.get(socket.assigns, :tags_editor, %{}) |> Map.get(:merge_target, List.first(selected) || ""),
+        Map.get(socket.assigns, :tags_editor, %{})
+        |> Map.get(:merge_target, List.first(selected) || ""),
       selected_section: selected_section
     }
 

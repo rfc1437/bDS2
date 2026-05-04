@@ -101,15 +101,40 @@ defmodule BDS.UI.Registry do
       %{id: :chat, singleton: false, entity_tab: true, title: dgettext("ui", "Chat")},
       %{id: :import, singleton: false, entity_tab: true, title: dgettext("ui", "Import")},
       %{id: :menu_editor, singleton: true, entity_tab: false, title: dgettext("ui", "Menu")},
-      %{id: :metadata_diff, singleton: true, entity_tab: false, title: dgettext("ui", "Metadata Diff")},
+      %{
+        id: :metadata_diff,
+        singleton: true,
+        entity_tab: false,
+        title: dgettext("ui", "Metadata Diff")
+      },
       %{id: :git_diff, singleton: false, entity_tab: true, title: dgettext("ui", "Git Diff")},
-      %{id: :documentation, singleton: true, entity_tab: false, title: dgettext("ui", "Documentation")},
+      %{
+        id: :documentation,
+        singleton: true,
+        entity_tab: false,
+        title: dgettext("ui", "Documentation")
+      },
       %{id: :api_documentation, singleton: true, entity_tab: false, title: dgettext("ui", "API")},
-      %{id: :site_validation, singleton: true, entity_tab: false, title: dgettext("ui", "Site Validation")},
-      %{id: :translation_validation, singleton: true, entity_tab: false, title: dgettext("ui", "Translations")},
+      %{
+        id: :site_validation,
+        singleton: true,
+        entity_tab: false,
+        title: dgettext("ui", "Site Validation")
+      },
+      %{
+        id: :translation_validation,
+        singleton: true,
+        entity_tab: false,
+        title: dgettext("ui", "Translations")
+      },
       %{id: :scripts, singleton: false, entity_tab: true, title: dgettext("ui", "Script")},
       %{id: :templates, singleton: false, entity_tab: true, title: dgettext("ui", "Template")},
-      %{id: :find_duplicates, singleton: true, entity_tab: false, title: dgettext("ui", "Find Duplicates")}
+      %{
+        id: :find_duplicates,
+        singleton: true,
+        entity_tab: false,
+        title: dgettext("ui", "Find Duplicates")
+      }
     ]
   end
 

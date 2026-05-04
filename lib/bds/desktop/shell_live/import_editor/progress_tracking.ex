@@ -130,7 +130,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
             )
             |> append_output.(
               dgettext("ui", "Import"),
-               dgettext("ui", "Import completed successfully!", count: previous_state.count),
+              dgettext("ui", "Import completed successfully!", count: previous_state.count),
               nil,
               "info"
             )
@@ -265,9 +265,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.ProgressTracking do
     seconds = div(ms, 1000)
 
     if seconds < 60 do
-      dgettext("ui", "ETA: %{value}",
-        value: dgettext("ui", "%{count}s", count: seconds)
-      )
+      dgettext("ui", "ETA: %{value}", value: dgettext("ui", "%{count}s", count: seconds))
     else
       m = div(seconds, 60)
       s = rem(seconds, 60)

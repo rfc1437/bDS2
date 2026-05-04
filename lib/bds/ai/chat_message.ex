@@ -36,7 +36,9 @@ defmodule BDS.AI.ChatMessage do
         :cache_read_tokens,
         :cache_write_tokens,
         :created_at
-      ], empty_values: [nil])
+      ],
+      empty_values: [nil]
+    )
     |> validate_required([:conversation_id, :role, :created_at])
     |> assoc_constraint(:conversation)
   end

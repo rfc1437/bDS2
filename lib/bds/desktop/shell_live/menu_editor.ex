@@ -3,7 +3,6 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
   use Phoenix.LiveComponent
 
-
   use Gettext, backend: BDS.Gettext
 
   alias BDS.Desktop.ShellLive.MenuEditor.{
@@ -238,7 +237,11 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     tab_meta =
       Map.put(socket.assigns.tab_meta, {:menu_editor, tab_id}, %{
         title: dgettext("ui", "Blog Menu"),
-        subtitle: dgettext("ui", "Manage the central blog navigation outline and save it to meta/menu.opml.")
+        subtitle:
+          dgettext(
+            "ui",
+            "Manage the central blog navigation outline and save it to meta/menu.opml."
+          )
       })
 
     socket
@@ -407,7 +410,6 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
     """
   end
 
-
   @spec row_label(term(), term()) :: term()
   def row_label(item, category_titles) do
     if item.kind == :category_archive do
@@ -430,8 +432,11 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
   def editing_title(_menu_editor), do: dgettext("ui", "Select Page")
 
   @spec editing_hint(term()) :: term()
-  def editing_hint(%{draft: %{type: :category}}), do: dgettext("ui", "Select an existing category or press Enter to create a new archive entry")
-  def editing_hint(_menu_editor), do: dgettext("ui", "Select a page below or press Enter to create a submenu")
+  def editing_hint(%{draft: %{type: :category}}),
+    do: dgettext("ui", "Select an existing category or press Enter to create a new archive entry")
+
+  def editing_hint(_menu_editor),
+    do: dgettext("ui", "Select a page below or press Enter to create a submenu")
 
   @spec editing_placeholder(term()) :: term()
   def editing_placeholder(%{draft: %{type: :category}}),

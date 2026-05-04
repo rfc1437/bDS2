@@ -2,7 +2,7 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   @moduledoc false
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [send_update: 2]
+  import Phoenix.LiveView, only: [connected?: 1, send_update: 2]
 
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.{ChatEditor, PostEditor}
@@ -103,7 +103,8 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   end
 
   def handle_info({:chat_editor_switch_view, view}, socket, callbacks) do
-    {:noreply, callbacks.reload.(socket, Workbench.click_activity(socket.assigns.workbench, view))}
+    {:noreply,
+     callbacks.reload.(socket, Workbench.click_activity(socket.assigns.workbench, view))}
   end
 
   def handle_info({:entity_changed, payload}, socket, callbacks) when is_map(payload) do
@@ -113,35 +114,40 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   def handle_info(:refresh_task_status, socket, callbacks) do
     raw_task_status = BDS.Tasks.status_snapshot()
 
-    case SessionUtil.next_completed_task_result(socket, raw_task_status) do
-      nil ->
-        task_status =
-          BDS.Desktop.ShellLive.TaskLocalization.localize_task_status(
-            raw_task_status,
-            socket.assigns.page_language
+    socket =
+      case SessionUtil.next_completed_task_result(socket, raw_task_status) do
+        nil ->
+          task_status =
+            BDS.Desktop.ShellLive.TaskLocalization.localize_task_status(
+              raw_task_status,
+              socket.assigns.page_language
+            )
+
+          socket
+          |> assign(:task_status, task_status)
+          |> assign(:editor_meta, ShellData.editor_meta(task_status))
+          |> assign(
+            :status,
+            ShellData.status_bar(
+              socket.assigns.workbench,
+              task_status,
+              socket.assigns.dashboard,
+              ui_language: socket.assigns.page_language,
+              offline_mode: socket.assigns.offline_mode
+            )
           )
 
-        {:noreply,
-         socket
-         |> assign(:task_status, task_status)
-         |> assign(:editor_meta, ShellData.editor_meta(task_status))
-         |> assign(
-           :status,
-           ShellData.status_bar(
-             socket.assigns.workbench,
-             task_status,
-             socket.assigns.dashboard,
-             ui_language: socket.assigns.page_language,
-             offline_mode: socket.assigns.offline_mode
-           )
-         )}
+        task ->
+          socket
+          |> SessionUtil.mark_task_result_handled(task.id)
+          |> callbacks.apply_shell_command_result.(task.result)
+      end
 
-      task ->
-        {:noreply,
-         socket
-         |> SessionUtil.mark_task_result_handled(task.id)
-         |> callbacks.apply_shell_command_result.(task.result)}
+    if connected?(socket) do
+      Process.send_after(self(), :refresh_task_status, BDS.Desktop.ShellLive.refresh_interval())
     end
+
+    {:noreply, socket}
   end
 
   def handle_info({:tags_editor_output, title, message, level}, socket, callbacks) do
@@ -210,7 +216,12 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   end
 
   def handle_info({:post_editor_insert_content, post_id, content}, socket, _callbacks) do
-    send_update(PostEditor, id: "post-editor-#{post_id}", action: :insert_content, content: content)
+    send_update(PostEditor,
+      id: "post-editor-#{post_id}",
+      action: :insert_content,
+      content: content
+    )
+
     {:noreply, socket}
   end
 
@@ -220,7 +231,8 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   end
 
   def handle_info({:post_editor_apply_ai_suggestions, post_id, fields}, socket, _callbacks) do
-    send_update(PostEditor, id: "post-editor-#{post_id}",
+    send_update(PostEditor,
+      id: "post-editor-#{post_id}",
       action: :apply_ai_suggestions,
       fields: fields
     )

@@ -151,7 +151,10 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
                     socket
                     |> assign(:draft, nil)
                     |> build_data()
-                    |> notify_output(dgettext("ui", "Scripts"), dgettext("ui", "Script published"))
+                    |> notify_output(
+                      dgettext("ui", "Scripts"),
+                      dgettext("ui", "Script published")
+                    )
                     |> notify_reload()
 
                   {:error, reason} ->
@@ -273,8 +276,8 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
       | Regex.scan(~r/function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/, content || "",
           capture: :all_but_first
         )
-      |> List.flatten()
-      |> Enum.reject(&(&1 == "main"))
+        |> List.flatten()
+        |> Enum.reject(&(&1 == "main"))
     ]
   end
 

@@ -87,7 +87,12 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
     case Generation.apply_validation(project_id, report) do
       {:ok, result} ->
-        notify_output(dgettext("ui", "Site Validation"), dgettext("ui", "Validation changes applied"), inspect(result))
+        notify_output(
+          dgettext("ui", "Site Validation"),
+          dgettext("ui", "Validation changes applied"),
+          inspect(result)
+        )
+
         notify_command("validate_site")
         {:noreply, socket}
     end
@@ -108,7 +113,9 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
     notify_output(
       dgettext("ui", "Translation Validation"),
-      dgettext("ui", "Deleted %{dbRows} DB rows and %{files} files, flushed %{flushed} translations to disk",
+      dgettext(
+        "ui",
+        "Deleted %{dbRows} DB rows and %{files} files, flushed %{flushed} translations to disk",
         dbRows: result.deleted_database_rows,
         files: result.deleted_files,
         flushed: result.flushed_translations
@@ -193,7 +200,11 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
         next_payload = Map.put(payload, :pairs, next_pairs)
         notify_tab_meta(tab_type, tab_id, %{payload: next_payload})
-        notify_output(dgettext("ui", "Find Duplicates"), dgettext("ui", "Selected pairs dismissed"))
+
+        notify_output(
+          dgettext("ui", "Find Duplicates"),
+          dgettext("ui", "Selected pairs dismissed")
+        )
 
         {:noreply, assign(socket, :selected_pairs, MapSet.new()) |> build_data()}
 
@@ -242,12 +253,15 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   end
 
   def handle_event("open_duplicate_post", %{"id" => id, "title" => title}, socket) do
-    notify_open_sidebar_item(%{"route" => "post", "id" => id, "title" => title, "subtitle" => "draft"}, :preview)
+    notify_open_sidebar_item(
+      %{"route" => "post", "id" => id, "title" => title, "subtitle" => "draft"},
+      :preview
+    )
+
     {:noreply, socket}
   end
 
   # ── Public helper functions (used by template) ─────────────────────────────
-
 
   @spec misc_class(atom()) :: String.t()
   def misc_class(:site_validation), do: "site-validation-view"
@@ -430,7 +444,9 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
       subtitle: Map.get(meta, :subtitle, ""),
       summary: %{},
       summary_text:
-        dgettext("ui", "Checked DB rows: %{dbRows} · Checked files: %{files} · Invalid DB rows: %{invalidDb} · Invalid files: %{invalidFiles}",
+        dgettext(
+          "ui",
+          "Checked DB rows: %{dbRows} · Checked files: %{files} · Invalid DB rows: %{invalidDb} · Invalid files: %{invalidFiles}",
           dbRows: report.checked_database_row_count,
           files: report.checked_filesystem_file_count,
           invalidDb: length(report.invalid_database_rows),

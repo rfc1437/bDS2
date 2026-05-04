@@ -27,10 +27,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
         ),
       "online_title_model" => get_model_preference(:title),
       "online_image_analysis_model" => get_model_preference(:image_analysis),
-      "online_chat_images" =>
-        model_supports_images?(
-          get_model_preference(:image_analysis)
-        ),
+      "online_chat_images" => model_supports_images?(get_model_preference(:image_analysis)),
       "offline_url" => Map.get(airplane_endpoint || %{}, :url, ""),
       "offline_api_key" => Map.get(airplane_endpoint || %{}, :api_key, ""),
       "offline_mode" => Map.get(assigns, :offline_mode, AI.airplane_mode?(true)),
@@ -48,9 +45,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
       "offline_title_model" => get_model_preference(:airplane_title),
       "offline_image_analysis_model" => get_model_preference(:airplane_image_analysis),
       "offline_chat_images" =>
-        model_supports_images?(
-          get_model_preference(:airplane_image_analysis)
-        ),
+        model_supports_images?(get_model_preference(:airplane_image_analysis)),
       "system_prompt" => EditorSettings.get_global_setting("ai.system_prompt") || ""
     }
   end
@@ -120,14 +115,14 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
              attrs.online_chat_tools,
              attrs.online_chat_disable_reasoning
            ),
-          :ok <- maybe_put_model_preference(:title, attrs.online_title_model),
-          :ok <- maybe_put_model_preference(:image_analysis, attrs.online_image_analysis_model),
-          :ok <-
-            maybe_put_image_model_capabilities(
-              attrs.online_image_analysis_model,
-              attrs.online_chat_images
-            ),
-          :ok <- maybe_put_model_preference(:airplane_chat, attrs.offline_chat_model),
+         :ok <- maybe_put_model_preference(:title, attrs.online_title_model),
+         :ok <- maybe_put_model_preference(:image_analysis, attrs.online_image_analysis_model),
+         :ok <-
+           maybe_put_image_model_capabilities(
+             attrs.online_image_analysis_model,
+             attrs.online_chat_images
+           ),
+         :ok <- maybe_put_model_preference(:airplane_chat, attrs.offline_chat_model),
          :ok <-
            maybe_put_chat_model_capabilities(
              attrs.offline_chat_model,
@@ -135,17 +130,17 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
              attrs.offline_chat_disable_reasoning
            ),
          :ok <- maybe_put_model_preference(:airplane_title, attrs.offline_title_model),
-          :ok <-
-            maybe_put_model_preference(
-              :airplane_image_analysis,
-              attrs.offline_image_analysis_model
-            ),
-          :ok <-
-            maybe_put_image_model_capabilities(
-              attrs.offline_image_analysis_model,
-              attrs.offline_chat_images
-            ),
-          :ok <- EditorSettings.put_global_setting("ai.system_prompt", attrs.system_prompt) do
+         :ok <-
+           maybe_put_model_preference(
+             :airplane_image_analysis,
+             attrs.offline_image_analysis_model
+           ),
+         :ok <-
+           maybe_put_image_model_capabilities(
+             attrs.offline_image_analysis_model,
+             attrs.offline_chat_images
+           ),
+         :ok <- EditorSettings.put_global_setting("ai.system_prompt", attrs.system_prompt) do
       socket
       |> assign(:settings_editor_ai_draft, %{})
       |> assign(:offline_mode, attrs.offline_mode)

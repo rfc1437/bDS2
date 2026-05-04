@@ -1,7 +1,6 @@
 defmodule BDS.Desktop.ShellLive.TaskLocalization do
   @moduledoc false
 
-
   def localize_task_status(task_status, locale) do
     tasks = Enum.map(Map.get(task_status, :tasks, []), &localize_task(&1, locale))
     active = Enum.filter(tasks, &(&1.status in [:running, :pending]))

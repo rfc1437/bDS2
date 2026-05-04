@@ -124,7 +124,12 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
               |> build_data()
 
             notify_parent({:media_editor_dirty, media.id, false})
-            notify_parent({:media_editor_tab_meta, media.id, display_title(updated_media), updated_media.original_name || updated_media.mime_type || ""})
+
+            notify_parent(
+              {:media_editor_tab_meta, media.id, display_title(updated_media),
+               updated_media.original_name || updated_media.mime_type || ""}
+            )
+
             {:noreply, socket}
 
           {:ok, nil} ->
@@ -218,7 +223,11 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     {:noreply, socket}
   end
 
-  def handle_event("change_media_post_picker", %{"media_post_picker" => %{"query" => query}}, socket) do
+  def handle_event(
+        "change_media_post_picker",
+        %{"media_post_picker" => %{"query" => query}},
+        socket
+      ) do
     socket =
       socket
       |> assign(:post_picker_query, to_string(query || ""))
@@ -351,7 +360,13 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
               {:noreply, build_data(socket)}
 
             {:error, reason} ->
-              notify_output(socket, dgettext("ui", "Refresh Translation"), inspect(reason), "error")
+              notify_output(
+                socket,
+                dgettext("ui", "Refresh Translation"),
+                inspect(reason),
+                "error"
+              )
+
               {:noreply, build_data(socket)}
           end
 
@@ -469,7 +484,12 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
               |> build_data()
 
             notify_parent({:media_editor_dirty, media.id, false})
-            notify_parent({:media_editor_tab_meta, media.id, display_title(updated_media), updated_media.original_name || updated_media.mime_type || ""})
+
+            notify_parent(
+              {:media_editor_tab_meta, media.id, display_title(updated_media),
+               updated_media.original_name || updated_media.mime_type || ""}
+            )
+
             notify_output(socket, dgettext("ui", "Media"), dgettext("ui", "Media saved"))
             socket
 
@@ -683,7 +703,6 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
       trimmed -> trimmed
     end
   end
-
 
   @spec media_editor_save_state_label(term()) :: term()
   def media_editor_save_state_label(:dirty), do: dgettext("ui", "Unsaved")

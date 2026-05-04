@@ -60,6 +60,9 @@ defmodule BDS.Desktop.ShellLive do
   use Gettext, backend: BDS.Gettext
 
   @refresh_interval 1_500
+
+  def refresh_interval, do: @refresh_interval
+
   @output_entry_limit 20
   @sidebar_filter_events [
     "toggle_sidebar_filters",
@@ -126,7 +129,9 @@ defmodule BDS.Desktop.ShellLive do
     |> MapSet.union(MapSet.new([:open_in_browser, :open_data_folder]))
     |> MapSet.union(MapSet.new([:preview_post, :rebuild_database, :reindex_text]))
     |> MapSet.union(MapSet.new([:rebuild_embedding_index, :metadata_diff, :regenerate_calendar]))
-    |> MapSet.union(MapSet.new([:validate_translations, :fill_missing_translations, :find_duplicates]))
+    |> MapSet.union(
+      MapSet.new([:validate_translations, :fill_missing_translations, :find_duplicates])
+    )
     |> MapSet.union(MapSet.new([:generate_sitemap, :validate_site, :upload_site]))
   end
 
@@ -138,7 +143,7 @@ defmodule BDS.Desktop.ShellLive do
 
     if connected do
       Phoenix.PubSub.subscribe(BDS.PubSub, Watcher.topic())
-      :timer.send_interval(@refresh_interval, :refresh_task_status)
+      Process.send_after(self(), :refresh_task_status, @refresh_interval)
     end
 
     workbench = Workbench.new()
@@ -158,13 +163,13 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:titlebar_menu_item_index, nil)
      |> assign(:tab_meta, %{})
      |> assign(:project_menu_open, false)
-      |> assign(:sidebar_filters_by_view, %{})
-       |> assign(:sidebar_filter_panels, %{})
-      |> assign(:chat_editor_request_refs, %{})
-      |> assign(:shell_overlay, nil)
-      |> assign(:output_entries, [])
-      |> reload_shell(workbench)
-      |> tap(&sync_menu_bar_locale/1)}
+     |> assign(:sidebar_filters_by_view, %{})
+     |> assign(:sidebar_filter_panels, %{})
+     |> assign(:chat_editor_request_refs, %{})
+     |> assign(:shell_overlay, nil)
+     |> assign(:output_entries, [])
+     |> reload_shell(workbench)
+     |> tap(&sync_menu_bar_locale/1)}
   end
 
   @impl true
@@ -262,7 +267,14 @@ defmodule BDS.Desktop.ShellLive do
         %{"route" => route, "id" => id} = params,
         socket
       ) do
-    {:noreply, SidebarDelete.request_delete(socket, route, id, Map.get(params, "title"), sidebar_delete_callbacks())}
+    {:noreply,
+     SidebarDelete.request_delete(
+       socket,
+       route,
+       id,
+       Map.get(params, "title"),
+       sidebar_delete_callbacks()
+     )}
   end
 
   def handle_event("toggle_offline_mode", _params, socket) do
@@ -319,7 +331,8 @@ defmodule BDS.Desktop.ShellLive do
     do: OverlayManager.handle_event("overlay_keydown", params, socket, overlay_callbacks())
 
   def handle_event("overlay_toggle_ai_field", params, socket),
-    do: OverlayManager.handle_event("overlay_toggle_ai_field", params, socket, overlay_callbacks())
+    do:
+      OverlayManager.handle_event("overlay_toggle_ai_field", params, socket, overlay_callbacks())
 
   def handle_event("overlay_set_search", params, socket),
     do: OverlayManager.handle_event("overlay_set_search", params, socket, overlay_callbacks())
@@ -334,22 +347,36 @@ defmodule BDS.Desktop.ShellLive do
     do: OverlayManager.handle_event("overlay_select_result", params, socket, overlay_callbacks())
 
   def handle_event("overlay_insert_external", params, socket),
-    do: OverlayManager.handle_event("overlay_insert_external", params, socket, overlay_callbacks())
+    do:
+      OverlayManager.handle_event("overlay_insert_external", params, socket, overlay_callbacks())
 
   def handle_event("overlay_select_language", params, socket),
-    do: OverlayManager.handle_event("overlay_select_language", params, socket, overlay_callbacks())
+    do:
+      OverlayManager.handle_event("overlay_select_language", params, socket, overlay_callbacks())
 
   def handle_event("overlay_confirm", params, socket),
     do: OverlayManager.handle_event("overlay_confirm", params, socket, overlay_callbacks())
 
   def handle_event("overlay_select_gallery_image", params, socket),
-    do: OverlayManager.handle_event("overlay_select_gallery_image", params, socket, overlay_callbacks())
+    do:
+      OverlayManager.handle_event(
+        "overlay_select_gallery_image",
+        params,
+        socket,
+        overlay_callbacks()
+      )
 
   def handle_event("overlay_close_lightbox", params, socket),
     do: OverlayManager.handle_event("overlay_close_lightbox", params, socket, overlay_callbacks())
 
   def handle_event("overlay_lightbox_previous", params, socket),
-    do: OverlayManager.handle_event("overlay_lightbox_previous", params, socket, overlay_callbacks())
+    do:
+      OverlayManager.handle_event(
+        "overlay_lightbox_previous",
+        params,
+        socket,
+        overlay_callbacks()
+      )
 
   def handle_event("overlay_lightbox_next", params, socket),
     do: OverlayManager.handle_event("overlay_lightbox_next", params, socket, overlay_callbacks())
@@ -484,7 +511,8 @@ defmodule BDS.Desktop.ShellLive do
     next_socket =
       cond do
         Map.has_key?(socket.assigns.chat_editor_request_refs, ref) ->
-          {conversation_id, remaining_refs} = Map.pop(socket.assigns.chat_editor_request_refs, ref)
+          {conversation_id, remaining_refs} =
+            Map.pop(socket.assigns.chat_editor_request_refs, ref)
 
           if reason == :normal do
             assign(socket, :chat_editor_request_refs, remaining_refs)
@@ -552,7 +580,7 @@ defmodule BDS.Desktop.ShellLive do
     task_status = localize_task_status(raw_task_status, page_language)
 
     socket
-  |> assign(:tab_meta, tab_meta)
+    |> assign(:tab_meta, tab_meta)
     |> assign(:workbench, workbench)
     |> assign(:projects, projects)
     |> assign(:current_project, ShellData.current_project(projects))
@@ -737,7 +765,13 @@ defmodule BDS.Desktop.ShellLive do
         apply_shell_command(socket, Atom.to_string(action))
 
       true ->
-        append_output_entry(socket, "Menu", "Unsupported shell command", Atom.to_string(action), "error")
+        append_output_entry(
+          socket,
+          "Menu",
+          "Unsupported shell command",
+          Atom.to_string(action),
+          "error"
+        )
     end
   end
 
@@ -871,5 +905,4 @@ defmodule BDS.Desktop.ShellLive do
       pid -> send(pid, {:set_ui_locale, locale})
     end
   end
-
 end

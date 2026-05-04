@@ -60,7 +60,9 @@ defmodule BDS.AI.Model do
         :interleaved,
         :status,
         :updated_at
-      ], empty_values: [nil])
+      ],
+      empty_values: [nil]
+    )
     |> validate_required([
       :provider,
       :model_id,

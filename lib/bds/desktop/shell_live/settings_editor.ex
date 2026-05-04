@@ -118,13 +118,16 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
   end
 
   def handle_event("save_settings_publishing", _params, socket) do
-    socket = PublishingSettings.save_publishing(socket, reload_callback(), append_output_callback())
+    socket =
+      PublishingSettings.save_publishing(socket, reload_callback(), append_output_callback())
+
     notify_parent(:settings_changed)
     {:noreply, socket}
   end
 
   def handle_event("clear_settings_publishing", _params, socket) do
-    {:noreply, PublishingSettings.clear_publishing(socket, reload_callback(), append_output_callback())}
+    {:noreply,
+     PublishingSettings.clear_publishing(socket, reload_callback(), append_output_callback())}
   end
 
   def handle_event("change_settings_new_category", %{"name" => name}, socket) do
@@ -138,25 +141,38 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
   end
 
   def handle_event("reset_settings_categories", _params, socket) do
-    socket = ManagedCategories.reset_categories(socket, reload_callback(), append_output_callback())
+    socket =
+      ManagedCategories.reset_categories(socket, reload_callback(), append_output_callback())
+
     notify_parent(:settings_changed)
     {:noreply, socket}
   end
 
   def handle_event("save_settings_category", %{"category_settings" => params}, socket) do
-    socket = ManagedCategories.save_category(socket, params, reload_callback(), append_output_callback())
+    socket =
+      ManagedCategories.save_category(socket, params, reload_callback(), append_output_callback())
+
     notify_parent(:settings_changed)
     {:noreply, socket}
   end
 
   def handle_event("remove_settings_category", %{"category" => category}, socket) do
-    socket = ManagedCategories.remove_category(socket, category, reload_callback(), append_output_callback())
+    socket =
+      ManagedCategories.remove_category(
+        socket,
+        category,
+        reload_callback(),
+        append_output_callback()
+      )
+
     notify_parent(:settings_changed)
     {:noreply, socket}
   end
 
   def handle_event("toggle_settings_mcp_agent", %{"agent" => agent}, socket) do
-    socket = MCPConfig.toggle_mcp_agent(socket, agent, reload_callback(), append_output_callback())
+    socket =
+      MCPConfig.toggle_mcp_agent(socket, agent, reload_callback(), append_output_callback())
+
     notify_parent(:settings_changed)
     {:noreply, socket}
   end
@@ -385,5 +401,4 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
 
   defp section_matches?(query, keywords),
     do: Enum.any?(keywords, &String.contains?(&1, String.downcase(query)))
-
 end

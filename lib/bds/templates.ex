@@ -102,7 +102,8 @@ defmodule BDS.Templates do
           end
 
         content_changed? =
-          has_attr?(attrs, :content) and attr(attrs, :content) != effective_template_content(template)
+          has_attr?(attrs, :content) and
+            attr(attrs, :content) != effective_template_content(template)
 
         slug_changed? = next_slug != template.slug
         now = Persistence.now_ms()
@@ -472,7 +473,9 @@ defmodule BDS.Templates do
 
   defp hydrate_template_content(%Template{} = template) do
     case template do
-      %Template{content: content} when is_binary(content) -> template
+      %Template{content: content} when is_binary(content) ->
+        template
+
       %Template{status: :published, file_path: file_path} when file_path not in [nil, ""] ->
         %{template | content: published_template_body(template)}
 

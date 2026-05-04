@@ -1,6 +1,7 @@
 defmodule BDS.Desktop.ShellLiveTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
   import Phoenix.ConnTest
   import Phoenix.LiveViewTest
 
@@ -174,6 +175,26 @@ defmodule BDS.Desktop.ShellLiveTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+
+    Enum.each(BDS.Tasks.list_running_tasks(), fn task ->
+      BDS.Tasks.cancel_task(task.id)
+    end)
+
+    if :ets.whereis(:bds_ai_in_flight) != :undefined do
+      Enum.each(:ets.tab2list(:bds_ai_in_flight), fn {_conversation_id, pid} ->
+        Process.exit(pid, :kill)
+      end)
+    end
+
+    for {_, pid, _, _} <- DynamicSupervisor.which_children(BDS.TCP.TaskSupervisor) do
+      DynamicSupervisor.terminate_child(BDS.TCP.TaskSupervisor, pid)
+    end
+
+    for {_, pid, _, _} <- DynamicSupervisor.which_children(BDS.Tasks.TaskSupervisor) do
+      DynamicSupervisor.terminate_child(BDS.Tasks.TaskSupervisor, pid)
+    end
+
+    Process.sleep(100)
 
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-shell-live-#{System.unique_integer([:positive])}")
@@ -422,12 +443,16 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     _html =
       view
-      |> element("#tags-editor-shell button[phx-click='toggle_tag_selection'][phx-value-name='Alpha']")
+      |> element(
+        "#tags-editor-shell button[phx-click='toggle_tag_selection'][phx-value-name='Alpha']"
+      )
       |> render_click()
 
     _html =
       view
-      |> element("#tags-editor-shell button[phx-click='toggle_tag_selection'][phx-value-name='Beta']")
+      |> element(
+        "#tags-editor-shell button[phx-click='toggle_tag_selection'][phx-value-name='Beta']"
+      )
       |> render_click()
 
     _html =
@@ -1328,7 +1353,9 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     html =
       view
-      |> element("#settings-editor-shell button[phx-click='refresh_settings_ai_models'][phx-value-endpoint='online']")
+      |> element(
+        "#settings-editor-shell button[phx-click='refresh_settings_ai_models'][phx-value-endpoint='online']"
+      )
       |> render_click()
 
     assert html =~ ~s(<option value="gpt-4.1"></option>)
@@ -1336,7 +1363,9 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     html =
       view
-      |> element("#settings-editor-shell button[phx-click='refresh_settings_ai_models'][phx-value-endpoint='airplane']")
+      |> element(
+        "#settings-editor-shell button[phx-click='refresh_settings_ai_models'][phx-value-endpoint='airplane']"
+      )
       |> render_click()
 
     assert html =~ ~s(<option value="llama3.3"></option>)
@@ -2717,7 +2746,12 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert html =~ "ai-suggestions-modal"
 
-    send(view.pid, {:ai_suggestions_error, :post, post.id, :test_error})
+    _ =
+      capture_log(fn ->
+        send(view.pid, {:ai_suggestions_error, :post, post.id, :test_error})
+        render(view)
+      end)
+
     html = render(view)
 
     assert html =~ "ai-suggestions-modal"
@@ -3236,6 +3270,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       view
       |> element("[data-testid='chat-model-selector-button']")
       |> render_click()
+
     assert selector_html =~ ~s(class="chat-model-selector-menu")
     assert selector_html =~ ~s(data-testid="chat-model-selector-option")
     assert selector_html =~ "llama-current"

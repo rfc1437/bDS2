@@ -148,8 +148,12 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
               socket
 
             result ->
-              send(self(), {:post_editor_insert_content, post_id,
-               ShellOverlayComponents.markdown_link(result.title, result.canonical_url)})
+              send(
+                self(),
+                {:post_editor_insert_content, post_id,
+                 ShellOverlayComponents.markdown_link(result.title, result.canonical_url)}
+              )
+
               socket
           end
 
@@ -233,13 +237,15 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
 
     socket =
       case {socket.assigns[:shell_overlay], current_tab} do
-        {%{kind: :confirm_delete, delete_action: %{source: :sidebar, route: route, id: id}},
-         _tab} ->
+        {%{kind: :confirm_delete, delete_action: %{source: :sidebar, route: route, id: id}}, _tab} ->
           callbacks.execute_sidebar_delete.(socket, route, id)
 
         {%{kind: :ai_suggestions} = overlay, %{type: :post, id: post_id}} ->
-          send(self(), {:post_editor_apply_ai_suggestions, post_id,
-           Overlay.selected_ai_fields(overlay)})
+          send(
+            self(),
+            {:post_editor_apply_ai_suggestions, post_id, Overlay.selected_ai_fields(overlay)}
+          )
+
           socket
 
         {%{kind: :ai_suggestions} = overlay, %{type: :media, id: media_id}} ->
@@ -258,8 +264,10 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
 
               socket
               |> assign(:shell_overlay, nil)
-              |> assign(:tab_meta,
-                Map.delete(socket.assigns.tab_meta, {:media, media_id}))
+              |> assign(
+                :tab_meta,
+                Map.delete(socket.assigns.tab_meta, {:media, media_id})
+              )
               |> callbacks.reload.(workbench)
 
             {:error, reason} ->
@@ -331,8 +339,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
                   }
               end
 
-            assign(socket, :shell_overlay,
-              Overlay.set_ai_suggestions(overlay, suggestions))
+            assign(socket, :shell_overlay, Overlay.set_ai_suggestions(overlay, suggestions))
           else
             socket
           end
@@ -355,13 +362,12 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
           if current_tab && current_tab.type == type && current_tab.id == id do
             message =
               if is_map(reason) and Map.has_key?(reason, :kind) do
-              "#{reason.kind}: #{inspect(Map.drop(reason, [:kind]))}"
+                "#{reason.kind}: #{inspect(Map.drop(reason, [:kind]))}"
               else
                 inspect(reason)
               end
 
-            assign(socket, :shell_overlay,
-              Overlay.set_ai_suggestions_error(overlay, message))
+            assign(socket, :shell_overlay, Overlay.set_ai_suggestions_error(overlay, message))
           else
             socket
           end
@@ -444,5 +450,4 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
   rescue
     _error -> "en"
   end
-
 end

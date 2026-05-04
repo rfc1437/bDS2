@@ -241,7 +241,8 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert result.action == "fill_missing_translations"
     assert is_binary(result.task_id)
 
-    completed = wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)), 5_000)
+    completed =
+      wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)), 5_000)
 
     assert completed.group_name == "AI"
     assert completed.result.project_id == project.id
@@ -319,7 +320,9 @@ defmodule BDS.Desktop.ShellCommandsTest do
              })
 
     assert {:ok, result} = ShellCommands.execute("fill_missing_translations")
-    completed = wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)), 5_000)
+
+    completed =
+      wait_for_task(result.task_id, &(&1.status == :completed and is_map(&1.result)), 5_000)
 
     assert completed.result.translated_posts == 1
     assert completed.result.translated_media == 1
@@ -530,8 +533,10 @@ defmodule BDS.Desktop.ShellCommandsTest do
       wait_for_task(
         result.task_id,
         fn task ->
-          task.status in [:running, :completed] and is_number(task.progress) and task.progress > 0.2 and
-            Repo.get_by(BDS.Posts.Post, project_id: project.id, file_path: post_orphan_path) != nil and
+          task.status in [:running, :completed] and is_number(task.progress) and
+            task.progress > 0.2 and
+            Repo.get_by(BDS.Posts.Post, project_id: project.id, file_path: post_orphan_path) !=
+              nil and
             Repo.get_by(BDS.Posts.Translation,
               project_id: project.id,
               file_path: post_translation_orphan_path
@@ -545,6 +550,7 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert progressed.progress > 0.2
 
     assert Repo.get_by(BDS.Posts.Post, project_id: project.id, file_path: post_orphan_path)
+
     assert Repo.get_by(BDS.Posts.Translation,
              project_id: project.id,
              file_path: post_translation_orphan_path

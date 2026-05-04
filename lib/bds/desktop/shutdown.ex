@@ -21,9 +21,7 @@ defmodule BDS.Desktop.Shutdown do
       userData: self()
     )
 
-    :wxFrame.connect(frame, :command_menu_selected,
-      callback: &__MODULE__.command_menu_selected/2
-    )
+    :wxFrame.connect(frame, :command_menu_selected, callback: &__MODULE__.command_menu_selected/2)
 
     :ok
   rescue

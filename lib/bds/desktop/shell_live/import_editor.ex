@@ -31,6 +31,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     ]
 
   use Gettext, backend: BDS.Gettext
+
   import TaxonomyEditing,
     only: [
       existing_taxonomy_terms: 1,
@@ -344,7 +345,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
            mapped_to <- Map.get(params, "mapped_to"),
            normalized_value <-
              TaxonomyEditing.normalize_taxonomy_mapping_value(project_id, type, mapped_to),
-           updated_report <- TaxonomyEditing.update_taxonomy_mapping(report, type, name, normalized_value),
+           updated_report <-
+             TaxonomyEditing.update_taxonomy_mapping(report, type, name, normalized_value),
            {:ok, _definition} <-
              ImportDefinitions.update_definition(definition_id, %{
                last_analysis_result: updated_report
@@ -375,7 +377,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
            %{} = report <- ImportDefinitions.decode_analysis_result(definition),
            normalized_value <-
              TaxonomyEditing.normalize_taxonomy_mapping_value(project_id, type, ""),
-           updated_report <- TaxonomyEditing.update_taxonomy_mapping(report, type, name, normalized_value),
+           updated_report <-
+             TaxonomyEditing.update_taxonomy_mapping(report, type, name, normalized_value),
            {:ok, _definition} <-
              ImportDefinitions.update_definition(definition_id, %{
                last_analysis_result: updated_report
@@ -409,7 +412,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   def handle_event("toggle_import_ai_model_selector", _params, socket) do
     {:noreply,
-     assign(socket, :model_selector_open?, not socket.assigns.model_selector_open?) |> build_data()}
+     assign(socket, :model_selector_open?, not socket.assigns.model_selector_open?)
+     |> build_data()}
   end
 
   def handle_event("select_import_ai_model", %{"model" => model_id}, socket) do
@@ -432,7 +436,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
         if socket.assigns.offline_mode? do
           notify_output(
             dgettext("ui", "Import"),
-            BDS.Gettext.lgettext(socket.assigns[:page_language] || ShellData.ui_language(), "ui", "Automatic AI actions stay gated by airplane mode."),
+            BDS.Gettext.lgettext(
+              socket.assigns[:page_language] || ShellData.ui_language(),
+              "ui",
+              "Automatic AI actions stay gated by airplane mode."
+            ),
             "info"
           )
 
@@ -485,7 +493,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   # ── handle_info for async tasks ────────────────────────────────────────────
 
-  @spec handle_info({:import_analysis_progress, atom() | String.t(), String.t()}, Phoenix.LiveView.Socket.t()) ::
+  @spec handle_info(
+          {:import_analysis_progress, atom() | String.t(), String.t()},
+          Phoenix.LiveView.Socket.t()
+        ) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_info({:import_analysis_progress, step, detail}, socket) do
     socket =
@@ -551,7 +562,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           |> assign(:analysis_state, default_analysis_state())
           |> notify_output(dgettext("ui", "Import"), message, "error")
 
-        match?(%{ref: ^ref}, socket.assigns.execution_state) and reason not in [:normal, :shutdown] ->
+        match?(%{ref: ^ref}, socket.assigns.execution_state) and
+            reason not in [:normal, :shutdown] ->
           message = if is_binary(reason), do: reason, else: inspect(reason)
 
           socket
@@ -631,7 +643,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
     notify_parent(
       {:import_editor_tab_meta, socket.assigns.definition_id, title,
-       dgettext("ui", "Select a WordPress export file (WXR) and an uploads folder to analyze what would be imported.")}
+       dgettext(
+         "ui",
+         "Select a WordPress export file (WXR) and an uploads folder to analyze what would be imported."
+       )}
     )
 
     socket

@@ -65,7 +65,9 @@ defmodule BDS.Media.Rebuilder do
           Sidecars.upsert_translation_from_sidecar(
             project,
             canonical_media_by_binary_path,
-            sidecar, sync_search: false)
+            sidecar,
+            sync_search: false
+          )
 
           :ok = report_rebuild_progress(on_progress, index, total_files, "media files")
         end)

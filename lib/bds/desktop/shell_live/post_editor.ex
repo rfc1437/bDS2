@@ -47,6 +47,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     ]
 
   use Gettext, backend: BDS.Gettext
+
   import PostMetadata,
     only: [
       blank?: 1,
@@ -589,7 +590,10 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
             {:ok, %{language_code: language_code}}
             when is_binary(language_code) and language_code != "" ->
               socket
-              |> put_component_draft_field("language", normalize_language(language_code, socket.assigns.canonical_language))
+              |> put_component_draft_field(
+                "language",
+                normalize_language(language_code, socket.assigns.canonical_language)
+              )
               |> build_data()
 
             {:error, reason} ->
@@ -685,7 +689,10 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
                 socket
                 |> assign(:post, updated_post)
                 |> assign(:project_metadata, metadata)
-                |> assign(:drafts, Map.put(socket.assigns.drafts, active_language, refreshed_form))
+                |> assign(
+                  :drafts,
+                  Map.put(socket.assigns.drafts, active_language, refreshed_form)
+                )
                 |> assign(:save_state, :dirty)
                 |> assign(:dirty?, true)
                 |> assign(:shell_overlay, nil)
@@ -822,5 +829,4 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   @spec post_editor_mode_label(term()) :: term()
   def post_editor_mode_label(:markdown), do: dgettext("ui", "Markdown")
   def post_editor_mode_label(:preview), do: dgettext("ui", "Preview")
-
 end

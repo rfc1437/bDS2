@@ -431,7 +431,8 @@ defmodule BDS.Generation.Validation do
          _relative_path,
          %{requires_fallback_section_render: true},
          _main?
-       ), do: true
+       ),
+       do: true
 
   defp targeted_output_for_plan?(relative_path, plan, _main?) do
     cond do

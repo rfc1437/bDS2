@@ -211,8 +211,14 @@ defmodule BDS.AI.OneShot do
       model: model,
       max_output_tokens: @default_max_output_tokens,
       messages: [
-        %{"role" => "system", "content" => one_shot_system_prompt(operation, language, source_language)},
-        %{"role" => "user", "content" => one_shot_user_content(operation, payload, language, source_language)}
+        %{
+          "role" => "system",
+          "content" => one_shot_system_prompt(operation, language, source_language)
+        },
+        %{
+          "role" => "user",
+          "content" => one_shot_user_content(operation, payload, language, source_language)
+        }
       ]
     }
   end
@@ -320,7 +326,8 @@ defmodule BDS.AI.OneShot do
     [
       %{
         "type" => "text",
-        "text" => "Analyze this image and return title, alt text, and caption in #{language_name(language)}."
+        "text" =>
+          "Analyze this image and return title, alt text, and caption in #{language_name(language)}."
       },
       %{"type" => "image_url", "image_url" => %{"url" => media.image_url}}
     ]
@@ -443,7 +450,11 @@ defmodule BDS.AI.OneShot do
   defp resolve_image_data_url(%{image_url: "file://" <> path, mime_type: mime_type} = media) do
     with {:ok, binary} <- File.read(path) do
       data_url = "data:#{mime_type};base64," <> Base.encode64(binary)
-      Logger.debug("AI analyze_image converted file://#{path} to data URL (#{byte_size(data_url)} chars)")
+
+      Logger.debug(
+        "AI analyze_image converted file://#{path} to data URL (#{byte_size(data_url)} chars)"
+      )
+
       {:ok, %{media | image_url: data_url}}
     else
       {:error, reason} ->
@@ -452,7 +463,9 @@ defmodule BDS.AI.OneShot do
     end
   end
 
-  defp resolve_image_data_url(%{file_path: file_path, project_id: project_id, mime_type: mime_type} = media)
+  defp resolve_image_data_url(
+         %{file_path: file_path, project_id: project_id, mime_type: mime_type} = media
+       )
        when is_binary(file_path) and is_binary(project_id) do
     case Projects.get_project(project_id) do
       nil ->
@@ -465,7 +478,11 @@ defmodule BDS.AI.OneShot do
         case File.read(absolute_path) do
           {:ok, binary} ->
             data_url = "data:#{mime_type};base64," <> Base.encode64(binary)
-            Logger.debug("AI analyze_image converted #{absolute_path} to data URL (#{byte_size(data_url)} chars)")
+
+            Logger.debug(
+              "AI analyze_image converted #{absolute_path} to data URL (#{byte_size(data_url)} chars)"
+            )
+
             {:ok, %{media | image_url: data_url}}
 
           {:error, reason} ->

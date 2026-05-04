@@ -6,7 +6,13 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
   alias BDS.{AI, ImportDefinitions, Media, Posts, Scripts, Templates}
   use Gettext, backend: BDS.Gettext
 
-  @spec request_delete(Phoenix.LiveView.Socket.t(), String.t(), String.t(), String.t() | nil, map()) ::
+  @spec request_delete(
+          Phoenix.LiveView.Socket.t(),
+          String.t(),
+          String.t(),
+          String.t() | nil,
+          map()
+        ) ::
           Phoenix.LiveView.Socket.t()
   def request_delete(socket, route, id, fallback_title, callbacks) do
     case delete_target(socket, route, id, fallback_title) do
@@ -43,9 +49,15 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
         delete_entity(socket, :scripts, id, &Scripts.delete_script/1, callbacks)
 
       "templates" ->
-        delete_entity(socket, :templates, id, fn tid ->
-          Templates.delete_template(tid, force: true)
-        end, callbacks)
+        delete_entity(
+          socket,
+          :templates,
+          id,
+          fn tid ->
+            Templates.delete_template(tid, force: true)
+          end,
+          callbacks
+        )
 
       "chat" ->
         delete_entity(socket, :chat, id, &AI.delete_chat_conversation/1, callbacks)
@@ -56,7 +68,12 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
       _other ->
         socket
         |> assign(:shell_overlay, nil)
-        |> callbacks.append_output.(dgettext("ui", "Delete"), inspect(:unsupported_route), nil, "error")
+        |> callbacks.append_output.(
+          dgettext("ui", "Delete"),
+          inspect(:unsupported_route),
+          nil,
+          "error"
+        )
         |> callbacks.reload.(socket.assigns.workbench)
     end
   end
@@ -95,7 +112,9 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
       "post" ->
         case Posts.get_post(id) do
           %{project_id: ^active_project_id} = post ->
-            {:ok, present_title(fallback_title) || present_title(post.title) || present_title(post.slug) || id}
+            {:ok,
+             present_title(fallback_title) || present_title(post.title) ||
+               present_title(post.slug) || id}
 
           _other ->
             {:error, :not_found}
@@ -155,7 +174,10 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
   defp delete_title("post"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Post")
   defp delete_title("media"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Media")
   defp delete_title("scripts"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Script")
-  defp delete_title("templates"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Template")
+
+  defp delete_title("templates"),
+    do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Template")
+
   defp delete_title("import"), do: dgettext("ui", "Delete") <> " " <> dgettext("ui", "Import")
   defp delete_title(_route), do: dgettext("ui", "Delete")
 
@@ -168,5 +190,4 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
   end
 
   defp present_title(_value), do: nil
-
 end

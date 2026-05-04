@@ -61,7 +61,8 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   def handle_event("toggle_chat_model_selector", _params, socket) do
     {:noreply,
-     assign(socket, :model_selector_open?, not socket.assigns.model_selector_open?) |> build_data()}
+     assign(socket, :model_selector_open?, not socket.assigns.model_selector_open?)
+     |> build_data()}
   end
 
   def handle_event("select_chat_model", %{"model" => model_id}, socket) do
@@ -101,7 +102,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
       ) do
     socket =
       socket
-      |> assign(:surface_tabs, Map.put(socket.assigns.surface_tabs, surface_id, parse_integer(index)))
+      |> assign(
+        :surface_tabs,
+        Map.put(socket.assigns.surface_tabs, surface_id, parse_integer(index))
+      )
       |> build_data()
 
     {:noreply, socket}
@@ -272,7 +276,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         assign(socket, :request, nil) |> build_data()
 
       {:error, reason} ->
-        notify_parent({:chat_editor_output, dgettext("ui", "Chat"), format_error(reason), "error"})
+        notify_parent(
+          {:chat_editor_output, dgettext("ui", "Chat"), format_error(reason), "error"}
+        )
+
         assign(socket, :request, nil) |> build_data()
     end
   end

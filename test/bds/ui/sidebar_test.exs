@@ -213,6 +213,8 @@ defmodule BDS.UI.SidebarTest do
     Repo.update_all(
       from(definition in BDS.ImportDefinitions.ImportDefinition,
         where: definition.id == ^definition_id
-      ), set: [updated_at: updated_at])
+      ),
+      set: [updated_at: updated_at]
+    )
   end
 end

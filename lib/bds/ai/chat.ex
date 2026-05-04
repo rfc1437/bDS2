@@ -69,7 +69,9 @@ defmodule BDS.AI.Chat do
         {:error, :not_found}
 
       %ChatConversation{} = conversation ->
-        Repo.delete_all(from message in ChatMessage, where: message.conversation_id == ^conversation_id)
+        Repo.delete_all(
+          from message in ChatMessage, where: message.conversation_id == ^conversation_id
+        )
 
         case Repo.delete(conversation) do
           {:ok, _conversation} -> {:ok, :deleted}
@@ -375,7 +377,8 @@ defmodule BDS.AI.Chat do
              opts,
              @chat_max_tool_rounds
            ),
-         {:ok, reply} <- maybe_generate_chat_title(conversation.id, user_message.content, reply, opts) do
+         {:ok, reply} <-
+           maybe_generate_chat_title(conversation.id, user_message.content, reply, opts) do
       {:ok, reply}
     end
   end
@@ -425,7 +428,8 @@ defmodule BDS.AI.Chat do
     with {:ok, endpoint, model, mode} <- Runtime.resolve_target(:chat_title, opts),
          :ok <- Runtime.validate_target(:chat_title, model, mode),
          request <- build_chat_title_request(user_content, model),
-         {:ok, response} <- runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts) do
+         {:ok, response} <-
+           runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts) do
       title = sanitize_chat_title(Map.get(response, :content))
 
       if title == "" do

@@ -25,7 +25,11 @@ defmodule BDS.DesktopTest do
 
   defmodule FakeWindowLifecycle do
     def hide(window_id) do
-      send(Application.fetch_env!(:bds, :desktop_shutdown_test_pid), {:window_hide_requested, window_id})
+      send(
+        Application.fetch_env!(:bds, :desktop_shutdown_test_pid),
+        {:window_hide_requested, window_id}
+      )
+
       :ok
     end
 

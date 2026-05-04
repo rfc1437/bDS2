@@ -64,8 +64,6 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
 
   def markdown_link(text, url), do: "[#{text}](#{url})"
 
-
-
   def project_metadata(nil), do: %{main_language: "en", blog_languages: []}
 
   def project_metadata(project_id) do

@@ -69,8 +69,7 @@ defmodule BDS.Rendering.Filters do
             "macros/vimeo",
             %{
               "id" => Map.get(params, "id", ""),
-              "title" =>
-                default_macro_title(Map.get(params, "title"), language, "Vimeo video")
+              "title" => default_macro_title(Map.get(params, "title"), language, "Vimeo video")
             },
             context
           )

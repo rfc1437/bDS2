@@ -206,7 +206,8 @@ defmodule BDS.AITest do
           {:ok,
            %{
              json: %{
-               "title" => "Analyzed " <> (get_in(request.messages, [Access.at(1), "content"]) || ""),
+               "title" =>
+                 "Analyzed " <> (get_in(request.messages, [Access.at(1), "content"]) || ""),
                "excerpt" => "Analyzed excerpt",
                "slug" => "analyzed-slug"
              },
@@ -386,17 +387,22 @@ defmodule BDS.AITest do
 
     {:ok, {_address, port}} = ThousandIsland.listener_info(server)
 
-    assert {:error, %{kind: :invalid_json_response, reason: %Jason.DecodeError{}}} =
-             BDS.AI.OpenAICompatibleRuntime.generate(
-               %{url: "http://127.0.0.1:#{port}/v1", api_key: nil},
-               %{
-                 model: "gpt-test",
-                 messages: [%{"role" => "user", "content" => "Hello"}],
-                 max_output_tokens: 128,
-                 tools: []
-               },
-               []
-             )
+    log =
+      capture_log(fn ->
+        assert {:error, %{kind: :invalid_json_response, reason: %Jason.DecodeError{}}} =
+                 BDS.AI.OpenAICompatibleRuntime.generate(
+                   %{url: "http://127.0.0.1:#{port}/v1", api_key: nil},
+                   %{
+                     model: "gpt-test",
+                     messages: [%{"role" => "user", "content" => "Hello"}],
+                     max_output_tokens: 128,
+                     tools: []
+                   },
+                   []
+                 )
+      end)
+
+    assert log =~ "AI OpenAI-compatible response normalization failed"
   end
 
   test "openai-compatible generation accepts title requests without tools" do

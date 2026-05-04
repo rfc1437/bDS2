@@ -3,7 +3,9 @@ defmodule BDS.Desktop.ShellLive.SidebarEvents do
 
   alias BDS.Desktop.ShellLive.SidebarState, as: ShellSidebarState
 
-  @spec handle(Phoenix.LiveView.Socket.t(), String.t(), map(), (Phoenix.LiveView.Socket.t(), term() -> Phoenix.LiveView.Socket.t())) ::
+  @spec handle(Phoenix.LiveView.Socket.t(), String.t(), map(), (Phoenix.LiveView.Socket.t(),
+                                                                term() ->
+                                                                  Phoenix.LiveView.Socket.t())) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle(socket, event, params, reload)
 

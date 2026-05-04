@@ -86,7 +86,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
           socket
           |> append_output.(
             dgettext("ui", "Import"),
-            BDS.Gettext.lgettext(socket.assigns.page_language, "ui", "Automatic AI actions stay gated by airplane mode."),
+            BDS.Gettext.lgettext(
+              socket.assigns.page_language,
+              "ui",
+              "Automatic AI actions stay gated by airplane mode."
+            ),
             nil,
             "info"
           )
