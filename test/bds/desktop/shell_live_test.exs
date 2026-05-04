@@ -1047,6 +1047,7 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert has_element?(view, ".tab[data-tab-type='documentation'] .tab-title", "Documentation")
     assert has_element?(view, "[data-testid='help-documentation']")
+    assert has_element?(view, ".documentation-content.markdown-body .documentation-article")
     assert render(view) =~ "bDS2 User Guide"
   end
 
@@ -1067,6 +1068,7 @@ defmodule BDS.Desktop.ShellLiveTest do
            )
 
     assert has_element?(view, "[data-testid='help-api-documentation']")
+    assert has_element?(view, ".documentation-content.markdown-body .documentation-article")
     assert render(view) =~ "API Documentation"
     assert render(view) =~ "local result = bds.posts.get"
   end

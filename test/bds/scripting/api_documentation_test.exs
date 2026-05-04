@@ -1,6 +1,16 @@
 defmodule BDS.Scripting.ApiDocumentationTest do
   use ExUnit.Case, async: true
 
+  test "rendered API docs include richer module indexes and example responses" do
+    rendered = BDS.Scripting.ApiDocs.render()
+
+    assert rendered =~ "**Module APIs**"
+    assert rendered =~ "- [projects.create](#projectscreate)"
+    assert rendered =~ "**Example response**"
+    assert rendered =~ "- Data structures: `ProjectData`"
+    assert rendered =~ "[↑ Back to Table of contents](#table-of-contents)"
+  end
+
   test "API.md matches the generated Lua scripting contract" do
     api_doc_path = Path.expand("../../../API.md", __DIR__)
 

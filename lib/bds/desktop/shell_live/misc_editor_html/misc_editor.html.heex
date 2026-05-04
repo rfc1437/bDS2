@@ -26,14 +26,26 @@
   <div class="misc-editor-content">
     <%= case @misc_editor.kind do %>
       <% :documentation -> %>
-        <article class="misc-card help-doc-markdown" data-testid="help-documentation">
-          <%= markdown_html(@misc_editor.markdown) %>
-        </article>
+        <div class="documentation-view">
+          <main class="documentation-scroll">
+            <div class="documentation-content markdown-body">
+              <article class="documentation-article help-doc-markdown" data-testid="help-documentation">
+                <%= markdown_html(@misc_editor.markdown) %>
+              </article>
+            </div>
+          </main>
+        </div>
 
       <% :api_documentation -> %>
-        <article class="misc-card help-doc-markdown" data-testid="help-api-documentation">
-          <%= markdown_html(@misc_editor.markdown) %>
-        </article>
+        <div class="documentation-view">
+          <main class="documentation-scroll">
+            <div class="documentation-content markdown-body">
+              <article class="documentation-article help-doc-markdown" data-testid="help-api-documentation">
+                <%= markdown_html(@misc_editor.markdown) %>
+              </article>
+            </div>
+          </main>
+        </div>
 
       <% :site_validation -> %>
         <div class="misc-columns">

@@ -4457,6 +4457,189 @@ button svg * {
   flex: 1;
 }
 
+.help-doc-view {
+  --doc-bg: var(--panel-1, #1e1e1e);
+  --doc-surface: var(--panel-2, #252526);
+  --doc-border: var(--line, #3c3c3c);
+  --doc-text: var(--vscode-editor-foreground, #d4d4d4);
+  --doc-muted: var(--vscode-descriptionForeground, #9da3ad);
+  --doc-link: var(--vscode-textLink-foreground, #9cdcfe);
+  --doc-code-bg: var(--vscode-textCodeBlock-background, rgba(0, 0, 0, 0.2));
+  --doc-hover: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.06));
+}
+
+.help-doc-view .misc-editor-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+.documentation-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--doc-bg);
+}
+
+.documentation-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px 24px 40px;
+  background: var(--doc-bg);
+}
+
+.documentation-content {
+  max-width: 920px;
+  margin: 0 auto;
+  color: var(--doc-text);
+}
+
+.documentation-article {
+  background: var(--doc-surface);
+  padding: 18px 20px 24px;
+  border: 1px solid var(--doc-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.documentation-content.markdown-body > .documentation-article > :first-child {
+  margin-top: 0;
+}
+
+.documentation-content.markdown-body > .documentation-article > :last-child {
+  margin-bottom: 0;
+}
+
+.documentation-content.markdown-body h1,
+.documentation-content.markdown-body h2,
+.documentation-content.markdown-body h3 {
+  color: var(--doc-text);
+  border-bottom: 1px solid var(--doc-border);
+  padding-bottom: 6px;
+  line-height: 1.25;
+}
+
+.documentation-content.markdown-body h1 {
+  font-size: 1.9rem;
+}
+
+.documentation-content.markdown-body h2 {
+  margin-top: 2rem;
+  font-size: 1.35rem;
+}
+
+.documentation-content.markdown-body h3 {
+  margin-top: 1.6rem;
+  font-size: 1.05rem;
+}
+
+.documentation-content.markdown-body p,
+.documentation-content.markdown-body li,
+.documentation-content.markdown-body td,
+.documentation-content.markdown-body th {
+  line-height: 1.6;
+}
+
+.documentation-content.markdown-body a {
+  color: var(--doc-link);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.14em;
+}
+
+.documentation-content.markdown-body a:hover {
+  color: var(--doc-text);
+}
+
+.documentation-content.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--doc-border);
+  opacity: 0.8;
+}
+
+.documentation-content.markdown-body code {
+  background: var(--doc-code-bg);
+  padding: 0.12em 0.4em;
+  border-radius: 4px;
+  font: 0.92em/1.45 "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+}
+
+.documentation-content.markdown-body pre {
+  margin: 0.9rem 0 1.2rem;
+  background: var(--doc-code-bg);
+  border: 1px solid var(--doc-border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow: auto;
+}
+
+.documentation-content.markdown-body pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 0.9em;
+}
+
+.documentation-content.markdown-body blockquote {
+  margin: 1rem 0;
+  padding: 0 0 0 12px;
+  border-left: 3px solid var(--doc-border);
+  color: var(--doc-muted);
+}
+
+.documentation-content.markdown-body table {
+  width: 100%;
+  margin: 1rem 0 1.4rem;
+  border-collapse: collapse;
+  display: table;
+}
+
+.documentation-content.markdown-body th,
+.documentation-content.markdown-body td {
+  border: 1px solid var(--doc-border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.documentation-content.markdown-body th {
+  background: var(--doc-hover);
+  font-weight: 700;
+}
+
+.documentation-content.markdown-body ul,
+.documentation-content.markdown-body ol {
+  margin: 0.85rem 0 1rem;
+  padding-left: 1.5rem;
+  display: block;
+}
+
+.documentation-content.markdown-body ul {
+  list-style: disc;
+}
+
+.documentation-content.markdown-body ol {
+  list-style: decimal;
+}
+
+.documentation-content.markdown-body li {
+  margin: 0.3rem 0;
+}
+
+.documentation-content.markdown-body li > ul,
+.documentation-content.markdown-body li > ol {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.documentation-content.markdown-body strong {
+  color: var(--doc-text);
+}
+
+.documentation-content.markdown-body img {
+  max-width: 100%;
+  height: auto;
+}
+
 .misc-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

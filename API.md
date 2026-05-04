@@ -32,6 +32,22 @@ local meta = bds.meta.get_project_metadata()
 
 ## app
 
+**Module APIs**
+
+- [app.copy_to_clipboard](#appcopy_to_clipboard)
+- [app.get_blogmark_bookmarklet](#appget_blogmark_bookmarklet)
+- [app.get_data_paths](#appget_data_paths)
+- [app.get_default_project_path](#appget_default_project_path)
+- [app.get_system_language](#appget_system_language)
+- [app.get_title_bar_metrics](#appget_title_bar_metrics)
+- [app.notify_renderer_ready](#appnotify_renderer_ready)
+- [app.open_folder](#appopen_folder)
+- [app.read_project_metadata](#appread_project_metadata)
+- [app.select_folder](#appselect_folder)
+- [app.set_preview_post_target](#appset_preview_post_target)
+- [app.show_item_in_folder](#appshow_item_in_folder)
+- [app.trigger_menu_action](#apptrigger_menu_action)
+
 ### app.copy_to_clipboard
 
 Copy text to the system clipboard.
@@ -43,6 +59,12 @@ Copy text to the system clipboard.
 **Response specification**
 
 - Return type: `boolean`
+
+**Example response**
+
+```lua
+true
+```
 
 **Example call**
 
@@ -62,6 +84,12 @@ Return the Blogmark bookmarklet JavaScript source.
 
 - Return type: `string`
 
+**Example response**
+
+```lua
+"value"
+```
+
 **Example call**
 
 ```lua
@@ -80,6 +108,14 @@ Return filesystem paths for the current application and project data.
 
 - Return type: `table`
 
+**Example response**
+
+```lua
+{
+  key = "value"
+}
+```
+
 **Example call**
 
 ```lua
@@ -97,6 +133,14 @@ Return the current project's filesystem path.
 **Response specification**
 
 - Return type: `string | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+"value"
+```
 
 **Example call**
 
@@ -115,6 +159,14 @@ Return the current UI locale.
 **Response specification**
 
 - Return type: `string | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+"value"
+```
 
 **Example call**
 
@@ -133,6 +185,16 @@ Return desktop title bar inset metrics when available.
 **Response specification**
 
 - Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
 
 **Example call**
 
@@ -152,6 +214,12 @@ Notify the host application that the renderer is ready.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
@@ -170,10 +238,16 @@ Open a folder in the system file manager.
 
 - Return type: `string`
 
+**Example response**
+
+```lua
+"value"
+```
+
 **Example call**
 
 ```lua
-local result = bds.app.open_folder("value")
+local result = bds.app.open_folder("/Users/me/Sites/example")
 ```
 
 ### app.read_project_metadata
@@ -187,11 +261,35 @@ Read project metadata from a project folder path.
 **Response specification**
 
 - Return type: `ProjectMetadata | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ProjectMetadata`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  name = "value",
+  description = nil,
+  public_url = nil,
+  main_language = nil,
+  default_author = nil,
+  categories = {
+    "value"
+  },
+  blog_languages = {
+    "value"
+  },
+  publishing_preferences = {
+    key = "value"
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.app.read_project_metadata("value")
+local result = bds.app.read_project_metadata("/Users/me/Sites/example")
 ```
 
 ### app.select_folder
@@ -205,11 +303,19 @@ Show the native folder picker and return the chosen path.
 **Response specification**
 
 - Return type: `string | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+"value"
+```
 
 **Example call**
 
 ```lua
-local result = bds.app.select_folder("value")
+local result = bds.app.select_folder("Example Title")
 ```
 
 ### app.set_preview_post_target
@@ -224,10 +330,16 @@ Set the current preview-post target used by desktop integrations.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.app.set_preview_post_target("value")
+local result = bds.app.set_preview_post_target("id-1")
 ```
 
 ### app.show_item_in_folder
@@ -241,11 +353,18 @@ Reveal a file or folder in the system file manager.
 **Response specification**
 
 - Return type: `nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil
+```
 
 **Example call**
 
 ```lua
-local result = bds.app.show_item_in_folder("value")
+local result = bds.app.show_item_in_folder("/Users/me/Sites/example/output/index.html")
 ```
 
 ### app.trigger_menu_action
@@ -259,305 +378,38 @@ Trigger a native menu action by action id.
 **Response specification**
 
 - Return type: `nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil
+```
 
 **Example call**
 
 ```lua
-local result = bds.app.trigger_menu_action("value")
+local result = bds.app.trigger_menu_action("save")
 ```
 
+[↑ Back to Table of contents](#table-of-contents)
 
-## chat
+## projects
 
-### chat.analyze_media_image
+**Module APIs**
 
-Analyze a media image using the configured AI runtime.
+- [projects.create](#projectscreate)
+- [projects.delete](#projectsdelete)
+- [projects.delete_with_data](#projectsdelete_with_data)
+- [projects.get](#projectsget)
+- [projects.get_all](#projectsget_all)
+- [projects.get_active](#projectsget_active)
+- [projects.set_active](#projectsset_active)
+- [projects.update](#projectsupdate)
 
-**Parameters**
+### projects.create
 
-- media_id (string, required)
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.chat.analyze_media_image("value")
-```
-
-### chat.analyze_post
-
-Analyze a post using the configured AI runtime.
-
-**Parameters**
-
-- post_id (string, required)
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.chat.analyze_post("value")
-```
-
-### chat.detect_media_language
-
-Detect the language of media metadata.
-
-**Parameters**
-
-- title (string, required)
-- alt (string, optional)
-- caption (string, optional)
-
-**Response specification**
-
-- Return type: `table`
-
-**Example call**
-
-```lua
-local result = bds.chat.detect_media_language("value", "value", "value")
-```
-
-### chat.detect_post_language
-
-Detect the language of post title and content.
-
-**Parameters**
-
-- title (string, required)
-- content (string, required)
-
-**Response specification**
-
-- Return type: `table`
-
-**Example call**
-
-```lua
-local result = bds.chat.detect_post_language("value", "value")
-```
-
-### chat.translate_media_metadata
-
-Translate media metadata and persist the translation.
-
-**Parameters**
-
-- media_id (string, required)
-- language (string, required)
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.chat.translate_media_metadata("value", "value")
-```
-
-### chat.translate_post
-
-Translate a post and persist the translation.
-
-**Parameters**
-
-- post_id (string, required)
-- language (string, required)
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.chat.translate_post("value", "value")
-```
-
-
-## embeddings
-
-### embeddings.compute_similarities
-
-Compute similarity scores from one source post to target posts.
-
-**Parameters**
-
-- post_id (string, required)
-- target_ids (table, required)
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.embeddings.compute_similarities("value", {})
-```
-
-### embeddings.dismiss_pair
-
-Dismiss a duplicate candidate pair.
-
-**Parameters**
-
-- post_id_a (string, required)
-- post_id_b (string, required)
-
-**Response specification**
-
-- Return type: `boolean`
-
-**Example call**
-
-```lua
-local result = bds.embeddings.dismiss_pair("value", "value")
-```
-
-### embeddings.find_duplicates
-
-Find duplicate post candidates for the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.embeddings.find_duplicates()
-```
-
-### embeddings.find_similar
-
-Find posts similar to the given post id.
-
-**Parameters**
-
-- post_id (string, required)
-- limit (integer, optional)
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.embeddings.find_similar("value", 1)
-```
-
-### embeddings.get_progress
-
-Get embedding index progress for the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.embeddings.get_progress()
-```
-
-### embeddings.index_unindexed_posts
-
-Index posts missing embeddings for the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.embeddings.index_unindexed_posts()
-```
-
-### embeddings.suggest_tags
-
-Suggest tags for a post from semantic similarity.
-
-**Parameters**
-
-- post_id (string, required)
-- exclude_tags (table, optional)
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.embeddings.suggest_tags("value", {})
-```
-
-
-## media
-
-### media.delete_translation
-
-Delete a media translation by language.
-
-**Parameters**
-
-- media_id (string, required)
-- language (string, required)
-
-**Response specification**
-
-- Return type: `boolean`
-
-**Example call**
-
-```lua
-local result = bds.media.delete_translation("value", "value")
-```
-
-### media.filter
-
-Filter media using year, month, tags, language, or date range fields.
-
-**Parameters**
-
-- filters (table, required)
-
-**Response specification**
-
-- Return type: `MediaData[]`
-
-**Example call**
-
-```lua
-local result = bds.media.filter({})
-```
-
-### media.import
-
-Import media into the current project.
+Create a project.
 
 **Parameters**
 
@@ -565,72 +417,35 @@ Import media into the current project.
 
 **Response specification**
 
-- Return type: `MediaData | nil`
+- Return type: `ProjectData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ProjectData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  name = "value",
+  slug = "value",
+  description = nil,
+  data_path = nil,
+  is_active = true,
+  created_at = 1,
+  updated_at = 1
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.media.import({})
+local result = bds.projects.create({title = "Example Title"})
 ```
 
-### media.get_by_year_month
+### projects.delete
 
-Get media counts grouped by year and month.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table[]`
-
-**Example call**
-
-```lua
-local result = bds.media.get_by_year_month()
-```
-
-### media.get_file_path
-
-Return the absolute file path for a media item.
-
-**Parameters**
-
-- media_id (string, required)
-
-**Response specification**
-
-- Return type: `string | nil`
-
-**Example call**
-
-```lua
-local result = bds.media.get_file_path("value")
-```
-
-### media.update
-
-Update media metadata by id.
-
-**Parameters**
-
-- id (string, required)
-- data (table, required)
-
-**Response specification**
-
-- Return type: `MediaData | nil`
-
-**Example call**
-
-```lua
-local result = bds.media.update("value", {})
-```
-
-### media.delete
-
-Delete a media item by id.
+Delete a project by id.
 
 **Parameters**
 
@@ -640,15 +455,21 @@ Delete a media item by id.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.media.delete("value")
+local result = bds.projects.delete("id-1")
 ```
 
-### media.get
+### projects.delete_with_data
 
-Fetch one media item by id.
+Delete a project by id and remove its project directory.
 
 **Parameters**
 
@@ -656,510 +477,236 @@ Fetch one media item by id.
 
 **Response specification**
 
-- Return type: `MediaData | nil`
-
-**Example call**
-
-```lua
-local result = bds.media.get("value")
-```
-
-### media.get_all
-
-Fetch all media in the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `MediaData[]`
-
-**Example call**
-
-```lua
-local result = bds.media.get_all()
-```
-
-### media.get_tags
-
-Return tag names used by media in the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `string[]`
-
-**Example call**
-
-```lua
-local result = bds.media.get_tags()
-```
-
-### media.get_tags_with_counts
-
-Return media tags with usage counts.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table[]`
-
-**Example call**
-
-```lua
-local result = bds.media.get_tags_with_counts()
-```
-
-### media.get_thumbnail
-
-Return a media thumbnail as a data URL for the requested size.
-
-**Parameters**
-
-- media_id (string, required)
-- size (string, optional)
-
-**Response specification**
-
-- Return type: `string | nil`
-
-**Example call**
-
-```lua
-local result = bds.media.get_thumbnail("value", "value")
-```
-
-### media.get_translation
-
-Return one media translation by language.
-
-**Parameters**
-
-- media_id (string, required)
-- language (string, required)
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.media.get_translation("value", "value")
-```
-
-### media.get_translations
-
-Return all translations for a media item.
-
-**Parameters**
-
-- media_id (string, required)
-
-**Response specification**
-
-- Return type: `table[]`
-
-**Example call**
-
-```lua
-local result = bds.media.get_translations("value")
-```
-
-### media.get_url
-
-Return the project-relative public URL path for a media item.
-
-**Parameters**
-
-- media_id (string, required)
-
-**Response specification**
-
-- Return type: `string | nil`
-
-**Example call**
-
-```lua
-local result = bds.media.get_url("value")
-```
-
-### media.rebuild_from_files
-
-Rebuild media records from sidecar files on disk.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `MediaData[] | nil`
-
-**Example call**
-
-```lua
-local result = bds.media.rebuild_from_files()
-```
-
-### media.regenerate_missing_thumbnails
-
-Generate thumbnails for media items that are missing them.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table`
-
-**Example call**
-
-```lua
-local result = bds.media.regenerate_missing_thumbnails()
-```
-
-### media.regenerate_thumbnails
-
-Regenerate all thumbnails for one media item.
-
-**Parameters**
-
-- media_id (string, required)
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.media.regenerate_thumbnails("value")
-```
-
-### media.reindex_text
-
-Reindex post and media search text for the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.media.reindex_text()
+local result = bds.projects.delete_with_data("id-1")
 ```
 
-### media.replace_file
+### projects.get
 
-Replace the binary file behind an existing media item.
+Fetch one project by id.
 
 **Parameters**
 
-- media_id (string, required)
-- source_path (string, required)
+- id (string, required)
 
 **Response specification**
 
-- Return type: `MediaData | nil`
+- Return type: `ProjectData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ProjectData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  name = "value",
+  slug = "value",
+  description = nil,
+  data_path = nil,
+  is_active = true,
+  created_at = 1,
+  updated_at = 1
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.media.replace_file("value", "value")
+local result = bds.projects.get("id-1")
 ```
 
-### media.search
+### projects.get_all
 
-Search media by free-text query.
+Fetch all projects.
 
 **Parameters**
 
-- query (string, required)
+- None
 
 **Response specification**
 
-- Return type: `MediaData[] | nil`
+- Return type: `ProjectData[]`
+- Data structures: `ProjectData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    name = "value",
+    slug = "value",
+    description = nil,
+    data_path = nil,
+    is_active = true,
+    created_at = 1,
+    updated_at = 1
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.media.search("value")
+local result = bds.projects.get_all()
 ```
 
-### media.upsert_translation
+### projects.get_active
 
-Create or update a media translation.
+Fetch the active project.
 
 **Parameters**
 
-- media_id (string, required)
-- language (string, required)
+- None
+
+**Response specification**
+
+- Return type: `ProjectData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ProjectData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  name = "value",
+  slug = "value",
+  description = nil,
+  data_path = nil,
+  is_active = true,
+  created_at = 1,
+  updated_at = 1
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.projects.get_active()
+```
+
+### projects.set_active
+
+Set the active project by id.
+
+**Parameters**
+
+- id (string, required)
+
+**Response specification**
+
+- Return type: `ProjectData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ProjectData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  name = "value",
+  slug = "value",
+  description = nil,
+  data_path = nil,
+  is_active = true,
+  created_at = 1,
+  updated_at = 1
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.projects.set_active("id-1")
+```
+
+### projects.update
+
+Update a project by id.
+
+**Parameters**
+
+- id (string, required)
 - data (table, required)
 
 **Response specification**
 
-- Return type: `table | nil`
+- Return type: `ProjectData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ProjectData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  name = "value",
+  slug = "value",
+  description = nil,
+  data_path = nil,
+  is_active = true,
+  created_at = 1,
+  updated_at = 1
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.media.upsert_translation("value", "value", {})
+local result = bds.projects.update("id-1", {title = "Example Title"})
 ```
 
-
-## meta
-
-### meta.add_category
-
-Add a category to the current project.
-
-**Parameters**
-
-- name (string, required)
-
-**Response specification**
-
-- Return type: `ProjectMetadata | nil`
-
-**Example call**
-
-```lua
-local result = bds.meta.add_category("value")
-```
-
-### meta.add_tag
-
-Add a tag record to the current project if it does not already exist.
-
-**Parameters**
-
-- name (string, required)
-
-**Response specification**
-
-- Return type: `string[]`
-
-**Example call**
-
-```lua
-local result = bds.meta.add_tag("value")
-```
-
-### meta.clear_publishing_preferences
-
-Reset publishing preferences to defaults.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.meta.clear_publishing_preferences()
-```
-
-### meta.get_categories
-
-Get project categories.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `string[]`
-
-**Example call**
-
-```lua
-local result = bds.meta.get_categories()
-```
-
-### meta.get_project_metadata
-
-Read metadata for the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `ProjectMetadata`
-
-**Example call**
-
-```lua
-local result = bds.meta.get_project_metadata()
-```
-
-### meta.get_publishing_preferences
-
-Get publishing preferences for the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.meta.get_publishing_preferences()
-```
-
-### meta.get_tags
-
-Get tag names for the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `string[]`
-
-**Example call**
-
-```lua
-local result = bds.meta.get_tags()
-```
-
-### meta.remove_category
-
-Remove a category from the current project.
-
-**Parameters**
-
-- name (string, required)
-
-**Response specification**
-
-- Return type: `ProjectMetadata | nil`
-
-**Example call**
-
-```lua
-local result = bds.meta.remove_category("value")
-```
-
-### meta.remove_tag
-
-Remove a tag record from the current project by name.
-
-**Parameters**
-
-- name (string, required)
-
-**Response specification**
-
-- Return type: `string[]`
-
-**Example call**
-
-```lua
-local result = bds.meta.remove_tag("value")
-```
-
-### meta.set_project_metadata
-
-Replace project metadata fields for the current project.
-
-**Parameters**
-
-- updates (table, required)
-
-**Response specification**
-
-- Return type: `ProjectMetadata | nil`
-
-**Example call**
-
-```lua
-local result = bds.meta.set_project_metadata({})
-```
-
-### meta.set_publishing_preferences
-
-Set publishing preferences for the current project.
-
-**Parameters**
-
-- prefs (table, required)
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.meta.set_publishing_preferences({})
-```
-
-### meta.sync_on_startup
-
-Synchronize startup metadata state and return tags, categories, and project metadata.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table`
-
-**Example call**
-
-```lua
-local result = bds.meta.sync_on_startup()
-```
-
-### meta.update_project_metadata
-
-Update metadata for the current project.
-
-**Parameters**
-
-- updates (table, required)
-
-**Response specification**
-
-- Return type: `ProjectMetadata | nil`
-
-**Example call**
-
-```lua
-local result = bds.meta.update_project_metadata({})
-```
-
+[↑ Back to Table of contents](#table-of-contents)
 
 ## posts
+
+**Module APIs**
+
+- [posts.create](#postscreate)
+- [posts.update](#postsupdate)
+- [posts.delete](#postsdelete)
+- [posts.discard](#postsdiscard)
+- [posts.filter](#postsfilter)
+- [posts.generate_unique_slug](#postsgenerate_unique_slug)
+- [posts.get](#postsget)
+- [posts.get_all](#postsget_all)
+- [posts.get_by_slug](#postsget_by_slug)
+- [posts.get_by_status](#postsget_by_status)
+- [posts.get_by_year_month](#postsget_by_year_month)
+- [posts.get_categories](#postsget_categories)
+- [posts.get_categories_with_counts](#postsget_categories_with_counts)
+- [posts.get_dashboard_stats](#postsget_dashboard_stats)
+- [posts.get_linked_by](#postsget_linked_by)
+- [posts.get_links_to](#postsget_links_to)
+- [posts.get_preview_url](#postsget_preview_url)
+- [posts.get_tags](#postsget_tags)
+- [posts.get_tags_with_counts](#postsget_tags_with_counts)
+- [posts.get_translation](#postsget_translation)
+- [posts.get_translations](#postsget_translations)
+- [posts.has_published_version](#postshas_published_version)
+- [posts.is_slug_available](#postsis_slug_available)
+- [posts.publish](#postspublish)
+- [posts.publish_translation](#postspublish_translation)
+- [posts.rebuild_from_files](#postsrebuild_from_files)
+- [posts.rebuild_links](#postsrebuild_links)
+- [posts.reindex_text](#postsreindex_text)
+- [posts.search](#postssearch)
 
 ### posts.create
 
@@ -1172,11 +719,43 @@ Create a post in the current project.
 **Response specification**
 
 - Return type: `PostData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  title = "value",
+  slug = "value",
+  status = "value",
+  language = nil,
+  tags = {
+    "value"
+  },
+  categories = {
+    "value"
+  },
+  backlinks = {
+    {
+      key = "value"
+    }
+  },
+  links_to = {
+    {
+      key = "value"
+    }
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.create({})
+local result = bds.posts.create({title = "Example Title"})
 ```
 
 ### posts.update
@@ -1191,11 +770,43 @@ Update a post by id.
 **Response specification**
 
 - Return type: `PostData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  title = "value",
+  slug = "value",
+  status = "value",
+  language = nil,
+  tags = {
+    "value"
+  },
+  categories = {
+    "value"
+  },
+  backlinks = {
+    {
+      key = "value"
+    }
+  },
+  links_to = {
+    {
+      key = "value"
+    }
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.update("value", {})
+local result = bds.posts.update("id-1", {title = "Example Title"})
 ```
 
 ### posts.delete
@@ -1210,10 +821,16 @@ Delete a post by id.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.posts.delete("value")
+local result = bds.posts.delete("id-1")
 ```
 
 ### posts.discard
@@ -1227,11 +844,43 @@ Discard unpublished post changes and restore the last published version from dis
 **Response specification**
 
 - Return type: `PostData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  title = "value",
+  slug = "value",
+  status = "value",
+  language = nil,
+  tags = {
+    "value"
+  },
+  categories = {
+    "value"
+  },
+  backlinks = {
+    {
+      key = "value"
+    }
+  },
+  links_to = {
+    {
+      key = "value"
+    }
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.discard("value")
+local result = bds.posts.discard("id-1")
 ```
 
 ### posts.filter
@@ -1245,11 +894,45 @@ Filter posts using status, tags, categories, language, year, month, or date rang
 **Response specification**
 
 - Return type: `PostData[] | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  {
+    id = "value",
+    project_id = "value",
+    title = "value",
+    slug = "value",
+    status = "value",
+    language = nil,
+    tags = {
+      "value"
+    },
+    categories = {
+      "value"
+    },
+    backlinks = {
+      {
+        key = "value"
+      }
+    },
+    links_to = {
+      {
+        key = "value"
+      }
+    }
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.filter({})
+local result = bds.posts.filter({status = "draft"})
 ```
 
 ### posts.generate_unique_slug
@@ -1265,10 +948,16 @@ Generate a unique slug from a title, optionally excluding one post id.
 
 - Return type: `string`
 
+**Example response**
+
+```lua
+"value"
+```
+
 **Example call**
 
 ```lua
-local result = bds.posts.generate_unique_slug("value", "value")
+local result = bds.posts.generate_unique_slug("Example Title", "value")
 ```
 
 ### posts.get
@@ -1282,11 +971,43 @@ Fetch one post by id.
 **Response specification**
 
 - Return type: `PostData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  title = "value",
+  slug = "value",
+  status = "value",
+  language = nil,
+  tags = {
+    "value"
+  },
+  categories = {
+    "value"
+  },
+  backlinks = {
+    {
+      key = "value"
+    }
+  },
+  links_to = {
+    {
+      key = "value"
+    }
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.get("value")
+local result = bds.posts.get("id-1")
 ```
 
 ### posts.get_all
@@ -1300,6 +1021,38 @@ Fetch all posts in the current project.
 **Response specification**
 
 - Return type: `PostData[]`
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    project_id = "value",
+    title = "value",
+    slug = "value",
+    status = "value",
+    language = nil,
+    tags = {
+      "value"
+    },
+    categories = {
+      "value"
+    },
+    backlinks = {
+      {
+        key = "value"
+      }
+    },
+    links_to = {
+      {
+        key = "value"
+      }
+    }
+  }
+}
+```
 
 **Example call**
 
@@ -1318,11 +1071,43 @@ Fetch one post by slug.
 **Response specification**
 
 - Return type: `PostData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  title = "value",
+  slug = "value",
+  status = "value",
+  language = nil,
+  tags = {
+    "value"
+  },
+  categories = {
+    "value"
+  },
+  backlinks = {
+    {
+      key = "value"
+    }
+  },
+  links_to = {
+    {
+      key = "value"
+    }
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.get_by_slug("value")
+local result = bds.posts.get_by_slug("example-slug")
 ```
 
 ### posts.get_by_status
@@ -1336,11 +1121,43 @@ Fetch posts filtered by a specific status.
 **Response specification**
 
 - Return type: `PostData[]`
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    project_id = "value",
+    title = "value",
+    slug = "value",
+    status = "value",
+    language = nil,
+    tags = {
+      "value"
+    },
+    categories = {
+      "value"
+    },
+    backlinks = {
+      {
+        key = "value"
+      }
+    },
+    links_to = {
+      {
+        key = "value"
+      }
+    }
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.get_by_status("value")
+local result = bds.posts.get_by_status("draft")
 ```
 
 ### posts.get_by_year_month
@@ -1354,6 +1171,16 @@ Get post counts grouped by year and month.
 **Response specification**
 
 - Return type: `table[]`
+
+**Example response**
+
+```lua
+{
+  {
+    key = "value"
+  }
+}
+```
 
 **Example call**
 
@@ -1373,6 +1200,14 @@ Get category names used by posts in the current project.
 
 - Return type: `string[]`
 
+**Example response**
+
+```lua
+{
+  "value"
+}
+```
+
 **Example call**
 
 ```lua
@@ -1390,6 +1225,16 @@ Get post categories with usage counts.
 **Response specification**
 
 - Return type: `table[]`
+
+**Example response**
+
+```lua
+{
+  {
+    key = "value"
+  }
+}
+```
 
 **Example call**
 
@@ -1409,6 +1254,14 @@ Return aggregate post dashboard counts for the current project.
 
 - Return type: `table`
 
+**Example response**
+
+```lua
+{
+  key = "value"
+}
+```
+
 **Example call**
 
 ```lua
@@ -1427,10 +1280,20 @@ Return posts that link to the given post.
 
 - Return type: `table[]`
 
+**Example response**
+
+```lua
+{
+  {
+    key = "value"
+  }
+}
+```
+
 **Example call**
 
 ```lua
-local result = bds.posts.get_linked_by("value")
+local result = bds.posts.get_linked_by("id-1")
 ```
 
 ### posts.get_links_to
@@ -1445,10 +1308,20 @@ Return posts linked from the given post.
 
 - Return type: `table[]`
 
+**Example response**
+
+```lua
+{
+  {
+    key = "value"
+  }
+}
+```
+
 **Example call**
 
 ```lua
-local result = bds.posts.get_links_to("value")
+local result = bds.posts.get_links_to("id-1")
 ```
 
 ### posts.get_preview_url
@@ -1463,11 +1336,19 @@ Return the local preview URL for a post, optionally with draft and language quer
 **Response specification**
 
 - Return type: `string | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+"value"
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.get_preview_url("value", {})
+local result = bds.posts.get_preview_url("id-1", {})
 ```
 
 ### posts.get_tags
@@ -1481,6 +1362,14 @@ Get tag names used by posts in the current project.
 **Response specification**
 
 - Return type: `string[]`
+
+**Example response**
+
+```lua
+{
+  "value"
+}
+```
 
 **Example call**
 
@@ -1500,6 +1389,16 @@ Get post tags with usage counts.
 
 - Return type: `table[]`
 
+**Example response**
+
+```lua
+{
+  {
+    key = "value"
+  }
+}
+```
+
 **Example call**
 
 ```lua
@@ -1518,11 +1417,21 @@ Get a single translation for a post by language.
 **Response specification**
 
 - Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.get_translation("value", "value")
+local result = bds.posts.get_translation("id-1", "en")
 ```
 
 ### posts.get_translations
@@ -1537,10 +1446,20 @@ Get all translations for a post.
 
 - Return type: `table[]`
 
+**Example response**
+
+```lua
+{
+  {
+    key = "value"
+  }
+}
+```
+
 **Example call**
 
 ```lua
-local result = bds.posts.get_translations("value")
+local result = bds.posts.get_translations("id-1")
 ```
 
 ### posts.has_published_version
@@ -1555,10 +1474,16 @@ Check whether a post has a published version.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.posts.has_published_version("value")
+local result = bds.posts.has_published_version("id-1")
 ```
 
 ### posts.is_slug_available
@@ -1574,10 +1499,16 @@ Return whether a slug is available in the current project, optionally excluding 
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.posts.is_slug_available("value", "value")
+local result = bds.posts.is_slug_available("example-slug", "value")
 ```
 
 ### posts.publish
@@ -1591,11 +1522,43 @@ Publish a post by id.
 **Response specification**
 
 - Return type: `PostData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  title = "value",
+  slug = "value",
+  status = "value",
+  language = nil,
+  tags = {
+    "value"
+  },
+  categories = {
+    "value"
+  },
+  backlinks = {
+    {
+      key = "value"
+    }
+  },
+  links_to = {
+    {
+      key = "value"
+    }
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.publish("value")
+local result = bds.posts.publish("id-1")
 ```
 
 ### posts.publish_translation
@@ -1610,11 +1573,21 @@ Publish one translation of a post by language.
 **Response specification**
 
 - Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.publish_translation("value", "value")
+local result = bds.posts.publish_translation("id-1", "en")
 ```
 
 ### posts.rebuild_from_files
@@ -1628,6 +1601,40 @@ Rebuild post records from published files.
 **Response specification**
 
 - Return type: `PostData[] | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  {
+    id = "value",
+    project_id = "value",
+    title = "value",
+    slug = "value",
+    status = "value",
+    language = nil,
+    tags = {
+      "value"
+    },
+    categories = {
+      "value"
+    },
+    backlinks = {
+      {
+        key = "value"
+      }
+    },
+    links_to = {
+      {
+        key = "value"
+      }
+    }
+  }
+}
+```
 
 **Example call**
 
@@ -1647,6 +1654,12 @@ Rebuild the post link graph for the current project.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
@@ -1665,6 +1678,12 @@ Reindex post and media search text for the current project.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
@@ -1682,19 +1701,143 @@ Search posts by free-text query.
 **Response specification**
 
 - Return type: `PostData[] | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `PostData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  {
+    id = "value",
+    project_id = "value",
+    title = "value",
+    slug = "value",
+    status = "value",
+    language = nil,
+    tags = {
+      "value"
+    },
+    categories = {
+      "value"
+    },
+    backlinks = {
+      {
+        key = "value"
+      }
+    },
+    links_to = {
+      {
+        key = "value"
+      }
+    }
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.posts.search("value")
+local result = bds.posts.search("example query")
 ```
 
+[↑ Back to Table of contents](#table-of-contents)
 
-## projects
+## media
 
-### projects.create
+**Module APIs**
 
-Create a project.
+- [media.delete_translation](#mediadelete_translation)
+- [media.filter](#mediafilter)
+- [media.import](#mediaimport)
+- [media.get_by_year_month](#mediaget_by_year_month)
+- [media.get_file_path](#mediaget_file_path)
+- [media.update](#mediaupdate)
+- [media.delete](#mediadelete)
+- [media.get](#mediaget)
+- [media.get_all](#mediaget_all)
+- [media.get_tags](#mediaget_tags)
+- [media.get_tags_with_counts](#mediaget_tags_with_counts)
+- [media.get_thumbnail](#mediaget_thumbnail)
+- [media.get_translation](#mediaget_translation)
+- [media.get_translations](#mediaget_translations)
+- [media.get_url](#mediaget_url)
+- [media.rebuild_from_files](#mediarebuild_from_files)
+- [media.regenerate_missing_thumbnails](#mediaregenerate_missing_thumbnails)
+- [media.regenerate_thumbnails](#mediaregenerate_thumbnails)
+- [media.reindex_text](#mediareindex_text)
+- [media.replace_file](#mediareplace_file)
+- [media.search](#mediasearch)
+- [media.upsert_translation](#mediaupsert_translation)
+
+### media.delete_translation
+
+Delete a media translation by language.
+
+**Parameters**
+
+- media_id (string, required)
+- language (string, required)
+
+**Response specification**
+
+- Return type: `boolean`
+
+**Example response**
+
+```lua
+true
+```
+
+**Example call**
+
+```lua
+local result = bds.media.delete_translation("id-1", "en")
+```
+
+### media.filter
+
+Filter media using year, month, tags, language, or date range fields.
+
+**Parameters**
+
+- filters (table, required)
+
+**Response specification**
+
+- Return type: `MediaData[]`
+- Data structures: `MediaData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    project_id = "value",
+    original_name = "value",
+    mime_type = "value",
+    file_path = "value",
+    title = nil,
+    alt = nil,
+    caption = nil,
+    tags = {
+      "value"
+    }
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.filter({status = "draft"})
+```
+
+### media.import
+
+Import media into the current project.
 
 **Parameters**
 
@@ -1702,17 +1845,132 @@ Create a project.
 
 **Response specification**
 
-- Return type: `ProjectData | nil`
+- Return type: `MediaData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `MediaData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  original_name = "value",
+  mime_type = "value",
+  file_path = "value",
+  title = nil,
+  alt = nil,
+  caption = nil,
+  tags = {
+    "value"
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.projects.create({})
+local result = bds.media.import({title = "Example Title"})
 ```
 
-### projects.delete
+### media.get_by_year_month
 
-Delete a project by id.
+Get media counts grouped by year and month.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table[]`
+
+**Example response**
+
+```lua
+{
+  {
+    key = "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.get_by_year_month()
+```
+
+### media.get_file_path
+
+Return the absolute file path for a media item.
+
+**Parameters**
+
+- media_id (string, required)
+
+**Response specification**
+
+- Return type: `string | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+"value"
+```
+
+**Example call**
+
+```lua
+local result = bds.media.get_file_path("id-1")
+```
+
+### media.update
+
+Update media metadata by id.
+
+**Parameters**
+
+- id (string, required)
+- data (table, required)
+
+**Response specification**
+
+- Return type: `MediaData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `MediaData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  original_name = "value",
+  mime_type = "value",
+  file_path = "value",
+  title = nil,
+  alt = nil,
+  caption = nil,
+  tags = {
+    "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.update("id-1", {title = "Example Title"})
+```
+
+### media.delete
+
+Delete a media item by id.
 
 **Parameters**
 
@@ -1722,144 +1980,503 @@ Delete a project by id.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.projects.delete("value")
+local result = bds.media.delete("id-1")
 ```
 
-### projects.delete_with_data
+### media.get
 
-Delete a project by id and remove its project directory.
+Fetch one media item by id.
 
 **Parameters**
 
 - id (string, required)
+
+**Response specification**
+
+- Return type: `MediaData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `MediaData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  original_name = "value",
+  mime_type = "value",
+  file_path = "value",
+  title = nil,
+  alt = nil,
+  caption = nil,
+  tags = {
+    "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.get("id-1")
+```
+
+### media.get_all
+
+Fetch all media in the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `MediaData[]`
+- Data structures: `MediaData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    project_id = "value",
+    original_name = "value",
+    mime_type = "value",
+    file_path = "value",
+    title = nil,
+    alt = nil,
+    caption = nil,
+    tags = {
+      "value"
+    }
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.get_all()
+```
+
+### media.get_tags
+
+Return tag names used by media in the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `string[]`
+
+**Example response**
+
+```lua
+{
+  "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.get_tags()
+```
+
+### media.get_tags_with_counts
+
+Return media tags with usage counts.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table[]`
+
+**Example response**
+
+```lua
+{
+  {
+    key = "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.get_tags_with_counts()
+```
+
+### media.get_thumbnail
+
+Return a media thumbnail as a data URL for the requested size.
+
+**Parameters**
+
+- media_id (string, required)
+- size (string, optional)
+
+**Response specification**
+
+- Return type: `string | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+"value"
+```
+
+**Example call**
+
+```lua
+local result = bds.media.get_thumbnail("id-1", "value")
+```
+
+### media.get_translation
+
+Return one media translation by language.
+
+**Parameters**
+
+- media_id (string, required)
+- language (string, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.get_translation("id-1", "en")
+```
+
+### media.get_translations
+
+Return all translations for a media item.
+
+**Parameters**
+
+- media_id (string, required)
+
+**Response specification**
+
+- Return type: `table[]`
+
+**Example response**
+
+```lua
+{
+  {
+    key = "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.get_translations("id-1")
+```
+
+### media.get_url
+
+Return the project-relative public URL path for a media item.
+
+**Parameters**
+
+- media_id (string, required)
+
+**Response specification**
+
+- Return type: `string | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+"value"
+```
+
+**Example call**
+
+```lua
+local result = bds.media.get_url("id-1")
+```
+
+### media.rebuild_from_files
+
+Rebuild media records from sidecar files on disk.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `MediaData[] | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `MediaData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  {
+    id = "value",
+    project_id = "value",
+    original_name = "value",
+    mime_type = "value",
+    file_path = "value",
+    title = nil,
+    alt = nil,
+    caption = nil,
+    tags = {
+      "value"
+    }
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.rebuild_from_files()
+```
+
+### media.regenerate_missing_thumbnails
+
+Generate thumbnails for media items that are missing them.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table`
+
+**Example response**
+
+```lua
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.regenerate_missing_thumbnails()
+```
+
+### media.regenerate_thumbnails
+
+Regenerate all thumbnails for one media item.
+
+**Parameters**
+
+- media_id (string, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.media.regenerate_thumbnails("id-1")
+```
+
+### media.reindex_text
+
+Reindex post and media search text for the current project.
+
+**Parameters**
+
+- None
 
 **Response specification**
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.projects.delete_with_data("value")
+local result = bds.media.reindex_text()
 ```
 
-### projects.get
+### media.replace_file
 
-Fetch one project by id.
+Replace the binary file behind an existing media item.
 
 **Parameters**
 
-- id (string, required)
+- media_id (string, required)
+- source_path (string, required)
 
 **Response specification**
 
-- Return type: `ProjectData | nil`
+- Return type: `MediaData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `MediaData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  original_name = "value",
+  mime_type = "value",
+  file_path = "value",
+  title = nil,
+  alt = nil,
+  caption = nil,
+  tags = {
+    "value"
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.projects.get("value")
+local result = bds.media.replace_file("id-1", "/Users/me/Pictures/example.jpg")
 ```
 
-### projects.get_all
+### media.search
 
-Fetch all projects.
+Search media by free-text query.
 
 **Parameters**
 
-- None
+- query (string, required)
 
 **Response specification**
 
-- Return type: `ProjectData[]`
+- Return type: `MediaData[] | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `MediaData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  {
+    id = "value",
+    project_id = "value",
+    original_name = "value",
+    mime_type = "value",
+    file_path = "value",
+    title = nil,
+    alt = nil,
+    caption = nil,
+    tags = {
+      "value"
+    }
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.projects.get_all()
+local result = bds.media.search("example query")
 ```
 
-### projects.get_active
+### media.upsert_translation
 
-Fetch the active project.
+Create or update a media translation.
 
 **Parameters**
 
-- None
-
-**Response specification**
-
-- Return type: `ProjectData | nil`
-
-**Example call**
-
-```lua
-local result = bds.projects.get_active()
-```
-
-### projects.set_active
-
-Set the active project by id.
-
-**Parameters**
-
-- id (string, required)
-
-**Response specification**
-
-- Return type: `ProjectData | nil`
-
-**Example call**
-
-```lua
-local result = bds.projects.set_active("value")
-```
-
-### projects.update
-
-Update a project by id.
-
-**Parameters**
-
-- id (string, required)
+- media_id (string, required)
+- language (string, required)
 - data (table, required)
 
 **Response specification**
 
-- Return type: `ProjectData | nil`
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.projects.update("value", {})
+local result = bds.media.upsert_translation("id-1", "en", {title = "Example Title"})
 ```
 
-
-## publish
-
-### publish.upload_site
-
-Upload the rendered site using the provided publishing credentials.
-
-**Parameters**
-
-- credentials (table, required)
-
-**Response specification**
-
-- Return type: `TaskData | nil`
-
-**Example call**
-
-```lua
-local result = bds.publish.upload_site({})
-```
-
+[↑ Back to Table of contents](#table-of-contents)
 
 ## scripts
+
+**Module APIs**
+
+- [scripts.create](#scriptscreate)
+- [scripts.update](#scriptsupdate)
+- [scripts.delete](#scriptsdelete)
+- [scripts.get](#scriptsget)
+- [scripts.get_all](#scriptsget_all)
+- [scripts.publish](#scriptspublish)
+- [scripts.rebuild_from_files](#scriptsrebuild_from_files)
 
 ### scripts.create
 
@@ -1872,11 +2489,29 @@ Create a script in the current project.
 **Response specification**
 
 - Return type: `ScriptData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ScriptData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  slug = "value",
+  title = "value",
+  kind = "value",
+  entrypoint = "value",
+  enabled = true,
+  status = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.scripts.create({})
+local result = bds.scripts.create({title = "Example Title"})
 ```
 
 ### scripts.update
@@ -1891,11 +2526,29 @@ Update a script by id.
 **Response specification**
 
 - Return type: `ScriptData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ScriptData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  slug = "value",
+  title = "value",
+  kind = "value",
+  entrypoint = "value",
+  enabled = true,
+  status = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.scripts.update("value", {})
+local result = bds.scripts.update("id-1", {title = "Example Title"})
 ```
 
 ### scripts.delete
@@ -1910,10 +2563,16 @@ Delete a script by id.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.scripts.delete("value")
+local result = bds.scripts.delete("id-1")
 ```
 
 ### scripts.get
@@ -1927,11 +2586,29 @@ Fetch one script by id.
 **Response specification**
 
 - Return type: `ScriptData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ScriptData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  slug = "value",
+  title = "value",
+  kind = "value",
+  entrypoint = "value",
+  enabled = true,
+  status = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.scripts.get("value")
+local result = bds.scripts.get("id-1")
 ```
 
 ### scripts.get_all
@@ -1945,6 +2622,24 @@ Fetch all scripts in the current project.
 **Response specification**
 
 - Return type: `ScriptData[]`
+- Data structures: `ScriptData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    project_id = "value",
+    slug = "value",
+    title = "value",
+    kind = "value",
+    entrypoint = "value",
+    enabled = true,
+    status = "value"
+  }
+}
+```
 
 **Example call**
 
@@ -1963,11 +2658,29 @@ Publish a script by id.
 **Response specification**
 
 - Return type: `ScriptData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ScriptData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  slug = "value",
+  title = "value",
+  kind = "value",
+  entrypoint = "value",
+  enabled = true,
+  status = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.scripts.publish("value")
+local result = bds.scripts.publish("id-1")
 ```
 
 ### scripts.rebuild_from_files
@@ -1981,6 +2694,26 @@ Rebuild script records from published files.
 **Response specification**
 
 - Return type: `ScriptData[] | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ScriptData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  {
+    id = "value",
+    project_id = "value",
+    slug = "value",
+    title = "value",
+    kind = "value",
+    entrypoint = "value",
+    enabled = true,
+    status = "value"
+  }
+}
+```
 
 **Example call**
 
@@ -1988,48 +2721,417 @@ Rebuild script records from published files.
 local result = bds.scripts.rebuild_from_files()
 ```
 
+[↑ Back to Table of contents](#table-of-contents)
 
-## sync
+## templates
 
-### sync.check_availability
+**Module APIs**
 
-Return whether Git is available on the current machine.
+- [templates.create](#templatescreate)
+- [templates.update](#templatesupdate)
+- [templates.delete](#templatesdelete)
+- [templates.get](#templatesget)
+- [templates.get_all](#templatesget_all)
+- [templates.get_enabled_by_kind](#templatesget_enabled_by_kind)
+- [templates.publish](#templatespublish)
+- [templates.rebuild_from_files](#templatesrebuild_from_files)
+- [templates.validate](#templatesvalidate)
+
+### templates.create
+
+Create a template in the current project.
 
 **Parameters**
 
-- None
+- data (table, required)
+
+**Response specification**
+
+- Return type: `TemplateData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TemplateData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  slug = "value",
+  title = "value",
+  kind = "value",
+  enabled = true,
+  status = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.templates.create({title = "Example Title"})
+```
+
+### templates.update
+
+Update a template by id.
+
+**Parameters**
+
+- id (string, required)
+- data (table, required)
+
+**Response specification**
+
+- Return type: `TemplateData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TemplateData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  slug = "value",
+  title = "value",
+  kind = "value",
+  enabled = true,
+  status = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.templates.update("id-1", {title = "Example Title"})
+```
+
+### templates.delete
+
+Delete a template by id.
+
+**Parameters**
+
+- id (string, required)
 
 **Response specification**
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.sync.check_availability()
+local result = bds.templates.delete("id-1")
 ```
 
-### sync.commit_all
+### templates.get
 
-Commit all pending repository changes for the current project.
+Fetch one template by id.
 
 **Parameters**
 
-- message (string, required)
+- id (string, required)
 
 **Response specification**
 
-- Return type: `table | nil`
+- Return type: `TemplateData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TemplateData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  slug = "value",
+  title = "value",
+  kind = "value",
+  enabled = true,
+  status = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.sync.commit_all("value")
+local result = bds.templates.get("id-1")
 ```
 
-### sync.fetch
+### templates.get_all
 
-Fetch remote Git refs for the current project.
+Fetch all templates in the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `TemplateData[]`
+- Data structures: `TemplateData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    project_id = "value",
+    slug = "value",
+    title = "value",
+    kind = "value",
+    enabled = true,
+    status = "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.templates.get_all()
+```
+
+### templates.get_enabled_by_kind
+
+Fetch enabled templates filtered by kind.
+
+**Parameters**
+
+- kind (string, required)
+
+**Response specification**
+
+- Return type: `TemplateData[]`
+- Data structures: `TemplateData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    project_id = "value",
+    slug = "value",
+    title = "value",
+    kind = "value",
+    enabled = true,
+    status = "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.templates.get_enabled_by_kind("post")
+```
+
+### templates.publish
+
+Publish a template by id.
+
+**Parameters**
+
+- id (string, required)
+
+**Response specification**
+
+- Return type: `TemplateData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TemplateData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  slug = "value",
+  title = "value",
+  kind = "value",
+  enabled = true,
+  status = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.templates.publish("id-1")
+```
+
+### templates.rebuild_from_files
+
+Rebuild template records from published files.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `TemplateData[] | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TemplateData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  {
+    id = "value",
+    project_id = "value",
+    slug = "value",
+    title = "value",
+    kind = "value",
+    enabled = true,
+    status = "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.templates.rebuild_from_files()
+```
+
+### templates.validate
+
+Validate Liquid template syntax.
+
+**Parameters**
+
+- content (string, required)
+
+**Response specification**
+
+- Return type: `ValidationResult | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ValidationResult`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  valid = true,
+  errors = {
+    "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.templates.validate("Example content")
+```
+
+[↑ Back to Table of contents](#table-of-contents)
+
+## meta
+
+**Module APIs**
+
+- [meta.add_category](#metaadd_category)
+- [meta.add_tag](#metaadd_tag)
+- [meta.clear_publishing_preferences](#metaclear_publishing_preferences)
+- [meta.get_categories](#metaget_categories)
+- [meta.get_project_metadata](#metaget_project_metadata)
+- [meta.get_publishing_preferences](#metaget_publishing_preferences)
+- [meta.get_tags](#metaget_tags)
+- [meta.remove_category](#metaremove_category)
+- [meta.remove_tag](#metaremove_tag)
+- [meta.set_project_metadata](#metaset_project_metadata)
+- [meta.set_publishing_preferences](#metaset_publishing_preferences)
+- [meta.sync_on_startup](#metasync_on_startup)
+- [meta.update_project_metadata](#metaupdate_project_metadata)
+
+### meta.add_category
+
+Add a category to the current project.
+
+**Parameters**
+
+- name (string, required)
+
+**Response specification**
+
+- Return type: `ProjectMetadata | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ProjectMetadata`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  name = "value",
+  description = nil,
+  public_url = nil,
+  main_language = nil,
+  default_author = nil,
+  categories = {
+    "value"
+  },
+  blog_languages = {
+    "value"
+  },
+  publishing_preferences = {
+    key = "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.meta.add_category("Example Name")
+```
+
+### meta.add_tag
+
+Add a tag record to the current project if it does not already exist.
+
+**Parameters**
+
+- name (string, required)
+
+**Response specification**
+
+- Return type: `string[]`
+
+**Example response**
+
+```lua
+{
+  "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.meta.add_tag("Example Name")
+```
+
+### meta.clear_publishing_preferences
+
+Reset publishing preferences to defaults.
 
 **Parameters**
 
@@ -2038,16 +3140,92 @@ Fetch remote Git refs for the current project.
 **Response specification**
 
 - Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.sync.fetch()
+local result = bds.meta.clear_publishing_preferences()
 ```
 
-### sync.get_history
+### meta.get_categories
 
-Return commit history for the current project repository.
+Get project categories.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `string[]`
+
+**Example response**
+
+```lua
+{
+  "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.meta.get_categories()
+```
+
+### meta.get_project_metadata
+
+Read metadata for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `ProjectMetadata`
+- Data structures: `ProjectMetadata`
+
+**Example response**
+
+```lua
+{
+  name = "value",
+  description = nil,
+  public_url = nil,
+  main_language = nil,
+  default_author = nil,
+  categories = {
+    "value"
+  },
+  blog_languages = {
+    "value"
+  },
+  publishing_preferences = {
+    key = "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.meta.get_project_metadata()
+```
+
+### meta.get_publishing_preferences
+
+Get publishing preferences for the current project.
 
 **Parameters**
 
@@ -2056,16 +3234,26 @@ Return commit history for the current project repository.
 **Response specification**
 
 - Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.sync.get_history()
+local result = bds.meta.get_publishing_preferences()
 ```
 
-### sync.get_remote_state
+### meta.get_tags
 
-Return remote repository state information for the current project.
+Get tag names for the current project.
 
 **Parameters**
 
@@ -2073,17 +3261,163 @@ Return remote repository state information for the current project.
 
 **Response specification**
 
-- Return type: `table | nil`
+- Return type: `string[]`
+
+**Example response**
+
+```lua
+{
+  "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.sync.get_remote_state()
+local result = bds.meta.get_tags()
 ```
 
-### sync.get_repo_state
+### meta.remove_category
 
-Return repository state information for the current project.
+Remove a category from the current project.
+
+**Parameters**
+
+- name (string, required)
+
+**Response specification**
+
+- Return type: `ProjectMetadata | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ProjectMetadata`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  name = "value",
+  description = nil,
+  public_url = nil,
+  main_language = nil,
+  default_author = nil,
+  categories = {
+    "value"
+  },
+  blog_languages = {
+    "value"
+  },
+  publishing_preferences = {
+    key = "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.meta.remove_category("Example Name")
+```
+
+### meta.remove_tag
+
+Remove a tag record from the current project by name.
+
+**Parameters**
+
+- name (string, required)
+
+**Response specification**
+
+- Return type: `string[]`
+
+**Example response**
+
+```lua
+{
+  "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.meta.remove_tag("Example Name")
+```
+
+### meta.set_project_metadata
+
+Replace project metadata fields for the current project.
+
+**Parameters**
+
+- updates (table, required)
+
+**Response specification**
+
+- Return type: `ProjectMetadata | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ProjectMetadata`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  name = "value",
+  description = nil,
+  public_url = nil,
+  main_language = nil,
+  default_author = nil,
+  categories = {
+    "value"
+  },
+  blog_languages = {
+    "value"
+  },
+  publishing_preferences = {
+    key = "value"
+  }
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.meta.set_project_metadata({name = "Updated Blog"})
+```
+
+### meta.set_publishing_preferences
+
+Set publishing preferences for the current project.
+
+**Parameters**
+
+- prefs (table, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.meta.set_publishing_preferences({provider = "filesystem"})
+```
+
+### meta.sync_on_startup
+
+Synchronize startup metadata state and return tags, categories, and project metadata.
 
 **Parameters**
 
@@ -2091,70 +3425,81 @@ Return repository state information for the current project.
 
 **Response specification**
 
-- Return type: `table | nil`
+- Return type: `table`
+
+**Example response**
+
+```lua
+{
+  key = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.sync.get_repo_state()
+local result = bds.meta.sync_on_startup()
 ```
 
-### sync.get_status
+### meta.update_project_metadata
 
-Return Git status information for the current project.
+Update metadata for the current project.
 
 **Parameters**
 
-- None
+- updates (table, required)
 
 **Response specification**
 
-- Return type: `table | nil`
+- Return type: `ProjectMetadata | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `ProjectMetadata`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  name = "value",
+  description = nil,
+  public_url = nil,
+  main_language = nil,
+  default_author = nil,
+  categories = {
+    "value"
+  },
+  blog_languages = {
+    "value"
+  },
+  publishing_preferences = {
+    key = "value"
+  }
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.sync.get_status()
+local result = bds.meta.update_project_metadata({name = "Updated Blog"})
 ```
 
-### sync.pull
-
-Pull remote changes for the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.sync.pull()
-```
-
-### sync.push
-
-Push local changes for the current project.
-
-**Parameters**
-
-- None
-
-**Response specification**
-
-- Return type: `table | nil`
-
-**Example call**
-
-```lua
-local result = bds.sync.push()
-```
-
+[↑ Back to Table of contents](#table-of-contents)
 
 ## tags
+
+**Module APIs**
+
+- [tags.create](#tagscreate)
+- [tags.update](#tagsupdate)
+- [tags.delete](#tagsdelete)
+- [tags.get](#tagsget)
+- [tags.get_all](#tagsget_all)
+- [tags.get_by_name](#tagsget_by_name)
+- [tags.get_posts_with_tag](#tagsget_posts_with_tag)
+- [tags.get_with_counts](#tagsget_with_counts)
+- [tags.merge](#tagsmerge)
+- [tags.rename](#tagsrename)
+- [tags.sync_from_posts](#tagssync_from_posts)
 
 ### tags.create
 
@@ -2167,11 +3512,26 @@ Create a tag in the current project.
 **Response specification**
 
 - Return type: `TagData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TagData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  name = "value",
+  color = nil,
+  post_template_slug = nil
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.tags.create({})
+local result = bds.tags.create({title = "Example Title"})
 ```
 
 ### tags.update
@@ -2186,11 +3546,26 @@ Update a tag by id.
 **Response specification**
 
 - Return type: `TagData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TagData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  name = "value",
+  color = nil,
+  post_template_slug = nil
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.tags.update("value", {})
+local result = bds.tags.update("id-1", {title = "Example Title"})
 ```
 
 ### tags.delete
@@ -2205,10 +3580,16 @@ Delete a tag by id.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.tags.delete("value")
+local result = bds.tags.delete("id-1")
 ```
 
 ### tags.get
@@ -2222,11 +3603,26 @@ Fetch one tag by id.
 **Response specification**
 
 - Return type: `TagData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TagData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  name = "value",
+  color = nil,
+  post_template_slug = nil
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.tags.get("value")
+local result = bds.tags.get("id-1")
 ```
 
 ### tags.get_all
@@ -2240,6 +3636,21 @@ Fetch all tags in the current project.
 **Response specification**
 
 - Return type: `TagData[]`
+- Data structures: `TagData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    project_id = "value",
+    name = "value",
+    color = nil,
+    post_template_slug = nil
+  }
+}
+```
 
 **Example call**
 
@@ -2258,11 +3669,26 @@ Fetch one tag by name.
 **Response specification**
 
 - Return type: `TagData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TagData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  name = "value",
+  color = nil,
+  post_template_slug = nil
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.tags.get_by_name("value")
+local result = bds.tags.get_by_name("Example Name")
 ```
 
 ### tags.get_posts_with_tag
@@ -2277,10 +3703,18 @@ Get post ids using a specific tag.
 
 - Return type: `string[]`
 
+**Example response**
+
+```lua
+{
+  "value"
+}
+```
+
 **Example call**
 
 ```lua
-local result = bds.tags.get_posts_with_tag("value")
+local result = bds.tags.get_posts_with_tag("id-1")
 ```
 
 ### tags.get_with_counts
@@ -2294,6 +3728,16 @@ Fetch tags with usage counts.
 **Response specification**
 
 - Return type: `table[]`
+
+**Example response**
+
+```lua
+{
+  {
+    key = "value"
+  }
+}
+```
 
 **Example call**
 
@@ -2314,10 +3758,16 @@ Merge source tags into a target tag.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.tags.merge({}, "value")
+local result = bds.tags.merge({}, "id-1")
 ```
 
 ### tags.rename
@@ -2332,11 +3782,26 @@ Rename a tag by id.
 **Response specification**
 
 - Return type: `TagData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TagData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  project_id = "value",
+  name = "value",
+  color = nil,
+  post_template_slug = nil
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.tags.rename("value", "value")
+local result = bds.tags.rename("id-1", "value")
 ```
 
 ### tags.sync_from_posts
@@ -2350,6 +3815,23 @@ Sync tag records from post tags.
 **Response specification**
 
 - Return type: `TagData[] | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TagData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  {
+    id = "value",
+    project_id = "value",
+    name = "value",
+    color = nil,
+    post_template_slug = nil
+  }
+}
+```
 
 **Example call**
 
@@ -2357,8 +3839,18 @@ Sync tag records from post tags.
 local result = bds.tags.sync_from_posts()
 ```
 
+[↑ Back to Table of contents](#table-of-contents)
 
 ## tasks
+
+**Module APIs**
+
+- [tasks.cancel](#taskscancel)
+- [tasks.clear_completed](#tasksclear_completed)
+- [tasks.get](#tasksget)
+- [tasks.get_all](#tasksget_all)
+- [tasks.get_running](#tasksget_running)
+- [tasks.status_snapshot](#tasksstatus_snapshot)
 
 ### tasks.cancel
 
@@ -2372,10 +3864,16 @@ Cancel a task by id.
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.tasks.cancel("value")
+local result = bds.tasks.cancel("id-1")
 ```
 
 ### tasks.clear_completed
@@ -2389,6 +3887,12 @@ Clear completed tasks from the in-memory task list.
 **Response specification**
 
 - Return type: `boolean`
+
+**Example response**
+
+```lua
+true
+```
 
 **Example call**
 
@@ -2407,11 +3911,26 @@ Fetch one task by id.
 **Response specification**
 
 - Return type: `TaskData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TaskData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  name = "value",
+  status = "value",
+  progress = nil,
+  message = nil
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.tasks.get("value")
+local result = bds.tasks.get("id-1")
 ```
 
 ### tasks.get_all
@@ -2425,6 +3944,21 @@ Fetch all tasks currently tracked by the task manager.
 **Response specification**
 
 - Return type: `TaskData[]`
+- Data structures: `TaskData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    name = "value",
+    status = "value",
+    progress = nil,
+    message = nil
+  }
+}
+```
 
 **Example call**
 
@@ -2443,6 +3977,21 @@ Fetch running tasks currently tracked by the task manager.
 **Response specification**
 
 - Return type: `TaskData[]`
+- Data structures: `TaskData`
+
+**Example response**
+
+```lua
+{
+  {
+    id = "value",
+    name = "value",
+    status = "value",
+    progress = nil,
+    message = nil
+  }
+}
+```
 
 **Example call**
 
@@ -2461,6 +4010,26 @@ Fetch the current task status snapshot.
 **Response specification**
 
 - Return type: `TaskStatus`
+- Data structures: `TaskStatus`
+
+**Example response**
+
+```lua
+{
+  active_count = 1,
+  running_count = 1,
+  pending_count = 1,
+  tasks = {
+    {
+      id = "value",
+      name = "value",
+      status = "value",
+      progress = nil,
+      message = nil
+    }
+  }
+}
+```
 
 **Example call**
 
@@ -2468,85 +4037,77 @@ Fetch the current task status snapshot.
 local result = bds.tasks.status_snapshot()
 ```
 
+[↑ Back to Table of contents](#table-of-contents)
 
-## templates
+## sync
 
-### templates.create
+**Module APIs**
 
-Create a template in the current project.
+- [sync.check_availability](#synccheck_availability)
+- [sync.commit_all](#synccommit_all)
+- [sync.fetch](#syncfetch)
+- [sync.get_history](#syncget_history)
+- [sync.get_remote_state](#syncget_remote_state)
+- [sync.get_repo_state](#syncget_repo_state)
+- [sync.get_status](#syncget_status)
+- [sync.pull](#syncpull)
+- [sync.push](#syncpush)
 
-**Parameters**
+### sync.check_availability
 
-- data (table, required)
-
-**Response specification**
-
-- Return type: `TemplateData | nil`
-
-**Example call**
-
-```lua
-local result = bds.templates.create({})
-```
-
-### templates.update
-
-Update a template by id.
+Return whether Git is available on the current machine.
 
 **Parameters**
 
-- id (string, required)
-- data (table, required)
-
-**Response specification**
-
-- Return type: `TemplateData | nil`
-
-**Example call**
-
-```lua
-local result = bds.templates.update("value", {})
-```
-
-### templates.delete
-
-Delete a template by id.
-
-**Parameters**
-
-- id (string, required)
+- None
 
 **Response specification**
 
 - Return type: `boolean`
 
+**Example response**
+
+```lua
+true
+```
+
 **Example call**
 
 ```lua
-local result = bds.templates.delete("value")
+local result = bds.sync.check_availability()
 ```
 
-### templates.get
+### sync.commit_all
 
-Fetch one template by id.
+Commit all pending repository changes for the current project.
 
 **Parameters**
 
-- id (string, required)
+- message (string, required)
 
 **Response specification**
 
-- Return type: `TemplateData | nil`
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.templates.get("value")
+local result = bds.sync.commit_all("Update content")
 ```
 
-### templates.get_all
+### sync.fetch
 
-Fetch all templates in the current project.
+Fetch remote Git refs for the current project.
 
 **Parameters**
 
@@ -2554,53 +4115,27 @@ Fetch all templates in the current project.
 
 **Response specification**
 
-- Return type: `TemplateData[]`
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.templates.get_all()
+local result = bds.sync.fetch()
 ```
 
-### templates.get_enabled_by_kind
+### sync.get_history
 
-Fetch enabled templates filtered by kind.
-
-**Parameters**
-
-- kind (string, required)
-
-**Response specification**
-
-- Return type: `TemplateData[]`
-
-**Example call**
-
-```lua
-local result = bds.templates.get_enabled_by_kind("value")
-```
-
-### templates.publish
-
-Publish a template by id.
-
-**Parameters**
-
-- id (string, required)
-
-**Response specification**
-
-- Return type: `TemplateData | nil`
-
-**Example call**
-
-```lua
-local result = bds.templates.publish("value")
-```
-
-### templates.rebuild_from_files
-
-Rebuild template records from published files.
+Return commit history for the current project repository.
 
 **Parameters**
 
@@ -2608,32 +4143,598 @@ Rebuild template records from published files.
 
 **Response specification**
 
-- Return type: `TemplateData[] | nil`
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.templates.rebuild_from_files()
+local result = bds.sync.get_history()
 ```
 
-### templates.validate
+### sync.get_remote_state
 
-Validate Liquid template syntax.
+Return remote repository state information for the current project.
 
 **Parameters**
 
+- None
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.sync.get_remote_state()
+```
+
+### sync.get_repo_state
+
+Return repository state information for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.sync.get_repo_state()
+```
+
+### sync.get_status
+
+Return Git status information for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.sync.get_status()
+```
+
+### sync.pull
+
+Pull remote changes for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.sync.pull()
+```
+
+### sync.push
+
+Push local changes for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.sync.push()
+```
+
+[↑ Back to Table of contents](#table-of-contents)
+
+## publish
+
+**Module APIs**
+
+- [publish.upload_site](#publishupload_site)
+
+### publish.upload_site
+
+Upload the rendered site using the provided publishing credentials.
+
+**Parameters**
+
+- credentials (table, required)
+
+**Response specification**
+
+- Return type: `TaskData | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+- Data structures: `TaskData`
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  id = "value",
+  name = "value",
+  status = "value",
+  progress = nil,
+  message = nil
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.publish.upload_site({provider = "sftp"})
+```
+
+[↑ Back to Table of contents](#table-of-contents)
+
+## chat
+
+**Module APIs**
+
+- [chat.analyze_media_image](#chatanalyze_media_image)
+- [chat.analyze_post](#chatanalyze_post)
+- [chat.detect_media_language](#chatdetect_media_language)
+- [chat.detect_post_language](#chatdetect_post_language)
+- [chat.translate_media_metadata](#chattranslate_media_metadata)
+- [chat.translate_post](#chattranslate_post)
+
+### chat.analyze_media_image
+
+Analyze a media image using the configured AI runtime.
+
+**Parameters**
+
+- media_id (string, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.chat.analyze_media_image("id-1")
+```
+
+### chat.analyze_post
+
+Analyze a post using the configured AI runtime.
+
+**Parameters**
+
+- post_id (string, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.chat.analyze_post("id-1")
+```
+
+### chat.detect_media_language
+
+Detect the language of media metadata.
+
+**Parameters**
+
+- title (string, required)
+- alt (string, optional)
+- caption (string, optional)
+
+**Response specification**
+
+- Return type: `table`
+
+**Example response**
+
+```lua
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.chat.detect_media_language("Example Title", "value", "value")
+```
+
+### chat.detect_post_language
+
+Detect the language of post title and content.
+
+**Parameters**
+
+- title (string, required)
 - content (string, required)
 
 **Response specification**
 
-- Return type: `ValidationResult | nil`
+- Return type: `table`
+
+**Example response**
+
+```lua
+{
+  key = "value"
+}
+```
 
 **Example call**
 
 ```lua
-local result = bds.templates.validate("value")
+local result = bds.chat.detect_post_language("Example Title", "Example content")
 ```
 
+### chat.translate_media_metadata
+
+Translate media metadata and persist the translation.
+
+**Parameters**
+
+- media_id (string, required)
+- language (string, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.chat.translate_media_metadata("id-1", "en")
+```
+
+### chat.translate_post
+
+Translate a post and persist the translation.
+
+**Parameters**
+
+- post_id (string, required)
+- language (string, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.chat.translate_post("id-1", "en")
+```
+
+[↑ Back to Table of contents](#table-of-contents)
+
+## embeddings
+
+**Module APIs**
+
+- [embeddings.compute_similarities](#embeddingscompute_similarities)
+- [embeddings.dismiss_pair](#embeddingsdismiss_pair)
+- [embeddings.find_duplicates](#embeddingsfind_duplicates)
+- [embeddings.find_similar](#embeddingsfind_similar)
+- [embeddings.get_progress](#embeddingsget_progress)
+- [embeddings.index_unindexed_posts](#embeddingsindex_unindexed_posts)
+- [embeddings.suggest_tags](#embeddingssuggest_tags)
+
+### embeddings.compute_similarities
+
+Compute similarity scores from one source post to target posts.
+
+**Parameters**
+
+- post_id (string, required)
+- target_ids (table, required)
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.embeddings.compute_similarities("id-1", {"id-2", "id-3"})
+```
+
+### embeddings.dismiss_pair
+
+Dismiss a duplicate candidate pair.
+
+**Parameters**
+
+- post_id_a (string, required)
+- post_id_b (string, required)
+
+**Response specification**
+
+- Return type: `boolean`
+
+**Example response**
+
+```lua
+true
+```
+
+**Example call**
+
+```lua
+local result = bds.embeddings.dismiss_pair("value", "value")
+```
+
+### embeddings.find_duplicates
+
+Find duplicate post candidates for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.embeddings.find_duplicates()
+```
+
+### embeddings.find_similar
+
+Find posts similar to the given post id.
+
+**Parameters**
+
+- post_id (string, required)
+- limit (integer, optional)
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.embeddings.find_similar("id-1", 10)
+```
+
+### embeddings.get_progress
+
+Get embedding index progress for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.embeddings.get_progress()
+```
+
+### embeddings.index_unindexed_posts
+
+Index posts missing embeddings for the current project.
+
+**Parameters**
+
+- None
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.embeddings.index_unindexed_posts()
+```
+
+### embeddings.suggest_tags
+
+Suggest tags for a post from semantic similarity.
+
+**Parameters**
+
+- post_id (string, required)
+- exclude_tags (table, optional)
+
+**Response specification**
+
+- Return type: `table | nil`
+- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value.
+
+**Example response**
+
+```lua
+nil  -- or
+{
+  key = "value"
+}
+```
+
+**Example call**
+
+```lua
+local result = bds.embeddings.suggest_tags("id-1", {"draft"})
+```
+
+[↑ Back to Table of contents](#table-of-contents)
 
 
 ## Data Structures

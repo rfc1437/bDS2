@@ -1236,21 +1236,25 @@ defmodule BDS.Scripting.ApiDocs do
   end
 
   defp table_of_contents do
-    @methods
-    |> Enum.map(& &1.module)
-    |> Enum.uniq()
+    module_names()
     |> Enum.map(fn module_name -> "- [#{module_name}](##{module_name})" end)
     |> Kernel.++(["- [Data Structures](#data-structures)"])
   end
 
   defp render_modules do
-    @methods
-    |> Enum.group_by(& &1.module)
-    |> Enum.flat_map(fn {module_name, methods} ->
+    module_names()
+    |> Enum.flat_map(fn module_name ->
+      methods = module_methods(module_name)
+
       [
         "## #{module_name}",
         "",
+        "**Module APIs**",
+        "",
+        Enum.map(methods, fn method -> "- [#{method.module}.#{method.name}](##{method.module}#{method.name})" end),
+        "",
         Enum.map(methods, &render_method/1),
+        "[↑ Back to Table of contents](#table-of-contents)",
         ""
       ]
     end)
@@ -1269,6 +1273,14 @@ defmodule BDS.Scripting.ApiDocs do
       "**Response specification**",
       "",
       "- Return type: `#{method.returns}`",
+      render_nullability(method.returns),
+      render_data_structure_references(method.returns),
+      "",
+      "**Example response**",
+      "",
+      "```lua",
+      render_example_response(method.returns),
+      "```",
       "",
       "**Example call**",
       "",
@@ -1277,6 +1289,7 @@ defmodule BDS.Scripting.ApiDocs do
       "```",
       ""
     ]
+    |> Enum.reject(&is_nil/1)
   end
 
   defp render_params([]), do: ["- None"]
@@ -1289,18 +1302,191 @@ defmodule BDS.Scripting.ApiDocs do
   end
 
   defp example_call(method) do
-    args =
-      method.params
-      |> Enum.map(fn param -> example_value(param.type) end)
-      |> Enum.join(", ")
+    args = Enum.map_join(method.params, ", ", &example_argument/1)
 
     "local result = bds.#{method.module}.#{method.name}(#{args})"
   end
 
-  defp example_value("string"), do: "\"value\""
-  defp example_value("table"), do: "{}"
-  defp example_value("integer"), do: "1"
-  defp example_value(_type), do: "nil"
+  defp module_names do
+    @methods
+    |> Enum.map(& &1.module)
+    |> Enum.uniq()
+  end
+
+  defp module_methods(module_name) do
+    Enum.filter(@methods, &(&1.module == module_name))
+  end
+
+  defp render_nullability(returns) do
+    if nullable_return?(returns) do
+      "- Nullability: Returns `nil` when no matching value exists or the operation cannot produce a value."
+    end
+  end
+
+  defp render_data_structure_references(returns) do
+    case response_structure_names(returns) do
+      [] -> nil
+      names -> "- Data structures: `#{Enum.join(names, "`, `")}`"
+    end
+  end
+
+  defp render_example_response(returns) do
+    returns
+    |> example_response_value()
+    |> render_lua_value(0)
+  end
+
+  defp example_argument(%{name: name, type: type}) do
+    example_argument_value(name, type)
+  end
+
+  defp example_argument_value(name, "string") do
+    case name do
+      "id" -> "\"id-1\""
+      suffix when suffix in ["post_id", "media_id", "project_id", "tag_id", "target_tag_id"] -> "\"id-1\""
+      "source_tag_ids" -> "{\"id-1\", \"id-2\"}"
+      "language" -> "\"en\""
+      "status" -> "\"draft\""
+      "kind" -> "\"post\""
+      "slug" -> "\"example-slug\""
+      "title" -> "\"Example Title\""
+      "name" -> "\"Example Name\""
+      "query" -> "\"example query\""
+      "content" -> "\"Example content\""
+      "message" -> "\"Update content\""
+      "folder_path" -> "\"/Users/me/Sites/example\""
+      "source_path" -> "\"/Users/me/Pictures/example.jpg\""
+      "item_path" -> "\"/Users/me/Sites/example/output/index.html\""
+      "action" -> "\"save\""
+      _ -> "\"value\""
+    end
+  end
+
+  defp example_argument_value("limit", "integer"), do: "10"
+  defp example_argument_value(_name, "integer"), do: "1"
+  defp example_argument_value(_name, "number"), do: "1.0"
+
+  defp example_argument_value(name, "table") do
+    case name do
+      "data" -> "{title = \"Example Title\"}"
+      "filters" -> "{status = \"draft\"}"
+      "options" -> "{}"
+      "updates" -> "{name = \"Updated Blog\"}"
+      "prefs" -> "{provider = \"filesystem\"}"
+      "credentials" -> "{provider = \"sftp\"}"
+      "target_ids" -> "{\"id-2\", \"id-3\"}"
+      "exclude_tags" -> "{\"draft\"}"
+      _ -> "{}"
+    end
+  end
+
+  defp example_argument_value(_name, _type), do: "nil"
+
+  defp nullable_return?(returns), do: String.contains?(returns, "nil")
+
+  defp response_structure_names(returns) do
+    structure_names = MapSet.new(Enum.map(@data_structures, & &1.name))
+
+    returns
+    |> String.split(~r/\s*\|\s*/)
+    |> Enum.map(&String.replace(&1, "[]", ""))
+    |> Enum.reject(&(&1 in ["nil", "boolean", "string", "integer", "number", "table"]))
+    |> Enum.filter(&MapSet.member?(structure_names, &1))
+    |> Enum.uniq()
+  end
+
+  defp example_response_value(returns) do
+    cond do
+      returns == "nil" -> nil
+      nullable_return?(returns) -> {:nullable, example_response_value(non_nil_return(returns))}
+      String.ends_with?(returns, "[]") -> [example_value_for_type(String.trim_trailing(returns, "[]"))]
+      true -> example_value_for_type(returns)
+    end
+  end
+
+  defp non_nil_return(returns) do
+    returns
+    |> String.split(~r/\s*\|\s*/)
+    |> Enum.reject(&(&1 == "nil"))
+    |> List.first()
+  end
+
+  defp example_value_for_type("boolean"), do: true
+  defp example_value_for_type("string"), do: "value"
+  defp example_value_for_type("integer"), do: 1
+  defp example_value_for_type("number"), do: 1.0
+  defp example_value_for_type("nil"), do: nil
+  defp example_value_for_type("table"), do: [{"key", "value"}]
+
+  defp example_value_for_type(type) do
+    case Enum.find(@data_structures, &(&1.name == type)) do
+      nil -> [{"key", "value"}]
+      structure -> Enum.map(structure.fields, fn field -> {field.name, example_field_value(field.type)} end)
+    end
+  end
+
+  defp example_field_value(type) do
+    cond do
+      String.contains?(type, " | nil") -> nil
+      String.ends_with?(type, "[]") -> [example_value_for_type(String.trim_trailing(type, "[]"))]
+      true -> example_value_for_type(type)
+    end
+  end
+
+  defp render_lua_value({:nullable, value}, indent) do
+    ["nil  -- or", render_lua_value(value, indent)]
+    |> Enum.join("\n")
+  end
+
+  defp render_lua_value(true, _indent), do: "true"
+  defp render_lua_value(false, _indent), do: "false"
+  defp render_lua_value(nil, _indent), do: "nil"
+  defp render_lua_value(value, _indent) when is_integer(value), do: Integer.to_string(value)
+  defp render_lua_value(value, _indent) when is_float(value), do: :erlang.float_to_binary(value, [:compact])
+  defp render_lua_value(value, _indent) when is_binary(value), do: inspect(value)
+
+  defp render_lua_value([], _indent), do: "{}"
+
+  defp render_lua_value(list, indent) when is_list(list) do
+    if keyword_like_list?(list) do
+      render_lua_table(list, indent)
+    else
+      render_lua_array(list, indent)
+    end
+  end
+
+  defp keyword_like_list?(list) do
+    Enum.all?(list, fn
+      {key, _value} when is_binary(key) -> true
+      _ -> false
+    end)
+  end
+
+  defp render_lua_table(entries, indent) do
+    outer_indent = indent_spaces(indent)
+    inner_indent = indent_spaces(indent + 2)
+
+    rendered_entries =
+      Enum.map_join(entries, ",\n", fn {key, value} ->
+        "#{inner_indent}#{key} = #{render_lua_value(value, indent + 2)}"
+      end)
+
+    "{\n#{rendered_entries}\n#{outer_indent}}"
+  end
+
+  defp render_lua_array(values, indent) do
+    outer_indent = indent_spaces(indent)
+    inner_indent = indent_spaces(indent + 2)
+
+    rendered_values =
+      Enum.map_join(values, ",\n", fn value ->
+        "#{inner_indent}#{render_lua_value(value, indent + 2)}"
+      end)
+
+    "{\n#{rendered_values}\n#{outer_indent}}"
+  end
+
+  defp indent_spaces(indent), do: String.duplicate(" ", indent)
 
   defp render_data_structures do
     Enum.flat_map(@data_structures, fn structure ->
