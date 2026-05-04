@@ -4005,7 +4005,7 @@ defmodule BDS.Desktop.ShellLiveTest do
   end
 
   test "chat editor hook reopens server-expanded A2UI surfaces after patches" do
-    live_js = File.read!(Path.expand("../../../assets/js/app.js", __DIR__))
+    live_js = File.read!(Path.expand("../../../assets/js/hooks/chat_surface.js", __DIR__))
 
     chat_editor =
       File.read!(Path.expand("../../../lib/bds/desktop/shell_live/chat_editor.ex", __DIR__))
@@ -4161,7 +4161,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert css =~ "max-height: 22px;"
     assert css =~ "padding: 0;"
 
-    live_js = File.read!(Path.expand("../../../assets/js/app.js", __DIR__))
+    live_js = File.read!(Path.expand("../../../assets/js/hooks/chat_surface.js", __DIR__))
 
     assert live_js =~
              "minHeight = parseFloat(styles.getPropertyValue(\"--chat-input-min-height\"))"

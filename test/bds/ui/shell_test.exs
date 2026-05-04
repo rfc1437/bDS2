@@ -28,6 +28,13 @@ defmodule BDS.UI.ShellTest do
     |> Enum.join("\n")
   end
 
+  defp live_js_source do
+    Path.wildcard("/Users/gb/Projects/bDS2/assets/js/**/*.js")
+    |> Enum.sort()
+    |> Enum.map(&File.read!/1)
+    |> Enum.join("\n")
+  end
+
   test "registry exposes the shared sidebar and editor contracts for the base shell" do
     sidebar_views = Registry.sidebar_views()
     editor_routes = Registry.editor_routes()
@@ -124,7 +131,7 @@ defmodule BDS.UI.ShellTest do
 
   test "desktop shell keeps the compact frame metrics and live bootstrap assets" do
     css = css_source()
-    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    live_js = live_js_source()
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
     assert File.exists?("/Users/gb/Projects/bDS2/assets/css/shell.css")
@@ -255,7 +262,7 @@ defmodule BDS.UI.ShellTest do
 
   test "phase 5 desktop-specific surfaces stay in source modules with responsive behavior" do
     css = css_source()
-    app_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    app_js = live_js_source()
 
     assert css =~ ".ai-suggestions-modal-backdrop"
     assert css =~ ".gallery-overlay"
@@ -304,15 +311,28 @@ defmodule BDS.UI.ShellTest do
 
   test "live javascript is split into focused Phoenix asset modules" do
     app_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    hooks_index = File.read!("/Users/gb/Projects/bDS2/assets/js/hooks/index.js")
 
-    assert app_js =~ ~s(import { createHooks } from "./hooks/index.js";)
-    assert app_js =~ ~s(import { syncTitlebarOverlayInsets } from "./bridges/titlebar_overlay.js";)
-    assert app_js =~ ~s(import { createMenuRuntimeCommandRunner } from "./bridges/menu_runtime.js";)
-    assert app_js =~ ~s(import { createMonacoServices } from "./monaco/services.js";)
+    assert app_js =~ ~s(import { Hooks } from "./hooks/index.js";)
+    assert hooks_index =~ ~s(import { AppShell } from "./app_shell.js";)
+    assert hooks_index =~ ~s(import { ChatSurface } from "./chat_surface.js";)
+    assert hooks_index =~ ~s(import { MenuEditorTree } from "./menu_editor_tree.js";)
+    assert hooks_index =~ ~s(import { MonacoEditor } from "./monaco_editor.js";)
+    assert hooks_index =~ ~s(import { MonacoDiffEditor } from "./monaco_diff_editor.js";)
     assert File.exists?("/Users/gb/Projects/bDS2/assets/js/hooks/index.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/hooks/app_shell.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/hooks/chat_surface.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/hooks/menu_editor_tree.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/hooks/monaco_editor.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/hooks/monaco_diff_editor.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/hooks/sidebar_interactions.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/hooks/section_scroll.js")
     assert File.exists?("/Users/gb/Projects/bDS2/assets/js/bridges/titlebar_overlay.js")
     assert File.exists?("/Users/gb/Projects/bDS2/assets/js/bridges/menu_runtime.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/bridges/document_commands.js")
     assert File.exists?("/Users/gb/Projects/bDS2/assets/js/monaco/services.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/monaco/theme.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/monaco/languages.js")
   end
 
   test "top level shell render uses utility classes for common layout" do
@@ -368,7 +388,7 @@ defmodule BDS.UI.ShellTest do
 
   test "monaco editor styling forces the internal editor surface to the dark theme" do
     css = css_source()
-    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    live_js = live_js_source()
 
     assert css =~ ".monaco-editor .margin"
     assert css =~ ".monaco-editor-background"
@@ -379,7 +399,7 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "monaco editor hook forces first visible layout and textarea content sync" do
-    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    live_js = live_js_source()
 
     assert live_js =~ "this.syncEditorFromTextarea"
     assert live_js =~ "this.layoutEditorSoon"
@@ -391,7 +411,7 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "monaco theme uses normalized app colors before defining the dark theme" do
-    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    live_js = live_js_source()
 
     assert live_js =~ "normalizeMonacoColor"
     assert live_js =~ "base: \"vs-dark\""
@@ -400,7 +420,7 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell assets persist workbench layout per project" do
-    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    live_js = live_js_source()
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
 
     session_util_ex =
@@ -416,7 +436,7 @@ defmodule BDS.UI.ShellTest do
 
   test "desktop shell assets reveal loaded media sidebar thumbnails" do
     css = css_source()
-    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    live_js = live_js_source()
 
     assert css =~ ".media-thumbnail.is-loaded .media-thumbnail-image"
     assert css =~ ".media-thumbnail.is-loaded .media-thumbnail-fallback"
@@ -444,7 +464,7 @@ defmodule BDS.UI.ShellTest do
 
   test "desktop shell assets keep old activity, tab, focus, and titlebar overlay parity rules" do
     css = css_source()
-    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    live_js = live_js_source()
     titlebar_js = File.read!("/Users/gb/Projects/bDS2/assets/js/bridges/titlebar_overlay.js")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
@@ -494,7 +514,7 @@ defmodule BDS.UI.ShellTest do
 
   test "desktop shell assets keep legacy titlebar menu keyboard and anchoring behavior" do
     css = css_source()
-    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+    live_js = live_js_source()
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
