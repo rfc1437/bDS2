@@ -1,52 +1,122 @@
 # bDS2
 
-bDS2 is the Elixir rewrite of bDS, the offline-first desktop blogging workspace in [../bDS](/Users/gb/Projects/bDS). The repository now contains a substantial BEAM application: Ecto persistence, filesystem-backed content workflows, rendering/generation/publishing pipelines, AI and MCP integrations, and a bundled desktop shell served by the Elixir runtime.
+bDS2 is the Elixir rewrite of bDS, the offline-first desktop blogging workspace. It is no longer just a rewrite scaffold: the repository now contains the main desktop runtime, Ecto persistence, filesystem-backed content workflows, rendering and publishing pipelines, Lua scripting, AI and MCP integration, and a Phoenix LiveView shell embedded in a native desktop window.
 
-The Allium specifications in [specs/](/Users/gb/Projects/bDS2/specs) remain the behavioral contract for the rewrite. For current implementation status and the parity roadmap, see [PLAN.md](/Users/gb/Projects/bDS2/PLAN.md).
+The Allium specs in [specs/](/Users/gb/Projects/bDS2/specs) remain the behavioral contract for the rewrite. For end-user operation, see [DOCUMENTATION.md](/Users/gb/Projects/bDS2/DOCUMENTATION.md). For the scripting surface, see [API.md](/Users/gb/Projects/bDS2/API.md).
 
-## Scope
+## Current Status
 
-The rewrite aims to preserve the product behavior of bDS while replacing the technical stack.
+The major architectural rework is in place.
 
-Behaviour that should remain stable includes:
+- The desktop UI is served by Phoenix LiveView inside the desktop shell rather than by a separate handwritten frontend runtime.
+- Assets use Phoenix-default Tailwind and esbuild tooling from [assets/](/Users/gb/Projects/bDS2/assets) into [priv/static/](/Users/gb/Projects/bDS2/priv/static).
+- Core editorial flows are implemented in the main application: posts, media, tags, templates, scripts, imports, preview, generation, publishing, maintenance, AI, and MCP.
+- Localization is now a first-class architectural concern rather than an afterthought: UI chrome and rendered site output have separate locale flows, and post/media translation workflows are built into the domain model.
 
-- Offline-first editorial workflows.
-- Filesystem-backed content with stable frontmatter, media sidecars, templates, scripts, and menu formats.
-- Project, post, media, translation, tag, template, generation, preview, publishing, AI, and MCP workflows.
-- Generated site output, search behavior, metadata synchronization, and rebuild behavior where those are part of the product contract.
+The rewrite still aims to preserve the product behavior of bDS while replacing the technical stack. The contract is product behavior, not the old implementation language or framework choices.
 
-The following are intentionally not part of the behavioral contract:
+## Architecture Overview
 
-- The implementation language.
-- Desktop container or UI framework.
-- ORM choice.
-- Internal state management, concurrency model, or runtime libraries.
+### Runtime
 
-## Scripting Direction
+[BDS.Application](/Users/gb/Projects/bDS2/lib/bds/application.ex) is the supervision root. It starts the Phoenix endpoint, database, preview and publishing workers, task supervisors, scripting jobs, and the desktop server/window adapters.
 
-bDS2 should use Lua as its user-facing scripting language.
+At a high level, the stack is:
 
-The reason is host fit, not language fashion: Lua has a better embedding story for the BEAM than Python does, while still being small, expressive, and suitable for user-authored macros, transforms, and utility scripts. The current direction is:
+- Native windowing through the `:desktop` integration.
+- Phoenix endpoint and LiveView shell for the actual app UI.
+- Ecto + SQLite for indexed state, editor state, and app data.
+- Filesystem-backed project data for published content, media, sidecars, scripts, templates, generated output, and rebuild workflows.
 
-- Lua script files as the persisted user script format.
-- A BEAM-hosted execution boundary with explicit host capabilities instead of unrestricted runtime access.
-- Bounded but long-running script execution for user-authored code, with explicit progress reporting through host APIs.
+### Desktop Shell
 
-The initial runtime baseline in this repository uses a dedicated Elixir scripting boundary with a Luerl-backed Lua adapter. The goal is to keep scripting integration native to the BEAM while making sandboxing and host capability exposure explicit at the application boundary.
+The desktop workbench lives under [lib/bds/desktop/](/Users/gb/Projects/bDS2/lib/bds/desktop). The main screen is [BDS.Desktop.ShellLive](/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex), with feature-specific editors and sidebar logic under [lib/bds/desktop/shell_live/](/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live).
 
-This keeps the scripting surface lightweight and aligned with the Elixir host application. Python remains a possible integration boundary for specialized tasks, but it is no longer the default scripting model for the rewrite.
+If you are tracing UI behavior, start there first:
 
-## Repository Layout
+- LiveView event routing, workbench state, overlays, and menu handling live in the desktop shell modules.
+- HEEx templates under the same tree now own most common layout and state styling.
+- Monaco remains a vendor drop under [priv/ui/monaco/](/Users/gb/Projects/bDS2/priv/ui/monaco).
 
-- [mix.exs](/Users/gb/Projects/bDS2/mix.exs): Mix project definition.
-- [config/](/Users/gb/Projects/bDS2/config): Elixir and Ecto configuration.
-- [lib/](/Users/gb/Projects/bDS2/lib): application bootstrap and shared runtime modules.
-- [priv/repo/](/Users/gb/Projects/bDS2/priv/repo): Ecto migrations.
-- [specs/](/Users/gb/Projects/bDS2/specs): Allium specs distilled from the existing bDS product and being normalized for implementation-agnostic use.
+### Domain Modules
+
+Most application behavior lives under [lib/bds/](/Users/gb/Projects/bDS2/lib/bds):
+
+- posts, media, tags, templates, scripts, and project settings
+- metadata, frontmatter, sidecars, rebuild, and maintenance
+- rendering, generation, preview, and publishing
+- AI runtimes, chat tooling, embeddings, and MCP
+- scripting capabilities and generated API docs
+
+The repo has been pushed toward smaller feature-focused modules rather than one large mixed runtime. For new work, prefer finding the owning feature module instead of adding more behavior to broad catch-all files.
+
+### Storage Model
+
+The database is important, but it is not the whole source of truth.
+
+- Ecto models hold app state, indexes, editor state, and workflow data.
+- The filesystem holds published content artifacts and sidecar metadata that must stay stable and reviewable.
+- Rebuild and metadata-diff flows exist because database state and filesystem state are expected to stay in sync.
+
+When you change persisted behavior, think in both directions: database writes and filesystem writes/readback.
+
+## Localization And i18n
+
+Localization now has two separate layers, and confusing them causes bugs.
+
+### 1. UI Localization
+
+UI chrome, menus, dashboard text, editor labels, and toasts use Gettext through [BDS.Gettext](/Users/gb/Projects/bDS2/lib/bds/gettext.ex) and the `ui` domain. Locale normalization lives in [BDS.I18n](/Users/gb/Projects/bDS2/lib/bds/i18n.ex), and the desktop shell binds the active UI locale through [BDS.Desktop.UILocale](/Users/gb/Projects/bDS2/lib/bds/desktop/ui_locale.ex).
+
+In practice, this is the language of the app itself.
+
+### 2. Render Localization
+
+Rendered site output uses a separate locale flow. Archive labels, pagination text, template-facing render strings, and generated site language handling use the `render` Gettext domain and the project's `main_language` and `blog_languages` settings.
+
+In practice, this is the language of the blog output, not necessarily the UI.
+
+### 3. Content Translation
+
+Posts and media have translation-aware workflows. Post translations and media metadata translations are modeled explicitly, and generation/preview/publishing use the project's configured languages when building output.
+
+Relevant translation resources live under:
+
+- [priv/gettext/](/Users/gb/Projects/bDS2/priv/gettext) for Gettext catalogs
+- [priv/i18n/](/Users/gb/Projects/bDS2/priv/i18n) for additional locale data used by the app
+
+If you touch i18n-sensitive behavior, check whether the change belongs to UI locale, render locale, or content translation. They are related, but they are not interchangeable.
+
+## Frontend And Assets
+
+Frontend source now follows the Phoenix asset layout:
+
+- [assets/css/](/Users/gb/Projects/bDS2/assets/css) for Tailwind-based CSS modules
+- [assets/js/](/Users/gb/Projects/bDS2/assets/js) for LiveView hooks, bridges, Monaco integration, and UI helpers
+- [priv/static/assets/](/Users/gb/Projects/bDS2/priv/static/assets) for generated outputs
+
+The rule of thumb is simple:
+
+- common layout, spacing, state, and typography belong in HEEx and small shared UI primitives
+- authored CSS stays for tokens and desktop-specific selectors
+- JavaScript stays focused on LiveView hooks, editor integration, drag/drop, and browser APIs
+
+## Repository Map
+
+- [mix.exs](/Users/gb/Projects/bDS2/mix.exs): Mix project definition, aliases, releases, and dependencies
+- [config/](/Users/gb/Projects/bDS2/config): runtime, dev, test, and asset configuration
+- [lib/bds/](/Users/gb/Projects/bDS2/lib/bds): core application modules
+- [lib/bds/desktop/](/Users/gb/Projects/bDS2/lib/bds/desktop): desktop endpoint, shell, menus, controllers, and window integration
+- [assets/](/Users/gb/Projects/bDS2/assets): Tailwind and esbuild source
+- [priv/repo/](/Users/gb/Projects/bDS2/priv/repo): Ecto migrations and snapshots
+- [priv/gettext/](/Users/gb/Projects/bDS2/priv/gettext): UI and render translation catalogs
+- [specs/](/Users/gb/Projects/bDS2/specs): Allium behavior specs
+- [DOCUMENTATION.md](/Users/gb/Projects/bDS2/DOCUMENTATION.md): end-user guide
+- [API.md](/Users/gb/Projects/bDS2/API.md): generated scripting API reference
 
 ## macOS Development Setup
 
-If you are setting up a new macOS machine, start with the toolchain.
+If you are setting up a new macOS machine, install the toolchain first.
 
 ### 1. Install Xcode Command Line Tools
 
@@ -55,8 +125,6 @@ xcode-select --install
 ```
 
 ### 2. Install Homebrew
-
-If Homebrew is not already installed:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -69,36 +137,28 @@ brew update
 brew install erlang elixir sqlite
 ```
 
-Verify the installation:
-
-```bash
-elixir --version
-mix --version
-sqlite3 --version
-```
-
-### 4. Fetch Dependencies
+### 4. Fetch Dependencies And Set Up The App
 
 ```bash
 cd /Users/gb/Projects/bDS2
-mix deps.get
+mix setup
+mix assets.setup
 ```
 
-### 5. Create the Local Database
+## Development Workflow
+
+Useful commands:
 
 ```bash
-mix ecto.create
-mix ecto.migrate
-```
-
-### 6. Run Tests
-
-```bash
+mix compile --warnings-as-errors
 mix test
+mix dialyzer
+mix assets.build
 ```
 
-## Development Notes
+Notes for developers:
 
-- Use `mix test` for validation during development.
-- The application behavior is defined by the Allium specs in [specs/](/Users/gb/Projects/bDS2/specs).
-- Use [PLAN.md](/Users/gb/Projects/bDS2/PLAN.md) for implementation status and the parity roadmap.
+- Specs in [specs/](/Users/gb/Projects/bDS2/specs) define the intended product behavior.
+- [DOCUMENTATION.md](/Users/gb/Projects/bDS2/DOCUMENTATION.md) is for end users, not implementation details.
+- [API.md](/Users/gb/Projects/bDS2/API.md) is generated from the live scripting capability map and should stay in sync with runtime changes.
+- When changing persistence or localization behavior, check both the database side and the filesystem/render side before assuming the change is complete.
