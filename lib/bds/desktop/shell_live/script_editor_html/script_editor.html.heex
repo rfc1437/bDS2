@@ -1,30 +1,31 @@
 <div class="scripts-view-shell editor flex h-full min-h-0 flex-col" data-testid="script-editor">
   <div class="editor-header scripts-header flex shrink-0 items-start justify-between gap-3">
-    <div class="editor-tabs flex min-w-0 flex-1 overflow-hidden"><div class="editor-tab active inline-flex max-w-full items-center overflow-hidden px-3 py-2"><span class="editor-tab-title truncate"><%= @script_editor.title %></span></div></div>
+    <div class="editor-tabs flex min-w-0 flex-1 overflow-hidden"><div class="editor-tab ui-tab ui-tab-active active inline-flex max-w-full items-center overflow-hidden px-3 py-2"><span class="editor-tab-title truncate"><%= @script_editor.title %></span></div></div>
     <div class="editor-actions flex flex-wrap items-center justify-end gap-2">
       <span class={[
         "status-badge",
+        "ui-badge",
         "status-#{@script_editor.status}"
       ]} data-testid="script-status-badge"><%= BDS.Desktop.ShellData.dashboard_status_label(@script_editor.status) %></span>
       <%= if @script_editor.can_publish? do %>
-        <button class="success" data-testid="script-publish-button" type="button" phx-click="publish_script_editor" phx-target={@myself}><%= dgettext("ui", "Publish") %></button>
+        <button class="success ui-button ui-button-primary" data-testid="script-publish-button" type="button" phx-click="publish_script_editor" phx-target={@myself}><%= dgettext("ui", "Publish") %></button>
       <% end %>
-      <button class="secondary scripts-save-button" type="button" phx-click="save_script_editor" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
-      <button class="secondary scripts-run-button" type="button" phx-click="run_script_editor" phx-target={@myself}><%= dgettext("ui", "Run") %></button>
-      <button class="secondary scripts-check-button" type="button" phx-click="check_script_editor" phx-target={@myself}><%= dgettext("ui", "Check Syntax") %></button>
-      <button class="secondary danger" type="button" phx-click="delete_script_editor" phx-target={@myself}><%= dgettext("ui", "Delete") %></button>
+      <button class="secondary scripts-save-button ui-button ui-button-secondary" type="button" phx-click="save_script_editor" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
+      <button class="secondary scripts-run-button ui-button ui-button-secondary" type="button" phx-click="run_script_editor" phx-target={@myself}><%= dgettext("ui", "Run") %></button>
+      <button class="secondary scripts-check-button ui-button ui-button-secondary" type="button" phx-click="check_script_editor" phx-target={@myself}><%= dgettext("ui", "Check Syntax") %></button>
+      <button class="secondary danger ui-button ui-button-secondary ui-button-danger" type="button" phx-click="delete_script_editor" phx-target={@myself}><%= dgettext("ui", "Delete") %></button>
     </div>
   </div>
   <form class="editor-content scripts-view flex min-h-0 flex-1 flex-col gap-4 overflow-hidden" phx-change="change_script_editor" phx-target={@myself}>
     <div class="editor-header-row scripts-meta-row grid gap-4">
       <div class="editor-meta flex min-w-0 flex-col gap-4">
         <div class="editor-field-row grid gap-4 md:grid-cols-2">
-          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Title") %></label><input type="text" name="script_editor[title]" value={@script_editor.title} /></div>
-          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Slug") %></label><input type="text" name="script_editor[slug]" value={@script_editor.slug} /></div>
+          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Title") %></label><input class="ui-input" type="text" name="script_editor[title]" value={@script_editor.title} /></div>
+          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Slug") %></label><input class="ui-input" type="text" name="script_editor[slug]" value={@script_editor.slug} /></div>
         </div>
         <div class="editor-field-row grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Kind") %></label><select name="script_editor[kind]"><option value="utility" selected={@script_editor.kind == "utility"}>utility</option><option value="macro" selected={@script_editor.kind == "macro"}>macro</option><option value="transform" selected={@script_editor.kind == "transform"}>transform</option></select></div>
-          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Entrypoint") %></label><select name="script_editor[entrypoint]"><%= for entrypoint <- @script_editor.entrypoints do %><option value={entrypoint} selected={entrypoint == @script_editor.entrypoint}><%= entrypoint %></option><% end %></select></div>
+          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Kind") %></label><select class="ui-input" name="script_editor[kind]"><option value="utility" selected={@script_editor.kind == "utility"}>utility</option><option value="macro" selected={@script_editor.kind == "macro"}>macro</option><option value="transform" selected={@script_editor.kind == "transform"}>transform</option></select></div>
+          <div class="editor-field flex flex-col gap-1.5"><label><%= dgettext("ui", "Entrypoint") %></label><select class="ui-input" name="script_editor[entrypoint]"><%= for entrypoint <- @script_editor.entrypoints do %><option value={entrypoint} selected={entrypoint == @script_editor.entrypoint}><%= entrypoint %></option><% end %></select></div>
           <div class="editor-field scripts-enabled-field flex flex-col justify-end gap-1.5"><label><input type="checkbox" name="script_editor[enabled]" checked={@script_editor.enabled} /> <%= dgettext("ui", "Enabled") %></label></div>
         </div>
       </div>

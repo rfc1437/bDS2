@@ -1,7 +1,7 @@
 <div class="post-editor editor flex h-full min-h-0 flex-col" data-testid="post-editor">
   <div class="editor-header flex shrink-0 items-start justify-between gap-3">
     <div class="editor-tabs flex min-w-0 flex-1 overflow-hidden">
-      <div class={["editor-tab active inline-flex max-w-full items-center gap-2 overflow-hidden px-3 py-2", if(@post_editor.dirty?, do: "dirty")]}> 
+      <div class={["editor-tab ui-tab ui-tab-active active inline-flex max-w-full items-center gap-2 overflow-hidden px-3 py-2", if(@post_editor.dirty?, do: "dirty")]}> 
         <span class="editor-tab-title truncate" data-testid="editor-title"><%= @post_editor.display_title %></span>
         <%= if @post_editor.dirty? do %>
           <span class="editor-tab-dirty" title={dgettext("ui", "Unsaved")}>●</span>
@@ -10,7 +10,7 @@
     </div>
 
     <div class="editor-actions flex flex-wrap items-center justify-end gap-2">
-      <span class={["status-badge", "status-#{@post_editor.status}"]} data-testid="post-status-badge">
+      <span class={["status-badge", "ui-badge", "status-#{@post_editor.status}"]} data-testid="post-status-badge">
         <%= post_status_label(@post_editor.status) %>
       </span>
       <%= if @post_editor.save_state in [:saving] do %>
@@ -19,7 +19,7 @@
 
       <div class="quick-actions-wrapper relative">
         <button
-          class="secondary quick-actions-btn inline-flex items-center gap-2"
+          class="secondary quick-actions-btn ui-button ui-button-secondary inline-flex items-center gap-2"
           type="button"
           phx-click="toggle_post_editor_quick_actions"
           phx-target={@myself}
@@ -66,17 +66,17 @@
       </div>
 
       <%= if @post_editor.can_publish? do %>
-        <button class="success" data-testid="post-publish-button" type="button" phx-click="publish_post_editor" phx-target={@myself}>
+        <button class="success ui-button ui-button-primary" data-testid="post-publish-button" type="button" phx-click="publish_post_editor" phx-target={@myself}>
           <%= dgettext("ui", "Publish") %>
         </button>
       <% end %>
       <%= if @post_editor.can_publish? do %>
-        <button class="secondary danger" data-testid="post-discard-button" type="button" phx-click="discard_post_editor" phx-target={@myself} title={@post_editor.discard_title}>
+        <button class="secondary danger ui-button ui-button-secondary ui-button-danger" data-testid="post-discard-button" type="button" phx-click="discard_post_editor" phx-target={@myself} title={@post_editor.discard_title}>
           <%= @post_editor.discard_label %>
         </button>
       <% end %>
       <%= if @post_editor.can_delete? do %>
-        <button class="secondary danger" data-testid="post-delete-button" type="button" phx-click="delete_post_editor" phx-target={@myself}>
+        <button class="secondary danger ui-button ui-button-secondary ui-button-danger" data-testid="post-delete-button" type="button" phx-click="delete_post_editor" phx-target={@myself}>
           <%= dgettext("ui", "Delete") %>
         </button>
       <% end %>
@@ -115,7 +115,7 @@
         <div class="editor-meta flex min-w-0 flex-col gap-4">
           <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Title") %></label>
-            <input class="post-editor-input" type="text" name="post_editor[title]" value={@post_editor.form["title"]} />
+            <input class="post-editor-input ui-input" type="text" name="post_editor[title]" value={@post_editor.form["title"]} />
           </div>
 
           <div class="editor-field flex flex-col gap-1.5">
@@ -164,20 +164,20 @@
 
           <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Author") %></label>
-            <input class="post-editor-input" type="text" name="post_editor[author]" value={@post_editor.form["author"]} />
+            <input class="post-editor-input ui-input" type="text" name="post_editor[author]" value={@post_editor.form["author"]} />
           </div>
 
           <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Language") %></label>
             <div class="editor-language-row flex items-center gap-2">
-              <select class="post-editor-input" name="post_editor[language]">
+              <select class="post-editor-input ui-input" name="post_editor[language]">
                 <%= for language <- @post_editor.languages do %>
                   <option value={language} selected={language == @post_editor.form["language"]}><%= String.upcase(language) %></option>
                 <% end %>
               </select>
 
               <button
-                class="secondary compact"
+                class="secondary compact ui-button ui-button-secondary ui-button-compact"
                 data-testid="post-detect-language-button"
                 type="button"
                 phx-click="detect_post_editor_language"
@@ -200,7 +200,7 @@
           <div class="editor-field-row grid gap-4 md:grid-cols-2">
             <div class="editor-field flex flex-col gap-1.5">
               <label><%= dgettext("ui", "Slug") %></label>
-              <input class="post-editor-input is-readonly" type="text" readonly value={@post_editor.slug} />
+              <input class="post-editor-input ui-input is-readonly ui-input-readonly" type="text" readonly value={@post_editor.slug} />
             </div>
 
             <div class="editor-field flex flex-col gap-1.5">
@@ -248,7 +248,7 @@
           <%= if @post_editor.show_template_selector? do %>
             <div class="editor-field flex flex-col gap-1.5">
               <label><%= dgettext("ui", "Template") %></label>
-              <select class="post-editor-input" name="post_editor[template_slug]">
+              <select class="post-editor-input ui-input" name="post_editor[template_slug]">
                 <option value=""><%= dgettext("ui", "Default") %></option>
                 <%= for template <- @post_editor.template_options do %>
                   <option value={template.slug} selected={template.slug == @post_editor.form["template_slug"]}><%= template.title %></option>
@@ -316,7 +316,7 @@
     <div class={["editor-excerpt-panel", if(not @post_editor.excerpt_expanded, do: "is-collapsed")]}> 
       <div class="editor-field flex flex-col gap-1.5">
         <label><%= dgettext("ui", "Excerpt") %></label>
-        <textarea class="post-editor-textarea post-editor-excerpt" name="post_editor[excerpt]" rows="4"><%= @post_editor.form["excerpt"] %></textarea>
+        <textarea class="post-editor-textarea post-editor-excerpt ui-textarea" name="post_editor[excerpt]" rows="4"><%= @post_editor.form["excerpt"] %></textarea>
       </div>
     </div>
 

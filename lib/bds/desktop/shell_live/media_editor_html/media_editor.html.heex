@@ -2,7 +2,7 @@
   <div class="editor-header flex shrink-0 items-start justify-between gap-3">
     <div class="editor-tabs flex min-w-0 flex-1 overflow-hidden">
       <div class={[
-        "editor-tab active inline-flex max-w-full items-center gap-2 overflow-hidden px-3 py-2",
+        "editor-tab ui-tab ui-tab-active active inline-flex max-w-full items-center gap-2 overflow-hidden px-3 py-2",
         if(@media_editor.dirty?, do: "dirty")
       ]}>
         <span class="editor-tab-title truncate" data-testid="editor-title"><%= @media_editor.display_title %></span>
@@ -19,7 +19,7 @@
 
       <div class="quick-actions-wrapper relative">
         <button
-          class="secondary quick-actions-btn inline-flex items-center gap-2"
+          class="secondary quick-actions-btn ui-button ui-button-secondary inline-flex items-center gap-2"
           type="button"
           phx-click="toggle_media_editor_quick_actions"
           phx-target={@myself}
@@ -82,14 +82,14 @@
         <% end %>
       </div>
 
-      <button class="secondary" type="button" phx-click="replace_media_editor_file" phx-target={@myself}>
+      <button class="secondary ui-button ui-button-secondary" type="button" phx-click="replace_media_editor_file" phx-target={@myself}>
         <%= dgettext("ui", "Replace File") %>
       </button>
-      <button data-testid="media-save-button" type="button" phx-click="save_media_editor" phx-target={@myself}>
+      <button class="ui-button ui-button-primary" data-testid="media-save-button" type="button" phx-click="save_media_editor" phx-target={@myself}>
         <%= dgettext("ui", "Save") %>
       </button>
       <button
-        class="secondary danger"
+        class="secondary danger ui-button ui-button-secondary ui-button-danger"
         data-testid="media-delete-button"
         type="button"
         phx-click="open_overlay"
@@ -120,56 +120,56 @@
       <form class="media-editor-details-form flex flex-col gap-4" data-testid="media-editor-form" phx-change="change_media_editor" phx-target={@myself}>
         <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "File Name") %></label>
-          <input class="post-editor-input disabled" type="text" value={@media_editor.original_name} disabled />
+          <input class="post-editor-input ui-input disabled ui-input-disabled" type="text" value={@media_editor.original_name} disabled />
         </div>
 
         <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "MIME Type") %></label>
-          <input class="post-editor-input disabled" type="text" value={@media_editor.mime_type} disabled />
+          <input class="post-editor-input ui-input disabled ui-input-disabled" type="text" value={@media_editor.mime_type} disabled />
         </div>
 
         <div class="editor-field-row grid gap-4 md:grid-cols-2">
           <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Size") %></label>
-            <input class="post-editor-input disabled" type="text" value={@media_editor.file_size} disabled />
+            <input class="post-editor-input ui-input disabled ui-input-disabled" type="text" value={@media_editor.file_size} disabled />
           </div>
 
           <%= if @media_editor.dimensions do %>
             <div class="editor-field flex flex-col gap-1.5">
               <label><%= dgettext("ui", "Dimensions") %></label>
-              <input class="post-editor-input disabled" type="text" value={@media_editor.dimensions} disabled />
+              <input class="post-editor-input ui-input disabled ui-input-disabled" type="text" value={@media_editor.dimensions} disabled />
             </div>
           <% end %>
         </div>
 
         <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Title") %></label>
-          <input class="post-editor-input" type="text" name="media_editor[title]" value={@media_editor.form["title"]} />
+          <input class="post-editor-input ui-input" type="text" name="media_editor[title]" value={@media_editor.form["title"]} />
         </div>
 
         <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Alt Text") %></label>
-          <input class="post-editor-input" type="text" name="media_editor[alt]" value={@media_editor.form["alt"]} />
+          <input class="post-editor-input ui-input" type="text" name="media_editor[alt]" value={@media_editor.form["alt"]} />
         </div>
 
         <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Caption") %></label>
-          <textarea class="post-editor-textarea" name="media_editor[caption]" rows="3"><%= @media_editor.form["caption"] %></textarea>
+          <textarea class="post-editor-textarea ui-textarea" name="media_editor[caption]" rows="3"><%= @media_editor.form["caption"] %></textarea>
         </div>
 
         <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Tags") %></label>
-          <input class="post-editor-input" type="text" name="media_editor[tags]" value={@media_editor.form["tags"]} />
+          <input class="post-editor-input ui-input" type="text" name="media_editor[tags]" value={@media_editor.form["tags"]} />
         </div>
 
         <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Author") %></label>
-          <input class="post-editor-input" type="text" name="media_editor[author]" value={@media_editor.form["author"]} />
+          <input class="post-editor-input ui-input" type="text" name="media_editor[author]" value={@media_editor.form["author"]} />
         </div>
 
         <div class="editor-field flex flex-col gap-1.5">
           <label><%= dgettext("ui", "Language") %></label>
-          <select class="post-editor-input" name="media_editor[language]">
+          <select class="post-editor-input ui-input" name="media_editor[language]">
             <option value=""><%= dgettext("ui", "None") %></option>
             <%= for language <- @media_editor.languages do %>
               <option value={language} selected={language == @media_editor.form["language"]}><%= language_label(language) %></option>
@@ -197,7 +197,7 @@
                   >
                     <%= translation.flag %> <%= language_label(translation.language) %><%= if translation.title, do: " — #{translation.title}" %>
                   </button>
-                  <button class="secondary compact" type="button" phx-click="refresh_media_translation" phx-target={@myself} phx-value-language={translation.language}>
+                  <button class="secondary compact ui-button ui-button-secondary ui-button-compact" type="button" phx-click="refresh_media_translation" phx-target={@myself} phx-value-language={translation.language}>
                     <%= dgettext("ui", "Refresh") %>
                   </button>
                   <button class="unlink-btn" type="button" phx-click="delete_media_translation" phx-target={@myself} phx-value-language={translation.language}>×</button>
@@ -283,20 +283,20 @@
           <input type="hidden" name="media_translation[language]" value={@media_editor.editing_translation["language"]} />
           <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Title") %></label>
-            <input class="post-editor-input" type="text" name="media_translation[title]" value={@media_editor.editing_translation["title"]} />
+            <input class="post-editor-input ui-input" type="text" name="media_translation[title]" value={@media_editor.editing_translation["title"]} />
           </div>
           <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Alt Text") %></label>
-            <input class="post-editor-input" type="text" name="media_translation[alt]" value={@media_editor.editing_translation["alt"]} />
+            <input class="post-editor-input ui-input" type="text" name="media_translation[alt]" value={@media_editor.editing_translation["alt"]} />
           </div>
           <div class="editor-field flex flex-col gap-1.5">
             <label><%= dgettext("ui", "Caption") %></label>
-            <textarea class="post-editor-textarea" name="media_translation[caption]" rows="3"><%= @media_editor.editing_translation["caption"] %></textarea>
+            <textarea class="post-editor-textarea ui-textarea" name="media_translation[caption]" rows="3"><%= @media_editor.editing_translation["caption"] %></textarea>
           </div>
         </form>
         <div class="translation-modal-footer flex items-center justify-end gap-2">
-          <button class="secondary" type="button" phx-click="close_media_translation_editor" phx-target={@myself}><%= dgettext("ui", "Cancel") %></button>
-          <button type="button" phx-click="save_media_translation" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
+          <button class="secondary ui-button ui-button-secondary" type="button" phx-click="close_media_translation_editor" phx-target={@myself}><%= dgettext("ui", "Cancel") %></button>
+          <button class="ui-button ui-button-primary" type="button" phx-click="save_media_translation" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
         </div>
       </div>
     </div>

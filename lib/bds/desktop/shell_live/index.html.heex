@@ -457,7 +457,7 @@
           <div class="panel-tabs flex min-w-0 items-center overflow-x-auto">
             <%= for tab <- @panel_tabs do %>
               <button
-                class={["panel-tab inline-flex h-9 items-center px-3 text-xs uppercase tracking-wide", if(@workbench.panel.active_tab == tab, do: "active")]}
+                class={["panel-tab", "ui-tab", if(@workbench.panel.active_tab == tab, do: "ui-tab-active"), "inline-flex h-9 items-center px-3 text-xs uppercase tracking-wide", if(@workbench.panel.active_tab == tab, do: "active")]}
                 type="button"
                 phx-click="select_panel_tab"
                 phx-value-tab={tab}
@@ -467,7 +467,7 @@
             <% end %>
           </div>
           <button
-            class="panel-close inline-flex h-8 w-8 items-center justify-center"
+            class="panel-close ui-button ui-button-secondary inline-flex h-8 w-8 items-center justify-center"
             data-testid="panel-close"
             type="button"
             phx-click="toggle_panel"
@@ -531,7 +531,7 @@
             ><%= @assistant_prompt %></textarea>
 
             <button
-              class="assistant-sidebar-start-button"
+              class="assistant-sidebar-start-button ui-button ui-button-primary"
               data-testid="assistant-start-button"
               type="submit"
               disabled={String.trim(@assistant_prompt || "") == ""}

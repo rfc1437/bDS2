@@ -22,13 +22,13 @@
   <div class="style-apply-row">
     <label class="style-preview-mode-control">
       <span><%= dgettext("ui", "Preview Mode") %></span>
-      <select phx-change="change_style_preview_mode" phx-target={@myself} name="mode">
+      <select class="ui-input" phx-change="change_style_preview_mode" phx-target={@myself} name="mode">
         <option value="auto" selected={@style_editor.preview_mode == "auto"}><%= dgettext("ui", "Auto") %></option>
         <option value="light" selected={@style_editor.preview_mode == "light"}><%= dgettext("ui", "Light") %></option>
         <option value="dark" selected={@style_editor.preview_mode == "dark"}><%= dgettext("ui", "Dark") %></option>
       </select>
     </label>
-    <button class="primary" type="button" phx-click="apply_style_theme" phx-target={@myself} disabled={@style_editor.selected_theme == @style_editor.applied_theme}><%= dgettext("ui", "Apply Theme") %></button>
+    <button class="primary ui-button ui-button-primary" type="button" phx-click="apply_style_theme" phx-target={@myself} disabled={@style_editor.selected_theme == @style_editor.applied_theme}><%= dgettext("ui", "Apply Theme") %></button>
   </div>
 
   <div class="style-preview-container">

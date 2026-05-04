@@ -140,6 +140,20 @@ defmodule BDS.UI.ShellTest do
     assert template =~ "data-workbench-session={encoded_workbench_session(@workbench)}"
   end
 
+  test "phase 4 css defines normalized shared primitives" do
+    css = css_source()
+
+    assert css =~ ".ui-button {"
+    assert css =~ ".ui-button-secondary {"
+    assert css =~ ".ui-button-danger {"
+    assert css =~ ".ui-input,"
+    assert css =~ ".ui-textarea {"
+    assert css =~ ".ui-tab {"
+    assert css =~ ".ui-badge {"
+    assert css =~ ".ui-panel-entry {"
+    assert css =~ ".ui-empty-state {"
+  end
+
   test "tailwind source keeps theme tokens and shared component primitives" do
     css = css_source()
     app_css = File.read!("/Users/gb/Projects/bDS2/assets/css/app.css")
@@ -399,7 +413,7 @@ defmodule BDS.UI.ShellTest do
     assert css =~ "opacity: 1;"
 
     assert Regex.match?(
-             ~r/class="secondary quick-actions-btn inline-flex items-center gap-2".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= dgettext\("ui", "Quick Actions"\) %><\/span>/s,
+             ~r/class="secondary quick-actions-btn ui-button ui-button-secondary inline-flex items-center gap-2".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= dgettext\("ui", "Quick Actions"\) %><\/span>/s,
              template
            )
 
@@ -519,7 +533,7 @@ defmodule BDS.UI.ShellTest do
     assert post_editor_ex =~ "defp build_data(socket)"
 
     assert Regex.match?(
-             ~r/class="secondary quick-actions-btn inline-flex items-center gap-2".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= dgettext\("ui", "Quick Actions"\) %><\/span>/s,
+             ~r/class="secondary quick-actions-btn ui-button ui-button-secondary inline-flex items-center gap-2".*?<span class="quick-actions-btn-icon">⚡<\/span>\s*<span class="quick-actions-btn-label"><%= dgettext\("ui", "Quick Actions"\) %><\/span>/s,
              post_template
            )
 

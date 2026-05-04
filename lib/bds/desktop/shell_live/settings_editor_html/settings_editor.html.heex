@@ -10,7 +10,7 @@
     <div class="settings-header flex shrink-0 items-center justify-between gap-3">
       <h2 data-testid="editor-title"><%= dgettext("ui", "Settings") %></h2>
       <form class="settings-search w-full max-w-xs" phx-change="change_settings_search" phx-target={@myself}>
-        <input type="text" name="query" value={@settings_editor.search_query} placeholder={dgettext("ui", "Search settings")} />
+        <input class="ui-input" type="text" name="query" value={@settings_editor.search_query} placeholder={dgettext("ui", "Search settings")} />
       </form>
     </div>
 
@@ -32,29 +32,29 @@
               <div class="setting-info">
                 <label class="setting-label"><%= dgettext("ui", "Project Name") %></label>
               </div>
-              <div class="setting-control"><input type="text" name="settings_project[name]" value={@settings_editor.project["name"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="text" name="settings_project[name]" value={@settings_editor.project["name"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Description") %></label></div>
-              <div class="setting-control"><textarea name="settings_project[description]" rows="3"><%= @settings_editor.project["description"] %></textarea></div>
+              <div class="setting-control"><textarea class="ui-textarea" name="settings_project[description]" rows="3"><%= @settings_editor.project["description"] %></textarea></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Data Path") %></label></div>
               <div class="setting-control">
                 <div class="setting-input-group">
-                  <input type="text" value={@settings_editor.project_data_path} readonly />
-                  <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="open_data_folder"><%= dgettext("ui", "Open") %></button>
+                  <input class="ui-input ui-input-readonly" type="text" value={@settings_editor.project_data_path} readonly />
+                  <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="open_data_folder"><%= dgettext("ui", "Open") %></button>
                 </div>
               </div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Public URL") %></label></div>
-              <div class="setting-control"><input type="url" name="settings_project[public_url]" value={@settings_editor.project["public_url"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="url" name="settings_project[public_url]" value={@settings_editor.project["public_url"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Main Language") %></label></div>
               <div class="setting-control">
-                <select name="settings_project[main_language]">
+                <select class="ui-input" name="settings_project[main_language]">
                   <%= for language <- @settings_editor.supported_languages do %>
                     <option value={language} selected={language == @settings_editor.project["main_language"]}><%= String.upcase(language) %></option>
                   <% end %>
@@ -76,16 +76,16 @@
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Default Author") %></label></div>
-              <div class="setting-control"><input type="text" name="settings_project[default_author]" value={@settings_editor.project["default_author"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="text" name="settings_project[default_author]" value={@settings_editor.project["default_author"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Max Posts Per Page") %></label></div>
-              <div class="setting-control"><input type="number" min="1" max="500" name="settings_project[max_posts_per_page]" value={@settings_editor.project["max_posts_per_page"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="number" min="1" max="500" name="settings_project[max_posts_per_page]" value={@settings_editor.project["max_posts_per_page"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Blogmark Category") %></label></div>
               <div class="setting-control">
-                <select name="settings_project[blogmark_category]">
+                <select class="ui-input" name="settings_project[blogmark_category]">
                   <%= for category <- Enum.map(@settings_editor.categories, & &1.name) do %>
                     <option value={category} selected={category == @settings_editor.project["blogmark_category"]}><%= category %></option>
                   <% end %>
@@ -97,7 +97,7 @@
               <div class="setting-control"><p class="setting-description"><%= dgettext("ui", "Bookmarklet copy support is wired through the desktop runtime and project public URL.") %></p></div>
             </div>
           </form>
-          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_project" phx-target={@myself}><%= dgettext("ui", "Save") %></button></div>
+          <div class="setting-actions"><button class="primary ui-button ui-button-primary" type="button" phx-click="save_settings_project" phx-target={@myself}><%= dgettext("ui", "Save") %></button></div>
         </div>
       <% end %>
 
@@ -111,7 +111,7 @@
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Default Editor Mode") %></label></div>
               <div class="setting-control">
-                <select name="settings_editor[default_mode]">
+                <select class="ui-input" name="settings_editor[default_mode]">
                   <option value="wysiwyg" selected={@settings_editor.editor["default_mode"] == "wysiwyg"}><%= dgettext("ui", "WYSIWYG") %></option>
                   <option value="markdown" selected={@settings_editor.editor["default_mode"] == "markdown"}><%= dgettext("ui", "Markdown") %></option>
                   <option value="preview" selected={@settings_editor.editor["default_mode"] == "preview"}><%= dgettext("ui", "Preview") %></option>
@@ -121,7 +121,7 @@
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Diff View Style") %></label></div>
               <div class="setting-control">
-                <select name="settings_editor[diff_view_style]">
+                <select class="ui-input" name="settings_editor[diff_view_style]">
                   <option value="inline" selected={@settings_editor.editor["diff_view_style"] == "inline"}><%= dgettext("ui", "Inline") %></option>
                   <option value="side-by-side" selected={@settings_editor.editor["diff_view_style"] == "side-by-side"}><%= dgettext("ui", "Side by Side") %></option>
                 </select>
@@ -136,7 +136,7 @@
               <div class="setting-control"><label><input type="checkbox" name="settings_editor[hide_unchanged_regions]" checked={@settings_editor.editor["hide_unchanged_regions"]} /> <%= dgettext("ui", "Collapse unchanged diff hunks") %></label></div>
             </div>
           </form>
-          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_editor" phx-target={@myself}><%= dgettext("ui", "Save") %></button></div>
+          <div class="setting-actions"><button class="primary ui-button ui-button-primary" type="button" phx-click="save_settings_editor" phx-target={@myself}><%= dgettext("ui", "Save") %></button></div>
         </div>
       <% end %>
 
@@ -161,12 +161,12 @@
                   <tr>
                     <td><%= category.name %></td>
                     <td>
-                      <input type="text" name="category_settings[title]" value={category.title} form={"category-form-#{category.name}"} />
+                      <input class="ui-input" type="text" name="category_settings[title]" value={category.title} form={"category-form-#{category.name}"} />
                     </td>
                     <td><input type="checkbox" name="category_settings[render_in_lists]" checked={category.render_in_lists} form={"category-form-#{category.name}"} /></td>
                     <td><input type="checkbox" name="category_settings[show_title]" checked={category.show_title} form={"category-form-#{category.name}"} /></td>
                     <td>
-                      <select name="category_settings[post_template_slug]" form={"category-form-#{category.name}"}>
+                      <select class="ui-input" name="category_settings[post_template_slug]" form={"category-form-#{category.name}"}>
                         <option value=""><%= dgettext("ui", "Default") %></option>
                         <%= for template <- @settings_editor.template_options.post do %>
                           <option value={template.slug} selected={template.slug == category.post_template_slug}><%= template.title %></option>
@@ -174,7 +174,7 @@
                       </select>
                     </td>
                     <td>
-                      <select name="category_settings[list_template_slug]" form={"category-form-#{category.name}"}>
+                      <select class="ui-input" name="category_settings[list_template_slug]" form={"category-form-#{category.name}"}>
                         <option value=""><%= dgettext("ui", "Default") %></option>
                         <%= for template <- @settings_editor.template_options.list do %>
                           <option value={template.slug} selected={template.slug == category.list_template_slug}><%= template.title %></option>
@@ -186,8 +186,8 @@
                         <form id={"category-form-#{category.name}"} phx-submit="save_settings_category" phx-target={@myself}>
                           <input type="hidden" name="category_settings[category]" value={category.name} />
                         </form>
-                        <button class="secondary" type="submit" form={"category-form-#{category.name}"}><%= dgettext("ui", "Save") %></button>
-                        <button class="secondary" type="button" phx-click="remove_settings_category" phx-target={@myself} phx-value-category={category.name} disabled={category.protected?}><%= dgettext("ui", "Remove") %></button>
+                        <button class="secondary ui-button ui-button-secondary" type="submit" form={"category-form-#{category.name}"}><%= dgettext("ui", "Save") %></button>
+                        <button class="secondary ui-button ui-button-secondary" type="button" phx-click="remove_settings_category" phx-target={@myself} phx-value-category={category.name} disabled={category.protected?}><%= dgettext("ui", "Remove") %></button>
                       </div>
                     </td>
                   </tr>
@@ -198,12 +198,12 @@
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Add Category") %></label></div>
               <div class="setting-control">
                 <div class="setting-input-group">
-                  <input type="text" value={@settings_editor.new_category} phx-change="change_settings_new_category" phx-target={@myself} name="name" />
-                  <button class="primary" type="button" phx-click="add_settings_category" phx-target={@myself}><%= dgettext("ui", "Add") %></button>
+                  <input class="ui-input" type="text" value={@settings_editor.new_category} phx-change="change_settings_new_category" phx-target={@myself} name="name" />
+                  <button class="primary ui-button ui-button-primary" type="button" phx-click="add_settings_category" phx-target={@myself}><%= dgettext("ui", "Add") %></button>
                 </div>
               </div>
             </div>
-            <div class="setting-actions"><button class="secondary" type="button" phx-click="reset_settings_categories" phx-target={@myself}><%= dgettext("ui", "Reset to Defaults") %></button></div>
+            <div class="setting-actions"><button class="secondary ui-button ui-button-secondary" type="button" phx-click="reset_settings_categories" phx-target={@myself}><%= dgettext("ui", "Reset to Defaults") %></button></div>
           </div>
         </div>
       <% end %>
@@ -216,18 +216,18 @@
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Online Endpoint URL") %></label></div>
               <div class="setting-control">
                 <div class="setting-input-group">
-                  <input type="url" name="settings_ai[online_url]" value={@settings_editor.ai["online_url"]} />
-                  <button class="secondary" type="button" phx-click="refresh_settings_ai_models" phx-target={@myself} phx-value-endpoint="online"><%= dgettext("ui", "Refresh Online Models") %></button>
+                  <input class="ui-input" type="url" name="settings_ai[online_url]" value={@settings_editor.ai["online_url"]} />
+                  <button class="secondary ui-button ui-button-secondary" type="button" phx-click="refresh_settings_ai_models" phx-target={@myself} phx-value-endpoint="online"><%= dgettext("ui", "Refresh Online Models") %></button>
                 </div>
               </div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Online API Key") %></label></div>
-              <div class="setting-control"><input type="password" name="settings_ai[online_api_key]" value={@settings_editor.ai["online_api_key"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="password" name="settings_ai[online_api_key]" value={@settings_editor.ai["online_api_key"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Online Chat Model") %></label></div>
-              <div class="setting-control"><input type="text" list="settings-ai-online-models" name="settings_ai[online_chat_model]" value={@settings_editor.ai["online_chat_model"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="text" list="settings-ai-online-models" name="settings_ai[online_chat_model]" value={@settings_editor.ai["online_chat_model"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Online Chat Tools") %></label></div>
@@ -239,11 +239,11 @@
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Online Title Model") %></label></div>
-              <div class="setting-control"><input type="text" list="settings-ai-online-models" name="settings_ai[online_title_model]" value={@settings_editor.ai["online_title_model"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="text" list="settings-ai-online-models" name="settings_ai[online_title_model]" value={@settings_editor.ai["online_title_model"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Online Image Analysis Model") %></label></div>
-              <div class="setting-control"><input type="text" list="settings-ai-online-models" name="settings_ai[online_image_analysis_model]" value={@settings_editor.ai["online_image_analysis_model"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="text" list="settings-ai-online-models" name="settings_ai[online_image_analysis_model]" value={@settings_editor.ai["online_image_analysis_model"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Online Image Support") %></label></div>
@@ -253,14 +253,14 @@
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Offline Endpoint URL") %></label></div>
               <div class="setting-control">
                 <div class="setting-input-group">
-                  <input type="url" name="settings_ai[offline_url]" value={@settings_editor.ai["offline_url"]} />
-                  <button class="secondary" type="button" phx-click="refresh_settings_ai_models" phx-target={@myself} phx-value-endpoint="airplane"><%= dgettext("ui", "Refresh Offline Models") %></button>
+                  <input class="ui-input" type="url" name="settings_ai[offline_url]" value={@settings_editor.ai["offline_url"]} />
+                  <button class="secondary ui-button ui-button-secondary" type="button" phx-click="refresh_settings_ai_models" phx-target={@myself} phx-value-endpoint="airplane"><%= dgettext("ui", "Refresh Offline Models") %></button>
                 </div>
               </div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Offline API Key") %></label></div>
-              <div class="setting-control"><input type="password" name="settings_ai[offline_api_key]" value={@settings_editor.ai["offline_api_key"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="password" name="settings_ai[offline_api_key]" value={@settings_editor.ai["offline_api_key"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Airplane Mode") %></label></div>
@@ -268,7 +268,7 @@
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Offline Chat Model") %></label></div>
-              <div class="setting-control"><input type="text" list="settings-ai-offline-models" name="settings_ai[offline_chat_model]" value={@settings_editor.ai["offline_chat_model"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="text" list="settings-ai-offline-models" name="settings_ai[offline_chat_model]" value={@settings_editor.ai["offline_chat_model"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Offline Chat Tools") %></label></div>
@@ -280,11 +280,11 @@
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Offline Title Model") %></label></div>
-              <div class="setting-control"><input type="text" list="settings-ai-offline-models" name="settings_ai[offline_title_model]" value={@settings_editor.ai["offline_title_model"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="text" list="settings-ai-offline-models" name="settings_ai[offline_title_model]" value={@settings_editor.ai["offline_title_model"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Offline Image Analysis Model") %></label></div>
-              <div class="setting-control"><input type="text" list="settings-ai-offline-models" name="settings_ai[offline_image_analysis_model]" value={@settings_editor.ai["offline_image_analysis_model"]} /></div>
+              <div class="setting-control"><input class="ui-input" type="text" list="settings-ai-offline-models" name="settings_ai[offline_image_analysis_model]" value={@settings_editor.ai["offline_image_analysis_model"]} /></div>
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Offline Image Support") %></label></div>
@@ -292,7 +292,7 @@
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "System Prompt") %></label></div>
-              <div class="setting-control"><textarea name="settings_ai[system_prompt]" rows="12"><%= @settings_editor.ai["system_prompt"] %></textarea></div>
+              <div class="setting-control"><textarea class="ui-textarea" name="settings_ai[system_prompt]" rows="12"><%= @settings_editor.ai["system_prompt"] %></textarea></div>
             </div>
             <datalist id="settings-ai-online-models">
               <%= for model <- @settings_editor.online_endpoint_models do %>
@@ -305,7 +305,7 @@
               <% end %>
             </datalist>
           </form>
-          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_ai" phx-target={@myself}><%= dgettext("ui", "Save") %></button><button class="secondary" type="button" phx-click="reset_settings_ai_prompt" phx-target={@myself}><%= dgettext("ui", "Reset to Default") %></button></div>
+          <div class="setting-actions"><button class="primary ui-button ui-button-primary" type="button" phx-click="save_settings_ai" phx-target={@myself}><%= dgettext("ui", "Save") %></button><button class="secondary ui-button ui-button-secondary" type="button" phx-click="reset_settings_ai_prompt" phx-target={@myself}><%= dgettext("ui", "Reset to Default") %></button></div>
         </div>
       <% end %>
 
@@ -322,7 +322,7 @@
               <div class="setting-control"><p class="setting-description"><%= dgettext("ui", "Scripting capabilities are configured at the application layer in the rewrite and do not expose runtime switching here.") %></p></div>
             </div>
           </form>
-          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_project" phx-target={@myself}><%= dgettext("ui", "Save") %></button></div>
+          <div class="setting-actions"><button class="primary ui-button ui-button-primary" type="button" phx-click="save_settings_project" phx-target={@myself}><%= dgettext("ui", "Save") %></button></div>
         </div>
       <% end %>
 
@@ -330,12 +330,12 @@
         <div class="setting-section" id="settings-section-publishing">
           <div class="setting-section-header"><h3><%= dgettext("ui", "Publishing") %></h3><p class="setting-section-description"><%= dgettext("ui", "Deployment credentials for upload tasks") %></p></div>
           <form class="setting-section-content" phx-change="change_settings_publishing" phx-target={@myself}>
-            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= dgettext("ui", "SSH Mode") %></label></div><div class="setting-control"><select name="settings_publishing[ssh_mode]"><option value="scp" selected={@settings_editor.publishing["ssh_mode"] == "scp"}>scp</option><option value="rsync" selected={@settings_editor.publishing["ssh_mode"] == "rsync"}>rsync</option></select></div></div>
-            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Host") %></label></div><div class="setting-control"><input type="text" name="settings_publishing[ssh_host]" value={@settings_editor.publishing["ssh_host"]} /></div></div>
-            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Username") %></label></div><div class="setting-control"><input type="text" name="settings_publishing[ssh_user]" value={@settings_editor.publishing["ssh_user"]} /></div></div>
-            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Remote Path") %></label></div><div class="setting-control"><input type="text" name="settings_publishing[ssh_remote_path]" value={@settings_editor.publishing["ssh_remote_path"]} /></div></div>
+            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= dgettext("ui", "SSH Mode") %></label></div><div class="setting-control"><select class="ui-input" name="settings_publishing[ssh_mode]"><option value="scp" selected={@settings_editor.publishing["ssh_mode"] == "scp"}>scp</option><option value="rsync" selected={@settings_editor.publishing["ssh_mode"] == "rsync"}>rsync</option></select></div></div>
+            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Host") %></label></div><div class="setting-control"><input class="ui-input" type="text" name="settings_publishing[ssh_host]" value={@settings_editor.publishing["ssh_host"]} /></div></div>
+            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Username") %></label></div><div class="setting-control"><input class="ui-input" type="text" name="settings_publishing[ssh_user]" value={@settings_editor.publishing["ssh_user"]} /></div></div>
+            <div class="setting-row"><div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Remote Path") %></label></div><div class="setting-control"><input class="ui-input" type="text" name="settings_publishing[ssh_remote_path]" value={@settings_editor.publishing["ssh_remote_path"]} /></div></div>
           </form>
-          <div class="setting-actions"><button class="primary" type="button" phx-click="save_settings_publishing" phx-target={@myself}><%= dgettext("ui", "Save") %></button><button class="secondary" type="button" phx-click="clear_settings_publishing" phx-target={@myself}><%= dgettext("ui", "Clear") %></button></div>
+          <div class="setting-actions"><button class="primary ui-button ui-button-primary" type="button" phx-click="save_settings_publishing" phx-target={@myself}><%= dgettext("ui", "Save") %></button><button class="secondary ui-button ui-button-secondary" type="button" phx-click="clear_settings_publishing" phx-target={@myself}><%= dgettext("ui", "Clear") %></button></div>
         </div>
       <% end %>
 
@@ -350,7 +350,7 @@
                   <p class="setting-description"><%= agent.config_path || dgettext("ui", "Not supported in the rewrite yet") %></p>
                 </div>
                 <div class="setting-control">
-                  <button class="secondary" type="button" phx-click="toggle_settings_mcp_agent" phx-target={@myself} phx-value-agent={agent.id} disabled={not agent.supported?}>
+                  <button class="secondary ui-button ui-button-secondary" type="button" phx-click="toggle_settings_mcp_agent" phx-target={@myself} phx-value-agent={agent.id} disabled={not agent.supported?}>
                     <%= if agent.configured?, do: dgettext("ui", "Remove"), else: dgettext("ui", "Add") %>
                   </button>
                 </div>
@@ -364,14 +364,14 @@
         <div class="setting-section" id="settings-section-data">
           <div class="setting-section-header"><h3><%= dgettext("ui", "Data Maintenance") %></h3><p class="setting-section-description"><%= dgettext("ui", "Rebuild filesystem-backed records and thumbnails") %></p></div>
           <div class="setting-actions">
-            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_posts_from_files"><%= dgettext("ui", "Rebuild Posts From Files") %></button>
-            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_media_from_files"><%= dgettext("ui", "Rebuild Media From Files") %></button>
-            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_scripts_from_files"><%= dgettext("ui", "Rebuild Scripts From Files") %></button>
-            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_templates_from_files"><%= dgettext("ui", "Rebuild Templates From Files") %></button>
-            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_post_links"><%= dgettext("ui", "Rebuild Links") %></button>
-            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="regenerate_missing_thumbnails"><%= dgettext("ui", "Regenerate Missing Thumbnails") %></button>
-            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_embedding_index"><%= dgettext("ui", "Rebuild Embedding Index") %></button>
-            <button class="secondary" type="button" phx-click="settings_shell_command" phx-value-action="open_data_folder"><%= dgettext("ui", "Open Data Folder") %></button>
+            <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_posts_from_files"><%= dgettext("ui", "Rebuild Posts From Files") %></button>
+            <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_media_from_files"><%= dgettext("ui", "Rebuild Media From Files") %></button>
+            <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_scripts_from_files"><%= dgettext("ui", "Rebuild Scripts From Files") %></button>
+            <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_templates_from_files"><%= dgettext("ui", "Rebuild Templates From Files") %></button>
+            <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_post_links"><%= dgettext("ui", "Rebuild Links") %></button>
+            <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="regenerate_missing_thumbnails"><%= dgettext("ui", "Regenerate Missing Thumbnails") %></button>
+            <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="rebuild_embedding_index"><%= dgettext("ui", "Rebuild Embedding Index") %></button>
+            <button class="secondary ui-button ui-button-secondary" type="button" phx-click="settings_shell_command" phx-value-action="open_data_folder"><%= dgettext("ui", "Open Data Folder") %></button>
           </div>
         </div>
       <% end %>

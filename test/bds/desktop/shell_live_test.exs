@@ -205,15 +205,28 @@ defmodule BDS.Desktop.ShellLiveTest do
       settings_editor: %{
         selected_section: "project",
         search_query: "",
-        active_sections: [],
-        project_visible?: false,
+        active_sections: ["project"],
+        project_visible?: true,
         editor_visible?: false,
         content_visible?: false,
         ai_visible?: false,
         publishing_visible?: false,
         data_visible?: false,
         technology_visible?: false,
-        mcp_visible?: false
+        mcp_visible?: false,
+        project: %{
+          "name" => "Shell Project",
+          "description" => "Project settings",
+          "public_url" => "https://example.test",
+          "main_language" => "en",
+          "blog_languages" => ["en", "fr"],
+          "default_author" => "Author",
+          "max_posts_per_page" => 10,
+          "blogmark_category" => "notes"
+        },
+        project_data_path: "/tmp/shell-project",
+        supported_languages: ["en", "fr"],
+        categories: [%{name: "notes"}, %{name: "posts"}]
       }
     }
   end
@@ -225,10 +238,10 @@ defmodule BDS.Desktop.ShellLiveTest do
         selected_section: "cloud",
         tags: [],
         new_tag: %{"name" => "", "color" => "#3b82f6"},
-        edit_draft: %{},
-        selected: [],
-        merge_target: nil,
-        templates: []
+        edit_draft: %{"name" => "news", "color" => "#3b82f6", "post_template_slug" => ""},
+        selected: ["news", "updates"],
+        merge_target: "news",
+        templates: [%{slug: "post-template", title: "Post Template"}]
       }
     }
   end
@@ -304,6 +317,64 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert tags_html =~ "tags-view-shell flex h-full min-h-0 flex-col overflow-hidden"
     assert tags_html =~ "tag-form-row flex flex-wrap items-center gap-3"
+  end
+
+  @tag :phase4
+  test "phase 4 shared primitives render normalized classes" do
+    conn = Plug.Conn.put_private(build_conn(), :phoenix_endpoint, BDS.Desktop.Endpoint)
+    {:ok, view, _shell_html} = live_isolated(conn, BDS.Desktop.ShellLive)
+
+    post_html = render_component(&BDS.Desktop.ShellLive.PostEditor.render/1, phase3_post_editor_assigns())
+    media_html = render_component(&BDS.Desktop.ShellLive.MediaEditor.render/1, phase3_media_editor_assigns())
+    script_html = render_component(&BDS.Desktop.ShellLive.ScriptEditor.render/1, phase3_script_editor_assigns())
+    template_html = render_component(&BDS.Desktop.ShellLive.TemplateEditor.render/1, phase3_template_editor_assigns())
+    settings_html = render_component(&BDS.Desktop.ShellLive.SettingsEditor.render/1, phase3_settings_editor_assigns())
+    tags_html = render_component(&BDS.Desktop.ShellLive.TagsEditor.render/1, phase3_tags_editor_assigns())
+
+    panel_html =
+      render_component(&BDS.Desktop.ShellLive.PanelRenderer.render_panel_body/1, %{
+        current_tab: %{type: :dashboard, id: "dashboard"},
+        task_status: %{tasks: []},
+        output_entries: [],
+        workbench: %{panel: %{active_tab: :tasks}}
+      })
+
+    assert post_html =~ ~s(class="status-badge ui-badge)
+    assert post_html =~ ~s(class="success ui-button ui-button-primary)
+    assert post_html =~ ~s(class="secondary danger ui-button ui-button-secondary ui-button-danger)
+    assert post_html =~ ~s(class="post-editor-input ui-input)
+    assert post_html =~ ~s(class="post-editor-textarea post-editor-excerpt ui-textarea)
+    assert post_html =~ ~s(class="editor-tab ui-tab ui-tab-active)
+
+    assert media_html =~ ~s(class="secondary quick-actions-btn ui-button ui-button-secondary)
+    assert media_html =~ ~s(class="post-editor-input ui-input disabled ui-input-disabled)
+    assert media_html =~ ~s(class="post-editor-textarea ui-textarea)
+
+    assert script_html =~ ~s(class="secondary scripts-save-button ui-button ui-button-secondary)
+    assert script_html =~ ~s(class="status-badge ui-badge)
+    assert script_html =~ ~s(class="ui-input")
+
+    assert template_html =~ ~s(class="secondary templates-save-button ui-button ui-button-secondary)
+    assert template_html =~ ~s(class="status-badge ui-badge)
+    assert template_html =~ ~s(class="ui-input")
+
+    assert settings_html =~ ~s(class="ui-input")
+    assert settings_html =~ ~s(class="primary ui-button ui-button-primary")
+    assert settings_html =~ ~s(class="secondary ui-button ui-button-secondary")
+
+    assert tags_html =~ ~s(class="tags-empty-state ui-empty-state flex flex-col gap-3")
+    assert tags_html =~ ~s(class="secondary ui-button ui-button-secondary")
+    assert tags_html =~ ~s(class="primary ui-button ui-button-primary")
+    assert tags_html =~ ~s(class="danger ui-button ui-button-danger")
+    assert tags_html =~ ~s(class="ui-input")
+
+    shell_html =
+      view
+      |> element("[data-testid='toggle-panel']")
+      |> render_click()
+
+    assert shell_html =~ ~s(class="panel-tab ui-tab ui-tab-active)
+    assert panel_html =~ ~s(class="panel-entry ui-panel-entry panel-empty-state ui-empty-state)
   end
 
   alias BDS.Persistence
@@ -2025,12 +2096,12 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ ~s(class="panel-shell flex min-h-0 shrink-0 flex-col overflow-hidden is-hidden")
 
     assert Regex.match?(
-             ~r/<button class="panel-tab [^"]*active" type="button" phx-click="select_panel_tab" phx-value-tab="tasks">/,
+             ~r/<button class="panel-tab [^"]*ui-tab[^"]*active" type="button" phx-click="select_panel_tab" phx-value-tab="tasks">/,
              html
            )
 
     assert html =~ ~s(class="task-list flex flex-col gap-2") or
-             html =~ ~s(class="panel-entry panel-empty-state")
+             html =~ ~s(class="panel-entry ui-panel-entry panel-empty-state ui-empty-state")
   end
 
   test "metadata diff tasks localize task text, show progress, and open the diff result in the UI" do
@@ -3127,10 +3198,10 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert published_script_html =~ ~s(class="scripts-view-shell editor flex h-full min-h-0 flex-col")
     assert published_script_html =~ ~s(data-testid="script-editor")
     assert published_script_html =~ ~s(data-testid="script-status-badge")
-    assert published_script_html =~ ~s(class="status-badge status-published")
-    assert published_script_html =~ ~s(class="secondary scripts-save-button")
-    assert published_script_html =~ ~s(class="secondary scripts-run-button")
-    assert published_script_html =~ ~s(class="secondary scripts-check-button")
+    assert published_script_html =~ ~s(class="status-badge ui-badge status-published")
+    assert published_script_html =~ ~s(class="secondary scripts-save-button ui-button ui-button-secondary")
+    assert published_script_html =~ ~s(class="secondary scripts-run-button ui-button ui-button-secondary")
+    assert published_script_html =~ ~s(class="secondary scripts-check-button ui-button ui-button-secondary")
     assert published_script_html =~ "published"
 
     assert published_script_html =~ "published script"
@@ -3148,9 +3219,9 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert published_template_html =~ ~s(class="templates-view-shell editor flex h-full min-h-0 flex-col")
     assert published_template_html =~ ~s(data-testid="template-editor")
     assert published_template_html =~ ~s(data-testid="template-status-badge")
-    assert published_template_html =~ ~s(class="status-badge status-published")
-    assert published_template_html =~ ~s(class="secondary templates-save-button")
-    assert published_template_html =~ ~s(class="secondary templates-validate-button")
+    assert published_template_html =~ ~s(class="status-badge ui-badge status-published")
+    assert published_template_html =~ ~s(class="secondary templates-save-button ui-button ui-button-secondary")
+    assert published_template_html =~ ~s(class="secondary templates-validate-button ui-button ui-button-secondary")
     assert published_template_html =~ "published"
 
     assert published_template_html =~ "published template"
@@ -3166,7 +3237,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       })
 
     assert draft_script_html =~ ~s(data-testid="script-publish-button")
-    assert draft_script_html =~ ~s(class="success")
+    assert draft_script_html =~ ~s(class="success ui-button ui-button-primary")
 
     draft_script_html =
       view
@@ -3187,7 +3258,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       })
 
     assert draft_template_html =~ ~s(data-testid="template-publish-button")
-    assert draft_template_html =~ ~s(class="success")
+    assert draft_template_html =~ ~s(class="success ui-button ui-button-primary")
 
     draft_template_html =
       view
@@ -3539,7 +3610,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-testid="chat-model-selector-button")
     assert html =~ ~s(class="chat-panel-title-main")
     assert html =~ ~s(class="chat-model-selector-wrap relative shrink-0")
-    assert html =~ ~s(class="chat-model-selector-button chat-model-selector-inline inline-flex items-center gap-2")
+    assert html =~ ~s(class="chat-model-selector-button chat-model-selector-inline ui-button ui-button-secondary inline-flex items-center gap-2")
     refute html =~ ~s(class="chat-panel-header-actions")
 
     css = desktop_css_source()
@@ -4038,7 +4109,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       })
 
     assert html =~ ~s(rows="1")
-    assert html =~ ~s(class="chat-input chat-surface-input")
+    assert html =~ ~s(class="chat-input chat-surface-input ui-textarea")
 
     css = desktop_css_source()
     assert css =~ "--chat-input-line-height: 20px;"
@@ -4356,7 +4427,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     {user_index, _length} = :binary.match(html, "Newest question")
 
     assert assistant_index < user_index
-    assert html =~ ~r/<textarea[^>]*class="chat-input chat-surface-input"[^>]*disabled/
+    assert html =~ ~r/<textarea[^>]*class="chat-input chat-surface-input ui-textarea"[^>]*disabled/
 
     send(view.pid, {
       :chat_tool_call,

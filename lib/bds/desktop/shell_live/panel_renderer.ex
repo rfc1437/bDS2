@@ -50,14 +50,14 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
   defp render_task_entries(assigns) do
     ~H"""
     <%= if Enum.empty?(Map.get(@task_status, :tasks, [])) do %>
-      <div class="panel-entry panel-empty-state">
+      <div class="panel-entry ui-panel-entry panel-empty-state ui-empty-state">
         <strong><%= dgettext("ui", "Tasks") %></strong>
         <span><%= dgettext("ui", "No background tasks running") %></span>
       </div>
     <% else %>
       <div class="task-list flex flex-col gap-2">
         <%= for task <- Map.get(@task_status, :tasks, []) do %>
-          <div class="panel-entry task-entry flex flex-col gap-2">
+          <div class="panel-entry ui-panel-entry task-entry flex flex-col gap-2">
             <div class="task-entry-header flex items-center justify-between gap-2">
               <strong><%= task.name %></strong>
               <span class={"task-status task-status-#{task.status}"}><%= Map.get(task, :status_label, task.status |> to_string() |> String.capitalize()) %></span>
@@ -79,7 +79,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
   defp render_output_entries(assigns) do
     ~H"""
     <%= if Enum.empty?(@output_entries) do %>
-      <div class="panel-entry panel-empty-state output-list">
+      <div class="panel-entry ui-panel-entry panel-empty-state ui-empty-state output-list">
         <strong><%= dgettext("ui", "Output") %></strong>
         <span><%= dgettext("ui", "No shell output yet") %></span>
       </div>
@@ -88,6 +88,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
         <%= for entry <- @output_entries do %>
           <div class={[
             "panel-entry",
+            "ui-panel-entry",
             "output-entry",
             if(Map.get(entry, :level) == "error", do: "output-entry-error")
           ]}>
@@ -113,17 +114,17 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
 
     ~H"""
     <%= if Enum.empty?(@backlinks) and Enum.empty?(@outlinks) do %>
-      <div class="panel-entry panel-empty-state">
+      <div class="panel-entry ui-panel-entry panel-empty-state ui-empty-state">
         <strong><%= dgettext("ui", "Post Links") %></strong>
         <span><%= dgettext("ui", "No post links yet") %></span>
       </div>
     <% else %>
       <div class="git-log-list flex flex-col gap-2">
         <%= if Enum.any?(@backlinks) do %>
-          <div class="panel-entry"><strong><%= dgettext("ui", "Backlinks") %></strong></div>
+          <div class="panel-entry ui-panel-entry"><strong><%= dgettext("ui", "Backlinks") %></strong></div>
           <%= for entry <- @backlinks do %>
             <button
-              class="panel-entry task-entry"
+              class="panel-entry ui-panel-entry task-entry"
               type="button"
               phx-click="pin_sidebar_item"
               phx-value-route="post"
@@ -138,10 +139,10 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
         <% end %>
 
         <%= if Enum.any?(@outlinks) do %>
-          <div class="panel-entry"><strong><%= dgettext("ui", "Links To") %></strong></div>
+          <div class="panel-entry ui-panel-entry"><strong><%= dgettext("ui", "Links To") %></strong></div>
           <%= for entry <- @outlinks do %>
             <button
-              class="panel-entry task-entry"
+              class="panel-entry ui-panel-entry task-entry"
               type="button"
               phx-click="pin_sidebar_item"
               phx-value-route="post"
@@ -166,7 +167,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     ~H"""
     <%= if Enum.empty?(@git_entries) do %>
       <div class="git-log-list flex flex-col gap-2">
-        <div class="panel-entry panel-empty-state">
+        <div class="panel-entry ui-panel-entry panel-empty-state ui-empty-state">
           <strong><%= dgettext("ui", "Git Log") %></strong>
           <span><%= dgettext("ui", "No git history yet") %></span>
         </div>
@@ -174,7 +175,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     <% else %>
       <div class="git-log-list">
         <%= for entry <- @git_entries do %>
-          <div class="panel-entry task-entry">
+          <div class="panel-entry ui-panel-entry task-entry">
             <strong><%= short_commit_hash(entry.hash) %> <%= entry.subject || dgettext("ui", "No commit subject") %></strong>
             <span><%= entry.hash %></span>
           </div>
@@ -188,7 +189,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     assigns = assign(assigns, :panel_label, ShellData.route_label(tab))
 
     ~H"""
-    <div class="panel-entry">
+    <div class="panel-entry ui-panel-entry">
       <strong><%= @panel_label %></strong>
       <span><%= dgettext("ui", "The shared lower panel is available for tasks, output, git details, and editor-specific diagnostics.") %></span>
     </div>

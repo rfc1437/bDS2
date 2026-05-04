@@ -16,6 +16,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   @impl true
+  def update(%{action: :finish_request}, %{assigns: %{request: nil}} = socket) do
+    {:ok, socket}
+  end
+
   def update(%{action: :finish_request, result: result}, socket) do
     {:ok, do_finish_request(socket, result)}
   end
@@ -252,13 +256,26 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
         notify_parent({:chat_editor_task_cancelled, conversation_id, ref})
 
-        # Allow the terminated task's DB connection to be cleaned up before rebuilding.
-        Process.sleep(20)
-
         socket
         |> assign(:request, nil)
-        |> build_data()
+        |> clear_streaming_state()
     end
+  end
+
+  defp clear_streaming_state(socket) do
+    input = socket.assigns.input || ""
+    chat_editor = socket.assigns.chat_editor || %{}
+
+    chat_editor =
+      chat_editor
+      |> Map.put(:is_streaming, false)
+      |> Map.put(:pending_user_message, nil)
+      |> Map.put(:streaming_content, "")
+      |> Map.put(:streaming_tool_markers, [])
+      |> Map.put(:streaming_inline_surfaces, [])
+      |> Map.put(:send_disabled?, String.trim(input) == "")
+
+    assign(socket, :chat_editor, chat_editor)
   end
 
   defp do_finish_request(socket, result) do
@@ -314,7 +331,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   defp update_request(socket, updater) do
     case socket.assigns.request do
       nil ->
-        socket
+        build_data(socket)
 
       request ->
         socket
