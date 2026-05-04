@@ -1,0 +1,336 @@
+.overlay-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+.overlay-root:empty {
+  display: none;
+}
+
+.editor-shared-actions {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.ai-suggestions-modal-backdrop,
+.insert-modal-backdrop,
+.language-picker-modal-backdrop,
+.confirm-delete-modal-backdrop,
+.confirm-dialog-overlay,
+.gallery-overlay,
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.ai-suggestions-modal,
+.insert-modal,
+.language-picker-modal,
+.confirm-delete-modal,
+.confirm-dialog,
+.gallery-overlay-content {
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.ai-suggestions-modal,
+.language-picker-modal,
+.confirm-delete-modal,
+.confirm-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.insert-modal {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gallery-overlay-content {
+  width: min(980px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ai-suggestions-modal-header,
+.language-picker-modal-header,
+.confirm-delete-modal-header,
+.insert-modal-header,
+.gallery-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.insert-modal-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.insert-modal-header.media-header-only {
+  flex-direction: row;
+  align-items: center;
+}
+
+.ai-suggestions-modal-header h2,
+.language-picker-modal-header h2,
+.confirm-delete-modal-header h2,
+.gallery-overlay-header h2,
+.insert-modal-title,
+.confirm-dialog h3 {
+  margin: 0;
+  color: #ffffff;
+}
+
+.ai-suggestions-modal-close,
+.confirm-delete-modal-close,
+.gallery-overlay-close,
+.shared-popover-close,
+.lightbox-close {
+  border: none;
+  background: transparent;
+  color: #c5c5c5;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.ai-suggestions-modal-body,
+.language-picker-modal-body,
+.confirm-delete-modal-body {
+  padding: 20px;
+  overflow: auto;
+}
+
+.ai-suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ai-suggestion-item {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  background: #252526;
+}
+
+.ai-suggestion-checkbox {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.ai-suggestion-checkbox input {
+  position: absolute;
+  opacity: 0;
+}
+
+.checkmark {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #555555;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e1e1e;
+}
+
+.ai-suggestion-checkbox input:checked + .checkmark,
+.ai-suggestion-checkbox input:checked ~ .checkmark {
+  background: #0078d4;
+  border-color: #0078d4;
+}
+
+.ai-suggestion-checkbox input:checked + .checkmark::after,
+.ai-suggestion-checkbox input:checked ~ .checkmark::after {
+  content: "✓";
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.ai-suggestion-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-suggestion-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.ai-suggestion-has-value,
+.language-picker-badge,
+.insert-modal-similarity-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c5c5c5;
+  font-size: 11px;
+}
+
+.ai-suggestion-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.ai-suggestion-column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ai-suggestion-column.muted {
+  color: #9d9d9d;
+}
+
+.ai-suggestion-column.highlighted {
+  border: 1px solid rgba(0, 122, 204, 0.4);
+  color: #ffffff;
+}
+
+.ai-suggestion-column-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ai-suggestion-arrow {
+  color: #9d9d9d;
+}
+
+.ai-suggestion-value {
+  min-height: 1.4em;
+}
+
+.ai-suggestion-value.loading {
+  color: var(--accent-color);
+  font-style: italic;
+}
+
+.ai-suggestions-error {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  background: rgba(220, 50, 50, 0.12);
+  border: 1px solid rgba(220, 50, 50, 0.35);
+  color: #ff6b6b;
+}
+
+.ai-suggestions-modal-footer,
+.confirm-delete-modal-footer,
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #3c3c3c;
+}
+
+.button-cancel,
+.button-delete,
+.button-apply,
+.confirm-dialog-actions button,
+.insert-modal-submit,
+.language-picker-row,
+.shared-popover-entry,
+.colour-swatch {
+  cursor: pointer;
+}
+
+.button-cancel,
+.confirm-dialog-actions button,
+.insert-modal-submit {
+  border: 1px solid #4c4c4c;
+  border-radius: 4px;
+  padding: 8px 14px;
+  background: transparent;
+  color: #f0f0f0;
+}
+
+.button-apply,
+.confirm-dialog-actions .primary,
+.insert-modal-submit {
+  background: #0e639c;
+  border-color: #0e639c;
+}
+
+.button-delete {
+  border: none;
+  border-radius: 4px;
+  padding: 8px 14px;
+  background: #c73c3c;
+  color: #ffffff;
+}
+
+.insert-modal-tabs {
+  display: flex;
+  margin: 0 -20px;
+}
+
+.insert-modal-tab {
+  flex: 1;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #9d9d9d;
+  padding: 10px 16px;
+}
+
+.insert-modal-tab.active {
+  color: #ffffff;
+  border-bottom-color: #0e639c;
+  background: #252526;
+}
+
+.insert-modal-search {
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.insert-modal-input,
+.shared-popover-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #f0f0f0;
+  padding: 14px 20px;
+  font: inherit;
+}
+

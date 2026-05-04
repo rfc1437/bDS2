@@ -16,9 +16,7 @@ defmodule BDS.Desktop.Layouts do
       </head>
       <body>
         <%= @inner_content %>
-        <script defer phx-track-static src="/vendor/phoenix/phoenix.min.js"></script>
-        <script defer phx-track-static src="/vendor/live_view/phoenix_live_view.min.js"></script>
-        <script defer phx-track-static src="/assets/live.js"></script>
+        <script defer phx-track-static src="/assets/app.js"></script>
       </body>
     </html>
     """

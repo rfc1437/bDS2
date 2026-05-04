@@ -1,3 +1,7 @@
+import { Socket } from "phoenix";
+import { LiveSocket } from "phoenix_live_view";
+import "phoenix_html";
+
 document.addEventListener("DOMContentLoaded", () => {
   const csrfToken = document
     .querySelector("meta[name='csrf-token']")
@@ -298,15 +302,16 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   };
 
-  const colorIsDark = (value) => {
+  const normalizeMonacoColor = (value, fallback) => {
     const rgb = parseRgbColor(value);
 
     if (!rgb) {
-      return true;
+      return fallback;
     }
 
-    const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
-    return luminance < 0.5;
+    return `#${[rgb.r, rgb.g, rgb.b]
+      .map((channel) => clamp(channel, 0, 255).toString(16).padStart(2, "0"))
+      .join("")}`;
   };
 
   const loadScript = (src) =>
@@ -492,14 +497,27 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const ensureMonacoTheme = (monaco) => {
-    const background = cssVar("--vscode-editor-background", cssVar("--vscode-input-background", "#1e1e1e"));
-    const foreground = cssVar("--vscode-editor-foreground", "#d4d4d4");
-    const lineNumber = cssVar("--vscode-editorLineNumber-foreground", "#858585");
-    const activeLineNumber = cssVar("--vscode-editorLineNumber-activeForeground", foreground);
-    const selection = cssVar("--vscode-editor-selectionBackground", "#264f78");
-    const inactiveSelection = cssVar("--vscode-editor-inactiveSelectionBackground", "#3a3d41");
-    const cursor = cssVar("--vscode-editorCursor-foreground", foreground);
-    const border = cssVar("--vscode-panel-border", "#3c3c3c");
+    const background = normalizeMonacoColor(
+      cssVar("--vscode-editor-background", cssVar("--vscode-input-background", "#1e1e1e")),
+      "#1e1e1e"
+    );
+    const foreground = normalizeMonacoColor(cssVar("--vscode-editor-foreground", "#d4d4d4"), "#d4d4d4");
+    const lineNumber = normalizeMonacoColor(cssVar("--vscode-editorLineNumber-foreground", "#858585"), "#858585");
+    const activeLineNumber = normalizeMonacoColor(
+      cssVar("--vscode-editorLineNumber-activeForeground", foreground),
+      foreground
+    );
+    const selection = normalizeMonacoColor(cssVar("--vscode-editor-selectionBackground", "#264f78"), "#264f78");
+    const inactiveSelection = normalizeMonacoColor(
+      cssVar("--vscode-editor-inactiveSelectionBackground", "#3a3d41"),
+      "#3a3d41"
+    );
+    const cursor = normalizeMonacoColor(cssVar("--vscode-editorCursor-foreground", foreground), foreground);
+    const border = normalizeMonacoColor(cssVar("--vscode-panel-border", "#3c3c3c"), "#3c3c3c");
+    const lineHighlight = normalizeMonacoColor(
+      cssVar("--vscode-editor-lineHighlightBackground", background),
+      background
+    );
     const signature = [background, foreground, lineNumber, activeLineNumber, selection, inactiveSelection, cursor, border].join("|");
 
     if (signature === monacoThemeSignature) {
@@ -508,7 +526,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     monaco.editor.defineTheme("bds-theme", {
-      base: colorIsDark(background) ? "vs-dark" : "vs",
+      base: "vs-dark",
       inherit: true,
       rules: [
         { token: "keyword.macro", foreground: "C586C0", fontStyle: "bold" },
@@ -518,7 +536,7 @@ document.addEventListener("DOMContentLoaded", () => {
       colors: {
         "editor.background": background,
         "editor.foreground": foreground,
-        "editor.lineHighlightBackground": cssVar("--vscode-editor-lineHighlightBackground", background),
+        "editor.lineHighlightBackground": lineHighlight,
         "editorCursor.foreground": cursor,
         "editor.selectionBackground": selection,
         "editor.inactiveSelectionBackground": inactiveSelection,
@@ -549,11 +567,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return monacoLoaderPromise;
     }
 
-    monacoLoaderPromise = loadScript("/assets/monaco/vs/loader.js")
+    monacoLoaderPromise = loadScript("/monaco/vs/loader.js")
       .then(
         () =>
           new Promise((resolve, reject) => {
-            window.require.config({ paths: { vs: "/assets/monaco/vs" } });
+            window.require.config({ paths: { vs: "/monaco/vs" } });
             window.require(["vs/editor/editor.main"], () => {
               ensureMonacoTheme(window.monaco);
               registerLiquidLanguage(window.monaco);
@@ -1146,6 +1164,84 @@ document.addEventListener("DOMContentLoaded", () => {
         this.isApplyingRemoteUpdate = false;
         this.lastKnownValue = this.textarea?.value || "";
 
+        this.syncEditorFromTextarea = () => {
+          this.textarea = document.getElementById(this.el.dataset.monacoInputId) || this.el.querySelector("textarea");
+
+          if (!this.textarea || !this.editor) {
+            return;
+          }
+
+          const value = this.textarea.value || "";
+
+          if (this.editor.getValue() !== value) {
+            this.isApplyingRemoteUpdate = true;
+            this.editor.setValue(value);
+            this.isApplyingRemoteUpdate = false;
+          }
+
+          this.lastKnownValue = value;
+        };
+
+        this.layoutEditorSoon = () => {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              if (!this.editor) {
+                return;
+              }
+
+              this.editor.layout();
+            });
+          });
+        };
+
+        this.waitForMonacoVisibleSize = () =>
+          new Promise((resolve) => {
+            let settled = false;
+            let attempts = 0;
+
+            const hasVisibleSize = () => {
+              const rect = this.host?.getBoundingClientRect();
+              return Boolean(rect && rect.width > 0 && rect.height > 0);
+            };
+
+            const finish = () => {
+              if (settled) {
+                return;
+              }
+
+              settled = true;
+              this.visibleSizeObserver?.disconnect();
+              this.visibleSizeObserver = null;
+              resolve();
+            };
+
+            const check = () => {
+              if (hasVisibleSize() || attempts >= 20) {
+                finish();
+                return;
+              }
+
+              attempts += 1;
+              window.requestAnimationFrame(check);
+            };
+
+            if (hasVisibleSize()) {
+              finish();
+              return;
+            }
+
+            if (window.ResizeObserver && this.host) {
+              this.visibleSizeObserver = new ResizeObserver(() => {
+                if (hasVisibleSize()) {
+                  finish();
+                }
+              });
+              this.visibleSizeObserver.observe(this.host);
+            }
+
+            window.requestAnimationFrame(check);
+          });
+
         this.queueSync = () => {
           if (!this.textarea || !this.editor) {
             return;
@@ -1200,10 +1296,12 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         loadMonaco()
-          .then((monaco) => {
+          .then(async (monaco) => {
             if (!this.host || !this.textarea) {
               return;
             }
+
+            await this.waitForMonacoVisibleSize();
 
             ensureMonacoTheme(monaco);
 
@@ -1231,6 +1329,9 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             monacoEditors.set(this.editorId || this.el.id, this.editor);
+            monaco.editor.setTheme("bds-theme");
+            this.syncEditorFromTextarea();
+            this.layoutEditorSoon();
 
             this.changeSubscription = this.editor.onDidChangeModelContent(() => {
               if (this.isApplyingRemoteUpdate) {
@@ -1270,17 +1371,13 @@ document.addEventListener("DOMContentLoaded", () => {
           this.editor.updateOptions({ wordWrap: this.wordWrap });
         });
 
-        if (this.editor.getValue() !== this.textarea.value && this.lastKnownValue !== this.textarea.value) {
-          this.isApplyingRemoteUpdate = true;
-          this.editor.setValue(this.textarea.value);
-          this.isApplyingRemoteUpdate = false;
-        }
-
-        this.lastKnownValue = this.textarea.value;
+        this.syncEditorFromTextarea();
+        this.layoutEditorSoon();
       },
 
       destroyed() {
         window.clearTimeout(this.syncTimer);
+        this.visibleSizeObserver?.disconnect();
         this.changeSubscription?.dispose();
         monacoEditors.delete(this.editorId || this.el.id);
         this.editor?.dispose();
@@ -1416,7 +1513,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  const liveSocket = new LiveView.LiveSocket("/live", Phoenix.Socket, {
+  const liveSocket = new LiveSocket("/live", Socket, {
     params: { _csrf_token: csrfToken },
     hooks: Hooks,
     metadata: {

@@ -171,7 +171,9 @@ defmodule BDS.DesktopTest do
 
   test "desktop external links point at the bDS2 GitHub project and issue tracker" do
     assert BDS.Desktop.ExternalLinks.github_url() == "https://github.com/rfc1437/bDS2"
-    assert BDS.Desktop.ExternalLinks.github_issues_url() == "https://github.com/rfc1437/bDS2/issues"
+
+    assert BDS.Desktop.ExternalLinks.github_issues_url() ==
+             "https://github.com/rfc1437/bDS2/issues"
   end
 
   test "icon menu quit requests app-owned shutdown" do
@@ -254,7 +256,7 @@ defmodule BDS.DesktopTest do
     assert_receive :window_quit_requested
   end
 
-  test "desktop root html is a LiveView shell and references only the live bootstrap assets" do
+  test "desktop root html is a LiveView shell and references the generated asset entrypoints" do
     conn = conn(:get, "/?k=#{Desktop.Auth.login_key()}")
     conn = BDS.Desktop.Endpoint.call(conn, BDS.Desktop.Endpoint.init([]))
 
@@ -270,9 +272,24 @@ defmodule BDS.DesktopTest do
     assert conn.resp_body =~ ~s(class="sidebar")
     assert conn.resp_body =~ ~s(class="status-bar")
     assert conn.resp_body =~ ~s(data-phx-main)
-    assert conn.resp_body =~ ~s(src="/assets/live.js")
     assert conn.resp_body =~ ~s(href="/assets/app.css")
-    refute conn.resp_body =~ ~s(src="/assets/app.js")
+    assert conn.resp_body =~ ~s(src="/assets/app.js")
+    refute conn.resp_body =~ ~s(src="/assets/live.js")
+    refute conn.resp_body =~ ~s(src="/vendor/phoenix/phoenix.min.js")
+    refute conn.resp_body =~ ~s(src="/vendor/live_view/phoenix_live_view.min.js")
+  end
+
+  test "desktop endpoint serves generated Phoenix-style CSS and JS assets" do
+    css_conn = conn(:get, "/assets/app.css?k=#{Desktop.Auth.login_key()}")
+    css_conn = BDS.Desktop.Endpoint.call(css_conn, BDS.Desktop.Endpoint.init([]))
+
+    js_conn = conn(:get, "/assets/app.js?k=#{Desktop.Auth.login_key()}")
+    js_conn = BDS.Desktop.Endpoint.call(js_conn, BDS.Desktop.Endpoint.init([]))
+
+    assert css_conn.status == 200
+    assert byte_size(css_conn.resp_body) > 0
+    assert js_conn.status == 200
+    assert byte_size(js_conn.resp_body) > 0
   end
 
   test "desktop endpoint serves the live shell without extra router-side secret injection" do

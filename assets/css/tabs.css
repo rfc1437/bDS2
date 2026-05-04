@@ -1,0 +1,189 @@
+.tab-bar {
+  display: flex;
+  align-items: center;
+  background-color: var(--vscode-editorGroupHeader-tabsBackground);
+  border-bottom: 1px solid var(--vscode-editorGroupHeader-tabsBorder);
+  height: 35px;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tab-bar-tabs {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1;
+}
+
+.tab-bar-tabs::-webkit-scrollbar {
+  height: 0;
+  display: none;
+}
+
+.tab-bar-empty {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 10px;
+  height: 100%;
+  min-width: 100px;
+  max-width: 180px;
+  cursor: pointer;
+  background-color: var(--vscode-tab-inactiveBackground);
+  border: none;
+  border-right: 1px solid var(--vscode-tab-border);
+  color: var(--vscode-tab-inactiveForeground);
+  font-size: 13px;
+  user-select: none;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tab-select {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: inherit;
+}
+
+.tab:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.tab.active {
+  background-color: var(--vscode-tab-activeBackground);
+  color: var(--vscode-tab-activeForeground);
+}
+
+.tab.active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: var(--vscode-focusBorder);
+}
+
+.tab.transient .tab-title {
+  font-style: italic;
+}
+
+.tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.tab-dirty-indicator {
+  color: var(--vscode-editorWarning-foreground, #e2c08d);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.tab-title,
+.status-bar-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-close {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--vscode-icon-foreground, #c5c5c5);
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  opacity: 0;
+}
+
+.tab:hover .tab-close {
+  opacity: 0.7;
+}
+
+.tab.active .tab-close {
+  opacity: 0.7;
+}
+
+.tab-close:hover {
+  opacity: 1 !important;
+  background-color: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-tab-activeForeground);
+}
+
+.tab-close:active {
+  background-color: var(--vscode-toolbar-activeBackground, rgba(99, 102, 103, 0.31));
+}
+
+.tab.dirty .tab-dirty-indicator {
+  display: block;
+}
+
+.tab.dirty .tab-close {
+  display: none;
+}
+
+.tab.dirty:hover .tab-close {
+  display: flex;
+  opacity: 0.7;
+}
+
+.tab.dirty:hover .tab-dirty-indicator {
+  display: none;
+}
+
+.tab:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
+}
+
+.output-item-details {
+  margin: 4px 0 0;
+  padding: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  user-select: text;
+}
+

@@ -1251,7 +1251,9 @@ defmodule BDS.Scripting.ApiDocs do
         "",
         "**Module APIs**",
         "",
-        Enum.map(methods, fn method -> "- [#{method.module}.#{method.name}](##{method.module}#{method.name})" end),
+        Enum.map(methods, fn method ->
+          "- [#{method.module}.#{method.name}](##{method.module}#{method.name})"
+        end),
         "",
         Enum.map(methods, &render_method/1),
         "[↑ Back to Table of contents](#table-of-contents)",
@@ -1342,23 +1344,56 @@ defmodule BDS.Scripting.ApiDocs do
 
   defp example_argument_value(name, "string") do
     case name do
-      "id" -> "\"id-1\""
-      suffix when suffix in ["post_id", "media_id", "project_id", "tag_id", "target_tag_id"] -> "\"id-1\""
-      "source_tag_ids" -> "{\"id-1\", \"id-2\"}"
-      "language" -> "\"en\""
-      "status" -> "\"draft\""
-      "kind" -> "\"post\""
-      "slug" -> "\"example-slug\""
-      "title" -> "\"Example Title\""
-      "name" -> "\"Example Name\""
-      "query" -> "\"example query\""
-      "content" -> "\"Example content\""
-      "message" -> "\"Update content\""
-      "folder_path" -> "\"/Users/me/Sites/example\""
-      "source_path" -> "\"/Users/me/Pictures/example.jpg\""
-      "item_path" -> "\"/Users/me/Sites/example/output/index.html\""
-      "action" -> "\"save\""
-      _ -> "\"value\""
+      "id" ->
+        "\"id-1\""
+
+      suffix when suffix in ["post_id", "media_id", "project_id", "tag_id", "target_tag_id"] ->
+        "\"id-1\""
+
+      "source_tag_ids" ->
+        "{\"id-1\", \"id-2\"}"
+
+      "language" ->
+        "\"en\""
+
+      "status" ->
+        "\"draft\""
+
+      "kind" ->
+        "\"post\""
+
+      "slug" ->
+        "\"example-slug\""
+
+      "title" ->
+        "\"Example Title\""
+
+      "name" ->
+        "\"Example Name\""
+
+      "query" ->
+        "\"example query\""
+
+      "content" ->
+        "\"Example content\""
+
+      "message" ->
+        "\"Update content\""
+
+      "folder_path" ->
+        "\"/Users/me/Sites/example\""
+
+      "source_path" ->
+        "\"/Users/me/Pictures/example.jpg\""
+
+      "item_path" ->
+        "\"/Users/me/Sites/example/output/index.html\""
+
+      "action" ->
+        "\"save\""
+
+      _ ->
+        "\"value\""
     end
   end
 
@@ -1397,10 +1432,17 @@ defmodule BDS.Scripting.ApiDocs do
 
   defp example_response_value(returns) do
     cond do
-      returns == "nil" -> nil
-      nullable_return?(returns) -> {:nullable, example_response_value(non_nil_return(returns))}
-      String.ends_with?(returns, "[]") -> [example_value_for_type(String.trim_trailing(returns, "[]"))]
-      true -> example_value_for_type(returns)
+      returns == "nil" ->
+        nil
+
+      nullable_return?(returns) ->
+        {:nullable, example_response_value(non_nil_return(returns))}
+
+      String.ends_with?(returns, "[]") ->
+        [example_value_for_type(String.trim_trailing(returns, "[]"))]
+
+      true ->
+        example_value_for_type(returns)
     end
   end
 
@@ -1420,8 +1462,11 @@ defmodule BDS.Scripting.ApiDocs do
 
   defp example_value_for_type(type) do
     case Enum.find(@data_structures, &(&1.name == type)) do
-      nil -> [{"key", "value"}]
-      structure -> Enum.map(structure.fields, fn field -> {field.name, example_field_value(field.type)} end)
+      nil ->
+        [{"key", "value"}]
+
+      structure ->
+        Enum.map(structure.fields, fn field -> {field.name, example_field_value(field.type)} end)
     end
   end
 
@@ -1442,7 +1487,10 @@ defmodule BDS.Scripting.ApiDocs do
   defp render_lua_value(false, _indent), do: "false"
   defp render_lua_value(nil, _indent), do: "nil"
   defp render_lua_value(value, _indent) when is_integer(value), do: Integer.to_string(value)
-  defp render_lua_value(value, _indent) when is_float(value), do: :erlang.float_to_binary(value, [:compact])
+
+  defp render_lua_value(value, _indent) when is_float(value),
+    do: :erlang.float_to_binary(value, [:compact])
+
   defp render_lua_value(value, _indent) when is_binary(value), do: inspect(value)
 
   defp render_lua_value([], _indent), do: "{}"

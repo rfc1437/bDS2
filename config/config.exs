@@ -27,6 +27,31 @@ config :bds, BDS.Desktop.Endpoint,
   pubsub_server: BDS.PubSub,
   live_view: [signing_salt: "desktop-live-view"]
 
+config :tailwind,
+  version: "4.1.14",
+  default: [
+    cd: Path.expand("..", __DIR__),
+    args: ~w(
+      --input=assets/css/app.css
+      --output=priv/static/assets/app.css
+    )
+  ]
+
+config :esbuild,
+  version: "0.25.4",
+  default: [
+    cd: Path.expand("../assets", __DIR__),
+    args: ~w(
+      js/app.js
+      --bundle
+      --target=es2022
+      --outdir=../priv/static/assets
+      --external:/fonts/*
+      --external:/images/*
+    ),
+    env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
+  ]
+
 config :bds, :scripting,
   runtime: BDS.Scripting.Lua,
   timeout: 300_000,

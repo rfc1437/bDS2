@@ -36,6 +36,8 @@ defmodule BDS.MixProject do
       {:image, "~> 0.65"},
       {:stemex, "~> 0.2.1"},
       {:gettext, "~> 0.24"},
+      {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
+      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
@@ -46,6 +48,9 @@ defmodule BDS.MixProject do
       setup: ["deps.get", "ecto.setup"],
       "ecto.setup": ["ecto.create", "ecto.migrate"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
+      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.build": ["tailwind default", "esbuild default"],
+      "assets.deploy": ["tailwind default --minify", "esbuild default --minify"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       validate: ["test", "dialyzer"]
     ]

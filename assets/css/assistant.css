@@ -1,0 +1,206 @@
+.settings-view-shell,
+.style-view,
+.tags-view-shell,
+.scripts-view-shell,
+.templates-view-shell,
+.chat-panel {
+  height: 100%;
+  background: var(--vscode-editor-background);
+}
+
+.chat-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  color: var(--vscode-editor-foreground);
+}
+
+.chat-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-sideBar-background);
+}
+
+.chat-panel-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: visible;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chat-panel-title-main {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-model-selector-wrap {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.chat-model-selector-button,
+.chat-model-selector-option {
+  border: 1px solid var(--vscode-input-border);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
+
+.chat-model-selector-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: auto;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  background: var(--vscode-dropdown-background, var(--vscode-sideBar-background));
+  color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+  z-index: 20;
+}
+
+.chat-panel .chat-model-selector-button.chat-model-selector-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-panel .chat-model-selector-caret {
+  position: static;
+  font-size: 10px;
+}
+
+.chat-messages,
+.chat-surface-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.chat-message {
+  display: flex;
+  max-width: 100%;
+}
+
+.chat-message.user {
+  justify-content: flex-end;
+}
+
+.chat-message-content {
+  max-width: min(760px, 100%);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  background: var(--vscode-sideBar-background);
+  color: var(--vscode-editor-foreground);
+}
+
+.chat-panel .chat-message.user .chat-message-content {
+  background: transparent;
+  color: var(--vscode-list-activeSelectionForeground);
+  border: 0;
+  padding: 6px 12px;
+  line-height: 1.35;
+}
+
+.chat-tool-surface-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.chat-tool-surface-table th,
+.chat-tool-surface-table td {
+  border-bottom: 1px solid var(--vscode-panel-border);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.chat-tool-surface-json {
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  background: var(--vscode-textCodeBlock-background);
+}
+
+.chat-panel .chat-input-container {
+  --chat-input-line-height: 20px;
+  --chat-input-min-height: 20px;
+  border-top: 1px solid var(--vscode-panel-border);
+  padding: 8px 16px;
+  background: var(--vscode-sideBar-background);
+}
+
+.chat-panel .chat-input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-height: 30px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: var(--vscode-input-background);
+}
+
+.chat-panel .chat-input-wrapper:focus-within {
+  border-color: var(--vscode-focusBorder);
+}
+
+.chat-panel .chat-input {
+  flex: 1;
+  box-sizing: border-box;
+  height: var(--chat-input-min-height);
+  min-height: var(--chat-input-min-height);
+  margin: 0;
+  padding: 6px 8px;
+  line-height: var(--chat-input-line-height);
+  max-height: 160px;
+  resize: vertical;
+  border: 0;
+  background: transparent;
+  color: var(--vscode-input-foreground);
+  overflow-y: hidden;
+}
+
+.chat-panel .chat-input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.chat-panel .chat-send-button {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  max-width: 22px;
+  max-height: 22px;
+  padding: 0;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.chat-panel .chat-send-button:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.chat-panel .chat-send-button:disabled {
+  opacity: 0.5;
+}

@@ -16,20 +16,14 @@ defmodule BDS.Desktop.Endpoint do
 
   plug(Plug.Static,
     at: "/assets",
-    from: {:bds, "priv/ui"},
-    only: ["app.css", "live.js", "monaco"]
+    from: {:bds, "priv/static/assets"},
+    only: ["app.css", "app.js"]
   )
 
   plug(Plug.Static,
-    at: "/vendor/phoenix",
-    from: {:phoenix, "priv/static"},
-    only: ["phoenix.min.js"]
-  )
-
-  plug(Plug.Static,
-    at: "/vendor/live_view",
-    from: {:phoenix_live_view, "priv/static"},
-    only: ["phoenix_live_view.min.js"]
+    at: "/monaco",
+    from: {:bds, "priv/ui/monaco"},
+    only: ["vs"]
   )
 
   plug(BDS.Desktop.Router)

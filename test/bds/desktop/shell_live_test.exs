@@ -6,6 +6,27 @@ defmodule BDS.Desktop.ShellLiveTest do
   import Phoenix.LiveViewTest
 
   @shell_live_source_root Path.expand("../../../lib/bds/desktop/shell_live", __DIR__)
+  @css_source_files [
+    "tokens.css",
+    "shell.css",
+    "sidebar.css",
+    "tabs.css",
+    "editor.css",
+    "forms.css",
+    "panel.css",
+    "assistant.css",
+    "overlays.css",
+    "menu_editor.css",
+    "media_editor.css",
+    "import_editor.css",
+    "utilities.css"
+  ]
+
+  defp desktop_css_source do
+    @css_source_files
+    |> Enum.map(&File.read!(Path.expand("../../../assets/css/#{&1}", __DIR__)))
+    |> Enum.join("\n")
+  end
 
   test "shell live modules use contexts instead of direct Repo.get calls" do
     source_files =
@@ -3264,7 +3285,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="chat-model-selector-button chat-model-selector-inline")
     refute html =~ ~s(class="chat-panel-header-actions")
 
-    css = File.read!(Path.expand("../../../priv/ui/app.css", __DIR__))
+    css = desktop_css_source()
     assert css =~ ".chat-model-selector-wrap"
     assert css =~ "left: 0;"
     assert css =~ "right: auto;"
@@ -3313,7 +3334,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert selector_html =~ ~s(data-testid="chat-model-selector-option")
     assert selector_html =~ "llama-current"
 
-    css = File.read!(Path.expand("../../../priv/ui/app.css", __DIR__))
+    css = desktop_css_source()
     assert css =~ ".chat-panel-title {"
     assert css =~ "overflow: visible;"
 
@@ -3628,7 +3649,7 @@ defmodule BDS.Desktop.ShellLiveTest do
   end
 
   test "chat editor hook reopens server-expanded A2UI surfaces after patches" do
-    live_js = File.read!(Path.expand("../../../priv/ui/live.js", __DIR__))
+    live_js = File.read!(Path.expand("../../../assets/js/app.js", __DIR__))
 
     chat_editor =
       File.read!(Path.expand("../../../lib/bds/desktop/shell_live/chat_editor.ex", __DIR__))
@@ -3738,7 +3759,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~
              ~s(<div class="chat-message-text chat-user-message-text" data-testid="chat-user-message-text">wie viele Posts sind im Blog?</div>)
 
-    css = File.read!(Path.expand("../../../priv/ui/app.css", __DIR__))
+    css = desktop_css_source()
     assert css =~ ".chat-panel .chat-message.user .chat-message-content"
     assert css =~ "background: transparent;"
     assert css =~ "border: 0;"
@@ -3762,7 +3783,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(rows="1")
     assert html =~ ~s(class="chat-input chat-surface-input")
 
-    css = File.read!(Path.expand("../../../priv/ui/app.css", __DIR__))
+    css = desktop_css_source()
     assert css =~ "--chat-input-line-height: 20px;"
     assert css =~ "--chat-input-min-height: 20px;"
     assert css =~ ".chat-panel .chat-input-container"
@@ -3784,7 +3805,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert css =~ "max-height: 22px;"
     assert css =~ "padding: 0;"
 
-    live_js = File.read!(Path.expand("../../../priv/ui/live.js", __DIR__))
+    live_js = File.read!(Path.expand("../../../assets/js/app.js", __DIR__))
 
     assert live_js =~
              "minHeight = parseFloat(styles.getPropertyValue(\"--chat-input-min-height\"))"

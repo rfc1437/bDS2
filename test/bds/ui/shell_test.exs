@@ -6,6 +6,28 @@ defmodule BDS.UI.ShellTest do
   alias BDS.UI.Session
   alias BDS.UI.Workbench
 
+  @css_sources [
+    "tokens.css",
+    "shell.css",
+    "sidebar.css",
+    "tabs.css",
+    "editor.css",
+    "forms.css",
+    "panel.css",
+    "assistant.css",
+    "overlays.css",
+    "menu_editor.css",
+    "media_editor.css",
+    "import_editor.css",
+    "utilities.css"
+  ]
+
+  defp css_source do
+    @css_sources
+    |> Enum.map(&File.read!("/Users/gb/Projects/bDS2/assets/css/#{&1}"))
+    |> Enum.join("\n")
+  end
+
   test "registry exposes the shared sidebar and editor contracts for the base shell" do
     sidebar_views = Registry.sidebar_views()
     editor_routes = Registry.editor_routes()
@@ -101,25 +123,100 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell keeps the compact frame metrics and live bootstrap assets" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
-    live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
+    css = css_source()
+    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
-    assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/app.css")
-    assert File.exists?("/Users/gb/Projects/bDS2/priv/ui/live.js")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/css/shell.css")
+    assert File.exists?("/Users/gb/Projects/bDS2/assets/js/app.js")
     assert css =~ ".window-titlebar"
     assert css =~ "height: 34px"
     assert css =~ "width: 48px"
     assert css =~ "height: 35px"
     assert css =~ "height: 22px"
-    assert live_js =~ "LiveView.LiveSocket"
-    assert live_js =~ "Phoenix.Socket"
+    assert live_js =~ "new LiveSocket"
+    assert live_js =~ "Socket"
     assert template =~ "data-project-id={@projects.active_project_id || \"\"}"
     assert template =~ "data-workbench-session={encoded_workbench_session(@workbench)}"
   end
 
+  test "desktop shell css keeps editor and help docs on the VS Code dark surface" do
+    css = css_source()
+
+    assert css =~ ".post-editor .post-editor-markdown-surface"
+    assert css =~ ".scripts-monaco.monaco-editor-shell"
+    assert css =~ ".templates-monaco.monaco-editor-shell"
+    assert css =~ ".help-doc-markdown"
+    assert css =~ "background: var(--vscode-editor-background);"
+    assert css =~ "color: var(--vscode-editor-foreground);"
+    refute Regex.match?(~r/\.sidebar-item\s*\{[^}]*background:\s*var\(--panel-2\)/s, css)
+    refute Regex.match?(~r/\.sidebar-item\s*\{[^}]*color:\s*var\(--ink\)/s, css)
+  end
+
+  test "desktop help documentation keeps the old markdown viewer styling contract" do
+    css = css_source()
+
+    assert css =~ ".help-doc-view"
+    assert css =~ ".help-doc-view .misc-editor-content"
+    assert css =~ ".documentation-article"
+    assert css =~ ".documentation-content.markdown-body h1"
+    assert css =~ ".documentation-content.markdown-body table"
+    assert css =~ ".documentation-content.markdown-body ul"
+    assert css =~ "background: var(--doc-surface);"
+    assert css =~ "box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);"
+  end
+
+  test "desktop settings editor keeps the old preferences styling contract" do
+    css = css_source()
+
+    assert css =~ ".settings-view"
+    assert css =~ ".settings-header"
+    assert css =~ ".settings-content"
+    assert css =~ ".setting-section"
+    assert css =~ ".setting-section-header"
+    assert css =~ ".setting-section-content"
+    assert css =~ ".setting-row"
+    assert css =~ ".setting-control"
+    assert css =~ "grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);"
+    assert css =~ "background: var(--panel-2, #252526);"
+    assert css =~ "border: 1px solid var(--line, #3c3c3c);"
+  end
+
+  test "monaco editor styling forces the internal editor surface to the dark theme" do
+    css = css_source()
+    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+
+    assert css =~ ".monaco-editor .margin"
+    assert css =~ ".monaco-editor-background"
+    assert css =~ "background-color: var(--vscode-editor-background) !important;"
+    assert css =~ ".monaco-editor .view-line"
+    assert live_js =~ "base: \"vs-dark\""
+    assert live_js =~ "monaco.editor.setTheme(\"bds-theme\");"
+  end
+
+  test "monaco editor hook forces first visible layout and textarea content sync" do
+    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+
+    assert live_js =~ "this.syncEditorFromTextarea"
+    assert live_js =~ "this.layoutEditorSoon"
+    assert live_js =~ "this.waitForMonacoVisibleSize"
+    assert live_js =~ "ResizeObserver"
+    assert live_js =~ "requestAnimationFrame"
+    assert live_js =~ "this.editor.layout()"
+    assert live_js =~ "this.syncEditorFromTextarea()"
+  end
+
+  test "monaco theme uses normalized app colors before defining the dark theme" do
+    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
+
+    assert live_js =~ "normalizeMonacoColor"
+    assert live_js =~ "base: \"vs-dark\""
+    assert live_js =~ "\"editor.background\": background"
+    assert live_js =~ "monaco.editor.defineTheme(\"bds-theme\""
+  end
+
   test "desktop shell assets persist workbench layout per project" do
-    live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
+    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
 
     session_util_ex =
@@ -134,8 +231,8 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell assets reveal loaded media sidebar thumbnails" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
-    live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
+    css = css_source()
+    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
 
     assert css =~ ".media-thumbnail.is-loaded .media-thumbnail-image"
     assert css =~ ".media-thumbnail.is-loaded .media-thumbnail-fallback"
@@ -145,7 +242,7 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell css keeps the status bar and hidden menu alignment rules" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    css = css_source()
 
     assert css =~ ".window-titlebar-menu-bar.is-hidden"
     assert css =~ "--vscode-statusBar-background: #007acc"
@@ -162,8 +259,8 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell assets keep old activity, tab, focus, and titlebar overlay parity rules" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
-    live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
+    css = css_source()
+    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
     assert css =~ "color: var(--vscode-activityBar-foreground)"
@@ -194,14 +291,14 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell keeps sidebar delete buttons visible in the default state" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    css = css_source()
 
     assert Regex.match?(~r/\.sidebar-delete-button\s*\{[^}]*opacity:\s*1;/s, css)
     refute Regex.match?(~r/\.sidebar-delete-button\s*\{[^}]*opacity:\s*0;/s, css)
   end
 
   test "desktop shell css keeps the old activity bar active marker contrast" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    css = css_source()
 
     assert css =~ "--vscode-activityBar-foreground: #ffffff"
     assert css =~ ".activity-bar-item:hover {"
@@ -211,8 +308,8 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell assets keep legacy titlebar menu keyboard and anchoring behavior" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
-    live_js = File.read!("/Users/gb/Projects/bDS2/priv/ui/live.js")
+    css = css_source()
+    live_js = File.read!("/Users/gb/Projects/bDS2/assets/js/app.js")
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
@@ -232,7 +329,7 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell css keeps the old media editor layout contract" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    css = css_source()
 
     template =
       File.read!(
@@ -288,7 +385,7 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell css keeps old panel and output density" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    css = css_source()
 
     assert css =~ ".panel-content {"
     assert css =~ "padding: 8px;"
@@ -302,7 +399,7 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell css keeps legacy sidebar header and post list layout" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    css = css_source()
 
     assert css =~ ".sidebar-section {"
     assert css =~ "margin-bottom: 4px;"
@@ -317,7 +414,7 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell assets keep the assistant sidebar chat surface contract" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    css = css_source()
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
     assert css =~ ".assistant-sidebar-context"
@@ -332,7 +429,7 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell assets expose the shared overlay render contract" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    css = css_source()
     live_ex = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live.ex")
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 
@@ -439,7 +536,7 @@ defmodule BDS.UI.ShellTest do
   end
 
   test "desktop shell css keeps the old assistant sidebar panel styling" do
-    css = File.read!("/Users/gb/Projects/bDS2/priv/ui/app.css")
+    css = css_source()
 
     assert css =~ ".assistant-content {"
     assert css =~ "padding: 12px;"

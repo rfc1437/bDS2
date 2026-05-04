@@ -1,0 +1,19 @@
+@import "tailwindcss" source(none);
+
+@source "../css";
+@source "../js";
+@source "../../lib/bds/desktop";
+
+@import "./tokens.css";
+@import "./shell.css";
+@import "./sidebar.css";
+@import "./tabs.css";
+@import "./editor.css";
+@import "./forms.css";
+@import "./panel.css";
+@import "./assistant.css";
+@import "./overlays.css";
+@import "./menu_editor.css";
+@import "./media_editor.css";
+@import "./import_editor.css";
+@import "./utilities.css";

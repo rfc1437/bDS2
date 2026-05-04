@@ -1,0 +1,807 @@
+.app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--vscode-editor-background);
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.window-titlebar {
+  position: relative;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--vscode-editorGroupHeader-tabsBackground);
+  border-bottom: 1px solid var(--vscode-editorGroupHeader-tabsBorder);
+  flex-shrink: 0;
+  app-region: drag;
+  -webkit-app-region: drag;
+  padding-right: calc(10px + var(--bds-titlebar-overlay-right, 0px));
+}
+
+.window-titlebar-menu-bar {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  margin-left: 6px;
+  gap: 2px;
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+  z-index: 2;
+}
+
+.window-titlebar-menu-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.window-titlebar-menu-bar.is-hidden {
+  display: none;
+}
+
+.window-titlebar.is-mac .window-titlebar-menu-bar {
+  margin-left: max(var(--bds-titlebar-macos-left-inset, 78px), calc(6px + var(--bds-titlebar-overlay-left, 0px)));
+}
+
+.window-titlebar-menu-button {
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--vscode-titleBar-activeForeground);
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.window-titlebar-menu-button:hover,
+.window-titlebar-action-button:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.window-titlebar-menu-button.is-active {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.window-titlebar-menu-button:focus,
+.window-titlebar-menu-button:focus-visible,
+.window-titlebar-action-button:focus,
+.window-titlebar-action-button:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.window-titlebar-menu-dropdown {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  min-width: 210px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background-color: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  border-radius: 6px;
+  box-shadow: var(--vscode-widget-shadow, 0 8px 24px rgba(0, 0, 0, 0.4));
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+  z-index: 10;
+}
+
+.window-titlebar-menu-item {
+  border: none;
+  background: transparent;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.window-titlebar-menu-item:focus,
+.window-titlebar-menu-item:focus-visible {
+  outline: none;
+  box-shadow: none;
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.window-titlebar-menu-item:hover,
+.window-titlebar-menu-item.is-keyboard-active {
+  background-color: var(--vscode-menu-selectionBackground, var(--vscode-toolbar-hoverBackground));
+}
+
+.window-titlebar-menu-item-accelerator {
+  opacity: 0.8;
+}
+
+.window-titlebar-menu-separator {
+  height: 1px;
+  margin: 4px 2px;
+  background-color: var(--vscode-menu-separatorBackground, rgba(255, 255, 255, 0.08));
+}
+
+.window-titlebar-drag-region {
+  flex: 1;
+  height: 100%;
+}
+
+.window-titlebar-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 45%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-titleBar-activeForeground);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+  pointer-events: none;
+}
+
+.window-titlebar-actions {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  margin-right: 6px;
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+
+.window-titlebar-action-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  line-height: 0;
+  background: transparent;
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.window-titlebar-sidebar-icon,
+.window-titlebar-panel-icon,
+.window-titlebar-assistant-icon {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  display: block;
+  position: relative;
+  overflow: hidden;
+}
+
+.window-titlebar-sidebar-icon::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 33.3333%;
+  width: 1.5px;
+  transform: translateX(-50%);
+  background-color: currentColor;
+}
+
+.window-titlebar-panel-icon::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 66.6667%;
+  height: 1.5px;
+  transform: translateY(-50%);
+  background-color: currentColor;
+}
+
+.window-titlebar-assistant-icon::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 66.6667%;
+  width: 1.5px;
+  transform: translateX(-50%);
+  background-color: currentColor;
+}
+
+.window-titlebar-sidebar-pane,
+.window-titlebar-panel-pane,
+.window-titlebar-assistant-pane {
+  position: absolute;
+  background-color: currentColor;
+  transition: opacity 120ms ease;
+}
+
+.window-titlebar-sidebar-pane {
+  left: 0;
+  top: 0;
+  width: 33.3333%;
+  height: 100%;
+}
+
+.window-titlebar-panel-pane {
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 33.3333%;
+}
+
+.window-titlebar-assistant-pane {
+  right: 0;
+  top: 0;
+  width: 33.3333%;
+  height: 100%;
+}
+
+.window-titlebar-sidebar-icon.is-inactive .window-titlebar-sidebar-pane,
+.window-titlebar-panel-icon.is-inactive .window-titlebar-panel-pane,
+.window-titlebar-assistant-icon.is-inactive .window-titlebar-assistant-pane {
+  opacity: 0;
+}
+
+.panel-shell {
+  height: 200px;
+  border-top: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-panel-background);
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-shell.is-hidden {
+  display: none;
+}
+
+.editor-toolbar-button.is-destructive {
+  color: #f48771;
+}
+
+.shell-overlay-backdrop,
+.gallery-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 10000;
+}
+
+.shell-overlay-dismiss {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.gallery-overlay {
+  position: relative;
+  width: min(980px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 1;
+}
+
+.insert-modal-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.insert-modal-media-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  background: #252526;
+  color: inherit;
+  padding: 10px;
+  text-align: left;
+}
+
+.insert-modal-media-thumb {
+  width: 100%;
+  min-height: 112px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.insert-modal-media-title {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.language-picker-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.language-picker-option {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  border: none;
+  border-radius: 4px;
+  padding: 12px 16px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.language-picker-label,
+.language-picker-status,
+.lightbox-counter {
+  color: #9d9d9d;
+  font-size: 12px;
+}
+
+.lightbox-counter {
+  margin-top: 4px;
+}
+
+@media (max-width: 720px) {
+  .insert-modal-media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.panel-header {
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  background-color: var(--vscode-sideBar-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.panel-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+}
+
+.panel-tab {
+  border: none;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.panel-tab.active {
+  color: var(--vscode-tab-activeForeground);
+}
+
+.panel-close {
+  background: transparent;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  font-size: 18px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+}
+
+.panel-close:hover {
+  background-color: var(--vscode-list-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+.panel-content {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+.panel-entry,
+.assistant-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.output-list,
+.git-log-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.task-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.task-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-descriptionForeground);
+}
+
+.task-status-running {
+  color: var(--vscode-terminal-ansiGreen, var(--vscode-statusBar-foreground));
+}
+
+.task-status-pending {
+  color: var(--vscode-terminal-ansiYellow, var(--vscode-statusBar-foreground));
+}
+
+.panel-empty-state {
+  min-height: 100%;
+  justify-content: center;
+}
+
+.status-bar {
+  height: 22px;
+  background: var(--vscode-statusBar-background);
+  color: var(--vscode-statusBar-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.status-bar-left,
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.status-bar-left {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.status-shell-controls {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.status-shell-toggle-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 100%;
+  padding: 0;
+  line-height: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.status-shell-toggle-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.status-shell-toggle-button:focus,
+.status-shell-toggle-button:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.status-shell-toggle-button .window-titlebar-sidebar-icon,
+.status-shell-toggle-button .window-titlebar-panel-icon,
+.status-shell-toggle-button .window-titlebar-assistant-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.status-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  height: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.status-bar-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.status-bar-task-button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.status-bar-item.theme-badge {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+
+.status-bar-item.language-badge {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  gap: 4px;
+}
+
+.status-bar-item.offline-badge {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.4;
+  font-size: 13px;
+  padding: 0 4px;
+}
+
+.status-bar-item.offline-badge.active {
+  background-color: rgba(255, 196, 0, 0.28);
+  opacity: 1;
+}
+
+.project-selector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.project-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  color: var(--vscode-statusBar-foreground);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+
+.project-selector-trigger:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.project-selector-trigger:focus {
+  outline: none;
+}
+
+.project-icon,
+.dropdown-arrow,
+.project-check-icon {
+  flex-shrink: 0;
+}
+
+.project-name,
+.project-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-name {
+  max-width: 180px;
+}
+
+.dropdown-arrow {
+  opacity: 0.6;
+}
+
+.project-dropdown {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  min-width: 220px;
+  margin-bottom: 4px;
+  background-color: #252526;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.project-dropdown-header {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--vscode-descriptionForeground);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.project-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.project-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.project-item:hover,
+.project-item.active {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.project-item.active .project-check-icon {
+  color: #89d185;
+}
+
+.project-dropdown-footer {
+  padding: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: grid;
+  gap: 6px;
+}
+
+.create-project-btn,
+.existing-project-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.create-project-btn:hover,
+.existing-project-btn:hover {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+.status-bar-language-select {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+}
+
+.status-bar-language-select:focus {
+  outline: none;
+}
+
+.status-bar-count {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.status-bar-item.brand {
+  font-weight: 600;
+}
+
+@media (max-width: 960px) {
+  .editor-frame {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editor-meta {
+    border-left: none;
+    border-top: 1px solid var(--vscode-panel-border);
+    padding-left: 0;
+    padding-top: 10px;
+  }
+}
+
+.editor-section ul {
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 10px;
+}
+
+.editor-toolbar button {
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-3);
+  color: var(--ink);
+}
+
+.editor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.editor-meta-card,
+.assistant-card,
+.panel-entry {
+  padding: 16px;
+}
+
+.sidebar-header,
+.assistant-header,
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+

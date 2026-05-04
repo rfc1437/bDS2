@@ -1,0 +1,141 @@
+.settings-view,
+.style-view {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+}
+
+.settings-header,
+.style-view-header {
+	padding: 18px 20px;
+	border-bottom: 1px solid var(--line, #3c3c3c);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.settings-search input {
+	width: min(320px, 40vw);
+}
+
+.settings-content {
+	padding: 20px;
+	overflow: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+
+.setting-section {
+	border: 1px solid var(--line, #3c3c3c);
+	border-radius: 12px;
+	background: var(--panel-2, #252526);
+}
+
+.setting-section-header {
+	padding: 14px 16px;
+	border-bottom: 1px solid var(--line, #3c3c3c);
+}
+
+.setting-section-content {
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.setting-row {
+	display: grid;
+	grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+	gap: 16px;
+	align-items: start;
+}
+
+.setting-label {
+	font-weight: 600;
+}
+
+.setting-control,
+.setting-input-group {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	align-items: center;
+}
+
+.setting-actions {
+	padding: 0 16px 16px;
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.style-theme-picker {
+	padding: 20px;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 14px;
+}
+
+.style-theme-option {
+	border: 1px solid var(--line, #3c3c3c);
+	background: var(--panel-2, #252526);
+	border-radius: 14px;
+	padding: 14px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.style-theme-option.selected {
+	border-color: var(--accent-color);
+	box-shadow: 0 0 0 1px var(--accent-color);
+}
+
+.style-theme-swatch {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.style-theme-tones {
+	display: grid;
+	grid-template-columns: 2fr 1fr 1fr;
+	gap: 8px;
+}
+
+.style-theme-tone {
+	height: 42px;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.style-apply-row {
+	padding: 0 20px 20px;
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+}
+
+.style-preview-container {
+	padding: 0 20px 20px;
+	flex: 1;
+	min-height: 0;
+}
+
+.style-preview-frame {
+	width: 100%;
+	height: 100%;
+	min-height: 420px;
+	border: 1px solid var(--line, #3c3c3c);
+	border-radius: 14px;
+	background: #ffffff;
+}
+
+@media (max-width: 1100px) {
+	.setting-row {
+		grid-template-columns: 1fr;
+	}
+}
