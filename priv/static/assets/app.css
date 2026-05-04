@@ -2508,7 +2508,7 @@ button svg, button svg * {
   max-width: 100%;
   height: auto;
 }
-.post-editor.editor, .scripts-view-shell.editor, .templates-view-shell.editor {
+.post-editor, .scripts-view-shell, .templates-view-shell {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -2555,22 +2555,22 @@ button svg, button svg * {
   font-size: 11px;
   opacity: 0.7;
 }
-.post-editor .status-badge, .scripts-view-shell.editor .status-badge, .templates-view-shell.editor .status-badge {
+.post-editor .status-badge, .scripts-view-shell .status-badge, .templates-view-shell .status-badge {
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
 }
-.post-editor .status-badge.status-draft, .scripts-view-shell.editor .status-badge.status-draft, .templates-view-shell.editor .status-badge.status-draft {
+.post-editor .status-badge.status-draft, .scripts-view-shell .status-badge.status-draft, .templates-view-shell .status-badge.status-draft {
   background-color: rgba(204, 167, 0, 0.2);
   color: var(--vscode-notificationsWarningIcon-foreground, var(--vscode-editorWarning-foreground));
 }
-.post-editor .status-badge.status-published, .scripts-view-shell.editor .status-badge.status-published, .templates-view-shell.editor .status-badge.status-published {
+.post-editor .status-badge.status-published, .scripts-view-shell .status-badge.status-published, .templates-view-shell .status-badge.status-published {
   background-color: rgba(115, 201, 145, 0.2);
   color: var(--vscode-testing-iconPassed);
 }
-.post-editor .status-badge.status-archived, .scripts-view-shell.editor .status-badge.status-archived, .templates-view-shell.editor .status-badge.status-archived {
+.post-editor .status-badge.status-archived, .scripts-view-shell .status-badge.status-archived, .templates-view-shell .status-badge.status-archived {
   background-color: rgba(133, 133, 133, 0.2);
   color: var(--vscode-descriptionForeground);
 }
@@ -3024,7 +3024,7 @@ button svg, button svg * {
   flex-wrap: wrap;
 }
 @media (max-width: 980px) {
-  .post-editor .editor-header, .scripts-view-shell.editor .editor-header, .templates-view-shell.editor .editor-header, .post-editor .metadata-toggle-header, .post-editor .editor-toolbar {
+  .post-editor .editor-header, .scripts-view-shell .ui-editor-header, .templates-view-shell .ui-editor-header, .post-editor .metadata-toggle-header, .post-editor .editor-toolbar {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -3035,7 +3035,7 @@ button svg, button svg * {
   .post-editor .editor-media-panel {
     width: 100%;
   }
-  .post-editor .editor-toolbar-right, .post-editor .editor-actions, .scripts-view-shell.editor .editor-actions, .templates-view-shell.editor .editor-actions {
+  .post-editor .editor-toolbar-right, .post-editor .ui-editor-actions, .scripts-view-shell .ui-editor-actions, .templates-view-shell .ui-editor-actions {
     justify-content: flex-start;
   }
 }
@@ -4255,11 +4255,11 @@ button svg, button svg * {
   color: var(--vscode-notificationsWarningIcon-foreground, var(--vscode-editorWarning-foreground));
   font-size: 10px;
 }
-[data-testid="media-editor"] .editor-actions button {
+[data-testid="media-editor"] .ui-editor-actions button {
   padding: 4px 10px;
   font-size: 12px;
 }
-[data-testid="media-editor"] .editor-actions button.danger:hover {
+[data-testid="media-editor"] .ui-editor-actions button.danger:hover {
   background-color: var(--vscode-notificationsErrorIcon-foreground);
 }
 [data-testid="media-editor"] .auto-save-indicator {

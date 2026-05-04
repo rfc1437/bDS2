@@ -292,19 +292,19 @@ defmodule BDS.Desktop.ShellLiveTest do
     settings_html = render_component(&BDS.Desktop.ShellLive.SettingsEditor.render/1, phase3_settings_editor_assigns())
     tags_html = render_component(&BDS.Desktop.ShellLive.TagsEditor.render/1, phase3_tags_editor_assigns())
 
-    assert post_html =~ "post-editor editor ui-editor-shell flex h-full min-h-0 flex-col"
+    assert post_html =~ "post-editor ui-editor-shell flex h-full min-h-0 flex-col"
     assert post_html =~ "editor-header ui-editor-header flex shrink-0 items-start justify-between gap-3"
     assert post_html =~ "editor-field ui-field-stack flex flex-col gap-1.5"
     assert post_html =~ "editor-toolbar ui-toolbar flex items-center gap-3"
 
-    assert media_html =~ "media-editor editor ui-editor-shell flex h-full min-h-0 flex-col"
+    assert media_html =~ "media-editor ui-editor-shell flex h-full min-h-0 flex-col"
     assert media_html =~ "editor-content media-editor grid min-h-0 flex-1 gap-4 overflow-auto p-4"
 
-    assert script_html =~ "scripts-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col"
-    assert script_html =~ "editor-content scripts-view flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4"
+    assert script_html =~ "scripts-view-shell ui-editor-shell flex h-full min-h-0 flex-col"
+    assert script_html =~ "flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4"
 
-    assert template_html =~ "templates-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col"
-    assert template_html =~ "editor-content templates-view flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4"
+    assert template_html =~ "templates-view-shell ui-editor-shell flex h-full min-h-0 flex-col"
+    assert template_html =~ "flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4"
 
     assert chat_html =~ "chat-panel ui-editor-shell flex h-full min-h-0 flex-col"
     assert chat_html =~ "chat-panel-header flex shrink-0 items-center justify-between gap-3"
@@ -344,7 +344,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert post_html =~ ~s(class="secondary danger ui-button ui-button-secondary ui-button-danger)
     assert post_html =~ ~s(class="post-editor-input ui-input)
     assert post_html =~ ~s(class="post-editor-textarea post-editor-excerpt ui-textarea)
-    assert post_html =~ ~s(class="editor-tab ui-tab ui-tab-active)
+    assert post_html =~ "ui-tab ui-tab-active ui-editor-tab-current"
 
     assert media_html =~ ~s(class="secondary quick-actions-btn ui-button ui-button-secondary)
     assert media_html =~ ~s(class="post-editor-input ui-input disabled ui-input-disabled)
@@ -3223,7 +3223,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => "published"
       })
 
-    assert published_script_html =~ ~s(class="scripts-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col")
+    assert published_script_html =~ ~s(class="scripts-view-shell ui-editor-shell flex h-full min-h-0 flex-col")
     assert published_script_html =~ ~s(data-testid="script-editor")
     assert published_script_html =~ ~s(data-testid="script-status-badge")
     assert published_script_html =~ ~s(class="status-badge ui-badge status-published")
@@ -3244,7 +3244,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => "published"
       })
 
-    assert published_template_html =~ ~s(class="templates-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col")
+    assert published_template_html =~ ~s(class="templates-view-shell ui-editor-shell flex h-full min-h-0 flex-col")
     assert published_template_html =~ ~s(data-testid="template-editor")
     assert published_template_html =~ ~s(data-testid="template-status-badge")
     assert published_template_html =~ ~s(class="status-badge ui-badge status-published")
@@ -3587,7 +3587,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => script.slug
       })
 
-    assert script_html =~ ~s(class="scripts-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col")
+    assert script_html =~ ~s(class="scripts-view-shell ui-editor-shell flex h-full min-h-0 flex-col")
     assert script_html =~ "scripts-monaco"
     assert script_html =~ ~s(data-monaco-language="lua")
     assert script_html =~ ~s(data-monaco-word-wrap="on")
@@ -3602,7 +3602,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         "subtitle" => template.slug
       })
 
-    assert template_html =~ ~s(class="templates-view-shell editor ui-editor-shell flex h-full min-h-0 flex-col")
+    assert template_html =~ ~s(class="templates-view-shell ui-editor-shell flex h-full min-h-0 flex-col")
     assert template_html =~ "templates-monaco"
     assert template_html =~ ~s(data-monaco-language="liquid")
     assert template_html =~ ~s(data-monaco-word-wrap="on")
