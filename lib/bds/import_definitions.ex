@@ -91,19 +91,11 @@ defmodule BDS.ImportDefinitions do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
+  alias BDS.MapUtils
+
   defp normalize_analysis_result(nil), do: nil
   defp normalize_analysis_result(value) when is_binary(value), do: value
   defp normalize_analysis_result(value), do: Jason.encode!(value)
 
-  defp atomize_keys(value) when is_map(value) do
-    value
-    |> Enum.map(fn {key, nested_value} ->
-      normalized_key = if(is_binary(key), do: String.to_atom(key), else: key)
-      {normalized_key, atomize_keys(nested_value)}
-    end)
-    |> Map.new()
-  end
-
-  defp atomize_keys(value) when is_list(value), do: Enum.map(value, &atomize_keys/1)
-  defp atomize_keys(value), do: value
+  defp atomize_keys(value), do: MapUtils.safe_atomize_keys(value)
 end

@@ -35,6 +35,70 @@ defmodule BDS.MapUtilsTest do
     end
   end
 
+  describe "safe_atomize_key/1" do
+    test "converts known string keys to existing atoms" do
+      _ = :title
+      _ = :status
+      assert MapUtils.safe_atomize_key("title") == :title
+      assert MapUtils.safe_atomize_key("status") == :status
+    end
+
+    test "leaves unknown string keys as strings without creating new atoms" do
+      unique_keys = for i <- 1..100, do: "csm001_fictive_#{i}_#{:erlang.unique_integer()}"
+
+      Enum.each(unique_keys, fn key ->
+        result = MapUtils.safe_atomize_key(key)
+        assert is_binary(result)
+        assert result == key
+        assert_raise ArgumentError, fn -> String.to_existing_atom(key) end
+      end)
+    end
+
+    test "passes atoms through unchanged" do
+      assert MapUtils.safe_atomize_key(:title) == :title
+    end
+
+    test "safe_atomize_keys recursively converts map keys safely" do
+      input = %{
+        "title" => "Hello",
+        "status" => "draft",
+        "nested" => %{"title" => "Inner", "completely_unknown_key" => "val"},
+        "items" => [%{"title" => "One"}, %{"title" => "Two"}]
+      }
+
+      _ = :title
+      _ = :status
+      _ = :nested
+      _ = :items
+
+      result = MapUtils.safe_atomize_keys(input)
+
+      assert result.title == "Hello"
+      assert result.status == "draft"
+      assert result.nested.title == "Inner"
+      assert Map.get(result.nested, "completely_unknown_key") == "val"
+      assert length(result.items) == 2
+    end
+
+    test "safe_atomize_keys does not create atoms for malicious payloads" do
+      unique_suffix = :erlang.unique_integer()
+
+      malicious = for i <- 1..500, into: %{} do
+        {"csm001_malicious_#{i}_#{unique_suffix}", "val"}
+      end
+
+      result = MapUtils.safe_atomize_keys(malicious)
+
+      assert map_size(result) == 500
+
+      Enum.each(1..500, fn i ->
+        key = "csm001_malicious_#{i}_#{unique_suffix}"
+        assert Map.get(result, key) == "val"
+        assert_raise ArgumentError, fn -> String.to_existing_atom(key) end
+      end)
+    end
+  end
+
   describe "atom/string key duality" do
     test "shared attr helper is used for same-name atom and string reads" do
       root = File.cwd!()

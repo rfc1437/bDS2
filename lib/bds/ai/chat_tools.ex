@@ -909,7 +909,7 @@ defmodule BDS.AI.ChatTools do
 
   defp metadata_attrs(arguments, keys) do
     Enum.reduce(keys, %{}, fn key, acc ->
-      maybe_put(acc, String.to_atom(key), arguments[key])
+      maybe_put(acc, BDS.MapUtils.safe_atomize_key(key), arguments[key])
     end)
   end
 

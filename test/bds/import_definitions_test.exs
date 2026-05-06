@@ -18,6 +18,34 @@ defmodule BDS.ImportDefinitionsTest do
     %{project: project, temp_dir: temp_dir}
   end
 
+  test "decode_analysis_result does not create atoms from unknown keys" do
+    unique_suffix = :erlang.unique_integer()
+    unknown_key_1 = "csm001_fictive_#{unique_suffix}"
+    unknown_key_2 = "csm001_nested_#{unique_suffix}"
+
+    malicious_json =
+      Jason.encode!(%{
+        unknown_key_1 => "val",
+        "site_info" => %{unknown_key_2 => "nested_val"}
+      })
+
+    result = ImportDefinitions.decode_analysis_result(malicious_json)
+
+    assert is_map(result)
+    assert Map.get(result, unknown_key_1) == "val" or Map.get(result, "csm001_fictive_#{unique_suffix}") == "val"
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key_1) end
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key_2) end
+  end
+
+  test "decode_analysis_result converts known keys to atoms" do
+    json = Jason.encode!(%{"site_info" => %{"title" => "My Blog"}})
+
+    result = ImportDefinitions.decode_analysis_result(json)
+
+    assert is_map(result)
+    assert Map.get(result, :site_info) != nil or Map.get(result, "site_info") != nil
+  end
+
   test "get, update, and delete round-trip import definition editor state", %{
     project: project,
     temp_dir: temp_dir

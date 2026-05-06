@@ -6,6 +6,7 @@ defmodule BDS.ImportExecution do
   alias BDS.Posts
   alias BDS.Posts.Post
   alias BDS.Repo
+  alias BDS.MapUtils
   alias BDS.Tags
 
   def execute_import(project_id, report, opts \\ [])
@@ -535,17 +536,7 @@ defmodule BDS.ImportExecution do
   defp item_identity(%{item_type: "media", filename: filename}), do: {:media, filename}
   defp item_identity(%{item_type: item_type, slug: slug}), do: {item_type, slug}
 
-  defp normalize_report(report) when is_map(report) do
-    report
-    |> Enum.map(fn {key, value} ->
-      normalized_key = if(is_binary(key), do: String.to_atom(key), else: key)
-      {normalized_key, normalize_report(value)}
-    end)
-    |> Map.new()
-  end
-
-  defp normalize_report(report) when is_list(report), do: Enum.map(report, &normalize_report/1)
-  defp normalize_report(report), do: report
+  defp normalize_report(report), do: MapUtils.safe_atomize_keys(report)
 
   defp normalize_item(item) do
     normalize_report(item)

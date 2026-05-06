@@ -30,4 +30,25 @@ defmodule BDS.MapUtils do
   def blank_to_nil(nil), do: nil
   def blank_to_nil(""), do: nil
   def blank_to_nil(value), do: value
+
+  @spec safe_atomize_key(atom() | String.t()) :: atom() | String.t()
+  def safe_atomize_key(key) when is_atom(key), do: key
+
+  def safe_atomize_key(key) when is_binary(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> key
+  end
+
+  @spec safe_atomize_keys(term()) :: term()
+  def safe_atomize_keys(value) when is_map(value) do
+    value
+    |> Enum.map(fn {key, nested_value} ->
+      {safe_atomize_key(key), safe_atomize_keys(nested_value)}
+    end)
+    |> Map.new()
+  end
+
+  def safe_atomize_keys(value) when is_list(value), do: Enum.map(value, &safe_atomize_keys/1)
+  def safe_atomize_keys(value), do: value
 end

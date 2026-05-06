@@ -375,13 +375,7 @@ defmodule BDS.Desktop.Automation do
   defp normalize_simple_reply("ok"), do: :ok
   defp normalize_simple_reply(reply), do: reply
 
-  defp atomize_map(map) when is_map(map) do
-    Enum.into(map, %{}, fn {key, value} ->
-      normalized_key = if is_binary(key), do: String.to_atom(key), else: key
-      normalized_value = if is_map(value), do: atomize_map(value), else: value
-      {normalized_key, normalized_value}
-    end)
-  end
+  defp atomize_map(map) when is_map(map), do: BDS.MapUtils.safe_atomize_keys(map)
 
   defp project_root do
     Path.expand("../../..", __DIR__)

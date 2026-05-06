@@ -287,7 +287,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
   defp map_value(map, key, default \\ nil)
 
   defp map_value(map, key, default) when is_map(map) and is_binary(key) do
-    Map.get(map, key, Map.get(map, String.to_atom(key), default))
+    Map.get(map, key, Map.get(map, String.to_existing_atom(key), default))
   rescue
     ArgumentError -> Map.get(map, key, default)
   end

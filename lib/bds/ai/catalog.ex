@@ -15,6 +15,7 @@ defmodule BDS.AI.Catalog do
   alias BDS.AI.Model
   alias BDS.AI.ModelModality
   alias BDS.AI.OpenAICompatibleRuntime
+  alias BDS.MapUtils
   alias BDS.Persistence
   alias BDS.Repo
 
@@ -211,9 +212,7 @@ defmodule BDS.AI.Catalog do
     end
   end
 
-  defp atomize_map_keys(map) do
-    Enum.into(map, %{}, fn {key, value} -> {String.to_atom(key), value} end)
-  end
+  defp atomize_map_keys(map), do: MapUtils.safe_atomize_keys(map)
 
   defp persist_catalog(payload) do
     now = Persistence.now_ms()
@@ -313,7 +312,7 @@ defmodule BDS.AI.Catalog do
   defp parse_modality("audio"), do: :audio
   defp parse_modality("file"), do: :file
   defp parse_modality("tool"), do: :tool
-  defp parse_modality(other) when is_binary(other), do: String.to_atom(other)
+  defp parse_modality(other) when is_binary(other), do: MapUtils.safe_atomize_key(other)
 
   defp encode_nullable(nil), do: nil
   defp encode_nullable(value), do: Jason.encode!(value)

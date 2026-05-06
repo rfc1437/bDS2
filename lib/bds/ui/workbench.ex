@@ -267,7 +267,7 @@ defmodule BDS.UI.Workbench do
   defp token_usage(_state, _usage), do: nil
 
   defp normalize_type(type) when is_atom(type), do: type
-  defp normalize_type(type) when is_binary(type), do: String.to_atom(type)
+  defp normalize_type(type) when is_binary(type), do: String.to_existing_atom(type)
 
   defp tab_ref(tab), do: {tab.type, tab.id}
 

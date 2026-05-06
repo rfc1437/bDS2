@@ -55,20 +55,28 @@ defmodule BDS.BoundedAtomsTest do
     assert BoundedAtoms.shell_command("unknown") == nil
   end
 
-  test "codebase does not use String.to_existing_atom rescues" do
+  test "codebase does not use String.to_atom on dynamic data" do
     lib_dir = Path.expand("../../lib", __DIR__)
+
+    allowed_files = [
+      "bounded_atoms.ex",
+      "map_utils.ex"
+    ]
 
     offenders =
       lib_dir
       |> Path.join("**/*.ex")
       |> Path.wildcard()
-      |> Enum.reject(&String.ends_with?(&1, "bounded_atoms.ex"))
-      |> Enum.filter(fn path ->
-        path
-        |> File.read!()
-        |> String.contains?("String.to_existing_atom")
+      |> Enum.reject(fn path ->
+        Enum.any?(allowed_files, &String.ends_with?(path, &1))
       end)
+      |> Enum.filter(fn path ->
+        content = File.read!(path)
+        String.contains?(content, "String.to_atom(")
+      end)
+      |> Enum.map(&Path.relative_to(&1, lib_dir))
 
-    assert offenders == []
+    assert offenders == [],
+           "Files still using String.to_atom (use String.to_existing_atom or BDS.MapUtils.safe_atomize_key): #{Enum.join(offenders, ", ")}"
   end
 end

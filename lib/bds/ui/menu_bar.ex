@@ -121,7 +121,7 @@ defmodule BDS.UI.MenuBar do
 
   defp sidebar_view_command(command_id) do
     with "view_" <> suffix <- Atom.to_string(command_id),
-         view_id = String.to_atom(suffix),
+         view_id = String.to_existing_atom(suffix),
          %{} <- Registry.sidebar_view(view_id) do
       {:ok, view_id}
     else
@@ -131,7 +131,7 @@ defmodule BDS.UI.MenuBar do
 
   defp singleton_editor_command(command_id) do
     with "open_" <> suffix <- Atom.to_string(command_id),
-         route_id = String.to_atom(suffix),
+         route_id = String.to_existing_atom(suffix),
          %{singleton: true} <- Registry.editor_route(route_id) do
       {:ok, route_id}
     else

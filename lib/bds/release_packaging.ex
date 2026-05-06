@@ -69,7 +69,7 @@ defmodule BDS.ReleasePackaging do
   defp normalize_platform(:darwin), do: :macos
 
   defp normalize_platform(platform) when is_binary(platform),
-    do: platform |> String.downcase() |> String.to_atom()
+    do: platform |> String.downcase() |> String.to_existing_atom()
 
   defp archive_extension(:windows), do: ".zip"
   defp archive_extension(_platform), do: ".tar.gz"

@@ -22,6 +22,39 @@ defmodule BDS.ImportExecutionTest do
     %{project: project, temp_dir: temp_dir}
   end
 
+  test "execute_import does not create atoms from malicious report keys", %{
+    project: project
+  } do
+    unique_suffix = :erlang.unique_integer()
+    unknown_key_1 = "csm001_malicious_#{unique_suffix}"
+    unknown_key_2 = "csm001_nested_#{unique_suffix}"
+
+    malicious_report = %{
+      "items" => %{
+        "categories" => [],
+        "tags" => [],
+        "posts" => [],
+        "pages" => [],
+        "media" => []
+      },
+      "details" => %{
+        "posts" => [],
+        "pages" => [],
+        "media" => []
+      },
+      unknown_key_1 => "attack",
+      "extra" => %{unknown_key_2 => "nested_attack"}
+    }
+
+    assert {:ok, _result} =
+             ImportExecution.execute_import(project.id, malicious_report,
+               default_author: "Test Author"
+             )
+
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key_1) end
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key_2) end
+  end
+
   test "execute_import creates tags, posts, pages, and media from the analysis report", %{
     project: project,
     temp_dir: temp_dir
