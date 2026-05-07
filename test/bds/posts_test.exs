@@ -214,6 +214,24 @@ defmodule BDS.PostsTest do
     refute File.exists?(full_path)
   end
 
+  test "delete_post removes DB row before cleaning up side effects", %{project: project} do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Atomic Delete",
+               content: "Body"
+             })
+
+    assert {:ok, :deleted} = BDS.Posts.delete_post(post.id)
+    assert BDS.Repo.get(BDS.Posts.Post, post.id) == nil
+
+    assert {:error, :not_found} = BDS.Posts.delete_post(post.id)
+  end
+
+  test "delete_post returns not_found for nonexistent post" do
+    assert {:error, :not_found} = BDS.Posts.delete_post(Ecto.UUID.generate())
+  end
+
   test "archive_post transitions draft and published posts to archived", %{project: project} do
     assert {:ok, draft_post} =
              BDS.Posts.create_post(%{

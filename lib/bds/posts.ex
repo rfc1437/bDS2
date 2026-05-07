@@ -294,7 +294,7 @@ defmodule BDS.Posts do
           {:ok, Translation.t()} | {:error, :not_found | :unsupported_file | :conflict}
   defdelegate import_orphan_post_translation_file(project_id, relative_path), to: RebuildFromFiles
 
-  @spec delete_post(String.t()) :: {:ok, :deleted} | {:error, :not_found}
+  @spec delete_post(String.t()) :: {:ok, :deleted} | {:error, :not_found | Ecto.Changeset.t()}
   def delete_post(post_id) do
     case Repo.get(Post, post_id) do
       nil ->
@@ -309,13 +309,18 @@ defmodule BDS.Posts do
               select: pm.media_id
           )
 
-        delete_post_file(post)
-        :ok = Embeddings.remove_post(post.id)
-        :ok = PostLinks.delete_post_links(post.id)
-        Repo.delete!(post)
-        Enum.each(linked_media_ids, &sync_deleted_post_media_sidecar/1)
-        :ok = Search.delete_post(post.id)
-        {:ok, :deleted}
+        case Repo.delete(post) do
+          {:ok, deleted_post} ->
+            delete_post_file(deleted_post)
+            Embeddings.remove_post(deleted_post.id)
+            PostLinks.delete_post_links(deleted_post.id)
+            Enum.each(linked_media_ids, &sync_deleted_post_media_sidecar/1)
+            Search.delete_post(deleted_post.id)
+            {:ok, :deleted}
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
     end
   end
 

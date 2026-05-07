@@ -129,9 +129,14 @@ defmodule BDS.Scripts do
         {:error, :not_found}
 
       script ->
-        delete_file_if_present(script.project_id, script.file_path)
-        Repo.delete!(script)
-        {:ok, :deleted}
+        case Repo.delete(script) do
+          {:ok, deleted_script} ->
+            delete_file_if_present(deleted_script.project_id, deleted_script.file_path)
+            {:ok, :deleted}
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
     end
   end
 

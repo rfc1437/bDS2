@@ -187,8 +187,10 @@ defmodule BDS.Projects do
           [internal_dir, project_cache_dir(project)] |> Enum.filter(&is_binary/1) |> Enum.uniq()
 
         Repo.transaction(fn ->
-          Repo.delete!(project)
-          project
+          case Repo.delete(project) do
+            {:ok, deleted} -> deleted
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
         end)
         |> case do
           {:ok, deleted_project} ->

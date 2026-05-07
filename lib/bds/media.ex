@@ -168,22 +168,40 @@ defmodule BDS.Media do
             from translation in Translation, where: translation.translation_for == ^media.id
           )
 
-        delete_file_if_present(media.project_id, media.file_path)
-        delete_file_if_present(media.project_id, media.sidecar_path)
-        delete_thumbnail_files(media.project_id, media)
+        transaction_result =
+          Repo.transaction(fn ->
+            Enum.each(translations, fn translation ->
+              case Repo.delete(translation) do
+                {:ok, _} -> :ok
+                {:error, changeset} -> Repo.rollback(changeset)
+              end
+            end)
 
-        Enum.each(translations, fn translation ->
-          delete_file_if_present(
-            media.project_id,
-            translation_sidecar_path(media, translation.language)
-          )
+            case Repo.delete(media) do
+              {:ok, deleted} -> deleted
+              {:error, changeset} -> Repo.rollback(changeset)
+            end
+          end)
 
-          Repo.delete!(translation)
-        end)
+        case transaction_result do
+          {:ok, _deleted_media} ->
+            delete_file_if_present(media.project_id, media.file_path)
+            delete_file_if_present(media.project_id, media.sidecar_path)
+            delete_thumbnail_files(media.project_id, media)
 
-        Repo.delete!(media)
-        :ok = Search.delete_media(media.id)
-        {:ok, :deleted}
+            Enum.each(translations, fn translation ->
+              delete_file_if_present(
+                media.project_id,
+                translation_sidecar_path(media, translation.language)
+              )
+            end)
+
+            Search.delete_media(media.id)
+            {:ok, :deleted}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 
@@ -247,7 +265,7 @@ defmodule BDS.Media do
           translation ->
             project = Projects.get_project!(media.project_id)
 
-            case Repo.transaction(fn -> Repo.delete!(translation) end) do
+            case Repo.delete(translation) do
               {:ok, _deleted} ->
                 delete_file_if_present(
                   media.project_id,
@@ -258,8 +276,8 @@ defmodule BDS.Media do
                 :ok = write_sidecar(project, media)
                 {:ok, true}
 
-              {:error, reason} ->
-                {:error, reason}
+              {:error, changeset} ->
+                {:error, changeset}
             end
         end
     end

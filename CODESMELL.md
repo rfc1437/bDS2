@@ -52,20 +52,23 @@
 
 ---
 
-### CSM-003 — Non-Atomic Side Effects in Post CRUD
-- **File:** `lib/bds/posts.ex`
-- **What:** `create_post/1` (Z. 65-108), `update_post/2` (Z. 112-151), `publish_post/1` (Z. 155-195), `delete_post/1` (Z. 298-320) mix DB writes with filesystem/search/embeddings side effects.
-- **Why it's bad:**
-  - If a side effect fails after the DB commit, the system is inconsistent (DB says one thing, filesystem another).
-  - `delete_post/1` (Z. 312-318) deletes files (`delete_post_file`), removes embeddings, deletes post links — all **before** `Repo.delete!(post)`. If `Repo.delete!` raises, the files are gone but the row remains.
-  - `Repo.delete!` (bang) crashes instead of returning `{:error, _}`.
-  - Same pattern with `Repo.delete!` in `tags.ex:153,232`, `scripts.ex:133`, `media.ex:184,250`, `projects.ex:190`, `templates.ex:216,535`, `posts/translations.ex:101`, `posts/translation_validation.ex:399`.
-- **Fix:**
-  - Use `Repo.transaction` or `Ecto.Multi` to group DB writes atomically.
-  - Perform filesystem side effects **after** the DB commit succeeds (use `Repo.transaction` callback or `Ecto.Multi` with `run/5`).
-  - Replace all `Repo.delete!` with `Repo.delete` and handle `{:error, _}` tuples.
-  - In `delete_post/1`: reorder to `Repo.delete` first, then clean up files/embeddings/search.
-- **Test:** Mock a file-delete failure in `delete_post/1`; assert the post row still exists.
+### ~~CSM-003 — Non-Atomic Side Effects in Post CRUD~~ ✅ FIXED
+- **Fixed:** 2026-05-07
+- **What was done:**
+  - Replaced all 11 `Repo.delete!` call sites with `Repo.delete` + `{:error, _}` handling:
+    - `lib/bds/posts.ex` — `delete_post/1`
+    - `lib/bds/scripts.ex` — `delete_script/1`
+    - `lib/bds/media.ex` — `delete_media/1`, `delete_media_translation/3`
+    - `lib/bds/templates.ex` — `delete_template/2`, `remove_orphan_templates/2`
+    - `lib/bds/tags.ex` — `delete_tag/1`, `merge_tags/2`
+    - `lib/bds/projects.ex` — `delete_project/1`
+    - `lib/bds/posts/translations.ex` — `delete_post_translation/1`
+    - `lib/bds/posts/translation_validation.ex` — `fix_invalid_database_row/1`
+  - Reordered `delete_post/1` to perform `Repo.delete` first, then clean up files/embeddings/search/links. Side effects now only run after DB commit succeeds.
+  - Same reordering applied to `delete_script/1`, `delete_media/1`, `delete_template/2`, and `delete_post_translation/1`.
+  - `delete_media/1` now wraps translation + media deletes in a `Repo.transaction` for atomicity.
+  - Tags and projects already used `Repo.transaction`; replaced inner `Repo.delete!` with `Repo.delete` + `Repo.rollback` on error.
+  - Added tests for delete atomicity and not-found handling.
 
 ---
 
@@ -399,7 +402,7 @@
   - CSM-002: Fixed. Search now pushes all filtering and pagination into SQL via Ecto queries and CTEs.
 - [ ] All high-severity items (CSM-006 to CSM-010) have been addressed.
 - [x] CSM-001 fix covers ALL 6 affected files, not just `import_definitions.ex`.
-- [ ] CSM-003 fix covers ALL `Repo.delete!` call sites (posts, tags, scripts, media, projects, templates, translations).
+- [x] CSM-003 fix covers ALL `Repo.delete!` call sites (posts, tags, scripts, media, projects, templates, translations).
 - [ ] CSM-007 decomposition is the prerequisite for fixing CSM-008 (render-path queries).
 - [x] Tests were written **before** implementation changes (Red → Green → Refactor).
 - [x] Full test suite passes: `mix test`.

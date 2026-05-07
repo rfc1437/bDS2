@@ -150,7 +150,11 @@ defmodule BDS.Tags do
             update_post_tags(post, updated_tags)
           end)
 
-          Repo.delete!(tag)
+          case Repo.delete(tag) do
+            {:ok, _} -> :ok
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+
           Enum.map(affected_posts, & &1.id)
         end)
         |> case do
@@ -229,7 +233,12 @@ defmodule BDS.Tags do
             update_post_tags(post, updated_tags)
           end)
 
-          Enum.each(source_tags, &Repo.delete!/1)
+          Enum.each(source_tags, fn tag ->
+            case Repo.delete(tag) do
+              {:ok, _} -> :ok
+              {:error, changeset} -> Repo.rollback(changeset)
+            end
+          end)
           Enum.map(affected_posts, & &1.id)
         end)
         |> case do

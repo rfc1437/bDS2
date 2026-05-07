@@ -97,10 +97,15 @@ defmodule BDS.Posts.Translations do
         {:error, :not_found}
 
       %Translation{} = translation ->
-        :ok = FileSync.delete_translation_file(translation)
-        Repo.delete!(translation)
-        :ok = Search.sync_post(translation.translation_for)
-        {:ok, :deleted}
+        case Repo.delete(translation) do
+          {:ok, deleted_translation} ->
+            FileSync.delete_translation_file(deleted_translation)
+            Search.sync_post(deleted_translation.translation_for)
+            {:ok, :deleted}
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
     end
   end
 

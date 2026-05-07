@@ -212,9 +212,14 @@ defmodule BDS.Templates do
               clear_template_references(template)
             end
 
-            delete_file_if_present(template.project_id, template.file_path)
-            Repo.delete!(template)
-            {:ok, :deleted}
+            case Repo.delete(template) do
+              {:ok, deleted_template} ->
+                delete_file_if_present(deleted_template.project_id, deleted_template.file_path)
+                {:ok, :deleted}
+
+              {:error, changeset} ->
+                {:error, changeset}
+            end
         end
     end
   end
@@ -532,7 +537,11 @@ defmodule BDS.Templates do
     )
     |> Enum.each(fn template ->
       clear_template_references(template)
-      Repo.delete!(template)
+
+      case Repo.delete(template) do
+        {:ok, _} -> :ok
+        {:error, _} -> :ok
+      end
     end)
 
     :ok

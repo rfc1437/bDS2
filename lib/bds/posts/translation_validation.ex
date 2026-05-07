@@ -396,8 +396,10 @@ defmodule BDS.Posts.TranslationValidation do
        when is_binary(translation_id) do
     case Repo.get(Translation, translation_id) do
       %Translation{} = translation ->
-        Repo.delete!(translation)
-        {:deleted, translation_for}
+        case Repo.delete(translation) do
+          {:ok, _} -> {:deleted, translation_for}
+          {:error, _} -> :noop
+        end
 
       nil ->
         :noop
