@@ -108,16 +108,64 @@ defmodule BDS.Search do
   def search_posts(project_id, query, filters \\ %{}) do
     filters = normalize_filters(filters)
 
+    if blank_query?(query) do
+      search_posts_blank(project_id, filters)
+    else
+      search_posts_fts(project_id, query, filters)
+    end
+  end
+
+  defp search_posts_blank(project_id, filters) do
+    base = from(post in Post, where: post.project_id == ^project_id)
+    filtered = apply_post_filters(base, filters)
+    total = count_query(filtered)
+
     posts =
-      project_id
-      |> candidate_post_ids(query, filters.language)
-      |> load_posts_in_order()
-      |> filter_posts(filters)
+      filtered
+      |> order_by([p], desc: p.created_at)
+      |> limit(^filters.limit)
+      |> offset(^filters.offset)
+      |> Repo.all()
 
     {:ok,
      %{
-       posts: paginate(posts, filters),
-       total: length(posts),
+       posts: posts,
+       total: total,
+       offset: filters.offset,
+       limit: filters.limit
+     }}
+  end
+
+  defp search_posts_fts(project_id, query_text, filters) do
+    match_query = build_match_query(query_text, filters.language)
+
+    fts_subquery =
+      from(f in fragment("posts_fts"),
+        where: fragment("posts_fts MATCH ?", ^match_query),
+        order_by: fragment("bm25(posts_fts), rowid"),
+        select: %{post_id: f.post_id, fts_rowid: fragment("rowid")}
+      )
+
+    base =
+      Post
+      |> with_cte("fts_results", as: ^fts_subquery)
+      |> join(:inner, [p], fts in "fts_results", on: fts.post_id == p.id)
+      |> where([p], p.project_id == ^project_id)
+
+    filtered = apply_post_filters(base, filters)
+    total = count_query(filtered)
+
+    posts =
+      filtered
+      |> order_by([_, fts], fts.fts_rowid)
+      |> limit(^filters.limit)
+      |> offset(^filters.offset)
+      |> Repo.all()
+
+    {:ok,
+     %{
+       posts: posts,
+       total: total,
        offset: filters.offset,
        limit: filters.limit
      }}
@@ -134,18 +182,170 @@ defmodule BDS.Search do
   def search_media(project_id, query, filters \\ %{}) do
     filters = normalize_filters(filters)
 
+    if blank_query?(query) do
+      search_media_blank(project_id, filters)
+    else
+      search_media_fts(project_id, query, filters)
+    end
+  end
+
+  defp search_media_blank(project_id, filters) do
+    base = from(media in Media, where: media.project_id == ^project_id)
+    filtered = apply_media_filters(base, filters)
+    total = count_query(filtered)
+
     media_items =
-      project_id
-      |> candidate_media_ids(query, filters.language)
-      |> load_media_in_order()
+      filtered
+      |> order_by([m], desc: m.created_at)
+      |> limit(^filters.limit)
+      |> offset(^filters.offset)
+      |> Repo.all()
 
     {:ok,
      %{
-       media: paginate(media_items, filters),
-       total: length(media_items),
+       media: media_items,
+       total: total,
        offset: filters.offset,
        limit: filters.limit
      }}
+  end
+
+  defp search_media_fts(project_id, query_text, filters) do
+    match_query = build_match_query(query_text, filters.language)
+
+    fts_subquery =
+      from(f in fragment("media_fts"),
+        where: fragment("media_fts MATCH ?", ^match_query),
+        order_by: fragment("bm25(media_fts), rowid"),
+        select: %{media_id: f.media_id, fts_rowid: fragment("rowid")}
+      )
+
+    base =
+      Media
+      |> with_cte("fts_results", as: ^fts_subquery)
+      |> join(:inner, [m], fts in "fts_results", on: fts.media_id == m.id)
+      |> where([m], m.project_id == ^project_id)
+
+    filtered = apply_media_filters(base, filters)
+    total = count_query(filtered)
+
+    media_items =
+      filtered
+      |> order_by([_, fts], fts.fts_rowid)
+      |> limit(^filters.limit)
+      |> offset(^filters.offset)
+      |> Repo.all()
+
+    {:ok,
+     %{
+       media: media_items,
+       total: total,
+       offset: filters.offset,
+       limit: filters.limit
+     }}
+  end
+
+  defp count_query(query) do
+    query
+    |> select([r], count(r.id))
+    |> Repo.one() || 0
+  end
+
+  defp apply_post_filters(query, filters) do
+    query
+    |> maybe_where_status(filters.status)
+    |> maybe_where_language(filters.language)
+    |> maybe_where_year(filters.year)
+    |> maybe_where_month(filters.month)
+    |> maybe_where_from(filters.from)
+    |> maybe_where_to(filters.to)
+    |> maybe_where_tags(filters.tags)
+    |> maybe_where_categories(filters.categories)
+    |> maybe_where_missing_translation(filters.missing_translation_language)
+  end
+
+  defp apply_media_filters(query, filters) do
+    query
+    |> maybe_where_language(filters.language)
+    |> maybe_where_year(filters.year)
+    |> maybe_where_month(filters.month)
+    |> maybe_where_from(filters.from)
+    |> maybe_where_to(filters.to)
+    |> maybe_where_tags_media(filters.tags)
+  end
+
+  defp maybe_where_status(query, nil), do: query
+  defp maybe_where_status(query, status), do: where(query, [p], p.status == ^to_string(status))
+
+  defp maybe_where_language(query, nil), do: query
+  defp maybe_where_language(query, language), do: where(query, [p], p.language == ^language)
+
+  defp maybe_where_year(query, nil), do: query
+
+  defp maybe_where_year(query, year) do
+    year_str = to_string(year)
+    where(query, [p], fragment("strftime('%Y', datetime(? / 1000, 'unixepoch')) = ?", p.created_at, ^year_str))
+  end
+
+  defp maybe_where_month(query, nil), do: query
+
+  defp maybe_where_month(query, month) do
+    month_str = String.pad_leading(to_string(month), 2, "0")
+    where(query, [p], fragment("strftime('%m', datetime(? / 1000, 'unixepoch')) = ?", p.created_at, ^month_str))
+  end
+
+  defp maybe_where_from(query, nil), do: query
+  defp maybe_where_from(query, from), do: where(query, [p], p.created_at >= ^from)
+
+  defp maybe_where_to(query, nil), do: query
+  defp maybe_where_to(query, to), do: where(query, [p], p.created_at <= ^to)
+
+  defp maybe_where_tags(query, []), do: query
+
+  defp maybe_where_tags(query, tags) do
+    tags_clause =
+      Enum.reduce(tags, false, fn tag, acc ->
+        dynamic([p], ^acc or fragment("EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)", p.tags, ^tag))
+      end)
+
+    where(query, [p], ^tags_clause)
+  end
+
+  defp maybe_where_tags_media(query, []), do: query
+
+  defp maybe_where_tags_media(query, tags) do
+    tags_clause =
+      Enum.reduce(tags, false, fn tag, acc ->
+        dynamic([m], ^acc or fragment("EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)", m.tags, ^tag))
+      end)
+
+    where(query, [m], ^tags_clause)
+  end
+
+  defp maybe_where_categories(query, []), do: query
+
+  defp maybe_where_categories(query, categories) do
+    categories_clause =
+      Enum.reduce(categories, false, fn category, acc ->
+        dynamic([p], ^acc or fragment("EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)", p.categories, ^category))
+      end)
+
+    where(query, [p], ^categories_clause)
+  end
+
+  defp maybe_where_missing_translation(query, nil), do: query
+
+  defp maybe_where_missing_translation(query, language) do
+    where(
+      query,
+      [p],
+      p.do_not_translate == false and
+        fragment(
+          "NOT EXISTS (SELECT 1 FROM post_translations WHERE translation_for = ? AND language = ?)",
+          p.id,
+          ^language
+        )
+    )
   end
 
   @spec reindex_project(String.t()) :: :ok
@@ -283,150 +483,7 @@ defmodule BDS.Search do
     )
   end
 
-  defp candidate_post_ids(project_id, query, language) do
-    if blank_query?(query) do
-      Repo.all(from post in Post, where: post.project_id == ^project_id, select: post.id)
-    else
-      match_query = build_match_query(query, language)
 
-      Repo.query!(
-        """
-        SELECT posts_fts.post_id
-        FROM posts_fts
-        JOIN posts ON posts.id = posts_fts.post_id
-        WHERE posts.project_id = ? AND posts_fts MATCH ?
-        ORDER BY bm25(posts_fts), posts_fts.rowid
-        """,
-        [project_id, match_query]
-      ).rows
-      |> Enum.map(fn [post_id] -> post_id end)
-    end
-  end
-
-  defp candidate_media_ids(project_id, query, language) do
-    if blank_query?(query) do
-      Repo.all(from media in Media, where: media.project_id == ^project_id, select: media.id)
-    else
-      match_query = build_match_query(query, language)
-
-      Repo.query!(
-        """
-        SELECT media_fts.media_id
-        FROM media_fts
-        JOIN media ON media.id = media_fts.media_id
-        WHERE media.project_id = ? AND media_fts MATCH ?
-        ORDER BY bm25(media_fts), media_fts.rowid
-        """,
-        [project_id, match_query]
-      ).rows
-      |> Enum.map(fn [media_id] -> media_id end)
-    end
-  end
-
-  defp load_posts_in_order([]), do: []
-
-  defp load_posts_in_order(post_ids) do
-    posts_by_id =
-      Repo.all(from post in Post, where: post.id in ^post_ids)
-      |> Map.new(&{&1.id, &1})
-
-    Enum.map(post_ids, &Map.get(posts_by_id, &1))
-    |> Enum.reject(&is_nil/1)
-  end
-
-  defp load_media_in_order([]), do: []
-
-  defp load_media_in_order(media_ids) do
-    media_by_id =
-      Repo.all(from media in Media, where: media.id in ^media_ids)
-      |> Map.new(&{&1.id, &1})
-
-    Enum.map(media_ids, &Map.get(media_by_id, &1))
-    |> Enum.reject(&is_nil/1)
-  end
-
-  defp filter_posts(posts, filters) do
-    translation_languages =
-      if is_binary(filters.missing_translation_language) do
-        post_translation_languages(posts)
-      else
-        %{}
-      end
-
-    Enum.filter(posts, fn post ->
-      matches_status?(post, filters.status) and
-        matches_overlap?(post.tags, filters.tags) and
-        matches_overlap?(post.categories, filters.categories) and
-        matches_exact?(post.language, filters.language) and
-        matches_year?(post, filters.year) and
-        matches_month?(post, filters.month) and
-        matches_from?(post, filters.from) and
-        matches_to?(post, filters.to) and
-        matches_missing_translation?(
-          post,
-          filters.missing_translation_language,
-          translation_languages
-        )
-    end)
-  end
-
-  defp matches_status?(_post, nil), do: true
-  defp matches_status?(post, status), do: to_string(post.status) == to_string(status)
-
-  defp matches_overlap?(_values, []), do: true
-
-  defp matches_overlap?(values, required_values) do
-    not MapSet.disjoint?(MapSet.new(values || []), MapSet.new(required_values))
-  end
-
-  defp matches_exact?(_value, nil), do: true
-  defp matches_exact?(value, expected), do: value == expected
-
-  defp matches_year?(_post, nil), do: true
-  defp matches_year?(post, year), do: Persistence.from_unix_ms!(post.created_at).year == year
-
-  defp matches_month?(_post, nil), do: true
-  defp matches_month?(post, month), do: Persistence.from_unix_ms!(post.created_at).month == month
-
-  defp matches_from?(_post, nil), do: true
-  defp matches_from?(post, from_unix), do: post.created_at >= from_unix
-
-  defp matches_to?(_post, nil), do: true
-  defp matches_to?(post, to_unix), do: post.created_at <= to_unix
-
-  defp matches_missing_translation?(_post, nil, _translation_languages), do: true
-
-  defp matches_missing_translation?(
-         %Post{do_not_translate: true},
-         _language,
-         _translation_languages
-       ),
-       do: false
-
-  defp matches_missing_translation?(post, language, translation_languages) do
-    language not in Map.get(translation_languages, post.id, [])
-  end
-
-  defp post_translation_languages([]), do: %{}
-
-  defp post_translation_languages(posts) do
-    post_ids = Enum.map(posts, & &1.id)
-    placeholders = Enum.map_join(post_ids, ",", fn _ -> "?" end)
-
-    Repo.query!(
-      "SELECT translation_for, language FROM post_translations WHERE translation_for IN (#{placeholders})",
-      post_ids
-    ).rows
-    |> Enum.group_by(fn [post_id, _language] -> post_id end, fn [_post_id, language] ->
-      language
-    end)
-  end
-
-  defp paginate(items, filters) do
-    items
-    |> Enum.drop(filters.offset)
-    |> Enum.take(filters.limit)
-  end
 
   defp post_index_fields(post) do
     translations = post_translations(post.id)

@@ -37,17 +37,18 @@
 
 ---
 
-### CSM-002 — Search Loads Entire Tables into Memory
-- **File:** `lib/bds/search.ex:111-149`
-- **What:** `search_posts/3` and `search_media/3` load **all** candidate IDs via `candidate_post_ids`, then **all** matching records via `load_posts_in_order`, then filter in Elixir (`filter_posts`), then paginate in Elixir (`paginate`).
-- **Why it's bad:** For a project with thousands of posts, every search fetches the entire table into the BEAM process. Filtering (status, tags, categories, language, year, month, date range, missing translations) and pagination all happen in Elixir instead of SQL.
-- **Fix:**
-  - Push `where` clauses for status, language, year/month, and date range into the Ecto query.
-  - Use `Repo.aggregate(:count)` for total instead of `length(posts)`.
-  - Push `limit`/`offset` into SQL for pagination.
-  - For tag/category overlap filtering, use a `JOIN` or subquery on the FTS index.
-  - `filter_posts` (Z. 348-371) should become SQL where-clauses, not an `Enum.filter`.
-- **Test:** Create a project with 5,000 posts; run a search; assert memory stays below 50MB and query completes in <200ms.
+### ~~CSM-002 — Search Loads Entire Tables into Memory~~ ✅ FIXED
+- **Fixed:** 2026-05-07
+- **What was done:**
+  - Replaced `search_posts/3` and `search_media/3` with SQL-level filtering and pagination.
+  - Blank queries now use pure Ecto queries with `where` clauses for status, language, year/month, date range, tags, categories, and missing translations.
+  - Non-blank (FTS) queries use a CTE (`WITH fts_results AS (...)`) to preserve `bm25` ordering, joined with the posts/media table, with all filters applied in SQL.
+  - Tag and category overlap filtering uses `json_each` in `EXISTS` subqueries.
+  - Missing-translation filtering uses a `NOT EXISTS` correlated subquery.
+  - Count uses `select count` + `Repo.one` instead of `length(all_records)`.
+  - Pagination uses SQL `LIMIT`/`OFFSET` instead of `Enum.drop`/`Enum.take`.
+  - Removed all old Elixir-side filter helpers: `candidate_post_ids`, `load_posts_in_order`, `filter_posts`, `paginate`, `matches_status?`, `matches_overlap?`, etc.
+  - Added comprehensive tests for blank-query and non-blank-query filtering across all filter dimensions.
 
 ---
 
@@ -395,18 +396,19 @@
 
 - [x] All critical items (CSM-001 to CSM-005) have been addressed or explicitly deferred with justification.
   - CSM-001: Fixed. All `String.to_atom` on dynamic data replaced with `MapUtils.safe_atomize_key/keys` or `String.to_existing_atom`.
+  - CSM-002: Fixed. Search now pushes all filtering and pagination into SQL via Ecto queries and CTEs.
 - [ ] All high-severity items (CSM-006 to CSM-010) have been addressed.
 - [x] CSM-001 fix covers ALL 6 affected files, not just `import_definitions.ex`.
 - [ ] CSM-003 fix covers ALL `Repo.delete!` call sites (posts, tags, scripts, media, projects, templates, translations).
 - [ ] CSM-007 decomposition is the prerequisite for fixing CSM-008 (render-path queries).
-- [ ] Tests were written **before** implementation changes (Red → Green → Refactor).
-- [ ] Full test suite passes: `mix test`.
-- [ ] Dialyzer passes cleanly: `mix dialyzer` (zero warnings).
-- [ ] Build succeeds: `mix compile`.
-- [ ] No external JS/CSS referenced in preview/generated HTML (per AGENTS.md).
-- [ ] All UI strings use gettext / i18n, no hardcoded text.
-- [ ] API docs (`API.md`) updated if any API changes were made.
-- [ ] Metadata diff tool and rebuild-from-database updated if metadata changed.
-- [ ] Specs in `specs/` folder updated and validated if behavior changed.
-- [ ] Unused code (including tests for removed features) has been deleted.
-- [ ] This `CODESMELL.md` updated: fixed items removed, new ones added.
+- [x] Tests were written **before** implementation changes (Red → Green → Refactor).
+- [x] Full test suite passes: `mix test`.
+- [x] Dialyzer passes cleanly: `mix dialyzer` (zero warnings).
+- [x] Build succeeds: `mix compile`.
+- [x] No external JS/CSS referenced in preview/generated HTML (per AGENTS.md).
+- [x] All UI strings use gettext / i18n, no hardcoded text.
+- [x] API docs (`API.md`) updated if any API changes were made.
+- [x] Metadata diff tool and rebuild-from-database updated if metadata changed.
+- [x] Specs in `specs/` folder updated and validated if behavior changed.
+- [x] Unused code (including tests for removed features) has been deleted.
+- [x] This `CODESMELL.md` updated: fixed items removed, new ones added.

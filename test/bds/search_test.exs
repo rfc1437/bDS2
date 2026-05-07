@@ -271,6 +271,270 @@ defmodule BDS.SearchTest do
     assert Enum.map(french_results.posts, & &1.id) == [french_post.id]
   end
 
+  test "search_posts applies blank query filters in SQL", %{project: project} do
+    assert {:ok, post1} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Post One",
+               content: "content one",
+               tags: ["alpha", "beta"],
+               categories: ["cat1"],
+               language: "en"
+             })
+
+    last_year = System.system_time(:millisecond) - 365 * 24 * 60 * 60 * 1000
+
+    assert {:ok, post1} =
+             BDS.Repo.update(Ecto.Changeset.change(post1, created_at: last_year))
+
+    assert {:ok, post2} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Post Two",
+               content: "content two",
+               tags: ["gamma"],
+               categories: ["cat2"],
+               language: "de",
+               status: :published
+             })
+
+    assert {:ok, post2} = BDS.Posts.publish_post(post2.id)
+
+    assert {:ok, post3} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Post Three",
+               content: "content three",
+               tags: ["alpha", "gamma"],
+               categories: ["cat1", "cat2"],
+               language: "en",
+               status: :archived
+             })
+
+    assert {:ok, post3} = BDS.Posts.archive_post(post3.id)
+
+    now = System.system_time(:millisecond)
+
+    :ok = BDS.Search.reindex_project(project.id)
+
+    # Blank query with status filter
+    assert {:ok, status_results} =
+             BDS.Search.search_posts(project.id, "", %{status: :published})
+
+    assert status_results.total == 1
+    assert Enum.map(status_results.posts, & &1.id) == [post2.id]
+
+    # Blank query with language filter
+    assert {:ok, lang_results} = BDS.Search.search_posts(project.id, "", %{language: "de"})
+    assert lang_results.total == 1
+    assert Enum.map(lang_results.posts, & &1.id) == [post2.id]
+
+    # Blank query with tags filter (overlap)
+    assert {:ok, tag_results} =
+             BDS.Search.search_posts(project.id, "", %{tags: ["alpha"]})
+
+    assert tag_results.total == 2
+
+    assert Enum.sort(Enum.map(tag_results.posts, & &1.id)) ==
+             Enum.sort([post1.id, post3.id])
+
+    # Blank query with categories filter (overlap)
+    assert {:ok, cat_results} =
+             BDS.Search.search_posts(project.id, "", %{categories: ["cat2"]})
+
+    assert cat_results.total == 2
+
+    assert Enum.sort(Enum.map(cat_results.posts, & &1.id)) ==
+             Enum.sort([post2.id, post3.id])
+
+    # Blank query with year filter
+    current_year = DateTime.from_unix!(div(now, 1000), :second).year
+    assert {:ok, year_results} = BDS.Search.search_posts(project.id, "", %{year: current_year})
+    assert year_results.total == 2
+
+    # Blank query with month filter
+    current_month = DateTime.from_unix!(div(now, 1000), :second).month
+
+    assert {:ok, month_results} =
+             BDS.Search.search_posts(project.id, "", %{month: current_month})
+
+    assert month_results.total >= 2
+
+    # Blank query with date range filter
+    assert {:ok, range_results} =
+             BDS.Search.search_posts(project.id, "", %{
+               from: div(last_year, 1000) * 1000,
+               to: now
+             })
+
+    assert range_results.total == 3
+
+    # Blank query with pagination
+    assert {:ok, page_results} =
+             BDS.Search.search_posts(project.id, "", %{limit: 1, offset: 0})
+
+    assert page_results.total == 3
+    assert length(page_results.posts) == 1
+  end
+
+  test "search_posts with non-blank query applies filters in SQL", %{project: project} do
+    now = System.system_time(:millisecond)
+
+    assert {:ok, _post1} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Nebula Alpha",
+               content: "galaxy content",
+               tags: ["space"],
+               categories: ["astro"],
+               language: "en",
+               status: :draft,
+               created_at: now
+             })
+
+    assert {:ok, post2} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Nebula Beta",
+               content: "galaxy content",
+               tags: ["space"],
+               categories: ["astro"],
+               language: "de",
+               status: :published,
+               created_at: now
+             })
+
+    assert {:ok, post2} = BDS.Posts.publish_post(post2.id)
+
+    :ok = BDS.Search.reindex_project(project.id)
+
+    # Query + status filter
+    assert {:ok, results} =
+             BDS.Search.search_posts(project.id, "nebula", %{status: :published})
+
+    assert results.total == 1
+    assert Enum.map(results.posts, & &1.id) == [post2.id]
+
+    # Query + language filter
+    assert {:ok, results} = BDS.Search.search_posts(project.id, "nebula", %{language: "de"})
+    assert results.total == 1
+    assert Enum.map(results.posts, & &1.id) == [post2.id]
+
+    # Query + tags filter
+    assert {:ok, results} =
+             BDS.Search.search_posts(project.id, "nebula", %{tags: ["space"]})
+
+    assert results.total == 2
+
+    # Query + pagination
+    assert {:ok, results} =
+             BDS.Search.search_posts(project.id, "nebula", %{limit: 1, offset: 0})
+
+    assert results.total == 2
+    assert length(results.posts) == 1
+  end
+
+  test "search_posts missing_translation filter with blank query", %{project: project} do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Translation Test",
+               content: "test content",
+               language: "en",
+               do_not_translate: false
+             })
+
+    now = System.system_time(:second)
+
+    Repo.query!(
+      """
+      INSERT INTO post_translations (
+        id, project_id, translation_for, language, title, excerpt, content, status,
+        created_at, updated_at, published_at, file_path, checksum
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      """,
+      [
+        Ecto.UUID.generate(),
+        project.id,
+        post.id,
+        "fr",
+        "Bonjour",
+        "Resume",
+        "contenu",
+        "draft",
+        now,
+        now,
+        nil,
+        "",
+        nil
+      ]
+    )
+
+    :ok = BDS.Search.reindex_project(project.id)
+
+    # Post has French translation, missing German -> should match
+    assert {:ok, results} =
+             BDS.Search.search_posts(project.id, "", %{
+               missing_translation_language: "de"
+             })
+
+    assert results.total == 1
+    assert Enum.map(results.posts, & &1.id) == [post.id]
+
+    # Post has French translation, not missing French -> should not match
+    assert {:ok, results} =
+             BDS.Search.search_posts(project.id, "", %{
+               missing_translation_language: "fr"
+             })
+
+    assert results.total == 0
+  end
+
+  test "search_media applies blank query filters in SQL", %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "media1.txt")
+    File.write!(source_path, "media1")
+
+    assert {:ok, media1} =
+             BDS.Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Media Alpha",
+               alt: "alt alpha",
+               tags: ["space"],
+               language: "en"
+             })
+
+    source_path2 = Path.join(temp_dir, "media2.txt")
+    File.write!(source_path2, "media2")
+
+    assert {:ok, media2} =
+             BDS.Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path2,
+               title: "Media Beta",
+               alt: "alt beta",
+               tags: ["nature"],
+               language: "de"
+             })
+
+    :ok = BDS.Search.reindex_project(project.id)
+
+    # Blank query with tags filter
+    assert {:ok, results} = BDS.Search.search_media(project.id, "", %{tags: ["space"]})
+    assert results.total == 1
+    assert Enum.map(results.media, & &1.id) == [media1.id]
+
+    # Blank query with language filter
+    assert {:ok, results} = BDS.Search.search_media(project.id, "", %{language: "de"})
+    assert results.total == 1
+    assert Enum.map(results.media, & &1.id) == [media2.id]
+
+    # Blank query with pagination
+    assert {:ok, results} = BDS.Search.search_media(project.id, "", %{limit: 1, offset: 0})
+    assert results.total == 2
+    assert length(results.media) == 1
+  end
+
   test "lists supported stemmer languages using normalized ISO codes" do
     languages = BDS.Search.list_stemmer_languages()
 
