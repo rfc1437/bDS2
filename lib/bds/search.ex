@@ -364,6 +364,10 @@ defmodule BDS.Search do
     )
 
     posts = Repo.all(from post in Post, where: post.project_id == ^project_id)
+
+    post_ids = Enum.map(posts, & &1.id)
+    translations_by_post_id = preload_post_translations(post_ids)
+
     on_progress = progress_callback(opts)
     total_posts = length(posts)
 
@@ -372,7 +376,8 @@ defmodule BDS.Search do
     posts
     |> Enum.with_index(1)
     |> Enum.each(fn {post, index} ->
-      insert_post_index(post)
+      translations = Map.get(translations_by_post_id, post.id, [])
+      insert_post_index(post, translations)
       :ok = report_reindex_progress(on_progress, index, total_posts, "posts")
     end)
 
@@ -387,6 +392,10 @@ defmodule BDS.Search do
     )
 
     media_items = Repo.all(from media in Media, where: media.project_id == ^project_id)
+
+    media_ids = Enum.map(media_items, & &1.id)
+    translations_by_media_id = preload_media_translations(media_ids)
+
     on_progress = progress_callback(opts)
     total_media = length(media_items)
 
@@ -395,7 +404,8 @@ defmodule BDS.Search do
     media_items
     |> Enum.with_index(1)
     |> Enum.each(fn {media, index} ->
-      insert_media_index(media)
+      translations = Map.get(translations_by_media_id, media.id, [])
+      insert_media_index(media, translations)
       :ok = report_reindex_progress(on_progress, index, total_media, "media items")
     end)
 
@@ -465,8 +475,9 @@ defmodule BDS.Search do
     )
   end
 
-  defp insert_post_index(%Post{} = post) do
-    {title, excerpt, content, tags, categories} = post_index_fields(post)
+  defp insert_post_index(%Post{} = post, translations \\ nil) do
+    translations = translations || post_translations(post.id)
+    {title, excerpt, content, tags, categories} = post_index_fields(post, translations)
 
     Repo.query!(
       "INSERT INTO posts_fts (post_id, title, excerpt, content, tags, categories) VALUES (?, ?, ?, ?, ?, ?)",
@@ -474,8 +485,9 @@ defmodule BDS.Search do
     )
   end
 
-  defp insert_media_index(%Media{} = media) do
-    {title, alt, caption, original_name, tags} = media_index_fields(media)
+  defp insert_media_index(%Media{} = media, translations \\ nil) do
+    translations = translations || media_translations(media.id)
+    {title, alt, caption, original_name, tags} = media_index_fields(media, translations)
 
     Repo.query!(
       "INSERT INTO media_fts (media_id, title, alt, caption, original_name, tags) VALUES (?, ?, ?, ?, ?, ?)",
@@ -485,8 +497,7 @@ defmodule BDS.Search do
 
 
 
-  defp post_index_fields(post) do
-    translations = post_translations(post.id)
+  defp post_index_fields(post, translations) do
     post_language = normalize_language(post.language)
 
     title =
@@ -519,12 +530,7 @@ defmodule BDS.Search do
     {title, excerpt, content, tags, categories}
   end
 
-  defp media_index_fields(media) do
-    translations =
-      Repo.all(
-        from translation in MediaTranslation, where: translation.translation_for == ^media.id
-      )
-
+  defp media_index_fields(media, translations) do
     media_language = normalize_language(media.language)
 
     title =
@@ -548,6 +554,31 @@ defmodule BDS.Search do
     {title, alt, caption, original_name, tags}
   end
 
+  defp preload_post_translations(post_ids) when is_list(post_ids) do
+    if Enum.empty?(post_ids) do
+      %{}
+    else
+      placeholders = Enum.map_join(post_ids, ", ", fn _ -> "?" end)
+
+      Repo.query!(
+        "SELECT translation_for, language, title, excerpt, content, status, file_path FROM post_translations WHERE translation_for IN (#{placeholders})",
+        post_ids
+      ).rows
+      |> Enum.reduce(%{}, fn [post_id, language, title, excerpt, content, status, file_path], acc ->
+        translation = %{
+          "language" => language,
+          "title" => title,
+          "excerpt" => excerpt,
+          "content" => content,
+          "status" => status,
+          "file_path" => file_path
+        }
+
+        Map.update(acc, post_id, [translation], &(&1 ++ [translation]))
+      end)
+    end
+  end
+
   defp post_translations(post_id) do
     Repo.query!(
       "SELECT language, title, excerpt, content, status, file_path FROM post_translations WHERE translation_for = ?",
@@ -563,6 +594,27 @@ defmodule BDS.Search do
         "file_path" => file_path
       }
     end)
+  end
+
+  defp preload_media_translations(media_ids) when is_list(media_ids) do
+    if Enum.empty?(media_ids) do
+      %{}
+    else
+      Repo.all(
+        from translation in MediaTranslation,
+        where: translation.translation_for in ^media_ids,
+        select: {translation.translation_for, translation}
+      )
+      |> Enum.reduce(%{}, fn {media_id, translation}, acc ->
+        Map.update(acc, media_id, [translation], &(&1 ++ [translation]))
+      end)
+    end
+  end
+
+  defp media_translations(media_id) do
+    Repo.all(
+      from translation in MediaTranslation, where: translation.translation_for == ^media_id
+    )
   end
 
   defp post_content(%Post{content: content}) when is_binary(content), do: content

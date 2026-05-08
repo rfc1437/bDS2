@@ -24,9 +24,20 @@ defmodule BDS.Rendering.ListArchive do
 
     canonical_media_paths = LinksAndLanguages.canonical_media_path_by_source_path(project_id)
 
+    input_posts = MapUtils.attr(assigns, :posts, [])
+
+    post_ids =
+      input_posts
+      |> Enum.map(&MapUtils.attr(&1, :id))
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    post_records = PostRendering.load_post_records_batch(post_ids)
+
     posts =
       normalize_list_posts(
-        MapUtils.attr(assigns, :posts, []),
+        input_posts,
+        post_records,
         canonical_post_paths,
         canonical_media_paths,
         language,
@@ -172,13 +183,15 @@ defmodule BDS.Rendering.ListArchive do
 
   defp normalize_list_posts(
          posts,
+         post_records,
          canonical_post_paths,
          canonical_media_paths,
          language,
          template_context
        ) do
     Enum.map(posts, fn post ->
-      post_record = PostRendering.load_post_record(post)
+      post_id = MapUtils.attr(post, :id)
+      post_record = Map.get(post_records, post_id)
 
       raw_content =
         Map.get(
@@ -332,4 +345,5 @@ defmodule BDS.Rendering.ListArchive do
     do: RenderMetadata.calendar_initial_month(post)
 
   defp calendar_initial_month_from_posts([]), do: nil
+
 end

@@ -1,6 +1,8 @@
 defmodule BDS.Rendering.PostRendering do
   @moduledoc false
 
+  import Ecto.Query
+
   alias BDS.Rendering.Filters
   alias BDS.Rendering.Labels
   alias BDS.Rendering.LinksAndLanguages
@@ -101,11 +103,42 @@ defmodule BDS.Rendering.PostRendering do
     }
   end
 
+  @spec load_post_record(map()) :: Post.t() | Translation.t() | nil
   def load_post_record(assigns) do
     case MapUtils.attr(assigns, :id) do
       nil -> nil
       post_id -> Repo.get(Post, post_id) || Repo.get(Translation, post_id)
     end
+  end
+
+  @spec load_post_records_batch([String.t()]) :: %{String.t() => Post.t() | Translation.t() | nil}
+  def load_post_records_batch([]), do: %{}
+
+  def load_post_records_batch(post_ids) when is_list(post_ids) do
+    posts =
+      Repo.all(from p in Post, where: p.id in ^post_ids)
+      |> Enum.map(&{&1.id, &1})
+      |> Map.new()
+
+    missing_ids = Enum.reject(post_ids, &Map.has_key?(posts, &1))
+
+    translations =
+      if Enum.empty?(missing_ids) do
+        %{}
+      else
+        Repo.all(from t in Translation, where: t.id in ^missing_ids)
+        |> Enum.map(&{&1.id, &1})
+        |> Map.new()
+      end
+
+    missing_after_translations = Enum.reject(missing_ids, &Map.has_key?(translations, &1))
+
+    nil_entries =
+      missing_after_translations
+      |> Enum.map(&{&1, nil})
+      |> Map.new()
+
+    Map.merge(posts, Map.merge(translations, nil_entries))
   end
 
   defp canonical_post_record(%Translation{translation_for: post_id}), do: Repo.get(Post, post_id)
