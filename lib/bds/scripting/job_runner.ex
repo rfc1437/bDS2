@@ -1,7 +1,7 @@
 defmodule BDS.Scripting.JobRunner do
   @moduledoc false
 
-  use GenServer
+  use GenServer, restart: :temporary
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts)
@@ -27,8 +27,13 @@ defmodule BDS.Scripting.JobRunner do
     }
 
     Process.flag(:trap_exit, true)
+    {:ok, state, {:continue, :attach_and_start}}
+  end
+
+  @impl true
+  def handle_continue(:attach_and_start, state) do
     :ok = BDS.Scripting.JobStore.attach_runner(state.job_id, self())
-    {:ok, state, {:continue, :start_job}}
+    {:noreply, state, {:continue, :start_job}}
   end
 
   @impl true
@@ -68,7 +73,6 @@ defmodule BDS.Scripting.JobRunner do
         finished_at: DateTime.utc_now()
       })
 
-    :ok = BDS.Scripting.JobStore.detach_runner(state.job_id)
     {:stop, :normal, :ok, %{state | cancelled?: true}}
   end
 
@@ -78,6 +82,7 @@ defmodule BDS.Scripting.JobRunner do
     {:noreply, state}
   end
 
+  @impl true
   def handle_info({ref, result}, %{task_ref: ref} = state) do
     Process.demonitor(ref, [:flush])
 
@@ -92,12 +97,12 @@ defmodule BDS.Scripting.JobRunner do
         end
 
       :ok = BDS.Scripting.JobStore.update_job(state.job_id, attrs)
-      :ok = BDS.Scripting.JobStore.detach_runner(state.job_id)
     end
 
     {:stop, :normal, %{state | completed?: true}}
   end
 
+  @impl true
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{task_ref: ref} = state) do
     cond do
       state.completed? or state.cancelled? ->
@@ -114,8 +119,21 @@ defmodule BDS.Scripting.JobRunner do
             finished_at: DateTime.utc_now()
           })
 
-        :ok = BDS.Scripting.JobStore.detach_runner(state.job_id)
         {:stop, :normal, state}
+    end
+  end
+
+  @impl true
+  def handle_info({:EXIT, _pid, _reason}, state) do
+    {:stop, :normal, state}
+  end
+
+  @impl true
+  def terminate(_reason, state) do
+    try do
+      BDS.Scripting.JobStore.detach_runner(state.job_id)
+    catch
+      :exit, _ -> :ok
     end
   end
 end

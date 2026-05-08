@@ -90,6 +90,26 @@ defmodule BDS.Scripting.JobTest do
     assert cancelled_job.finished_at != nil
   end
 
+  test "killing a runner detaches it from JobStore (CSM-004)" do
+    Application.put_env(:bds, :scripting,
+      runtime: BlockingRuntime,
+      timeout: 300_000,
+      max_reductions: 5_000_000,
+      job_timeout: :infinity,
+      job_max_reductions: :none
+    )
+
+    assert {:ok, job} = BDS.Scripting.start_job("irrelevant", "main")
+    _running_job = wait_for_job(job.id, &(&1.status == :running))
+
+    runner_pid = BDS.Scripting.JobStore.runner_for(job.id)
+    assert is_pid(runner_pid)
+
+    GenServer.stop(runner_pid, :shutdown)
+    Process.sleep(50)
+    assert BDS.Scripting.JobStore.runner_for(job.id) == nil
+  end
+
   defp wait_for_job(job_id, predicate, attempts \\ 50)
 
   defp wait_for_job(job_id, predicate, attempts) when attempts > 0 do

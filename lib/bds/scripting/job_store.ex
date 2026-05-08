@@ -65,8 +65,7 @@ defmodule BDS.Scripting.JobStore do
   end
 
   def handle_call({:detach_runner, job_id}, _from, state) do
-    next_state = update_in(state.runners, &Map.delete(&1, job_id))
-    {:reply, :ok, %{state | runners: next_state}}
+    {:reply, :ok, %{state | runners: Map.delete(state.runners, job_id)}}
   end
 
   def handle_call({:fetch_job, job_id}, _from, state) do

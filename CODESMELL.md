@@ -72,18 +72,17 @@
 
 ---
 
-### CSM-004 — Blocking `init/1` + Missing `terminate/2` in Job Runner
-- **File:** `lib/bds/scripting/job_runner.ex:28-35`
-- **What:**
-  1. Synchronous `GenServer.call` to `JobStore.attach_runner/2` inside `init/1` (Z. 30) blocks the supervisor if `JobStore` is slow.
-  2. `Process.flag(:trap_exit, true)` (Z. 29) is set but there is **no** `terminate/2` callback and **no** `{:EXIT, ...}` handler in `handle_info`.
-- **Why it's bad:**
-  - Supervisor child startup hangs if `JobStore` is slow or unavailable.
-  - If the runner process is killed (not via `:cancel`), the PID leaks in `JobStore.runners`. The `detach_runner/2` call only happens in `handle_call(:cancel)` (Z. 71) and `handle_info({ref, result})` (Z. 95) and `handle_info({:DOWN, ...})` (Z. 117). A linked process crash with `trap_exit` would send `{:EXIT, pid, reason}` which has **no handler**, so the runner stops without detaching.
-- **Fix:**
-  - Move `attach_runner` to `handle_continue/2`.
-  - Either remove `trap_exit` (the task uses `async_nolink`, so links aren't the issue) OR add `terminate/2` that calls `JobStore.detach_runner/2` and add an `{:EXIT, ...}` clause in `handle_info`.
-- **Test:** Start a runner, kill it (not via cancel); assert `JobStore` does not contain the dead PID.
+### ~~CSM-004 — Blocking `init/1` + Missing `terminate/2` in Job Runner~~ ✅ FIXED
+- **Fixed:** 2026-05-08
+- **What was done:**
+  - Moved `JobStore.attach_runner/2` from `init/1` to a new `handle_continue(:attach_and_start)` callback, so supervisor startup is no longer blocked by the synchronous call.
+  - Added `terminate/2` callback that calls `JobStore.detach_runner/2` (with `try/catch` for shutdown safety), centralizing cleanup that was previously scattered across individual exit paths.
+  - Added `handle_info({:EXIT, _pid, _reason})` clause to handle trapped exit signals from linked processes.
+  - Removed redundant inline `detach_runner` calls from `handle_call(:cancel)`, task result handler, and `:DOWN` handler — `terminate/2` now handles all detach cleanup.
+  - Changed `restart: :temporary` since job runners are one-shot processes that should not auto-restart on failure.
+  - Added `@impl true` to all `handle_info` clauses.
+  - Fixed pre-existing bug in `JobStore.detach_runner` handler where `update_in/2` macro result was incorrectly double-wrapped, corrupting state.
+  - Added test: start a runner, kill it externally (not via cancel), assert `JobStore` no longer contains the dead PID.
 
 ---
 
@@ -400,6 +399,7 @@
 - [x] All critical items (CSM-001 to CSM-005) have been addressed or explicitly deferred with justification.
   - CSM-001: Fixed. All `String.to_atom` on dynamic data replaced with `MapUtils.safe_atomize_key/keys` or `String.to_existing_atom`.
   - CSM-002: Fixed. Search now pushes all filtering and pagination into SQL via Ecto queries and CTEs.
+  - CSM-004: Fixed. `attach_runner` moved to `handle_continue`, `terminate/2` added for cleanup, `restart: :temporary` set, JobStore `detach_runner` bug fixed.
 - [ ] All high-severity items (CSM-006 to CSM-010) have been addressed.
 - [x] CSM-001 fix covers ALL 6 affected files, not just `import_definitions.ex`.
 - [x] CSM-003 fix covers ALL `Repo.delete!` call sites (posts, tags, scripts, media, projects, templates, translations).
