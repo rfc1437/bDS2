@@ -316,19 +316,41 @@ defmodule BDS.Tags do
   end
 
   defp posts_with_tag(project_id, tag_name) do
-    Repo.all(from post in Post, where: post.project_id == ^project_id)
-    |> Enum.filter(fn post -> tag_name in (post.tags || []) end)
+    Repo.all(
+      from post in Post,
+        where:
+          post.project_id == ^project_id and
+            fragment(
+              "EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)",
+              post.tags,
+              ^tag_name
+            )
+    )
   end
 
   defp posts_with_any_tag(project_id, tag_names) do
-    Repo.all(from post in Post, where: post.project_id == ^project_id)
-    |> Enum.filter(fn post -> Enum.any?(post.tags || [], &(&1 in tag_names)) end)
+    tags_json = Jason.encode!(tag_names)
+
+    Repo.all(
+      from post in Post,
+        where:
+          post.project_id == ^project_id and
+            fragment(
+              "EXISTS (SELECT 1 FROM json_each(?) je, json_each(?) jt WHERE je.value = jt.value)",
+              post.tags,
+              ^tags_json
+            )
+    )
   end
 
   defp post_tag_names(project_id) do
-    Repo.all(from post in Post, where: post.project_id == ^project_id)
-    |> Enum.flat_map(fn post ->
-      post.tags
+    Repo.all(
+      from post in Post,
+        where: post.project_id == ^project_id,
+        select: post.tags
+    )
+    |> Enum.flat_map(fn tags ->
+      tags
       |> Kernel.||([])
       |> Enum.map(&String.trim/1)
       |> Enum.reject(&(&1 == ""))

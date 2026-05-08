@@ -96,9 +96,13 @@ defmodule BDS.Scripting.Capabilities.Posts do
     normalized_status = string_or_nil(status) || ""
 
     Repo.all(
-      from(post in Post, where: post.project_id == ^project_id, order_by: [asc: post.created_at])
+      from(post in Post,
+        where:
+          post.project_id == ^project_id and
+            fragment("CAST(? AS TEXT) = ?", post.status, ^normalized_status),
+        order_by: [asc: post.created_at]
+      )
     )
-    |> Enum.filter(&(to_string(&1.status) == normalized_status))
     |> Enum.map(&post_payload/1)
   end
 
@@ -278,15 +282,18 @@ defmodule BDS.Scripting.Capabilities.Posts do
   end
 
   def names_with_counts(project_id, field) when field in [:tags, :categories] do
-    Repo.all(
-      from(post in Post,
-        where: post.project_id == ^project_id,
-        order_by: [asc: post.created_at]
+    column = Atom.to_string(field)
+
+    %{rows: rows} =
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        "SELECT trim(je.value) AS name, COUNT(*) AS cnt " <>
+          "FROM posts, json_each(posts.#{column}) je " <>
+          "WHERE posts.project_id = ?1 AND trim(je.value) != '' " <>
+          "GROUP BY name ORDER BY lower(name), cnt",
+        [project_id]
       )
-    )
-    |> Enum.flat_map(&(Map.get(&1, field) || []))
-    |> Enum.reduce(%{}, fn name, acc -> Map.update(acc, name, 1, &(&1 + 1)) end)
-    |> Enum.map(fn {name, count} -> %{"name" => name, "count" => count} end)
-    |> Enum.sort_by(&{String.downcase(&1["name"]), &1["count"]})
+
+    Enum.map(rows, fn [name, count] -> %{"name" => name, "count" => count} end)
   end
 end

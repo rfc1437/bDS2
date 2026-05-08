@@ -380,20 +380,17 @@ defmodule BDS.Posts do
     Repo.all(
       from(post in Post,
         where: post.project_id == ^project_id,
-        select: post.status
+        group_by: post.status,
+        select: {post.status, count(post.id)}
       )
     )
     |> Enum.reduce(
       %{total_posts: 0, draft_count: 0, published_count: 0, archived_count: 0},
-      fn status, acc ->
-        acc
-        |> Map.update!(:total_posts, &(&1 + 1))
-        |> case do
-          counts when status == :draft -> Map.update!(counts, :draft_count, &(&1 + 1))
-          counts when status == :published -> Map.update!(counts, :published_count, &(&1 + 1))
-          counts when status == :archived -> Map.update!(counts, :archived_count, &(&1 + 1))
-          counts -> counts
-        end
+      fn
+        {:draft, n}, acc -> %{acc | total_posts: acc.total_posts + n, draft_count: n}
+        {:published, n}, acc -> %{acc | total_posts: acc.total_posts + n, published_count: n}
+        {:archived, n}, acc -> %{acc | total_posts: acc.total_posts + n, archived_count: n}
+        {_other, n}, acc -> %{acc | total_posts: acc.total_posts + n}
       end
     )
   end

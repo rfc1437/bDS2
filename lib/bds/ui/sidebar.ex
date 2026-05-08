@@ -14,7 +14,6 @@ defmodule BDS.UI.Sidebar do
   alias BDS.Tags.Tag
   alias BDS.Templates.Template
 
-  @page_category "page"
   @default_page_size 500
 
   def snapshot(nil), do: empty_snapshot()
@@ -74,7 +73,7 @@ defmodule BDS.UI.Sidebar do
         )
 
       "tags" ->
-        tags_nav_view(list_tags(project_id))
+        tags_nav_view(tag_count(project_id))
 
       "chat" ->
         entity_list_view(
@@ -122,7 +121,7 @@ defmodule BDS.UI.Sidebar do
           "templates",
           []
         ),
-      "tags" => tags_nav_view([]),
+      "tags" => tags_nav_view(0),
       "chat" =>
         entity_list_view(
           dgettext("ui", "Chat"),
@@ -142,9 +141,9 @@ defmodule BDS.UI.Sidebar do
     }
   end
 
-  defp empty_view("posts"), do: posts_view_data([], [], %{}, false, empty_filter_params(), %{})
-  defp empty_view("pages"), do: posts_view_data([], [], %{}, true, empty_filter_params(), %{})
-  defp empty_view("media"), do: media_view_data([], [], empty_filter_params(), %{})
+  defp empty_view("posts"), do: build_posts_view([], %{}, false, empty_filter_params(), %{}, [], [], [])
+  defp empty_view("pages"), do: build_posts_view([], %{}, true, empty_filter_params(), %{}, [], [], [])
+  defp empty_view("media"), do: build_media_view([], empty_filter_params(), %{}, [], [], 0)
 
   defp empty_view("scripts"),
     do:
@@ -164,7 +163,7 @@ defmodule BDS.UI.Sidebar do
         []
       )
 
-  defp empty_view("tags"), do: tags_nav_view([])
+  defp empty_view("tags"), do: tags_nav_view(0)
 
   defp empty_view("chat"),
     do:
@@ -196,29 +195,70 @@ defmodule BDS.UI.Sidebar do
       empty_message: dgettext("ui", "No items")
     }
 
+  # ---------------------------------------------------------------------------
+  # Posts view (SQL-level filtering)
+  # ---------------------------------------------------------------------------
+
   defp posts_view(project_id, params, pages?) do
-    posts = list_posts(project_id)
+    filters = normalize_filter_params(params)
     translation_counts = translation_counts(project_id)
     tag_colors = tag_color_map(project_id)
-    filters = normalize_filter_params(params)
-    base_posts = Enum.filter(posts, &(page_post?(&1) == pages?))
-    filtered_posts = apply_post_filters(base_posts, filters)
 
-    posts_view_data(base_posts, filtered_posts, translation_counts, pages?, filters, tag_colors)
+    year_months = base_year_month_counts(project_id, pages?)
+    avail_tags = base_available_tags(project_id, pages?)
+    avail_categories = base_available_categories(project_id, pages?)
+
+    filtered_query =
+      base_posts_query(project_id, pages?)
+      |> apply_post_query_filters(filters)
+
+    total_count = Repo.one(from p in filtered_query, select: count(p.id))
+
+    limited_posts =
+      Repo.all(
+        from p in filtered_query,
+          order_by: [desc: p.created_at],
+          limit: ^filters.display_limit,
+          select: %{
+            id: p.id,
+            title: p.title,
+            slug: p.slug,
+            excerpt: p.excerpt,
+            status: p.status,
+            tags: p.tags,
+            categories: p.categories,
+            updated_at: p.updated_at,
+            published_at: p.published_at,
+            language: p.language
+          }
+      )
+
+    build_posts_view(
+      limited_posts,
+      translation_counts,
+      pages?,
+      filters,
+      tag_colors,
+      year_months,
+      avail_tags,
+      avail_categories,
+      total_count
+    )
   end
 
-  defp posts_view_data(
-         base_posts,
-         filtered_posts,
+  defp build_posts_view(
+         limited_posts,
          translation_counts,
          pages?,
          filters,
-         tag_colors
+         tag_colors,
+         year_month_counts,
+         available_tags,
+         available_categories,
+         total_count \\ 0
        ) do
-    limited_posts = Enum.take(filtered_posts, filters.display_limit)
     grouped_posts = group_posts(limited_posts)
-    available_tags = available_tags(base_posts, & &1.tags)
-    available_categories = available_categories(base_posts, pages?)
+    loaded_count = length(limited_posts)
 
     %{
       title: if(pages?, do: dgettext("ui", "Pages"), else: dgettext("ui", "Posts")),
@@ -247,15 +287,15 @@ defmodule BDS.UI.Sidebar do
         results_label: dgettext("ui", "results"),
         results_for_label: dgettext("ui", "results for"),
         no_results_label: dgettext("ui", "No matching posts"),
-        year_month_counts: year_month_counts(base_posts, &post_filter_timestamp/1),
+        year_month_counts: year_month_counts,
         available_tags: available_tags,
         available_tag_colors: Map.take(tag_colors, available_tags),
         available_categories: available_categories,
         max_items: @default_page_size,
         display_limit: filters.display_limit,
-        loaded_count: length(limited_posts),
-        total_count: length(filtered_posts),
-        has_more: length(filtered_posts) > filters.display_limit,
+        loaded_count: loaded_count,
+        total_count: total_count,
+        has_more: total_count > filters.display_limit,
         has_active_filters: filter_active?(filters),
         selected: %{
           search: filters.search,
@@ -291,18 +331,237 @@ defmodule BDS.UI.Sidebar do
     }
   end
 
-  defp media_view(project_id, params) do
-    media_items = list_media(project_id)
-    tag_colors = tag_color_map(project_id)
-    filters = normalize_filter_params(params)
-    filtered_media = apply_media_filters(media_items, filters)
-
-    media_view_data(media_items, filtered_media, filters, tag_colors)
+  defp base_posts_query(project_id, true = _pages?) do
+    from post in Post,
+      where: post.project_id == ^project_id,
+      where:
+        fragment(
+          "EXISTS (SELECT 1 FROM json_each(?) WHERE lower(value) = 'page')",
+          post.categories
+        )
   end
 
-  defp media_view_data(base_media, filtered_media, filters, tag_colors) do
-    limited_media = Enum.take(filtered_media, filters.display_limit)
-    available_tags = available_tags(base_media, & &1.tags)
+  defp base_posts_query(project_id, false = _pages?) do
+    from post in Post,
+      where: post.project_id == ^project_id,
+      where:
+        fragment(
+          "NOT EXISTS (SELECT 1 FROM json_each(?) WHERE lower(value) = 'page')",
+          post.categories
+        )
+  end
+
+  defp apply_post_query_filters(query, filters) do
+    query
+    |> maybe_where_search(filters.search)
+    |> maybe_where_year(filters.year)
+    |> maybe_where_month(filters.month)
+    |> maybe_where_all_tags(filters.tags)
+    |> maybe_where_all_categories(filters.categories)
+  end
+
+  defp maybe_where_search(query, nil), do: query
+
+  defp maybe_where_search(query, search) do
+    search_term = "%" <> String.downcase(search) <> "%"
+
+    where(
+      query,
+      [p],
+      fragment(
+        """
+        lower(COALESCE(?,'') || ' ' || COALESCE(?,'') || ' ' || COALESCE(?,'')
+              || ' ' || COALESCE(?,'[]') || ' ' || COALESCE(?,'[]')) LIKE ?
+        """,
+        p.title,
+        p.slug,
+        p.excerpt,
+        p.tags,
+        p.categories,
+        ^search_term
+      )
+    )
+  end
+
+  defp maybe_where_year(query, nil), do: query
+
+  defp maybe_where_year(query, year) do
+    year_str = to_string(year)
+
+    where(
+      query,
+      [p],
+      fragment(
+        "strftime('%Y', datetime(COALESCE(?, ?) / 1000, 'unixepoch')) = ?",
+        p.published_at,
+        p.updated_at,
+        ^year_str
+      )
+    )
+  end
+
+  defp maybe_where_month(query, nil), do: query
+
+  defp maybe_where_month(query, month) do
+    month_str = String.pad_leading(to_string(month), 2, "0")
+
+    where(
+      query,
+      [p],
+      fragment(
+        "strftime('%m', datetime(COALESCE(?, ?) / 1000, 'unixepoch')) = ?",
+        p.published_at,
+        p.updated_at,
+        ^month_str
+      )
+    )
+  end
+
+  defp maybe_where_all_tags(query, []), do: query
+
+  defp maybe_where_all_tags(query, tags) do
+    Enum.reduce(tags, query, fn tag, q ->
+      where(
+        q,
+        [p],
+        fragment(
+          "EXISTS (SELECT 1 FROM json_each(?) WHERE lower(value) = lower(?))",
+          p.tags,
+          ^tag
+        )
+      )
+    end)
+  end
+
+  defp maybe_where_all_categories(query, []), do: query
+
+  defp maybe_where_all_categories(query, categories) do
+    Enum.reduce(categories, query, fn category, q ->
+      where(
+        q,
+        [p],
+        fragment(
+          "EXISTS (SELECT 1 FROM json_each(?) WHERE lower(value) = lower(?) AND lower(value) != 'page')",
+          p.categories,
+          ^category
+        )
+      )
+    end)
+  end
+
+  defp base_year_month_counts(project_id, pages?) do
+    is_page = if pages?, do: 1, else: 0
+
+    %{rows: rows} =
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        """
+        SELECT CAST(strftime('%Y', datetime(COALESCE(published_at, updated_at) / 1000, 'unixepoch')) AS INTEGER),
+               CAST(strftime('%m', datetime(COALESCE(published_at, updated_at) / 1000, 'unixepoch')) AS INTEGER),
+               COUNT(*)
+        FROM posts
+        WHERE project_id = ?1
+          AND COALESCE(published_at, updated_at) IS NOT NULL
+          AND (
+            (?2 = 1 AND EXISTS (SELECT 1 FROM json_each(categories) WHERE lower(value) = 'page'))
+            OR
+            (?2 = 0 AND NOT EXISTS (SELECT 1 FROM json_each(categories) WHERE lower(value) = 'page'))
+          )
+        GROUP BY 1, 2
+        ORDER BY 1 DESC, 2 DESC
+        """,
+        [project_id, is_page]
+      )
+
+    Enum.map(rows, fn [year, month, count] -> %{year: year, month: month, count: count} end)
+  end
+
+  defp base_available_tags(project_id, pages?) do
+    is_page = if pages?, do: 1, else: 0
+
+    %{rows: rows} =
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        """
+        SELECT DISTINCT trim(je.value)
+        FROM posts, json_each(posts.tags) je
+        WHERE posts.project_id = ?1
+          AND trim(je.value) != ''
+          AND (
+            (?2 = 1 AND EXISTS (SELECT 1 FROM json_each(posts.categories) WHERE lower(value) = 'page'))
+            OR
+            (?2 = 0 AND NOT EXISTS (SELECT 1 FROM json_each(posts.categories) WHERE lower(value) = 'page'))
+          )
+        ORDER BY lower(trim(je.value))
+        """,
+        [project_id, is_page]
+      )
+
+    Enum.map(rows, fn [tag] -> tag end)
+  end
+
+  defp base_available_categories(project_id, pages?) do
+    is_page = if pages?, do: 1, else: 0
+
+    %{rows: rows} =
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        """
+        SELECT DISTINCT trim(je.value)
+        FROM posts, json_each(posts.categories) je
+        WHERE posts.project_id = ?1
+          AND trim(je.value) != ''
+          AND lower(trim(je.value)) != 'page'
+          AND (
+            (?2 = 1 AND EXISTS (SELECT 1 FROM json_each(posts.categories) jc WHERE lower(jc.value) = 'page'))
+            OR
+            (?2 = 0 AND NOT EXISTS (SELECT 1 FROM json_each(posts.categories) jc WHERE lower(jc.value) = 'page'))
+          )
+        ORDER BY lower(trim(je.value))
+        """,
+        [project_id, is_page]
+      )
+
+    Enum.map(rows, fn [category] -> category end)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Media view (SQL-level filtering)
+  # ---------------------------------------------------------------------------
+
+  defp media_view(project_id, params) do
+    filters = normalize_filter_params(params)
+    tag_colors = tag_color_map(project_id)
+
+    year_months = media_year_month_counts(project_id)
+    avail_tags = media_available_tags(project_id)
+
+    filtered_query = media_filtered_query(project_id, filters)
+    total_count = Repo.one(from m in filtered_query, select: count(m.id))
+
+    limited_media =
+      Repo.all(
+        from m in filtered_query,
+          order_by: [desc: m.created_at],
+          limit: ^filters.display_limit,
+          select: %{
+            id: m.id,
+            title: m.title,
+            original_name: m.original_name,
+            mime_type: m.mime_type,
+            size: m.size,
+            tags: m.tags,
+            alt: m.alt,
+            caption: m.caption,
+            updated_at: m.updated_at
+          }
+      )
+
+    build_media_view(limited_media, filters, tag_colors, year_months, avail_tags, total_count)
+  end
+
+  defp build_media_view(limited_media, filters, tag_colors, year_month_counts, available_tags, total_count) do
+    loaded_count = length(limited_media)
 
     %{
       title: dgettext("ui", "Media"),
@@ -320,15 +579,15 @@ defmodule BDS.UI.Sidebar do
         results_label: dgettext("ui", "results"),
         results_for_label: dgettext("ui", "results for"),
         no_results_label: dgettext("ui", "No media files"),
-        year_month_counts: year_month_counts(base_media, &Map.get(&1, :updated_at)),
+        year_month_counts: year_month_counts,
         available_tags: available_tags,
         available_tag_colors: Map.take(tag_colors, available_tags),
         available_categories: [],
         max_items: @default_page_size,
         display_limit: filters.display_limit,
-        loaded_count: length(limited_media),
-        total_count: length(filtered_media),
-        has_more: length(filtered_media) > filters.display_limit,
+        loaded_count: loaded_count,
+        total_count: total_count,
+        has_more: total_count > filters.display_limit,
         has_active_filters: filter_active?(filters),
         selected: %{
           search: filters.search,
@@ -354,7 +613,127 @@ defmodule BDS.UI.Sidebar do
     }
   end
 
-  defp tags_nav_view(tags) do
+  defp media_filtered_query(project_id, filters) do
+    from(media in Media, where: media.project_id == ^project_id)
+    |> maybe_where_media_search(filters.search)
+    |> maybe_where_media_year(filters.year)
+    |> maybe_where_media_month(filters.month)
+    |> maybe_where_all_media_tags(filters.tags)
+  end
+
+  defp maybe_where_media_search(query, nil), do: query
+
+  defp maybe_where_media_search(query, search) do
+    search_term = "%" <> String.downcase(search) <> "%"
+
+    where(
+      query,
+      [m],
+      fragment(
+        """
+        lower(COALESCE(?,'') || ' ' || COALESCE(?,'') || ' ' || COALESCE(?,'')
+              || ' ' || COALESCE(?,'') || ' ' || COALESCE(?,'[]')) LIKE ?
+        """,
+        m.title,
+        m.original_name,
+        m.alt,
+        m.caption,
+        m.tags,
+        ^search_term
+      )
+    )
+  end
+
+  defp maybe_where_media_year(query, nil), do: query
+
+  defp maybe_where_media_year(query, year) do
+    year_str = to_string(year)
+
+    where(
+      query,
+      [m],
+      fragment(
+        "strftime('%Y', datetime(? / 1000, 'unixepoch')) = ?",
+        m.updated_at,
+        ^year_str
+      )
+    )
+  end
+
+  defp maybe_where_media_month(query, nil), do: query
+
+  defp maybe_where_media_month(query, month) do
+    month_str = String.pad_leading(to_string(month), 2, "0")
+
+    where(
+      query,
+      [m],
+      fragment(
+        "strftime('%m', datetime(? / 1000, 'unixepoch')) = ?",
+        m.updated_at,
+        ^month_str
+      )
+    )
+  end
+
+  defp maybe_where_all_media_tags(query, []), do: query
+
+  defp maybe_where_all_media_tags(query, tags) do
+    Enum.reduce(tags, query, fn tag, q ->
+      where(
+        q,
+        [m],
+        fragment(
+          "EXISTS (SELECT 1 FROM json_each(?) WHERE lower(value) = lower(?))",
+          m.tags,
+          ^tag
+        )
+      )
+    end)
+  end
+
+  defp media_year_month_counts(project_id) do
+    %{rows: rows} =
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        """
+        SELECT CAST(strftime('%Y', datetime(updated_at / 1000, 'unixepoch')) AS INTEGER),
+               CAST(strftime('%m', datetime(updated_at / 1000, 'unixepoch')) AS INTEGER),
+               COUNT(*)
+        FROM media
+        WHERE project_id = ?1
+          AND updated_at IS NOT NULL
+        GROUP BY 1, 2
+        ORDER BY 1 DESC, 2 DESC
+        """,
+        [project_id]
+      )
+
+    Enum.map(rows, fn [year, month, count] -> %{year: year, month: month, count: count} end)
+  end
+
+  defp media_available_tags(project_id) do
+    %{rows: rows} =
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        """
+        SELECT DISTINCT trim(je.value)
+        FROM media, json_each(media.tags) je
+        WHERE media.project_id = ?1
+          AND trim(je.value) != ''
+        ORDER BY lower(trim(je.value))
+        """,
+        [project_id]
+      )
+
+    Enum.map(rows, fn [tag] -> tag end)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Navigation views
+  # ---------------------------------------------------------------------------
+
+  defp tags_nav_view(count) do
     %{
       title: dgettext("ui", "Tags"),
       subtitle: dgettext("ui", "Tag management"),
@@ -364,7 +743,7 @@ defmodule BDS.UI.Sidebar do
         %{id: "tags-manage", title: dgettext("ui", "Create / Edit"), icon: "✏️", route: "tags"},
         %{id: "tags-merge", title: dgettext("ui", "Merge Tags"), icon: "🔀", route: "tags"}
       ],
-      summary_badge: length(tags)
+      summary_badge: count
     }
   end
 
@@ -434,6 +813,10 @@ defmodule BDS.UI.Sidebar do
     }
   end
 
+  # ---------------------------------------------------------------------------
+  # Post section builder
+  # ---------------------------------------------------------------------------
+
   defp build_post_section(title, status, posts, translation_counts, published_meta?) do
     %{
       id: Atom.to_string(status),
@@ -461,25 +844,9 @@ defmodule BDS.UI.Sidebar do
     }
   end
 
-  defp list_posts(project_id) do
-    Repo.all(
-      from post in Post,
-        where: post.project_id == ^project_id,
-        order_by: [desc: post.created_at],
-        select: %{
-          id: post.id,
-          title: post.title,
-          slug: post.slug,
-          excerpt: post.excerpt,
-          status: post.status,
-          tags: post.tags,
-          categories: post.categories,
-          updated_at: post.updated_at,
-          published_at: post.published_at,
-          language: post.language
-        }
-    )
-  end
+  # ---------------------------------------------------------------------------
+  # Data queries
+  # ---------------------------------------------------------------------------
 
   defp translation_counts(project_id) do
     Repo.all(
@@ -489,25 +856,6 @@ defmodule BDS.UI.Sidebar do
         select: {translation.translation_for, count(translation.id)}
     )
     |> Map.new()
-  end
-
-  defp list_media(project_id) do
-    Repo.all(
-      from media in Media,
-        where: media.project_id == ^project_id,
-        order_by: [desc: media.created_at],
-        select: %{
-          id: media.id,
-          title: media.title,
-          original_name: media.original_name,
-          mime_type: media.mime_type,
-          size: media.size,
-          tags: media.tags,
-          alt: media.alt,
-          caption: media.caption,
-          updated_at: media.updated_at
-        }
-    )
   end
 
   defp list_scripts(project_id) do
@@ -532,13 +880,8 @@ defmodule BDS.UI.Sidebar do
     ImportDefinitions.list_definitions(project_id)
   end
 
-  defp list_tags(project_id) do
-    Repo.all(
-      from tag in Tag,
-        where: tag.project_id == ^project_id,
-        order_by: [asc: tag.name],
-        select: %{id: tag.id, title: tag.name, updated_at: tag.updated_at}
-    )
+  defp tag_count(project_id) do
+    Repo.one(from tag in Tag, where: tag.project_id == ^project_id, select: count(tag.id))
   end
 
   defp list_conversations do
@@ -554,19 +897,28 @@ defmodule BDS.UI.Sidebar do
   end
 
   defp group_posts(posts) do
-    Enum.reduce(posts, %{draft: [], published: [], archived: []}, fn post, acc ->
-      case post.status do
-        :draft -> %{acc | draft: acc.draft ++ [post]}
-        :published -> %{acc | published: acc.published ++ [post]}
-        :archived -> %{acc | archived: acc.archived ++ [post]}
-        _other -> acc
+    grouped = Enum.group_by(posts, & &1.status)
+
+    %{
+      draft: Map.get(grouped, :draft, []),
+      published: Map.get(grouped, :published, []),
+      archived: Map.get(grouped, :archived, [])
+    }
+  end
+
+  defp tag_color_map(project_id) do
+    Repo.all(from tag in Tag, where: tag.project_id == ^project_id, select: {tag.name, tag.color})
+    |> Enum.reduce(%{}, fn {name, color}, acc ->
+      case String.trim(to_string(color || "")) do
+        "" -> acc
+        trimmed -> Map.put(acc, to_string(name), trimmed)
       end
     end)
   end
 
-  defp page_post?(post) do
-    Enum.any?(post.categories || [], &(String.downcase(to_string(&1)) == @page_category))
-  end
+  # ---------------------------------------------------------------------------
+  # Helpers
+  # ---------------------------------------------------------------------------
 
   defp normalize_view_id(view_id) when is_atom(view_id), do: Atom.to_string(view_id)
   defp normalize_view_id(view_id) when is_binary(view_id), do: view_id
@@ -604,104 +956,6 @@ defmodule BDS.UI.Sidebar do
     present?(filters.search) or not is_nil(filters.year) or filters.tags != [] or
       filters.categories != []
   end
-
-  defp apply_post_filters(posts, filters) do
-    Enum.filter(posts, fn post ->
-      matches_search?(post_search_blob(post), filters.search) and
-        matches_year_month?(post_filter_timestamp(post), filters.year, filters.month) and
-        matches_overlap?(post.tags, filters.tags) and
-        matches_overlap?(filtered_categories(post.categories), filters.categories)
-    end)
-  end
-
-  defp apply_media_filters(media_items, filters) do
-    Enum.filter(media_items, fn media ->
-      matches_search?(media_search_blob(media), filters.search) and
-        matches_year_month?(media.updated_at, filters.year, filters.month) and
-        matches_overlap?(media.tags, filters.tags)
-    end)
-  end
-
-  defp matches_search?(_text, nil), do: true
-
-  defp matches_search?(text, search) do
-    String.contains?(String.downcase(text), String.downcase(search))
-  end
-
-  defp matches_year_month?(_timestamp, nil, _month), do: true
-  defp matches_year_month?(nil, _year, _month), do: false
-
-  defp matches_year_month?(timestamp, year, month) do
-    datetime = DateTime.from_unix!(timestamp, :millisecond)
-
-    datetime.year == year and
-      (is_nil(month) or datetime.month == month)
-  end
-
-  defp matches_overlap?(_values, []), do: true
-
-  defp matches_overlap?(values, filters) do
-    normalized_values = MapSet.new(Enum.map(values || [], &normalize_term/1))
-
-    Enum.all?(filters, fn filter ->
-      MapSet.member?(normalized_values, normalize_term(filter))
-    end)
-  end
-
-  defp year_month_counts(items, timestamp_fun) do
-    items
-    |> Enum.reduce(%{}, fn item, acc ->
-      case timestamp_fun.(item) do
-        timestamp when is_integer(timestamp) ->
-          datetime = DateTime.from_unix!(timestamp, :millisecond)
-          Map.update(acc, {datetime.year, datetime.month}, 1, &(&1 + 1))
-
-        _other ->
-          acc
-      end
-    end)
-    |> Enum.map(fn {{year, month}, count} -> %{year: year, month: month, count: count} end)
-    |> Enum.sort_by(fn entry -> {-entry.year, -entry.month} end)
-  end
-
-  defp available_tags(items, getter) do
-    items
-    |> Enum.flat_map(fn item -> getter.(item) || [] end)
-    |> Enum.map(&to_string/1)
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.uniq_by(&String.downcase/1)
-    |> Enum.sort_by(&String.downcase/1)
-  end
-
-  defp available_categories(posts, pages?) do
-    posts
-    |> Enum.flat_map(&filtered_categories(&1.categories || []))
-    |> then(fn categories ->
-      if pages?,
-        do: Enum.reject(categories, &(normalize_term(&1) == @page_category)),
-        else: categories
-    end)
-    |> Enum.map(&to_string/1)
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.uniq_by(&String.downcase/1)
-    |> Enum.sort_by(&String.downcase/1)
-  end
-
-  defp tag_color_map(project_id) do
-    Repo.all(from tag in Tag, where: tag.project_id == ^project_id, select: {tag.name, tag.color})
-    |> Enum.reduce(%{}, fn {name, color}, acc ->
-      case String.trim(to_string(color || "")) do
-        "" -> acc
-        trimmed -> Map.put(acc, to_string(name), trimmed)
-      end
-    end)
-  end
-
-  defp filtered_categories(categories) do
-    Enum.reject(categories || [], &(normalize_term(&1) == @page_category))
-  end
-
-  defp post_filter_timestamp(post), do: post.published_at || post.updated_at
 
   defp post_search_blob(post) do
     [
@@ -747,8 +1001,6 @@ defmodule BDS.UI.Sidebar do
   end
 
   defp normalize_string_list(_values), do: []
-
-  defp normalize_term(value), do: value |> to_string() |> String.downcase()
 
   defp display_post_title(post) do
     cond do

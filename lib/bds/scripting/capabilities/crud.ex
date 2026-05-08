@@ -212,12 +212,17 @@ defmodule BDS.Scripting.Capabilities.Crud do
       %Tag{name: tag_name} ->
         Repo.all(
           from(post in Post,
-            where: post.project_id == ^project_id,
-            order_by: [asc: post.created_at]
+            where:
+              post.project_id == ^project_id and
+                fragment(
+                  "EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)",
+                  post.tags,
+                  ^tag_name
+                ),
+            order_by: [asc: post.created_at],
+            select: post.id
           )
         )
-        |> Enum.filter(&(tag_name in (&1.tags || [])))
-        |> Enum.map(& &1.id)
 
       _other ->
         []

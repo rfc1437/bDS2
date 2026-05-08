@@ -86,19 +86,35 @@
 
 ---
 
-### CSM-005 — Client-Side Filtering of Entire Tables
-- **Files:** `lib/bds/ui/sidebar.ex`, `lib/bds/tags.ex`, `lib/bds/ui/dashboard.ex`
-- **What:**
-  - `UI.Sidebar.list_posts/1` (Z. 464-482) loads every post for a project, then `apply_post_filters/1` (Z. 608-615) filters in Elixir. Translation counts are a separate query but still unbounded.
-  - `Tags.posts_with_tag/2` (Z. 310-312) and `Tags.posts_with_any_tag/2` (Z. 314-316) load **all posts** to filter by tag name. `Tags.post_tag_names/1` (Z. 320-322) loads all posts to extract tag names.
-  - `UI.Dashboard.snapshot/1` (Z. 14-35) loads ALL posts and ALL media for counts and stats. Post stats (Z. 77-87) and media stats (Z. 89-96) are computed in Elixir via `Enum.reduce`.
-  - `Posts.dashboard_stats/1` (posts.ex:374-394) loads all post statuses and counts in Elixir.
-- **Fix:**
-  - Sidebar: Use `Repo.aggregate` for counts, `where` clauses for filters, `limit`/`offset` for pagination. Preload tag colors separately.
-  - Tags: Use `where: fragment("? IN (?)", ^tag_name, post.tags)` or JSON functions. For `post_tag_names`, use `Repo.aggregate` + `distinct`.
-  - Dashboard: Use `Repo.aggregate(:count)` with `group_by` for status counts, media counts, tag clouds, and category counts. No need to load full records.
-  - `dashboard_stats`: Replace with `from post in Post, where: post.project_id == ^project_id, group_by: post.status, select: {post.status, count(post.id)}`.
-- **Test:** Create 10,000 posts; open the sidebar; assert the LiveView process memory stays bounded.
+### ~~CSM-005 — Client-Side Filtering of Entire Tables~~ ✅ FIXED
+- **Fixed:** 2026-05-08
+- **What was done:**
+  - **Sidebar** (`lib/bds/ui/sidebar.ex`):
+    - Removed `list_posts/1` and `list_media/1` that loaded all records into memory.
+    - Replaced `apply_post_filters/1` and `apply_media_filters/1` (Elixir-side filtering) with SQL `WHERE` clauses using Ecto dynamic queries and SQLite `json_each` fragments.
+    - Page/non-page split now uses `EXISTS (SELECT 1 FROM json_each(categories) WHERE lower(value) = 'page')` in SQL.
+    - Search, year/month, tag, and category filters all push to SQL via `maybe_where_search`, `maybe_where_year`, `maybe_where_month`, `maybe_where_all_tags`, `maybe_where_all_categories`.
+    - Aggregate queries (`year_month_counts`, `available_tags`, `available_categories`) use `Ecto.Adapters.SQL.query!` with `json_each` cross-joins, `GROUP BY`, and `DISTINCT`.
+    - Pagination uses SQL `LIMIT` instead of `Enum.take`.
+    - `tag_count/1` replaces `list_tags/1` + `length/1` with `Repo.one(select: count(tag.id))`.
+    - Fixed `group_posts/1` O(n²) `acc.draft ++ [post]` pattern — now uses `Enum.group_by/2` (also fixes CSM-024).
+  - **Tags** (`lib/bds/tags.ex`):
+    - `posts_with_tag/2` now uses `EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)` instead of loading all posts.
+    - `posts_with_any_tag/2` now uses `json_each` cross-join with a JSON parameter for the tag name list.
+    - `post_tag_names/1` now selects only the `tags` column instead of loading full post records.
+  - **Dashboard** (`lib/bds/ui/dashboard.ex`):
+    - `post_stats` uses `GROUP BY post.status, SELECT {status, count(id)}` — no longer loads all posts.
+    - `media_stats` uses `SELECT count(id), coalesce(sum(size), 0)` and a separate image count query with `LIKE 'image/%'`.
+    - `tag_cloud_items` and `category_counts` use raw SQL with `json_each` cross-joins and `GROUP BY`.
+    - `timeline_entries` uses SQL `strftime` + `GROUP BY` for year/month aggregation.
+    - `recent_posts` uses SQL `ORDER BY updated_at DESC LIMIT 5`.
+  - **Posts** (`lib/bds/posts.ex`):
+    - `dashboard_stats/1` uses `GROUP BY post.status, SELECT {status, count(id)}` instead of loading all statuses.
+  - **Capabilities** (`lib/bds/scripting/capabilities/`):
+    - `tag_post_ids/2` uses `json_each` fragment + `SELECT post.id` instead of loading all posts.
+    - `names_with_counts/2` uses raw SQL with `json_each` + `GROUP BY` instead of loading all posts.
+    - `posts_by_status/2` filters at SQL level instead of loading all posts and filtering in Elixir.
+  - Added 20 tests in `test/bds/csm005_sql_filtering_test.exs` covering dashboard stats, tag cloud, sidebar page/post separation, tag/search/year-month filters, available aggregates, and media filtering.
 
 ---
 
