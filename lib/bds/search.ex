@@ -373,13 +373,16 @@ defmodule BDS.Search do
 
     :ok = report_reindex_started(on_progress, total_posts, "posts")
 
-    posts
-    |> Enum.with_index(1)
-    |> Enum.each(fn {post, index} ->
-      translations = Map.get(translations_by_post_id, post.id, [])
-      insert_post_index(post, translations)
-      :ok = report_reindex_progress(on_progress, index, total_posts, "posts")
-    end)
+    rows =
+      posts
+      |> Enum.with_index(1)
+      |> Enum.map(fn {post, index} ->
+        translations = Map.get(translations_by_post_id, post.id, [])
+        :ok = report_reindex_progress(on_progress, index, total_posts, "posts")
+        post_index_row(post, translations)
+      end)
+
+    batch_insert_post_index(rows)
 
     :ok
   end
@@ -401,13 +404,16 @@ defmodule BDS.Search do
 
     :ok = report_reindex_started(on_progress, total_media, "media items")
 
-    media_items
-    |> Enum.with_index(1)
-    |> Enum.each(fn {media, index} ->
-      translations = Map.get(translations_by_media_id, media.id, [])
-      insert_media_index(media, translations)
-      :ok = report_reindex_progress(on_progress, index, total_media, "media items")
-    end)
+    rows =
+      media_items
+      |> Enum.with_index(1)
+      |> Enum.map(fn {media, index} ->
+        translations = Map.get(translations_by_media_id, media.id, [])
+        :ok = report_reindex_progress(on_progress, index, total_media, "media items")
+        media_index_row(media, translations)
+      end)
+
+    batch_insert_media_index(rows)
 
     :ok
   end
@@ -475,23 +481,70 @@ defmodule BDS.Search do
     )
   end
 
-  defp insert_post_index(%Post{} = post, translations \\ nil) do
-    translations = translations || post_translations(post.id)
+  defp post_index_row(%Post{} = post, translations) do
     {title, excerpt, content, tags, categories} = post_index_fields(post, translations)
+    [post.id, title, excerpt, content, tags, categories]
+  end
+
+  defp media_index_row(%Media{} = media, translations) do
+    {title, alt, caption, original_name, tags} = media_index_fields(media, translations)
+    [media.id, title, alt, caption, original_name, tags]
+  end
+
+  # SQLite allows up to 999 bound parameters per statement.
+  # Posts have 6 columns → max 166 rows per batch.
+  @post_batch_size 166
+  @media_batch_size 166
+
+  defp batch_insert_post_index([]), do: :ok
+
+  defp batch_insert_post_index(rows) do
+    rows
+    |> Enum.chunk_every(@post_batch_size)
+    |> Enum.each(fn chunk ->
+      placeholders = Enum.map_join(chunk, ", ", fn _ -> "(?, ?, ?, ?, ?, ?)" end)
+      params = List.flatten(chunk)
+
+      Repo.query!(
+        "INSERT INTO posts_fts (post_id, title, excerpt, content, tags, categories) VALUES #{placeholders}",
+        params
+      )
+    end)
+  end
+
+  defp batch_insert_media_index([]), do: :ok
+
+  defp batch_insert_media_index(rows) do
+    rows
+    |> Enum.chunk_every(@media_batch_size)
+    |> Enum.each(fn chunk ->
+      placeholders = Enum.map_join(chunk, ", ", fn _ -> "(?, ?, ?, ?, ?, ?)" end)
+      params = List.flatten(chunk)
+
+      Repo.query!(
+        "INSERT INTO media_fts (media_id, title, alt, caption, original_name, tags) VALUES #{placeholders}",
+        params
+      )
+    end)
+  end
+
+  defp insert_post_index(%Post{} = post) do
+    translations = post_translations(post.id)
+    row = post_index_row(post, translations)
 
     Repo.query!(
       "INSERT INTO posts_fts (post_id, title, excerpt, content, tags, categories) VALUES (?, ?, ?, ?, ?, ?)",
-      [post.id, title, excerpt, content, tags, categories]
+      row
     )
   end
 
-  defp insert_media_index(%Media{} = media, translations \\ nil) do
-    translations = translations || media_translations(media.id)
-    {title, alt, caption, original_name, tags} = media_index_fields(media, translations)
+  defp insert_media_index(%Media{} = media) do
+    translations = media_translations(media.id)
+    row = media_index_row(media, translations)
 
     Repo.query!(
       "INSERT INTO media_fts (media_id, title, alt, caption, original_name, tags) VALUES (?, ?, ?, ?, ?, ?)",
-      [media.id, title, alt, caption, original_name, tags]
+      row
     )
   end
 
@@ -564,18 +617,19 @@ defmodule BDS.Search do
         "SELECT translation_for, language, title, excerpt, content, status, file_path FROM post_translations WHERE translation_for IN (#{placeholders})",
         post_ids
       ).rows
-      |> Enum.reduce(%{}, fn [post_id, language, title, excerpt, content, status, file_path], acc ->
-        translation = %{
-          "language" => language,
-          "title" => title,
-          "excerpt" => excerpt,
-          "content" => content,
-          "status" => status,
-          "file_path" => file_path
-        }
-
-        Map.update(acc, post_id, [translation], &(&1 ++ [translation]))
-      end)
+      |> Enum.group_by(
+        fn [post_id | _] -> post_id end,
+        fn [_post_id, language, title, excerpt, content, status, file_path] ->
+          %{
+            "language" => language,
+            "title" => title,
+            "excerpt" => excerpt,
+            "content" => content,
+            "status" => status,
+            "file_path" => file_path
+          }
+        end
+      )
     end
   end
 
@@ -605,9 +659,7 @@ defmodule BDS.Search do
         where: translation.translation_for in ^media_ids,
         select: {translation.translation_for, translation}
       )
-      |> Enum.reduce(%{}, fn {media_id, translation}, acc ->
-        Map.update(acc, media_id, [translation], &(&1 ++ [translation]))
-      end)
+      |> Enum.group_by(fn {media_id, _} -> media_id end, fn {_, translation} -> translation end)
     end
   end
 

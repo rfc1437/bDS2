@@ -120,13 +120,14 @@
 
 ## High Severity
 
-### CSM-006 — N+1 Queries in Reindexing & Rendering
-- **Files:** `lib/bds/search.ex:166-177`, `lib/bds/rendering/list_archive.ex:181`, `lib/bds/rendering/post_rendering.ex:21`
-- **What:**
-  - `Search.reindex_posts/1` (Z. 172-177) calls `insert_post_index/1` per post inside `Enum.each`; `insert_post_index` calls `post_index_fields/1` (Z. 268) which calls `post_translations/1` (Z. 494) — one query per post for translations. Same for media reindexing.
-  - `ListArchive` (Z. 181) and `PostRendering` (Z. 21) call `load_post_record/1` per-post inside `Enum.map`, which does `Repo.get(Post, post_id)` per iteration.
-- **Fix:** Preload all translations in a single query before the loop, or batch-insert with `Repo.insert_all`. For rendering, preload all needed records in one query.
-- **Test:** Reindex 100 posts; assert the total query count is <5 (use `Ecto.Adapters.SQL.query!/2` hook or logger capture).
+### ~~CSM-006 — N+1 Queries in Reindexing & Rendering~~ ✅ FIXED
+- **Fixed:** 2026-05-08
+- **What was done:**
+  - **Batch INSERT for reindexing:** Replaced per-row `Repo.query!` INSERT in `reindex_posts/2` and `reindex_media/2` with multi-row batch INSERTs. Rows are chunked at 166 per batch (SQLite 999-parameter limit ÷ 6 columns). Translations were already preloaded in batch; fixed O(n²) `acc ++ [translation]` pattern in `preload_post_translations` and `preload_media_translations` by replacing with `Enum.group_by`.
+  - **Rendering — preloaded post records:** `PostRendering.post_assigns/2` now accepts an optional `:_post_record` key in assigns, skipping the `Repo.get(Post, id)` re-query when the record is already available.
+  - **Generation outputs pass records:** `build_page_outputs` and `build_post_outputs` in `outputs.ex` now pass the already-loaded post/translation records via `:_post_record`, eliminating per-post DB queries during generation.
+  - **ListArchive** already used `load_post_records_batch` (batch query) — no change needed.
+  - Added telemetry-based query counting tests: reindex 100 posts/media and assert total query count <10.
 
 ---
 
@@ -417,6 +418,7 @@
   - CSM-002: Fixed. Search now pushes all filtering and pagination into SQL via Ecto queries and CTEs.
   - CSM-004: Fixed. `attach_runner` moved to `handle_continue`, `terminate/2` added for cleanup, `restart: :temporary` set, JobStore `detach_runner` bug fixed.
 - [ ] All high-severity items (CSM-006 to CSM-010) have been addressed.
+  - CSM-006: Fixed. Batch INSERT for reindexing, preloaded post records for rendering.
 - [x] CSM-001 fix covers ALL 6 affected files, not just `import_definitions.ex`.
 - [x] CSM-003 fix covers ALL `Repo.delete!` call sites (posts, tags, scripts, media, projects, templates, translations).
 - [ ] CSM-007 decomposition is the prerequisite for fixing CSM-008 (render-path queries).

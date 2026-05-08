@@ -20,7 +20,7 @@ defmodule BDS.Rendering.PostRendering do
     language = MapUtils.attr(assigns, :language, metadata.main_language || "en")
 
     main_language = metadata.main_language || language
-    post_record = load_post_record(assigns)
+    post_record = Map.get(assigns, :_post_record) || load_post_record(assigns)
     canonical_post = canonical_post_record(post_record)
     post_id = canonical_post_id(post_record, assigns)
     post_categories = Map.get(post_record || %{}, :categories, []) || []

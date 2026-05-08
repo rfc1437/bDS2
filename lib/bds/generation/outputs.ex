@@ -391,7 +391,8 @@ defmodule BDS.Generation.Outputs do
              content: body,
              slug: post.slug,
              language: canonical_variant.language,
-             excerpt: canonical_variant.excerpt
+             excerpt: canonical_variant.excerpt,
+             _post_record: canonical_variant
            },
            fn ->
              render_post_page(
@@ -422,7 +423,8 @@ defmodule BDS.Generation.Outputs do
                content: body,
                slug: post.slug,
                language: Map.get(post, :language),
-               excerpt: post.excerpt
+               excerpt: post.excerpt,
+               _post_record: post
              },
              fn -> render_post_page(post.title, body, post.slug, Map.get(post, :language)) end
            )}
@@ -517,7 +519,8 @@ defmodule BDS.Generation.Outputs do
              content: body,
              slug: post.slug,
              language: canonical_variant.language,
-             excerpt: canonical_variant.excerpt
+             excerpt: canonical_variant.excerpt,
+             _post_record: canonical_variant
            },
            fn ->
              render_post_page(
@@ -546,7 +549,8 @@ defmodule BDS.Generation.Outputs do
                content: body,
                slug: post.slug,
                language: Map.get(post, :language),
-               excerpt: post.excerpt
+               excerpt: post.excerpt,
+               _post_record: post
              },
              fn -> render_post_page(post.title, body, post.slug, Map.get(post, :language)) end
            )}

@@ -21,12 +21,15 @@ defmodule BDS.CSM006N1ReindexTest do
   end
 
   describe "Search.reindex_posts/2" do
-    test "preloads all translations in a single query, not per-post", %{project: project} do
+    test "uses batch inserts — query count does not scale with post count", %{project: project} do
       _post_ids = create_posts_with_translations(project.id, 100)
 
       query_count = count_queries(fn -> Search.reindex_posts(project.id) end)
 
-      assert query_count < 10, "Expected <10 queries, got #{query_count}"
+      # 1 DELETE + 1 SELECT posts + 1 SELECT translations + 1 batch INSERT = 4
+      # (may be a few more for chunking, but must be << 100)
+      assert query_count > 0, "Telemetry counting returned 0 — check event name"
+      assert query_count < 10, "Expected <10 queries for 100 posts, got #{query_count}"
     end
 
     test "correctly indexes posts and their translations", %{project: project} do
@@ -57,12 +60,13 @@ defmodule BDS.CSM006N1ReindexTest do
   end
 
   describe "Search.reindex_media/2" do
-    test "preloads all media translations in a single query, not per-media", %{project: project} do
+    test "uses batch inserts — query count does not scale with media count", %{project: project} do
       _media_ids = create_media_with_translations(project.id, 100)
 
       query_count = count_queries(fn -> Search.reindex_media(project.id) end)
 
-      assert query_count < 10, "Expected <10 queries, got #{query_count}"
+      assert query_count > 0, "Telemetry counting returned 0 — check event name"
+      assert query_count < 10, "Expected <10 queries for 100 media items, got #{query_count}"
     end
 
     test "correctly indexes media and their translations", %{project: project} do
@@ -172,7 +176,32 @@ defmodule BDS.CSM006N1ReindexTest do
   end
 
   defp count_queries(func) do
+    test_pid = self()
+    ref = make_ref()
+
+    handler_id = "csm006-query-counter-#{inspect(ref)}"
+
+    :telemetry.attach(
+      handler_id,
+      [:bds, :repo, :query],
+      fn _event, _measurements, _metadata, _ ->
+        send(test_pid, {:query_executed, ref})
+      end,
+      nil
+    )
+
     func.()
-    1
+
+    :telemetry.detach(handler_id)
+
+    count_messages(ref, 0)
+  end
+
+  defp count_messages(ref, acc) do
+    receive do
+      {:query_executed, ^ref} -> count_messages(ref, acc + 1)
+    after
+      0 -> acc
+    end
   end
 end
