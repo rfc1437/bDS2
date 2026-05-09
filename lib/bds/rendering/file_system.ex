@@ -25,17 +25,23 @@ defmodule BDS.Rendering.FileSystem do
         raise Liquex.Error, message: "Illegal template path '#{template_path}'"
 
       true ->
+        filename = ensure_liquid_ext(normalized_path)
+
         root_paths
-        |> Enum.map(&Path.expand(Path.join(&1, normalized_path <> ".liquid")))
+        |> Enum.map(&Path.expand(Path.join(&1, filename)))
         |> Enum.find(&File.regular?/1)
         |> case do
           nil ->
-            Path.expand(Path.join(List.first(root_paths) || ".", normalized_path <> ".liquid"))
+            Path.expand(Path.join(List.first(root_paths) || ".", filename))
 
           path ->
             path
         end
     end
+  end
+
+  defp ensure_liquid_ext(path) do
+    if Path.extname(path) == ".liquid", do: path, else: path <> ".liquid"
   end
 end
 

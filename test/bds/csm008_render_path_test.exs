@@ -8,6 +8,7 @@ defmodule BDS.CSM008RenderPathTest do
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+    Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
 
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-csm008-#{System.unique_integer([:positive])}")

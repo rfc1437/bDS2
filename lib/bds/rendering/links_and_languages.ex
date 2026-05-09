@@ -50,13 +50,13 @@ defmodule BDS.Rendering.LinksAndLanguages do
         ])
         |> String.downcase()
 
-      Map.put(acc, source_key, "/" <> media.file_path)
+      Map.put(acc, source_key, Path.join("/", media.file_path))
     end)
   end
 
   def post_path(post, language_prefix)
       when is_binary(language_prefix) and language_prefix != "" do
-    language_prefix <> post_path(post, nil)
+    String.trim_trailing(language_prefix, "/") <> post_path(post, nil)
   end
 
   def post_path(post, ""), do: post_path(post, nil)
@@ -65,13 +65,12 @@ defmodule BDS.Rendering.LinksAndLanguages do
     datetime = Persistence.from_unix_ms!(post.created_at)
 
     Path.join([
+      "/",
       Integer.to_string(datetime.year),
       String.pad_leading(Integer.to_string(datetime.month), 2, "0"),
       String.pad_leading(Integer.to_string(datetime.day), 2, "0"),
-      post.slug,
-      "index.html"
-    ])
-    |> then(&("/" <> String.trim_trailing(&1, "index.html")))
+      post.slug
+    ]) <> "/"
   end
 
   def post_path(post, language, main_language) do

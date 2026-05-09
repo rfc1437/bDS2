@@ -8,6 +8,7 @@ defmodule BDS.CSM011UrlStateTest do
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+    Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
 
     prev = System.get_env("BDS_DESKTOP_AUTOMATION")
     System.put_env("BDS_DESKTOP_AUTOMATION", "1")

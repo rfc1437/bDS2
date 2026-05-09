@@ -24,6 +24,10 @@ defmodule BDS.Rendering.Metadata do
     Enum.map(items, &to_template_menu_item/1)
   end
 
+  def menu_items_from_raw(items) when is_list(items) do
+    Enum.map(items, &to_template_menu_item/1)
+  end
+
   defp to_template_menu_item(item) do
     kind = Map.get(item, :kind)
     children = Enum.map(Map.get(item, :children, []), &to_template_menu_item/1)
@@ -40,7 +44,7 @@ defmodule BDS.Rendering.Metadata do
   defp menu_item_href(%{kind: :home}), do: "/"
 
   defp menu_item_href(%{kind: :page, slug: slug}) when is_binary(slug) and slug != "",
-    do: "/#{slug}/"
+    do: "/#{URI.encode(slug)}/"
 
   defp menu_item_href(%{kind: :category_archive, slug: slug}) when is_binary(slug) and slug != "",
     do: "/category/#{URI.encode(slug)}/"
@@ -109,7 +113,7 @@ defmodule BDS.Rendering.Metadata do
   def default_pico_stylesheet_href(theme), do: PreviewAssets.stylesheet_href(theme)
 
   def href_for_language(""), do: "/"
-  def href_for_language(prefix), do: prefix <> "/"
+  def href_for_language(prefix), do: String.trim_trailing(prefix, "/") <> "/"
 
   def calendar_initial_year(%{created_at: created_at}) when is_integer(created_at),
     do: Persistence.from_unix_ms!(created_at).year

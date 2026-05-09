@@ -270,15 +270,15 @@
 
 ---
 
-### CSM-016 — String Concatenation for Paths
-- **Files:**
-  - `lib/bds/rendering/metadata.ex:43` — `"/#{slug}/"`
-  - `lib/bds/rendering/metadata.ex:112` — `prefix <> "/"`
-  - `lib/bds/publishing.ex:284` — `String.trim_trailing(path, "/") <> "/"`
-  - `lib/bds/rendering/file_system.ex:29` — `normalized_path <> ".liquid"`
-  - `lib/bds/rendering/links_and_languages.ex` — path construction with `<>`
-- **Fix:** Use `Path.join/1-2` and `Path.extname` / `Path.rootname`. For `"/#{slug}/"`, use `Path.join(["/", slug])` or `"/" <> slug <> "/"` → `URI.encode(slug)` is already used elsewhere.
-- **Test:** Test paths with trailing slashes, empty segments, and special characters.
+### ~~CSM-016 — String Concatenation for Paths~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - **`lib/bds/rendering/file_system.ex`** — Extracted `ensure_liquid_ext/1` using `Path.extname/1` to check before appending `.liquid`, preventing double-extension bugs (e.g. `"header.liquid.liquid"`).
+  - **`lib/bds/rendering/metadata.ex`** — `menu_item_href` for `:page` kind now applies `URI.encode/1` to the slug (matching the existing `:category_archive` pattern). `href_for_language/1` now uses `String.trim_trailing(prefix, "/")` before appending `/` to prevent double trailing slashes.
+  - **`lib/bds/rendering/metadata.ex`** — Added `menu_items_from_raw/1` public function for testability.
+  - **`lib/bds/rendering/links_and_languages.ex`** — `post_path/2` for `nil` language now uses `Path.join(["/", year, month, day, slug]) <> "/"` instead of building with `index.html` then stripping it. Language-prefix clause uses `String.trim_trailing/2` to prevent double slashes. `canonical_media_path_by_source_path/1` uses `Path.join("/", media.file_path)` instead of `"/" <> file_path`.
+  - **`lib/bds/publishing.ex`** — `ensure_trailing_slash/1` made public for testability (implementation already correct).
+  - Added 17 tests in `test/bds/csm016_path_concatenation_test.exs`: FileSystem extension handling (bare name, double extension, nested paths), `href_for_language` (empty, with/without trailing slash), menu item href encoding (special chars, plain slugs, category slugs), post_path construction (leading/trailing slashes, no double slashes, language prefix), `language_prefix` (same/nil/different language), `ensure_trailing_slash` (without/with trailing slash, empty string).
 
 ---
 
