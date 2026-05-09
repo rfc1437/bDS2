@@ -11,6 +11,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
 
   alias BDS.Desktop.ShellLive.{
     MediaEditor,
+    Notify,
     PostEditor,
     TabHelpers
   }
@@ -170,7 +171,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
                   "[#{result.original_name}](bds-media://#{result.media_id})"
                 end
 
-              send(self(), {:post_editor_insert_content, post_id, syntax})
+              Notify.parent({:post_editor_insert_content, post_id, syntax})
               socket
           end
 
@@ -195,7 +196,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
             end
 
           if details do
-            send(self(), {:post_editor_insert_content, post_id, details})
+            Notify.parent({:post_editor_insert_content, post_id, details})
           end
 
           socket
@@ -213,7 +214,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
     socket =
       case {socket.assigns[:shell_overlay], current_tab} do
         {%{kind: :language_picker}, %{type: :post, id: post_id}} ->
-          send(self(), {:post_editor_translate, post_id, code})
+          Notify.parent({:post_editor_translate, post_id, code})
           socket
 
         {%{kind: :language_picker}, %{type: :media, id: media_id}} ->

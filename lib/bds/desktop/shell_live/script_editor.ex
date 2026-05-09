@@ -4,6 +4,7 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
   use Phoenix.LiveComponent
 
   alias BDS.{Scripts, Scripting}
+  alias BDS.Desktop.ShellLive.Notify
   alias BDS.Scripts.Script
   use Gettext, backend: BDS.Gettext
 
@@ -225,7 +226,7 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
 
     case Scripts.delete_script(script_id) do
       {:ok, _deleted} ->
-        send(self(), {:close_tab, :scripts, script_id})
+        Notify.close_tab(:scripts, script_id)
         socket
 
       {:error, reason} ->
@@ -282,12 +283,12 @@ defmodule BDS.Desktop.ShellLive.ScriptEditor do
   end
 
   defp notify_output(socket, title, message, level \\ "info") do
-    send(self(), {:script_editor_output, title, message, level})
+    Notify.output(title, message, level)
     socket
   end
 
   defp notify_reload(socket) do
-    send(self(), :reload_shell)
+    Notify.reload()
     socket
   end
 end

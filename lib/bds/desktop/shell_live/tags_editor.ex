@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
   import Ecto.Query
 
   alias BDS.{Repo, Tags}
+  alias BDS.Desktop.ShellLive.Notify
   alias BDS.Posts.Post
   alias BDS.Tags.Tag
   alias BDS.Templates.Template
@@ -292,11 +293,11 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
   defp noreply(socket), do: {:noreply, socket}
 
   defp notify_parent(message) do
-    send(self(), message)
+    Notify.parent(message)
   end
 
   defp notify_output(title, message, level) do
-    send(self(), {:tags_editor_output, title, message, level})
+    Notify.output(title, message, level)
   end
 
   @spec tag_font_size(term(), term()) :: term()

@@ -282,23 +282,26 @@
 
 ---
 
-### CSM-017 — `send(self(), ...)` Component Chatter
-- **Files:** 25+ call sites across editor components:
-  - `lib/bds/desktop/shell_live/script_editor.ex` (3 sends)
-  - `lib/bds/desktop/shell_live/post_editor.ex` (2 sends)
-  - `lib/bds/desktop/shell_live/template_editor.ex` (3 sends)
-  - `lib/bds/desktop/shell_live/media_editor.ex` (2 sends)
-  - `lib/bds/desktop/shell_live/chat_editor.ex` (1 send)
-  - `lib/bds/desktop/shell_live/menu_editor.ex` (1 send)
-  - `lib/bds/desktop/shell_live/settings_editor.ex` (2 sends)
-  - `lib/bds/desktop/shell_live/misc_editor.ex` (4 sends)
-  - `lib/bds/desktop/shell_live/tags_editor.ex` (2 sends)
-  - `lib/bds/desktop/shell_live/import_editor.ex` (1 send)
-  - `lib/bds/desktop/shell_live/overlay_manager.ex` (3 sends)
-  - `lib/bds/desktop/main_window.ex` (1 send)
-- **What:** Components send messages to the parent via `send(self(), ...)`, forcing a broad `handle_info` in `ShellLive`. Each message type must be handled in the parent, creating tight coupling.
-- **Fix:** Prefer `Phoenix.LiveView.send_update/2` for targeted component updates, or delegate through a single dispatch module that translates actions into specific state changes.
-- **Test:** Refactor one component; assert it no longer uses `send(self(), ...)`.
+### ~~CSM-017 — `send(self(), ...)` Component Chatter~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - Created `BDS.Desktop.ShellLive.Notify` — a single dispatch module that standardizes all parent communication from LiveComponent editors. Provides typed functions: `output/3`, `output/4`, `tab_meta/4`, `tab_meta_merge/3`, `close_tab/2`, `reload/0`, `dirty/3`, `command/2`, `open_sidebar_item/2`, and `parent/1` (escape hatch for chat-specific messages).
+  - Replaced all 25+ `send(self(), ...)` calls across 11 editor components with `Notify.*` calls:
+    - `post_editor.ex` — 13 calls (dirty, tab_meta, close_tab, output)
+    - `media_editor.ex` — 7 calls (dirty, tab_meta, output)
+    - `chat_editor.ex` — 15 calls (output, tab_meta, open_sidebar_item, plus chat-specific via `Notify.parent`)
+    - `template_editor.ex` — 3 calls (close_tab, output, reload)
+    - `script_editor.ex` — 3 calls (close_tab, output, reload)
+    - `misc_editor.ex` — 4 calls (command, output, tab_meta_merge, open_sidebar_item)
+    - `settings_editor.ex` — 2 calls (output, parent)
+    - `tags_editor.ex` — 2 calls (output, parent)
+    - `menu_editor.ex` — 1 call (output)
+    - `import_editor.ex` — 2 calls (tab_meta, output)
+    - `overlay_manager.ex` — 3 calls (parent for cross-component routing)
+  - Consolidated Bridges from 30+ editor-specific `handle_info` clauses to 4 generic handlers: `{:editor_output, ...}`, `{:editor_tab_meta, ...}`, `{:editor_dirty, ...}`, `{:editor_command, ...}`.
+  - Removed 18 editor-specific message atoms from Bridges (`:post_editor_output`, `:media_editor_output`, `:post_editor_dirty`, `:media_editor_dirty`, `:post_editor_tab_meta`, etc.).
+  - Kept chat-specific messages (`{:chat_editor_task_started, ...}`, `{:chat_editor_toggle_sidebar}`, etc.) and cross-component routing (`{:post_editor_insert_content, ...}`) in Bridges since they originate from AI streaming or overlay actions, not from editor self-notification.
+  - Added 24 tests in `test/bds/csm017_component_chatter_test.exs`: 11 source-level tests asserting no `send(self(), ...)` in any editor file, 1 aggregate test verifying all shell_live `send(self(), ...)` calls are in `notify.ex`, 2 Bridges tests verifying old patterns are gone and new generic handlers exist, 10 Notify API tests verifying each function sends the correct message.
 
 ---
 

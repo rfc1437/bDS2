@@ -4,6 +4,7 @@ defmodule BDS.Desktop.ShellLive.TemplateEditor do
   use Phoenix.LiveComponent
 
   alias BDS.{MCP, Templates}
+  alias BDS.Desktop.ShellLive.Notify
   alias BDS.Templates.Template
   use Gettext, backend: BDS.Gettext
 
@@ -182,7 +183,7 @@ defmodule BDS.Desktop.ShellLive.TemplateEditor do
 
     case Templates.delete_template(template_id, force: true) do
       {:ok, _deleted} ->
-        send(self(), {:close_tab, :templates, template_id})
+        Notify.close_tab(:templates, template_id)
         socket
 
       {:error, reason} ->
@@ -231,12 +232,12 @@ defmodule BDS.Desktop.ShellLive.TemplateEditor do
   defp normalize_template_kind(_kind), do: :post
 
   defp notify_output(socket, title, message, level \\ "info") do
-    send(self(), {:template_editor_output, title, message, level})
+    Notify.output(title, message, level)
     socket
   end
 
   defp notify_reload(socket) do
-    send(self(), :reload_shell)
+    Notify.reload()
     socket
   end
 end

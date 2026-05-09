@@ -9,24 +9,72 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   alias BDS.Desktop.ShellLive.{CliSync, SessionUtil}
   alias BDS.UI.Workbench
 
+  @refreshable_tab_meta_types [:import, :chat]
+
   @spec handle_info(tuple() | atom(), Phoenix.LiveView.Socket.t(), map()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
-  def handle_info({:import_editor_output, title, message, level}, socket, callbacks) do
-    {:noreply, callbacks.append_output.(socket, title, message, nil, level)}
+
+  # ── Generic editor notifications (sent via Notify module) ────────────────
+
+  def handle_info({:editor_output, title, message, detail, level}, socket, callbacks) do
+    {:noreply, callbacks.append_output.(socket, title, message, detail, level)}
   end
 
-  def handle_info({:import_editor_tab_meta, definition_id, title, subtitle}, socket, callbacks) do
-    tab_meta =
-      Map.put(socket.assigns.tab_meta, {:import, definition_id}, %{
-        title: title,
-        subtitle: subtitle || ""
-      })
+  def handle_info({:editor_tab_meta, type, id, updates}, socket, callbacks)
+      when is_atom(type) and is_map(updates) do
+    key = {type, id}
+    current_meta = Map.get(socket.assigns.tab_meta, key, %{})
+    next_meta = Map.merge(current_meta, updates)
+    tab_meta = Map.put(socket.assigns.tab_meta, key, next_meta)
 
+    socket = assign(socket, :tab_meta, tab_meta)
+
+    if type in @refreshable_tab_meta_types do
+      {:noreply, callbacks.refresh_sidebar.(socket, socket.assigns.workbench)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({:editor_dirty, type, id, dirty?}, socket, _callbacks) do
+    workbench =
+      if dirty? do
+        Workbench.mark_dirty(socket.assigns.workbench, type, id)
+      else
+        Workbench.clear_dirty(socket.assigns.workbench, type, id)
+      end
+
+    {:noreply, assign(socket, :workbench, workbench)}
+  end
+
+  def handle_info({:editor_command, action, params}, socket, callbacks) do
+    {:noreply, callbacks.apply_shell_command.(socket, action, params)}
+  end
+
+  # ── Shared actions (already generic) ─────────────────────────────────────
+
+  def handle_info({:open_sidebar_item, params, intent}, socket, callbacks) do
+    {:noreply, callbacks.open_sidebar.(socket, params, intent)}
+  end
+
+  def handle_info(:reload_shell, socket, callbacks) do
+    {:noreply, callbacks.reload.(socket, socket.assigns.workbench)}
+  end
+
+  def handle_info({:close_tab, type, id}, socket, callbacks) do
     {:noreply,
-     socket
-     |> assign(:tab_meta, tab_meta)
-     |> callbacks.refresh_sidebar.(socket.assigns.workbench)}
+     callbacks.refresh_layout.(socket, Workbench.close_tab(socket.assigns.workbench, type, id))}
   end
+
+  def handle_info(:tags_changed, socket, callbacks) do
+    {:noreply, callbacks.refresh_content.(socket, socket.assigns.workbench)}
+  end
+
+  def handle_info(:settings_changed, socket, callbacks) do
+    {:noreply, callbacks.reload.(socket, socket.assigns.workbench)}
+  end
+
+  # ── Chat editor messages (sent from AI streaming, not from Notify) ──────
 
   def handle_info({:chat_tool_call, conversation_id, tool_call}, socket, _callbacks) do
     send_update(ChatEditor,
@@ -68,27 +116,6 @@ defmodule BDS.Desktop.ShellLive.Bridges do
     {:noreply, assign(socket, :chat_editor_request_refs, refs)}
   end
 
-  def handle_info({:chat_editor_output, title, message, level}, socket, callbacks) do
-    {:noreply, callbacks.append_output.(socket, title, message, nil, level)}
-  end
-
-  def handle_info({:chat_editor_tab_meta, conversation_id, title, subtitle}, socket, callbacks) do
-    tab_meta =
-      Map.put(socket.assigns.tab_meta, {:chat, conversation_id}, %{
-        title: title,
-        subtitle: subtitle || ""
-      })
-
-    {:noreply,
-     socket
-     |> assign(:tab_meta, tab_meta)
-     |> callbacks.refresh_sidebar.(socket.assigns.workbench)}
-  end
-
-  def handle_info({:open_sidebar_item, params, intent}, socket, callbacks) do
-    {:noreply, callbacks.open_sidebar.(socket, params, intent)}
-  end
-
   def handle_info({:chat_editor_toggle_sidebar}, socket, callbacks) do
     {:noreply,
      callbacks.refresh_layout.(socket, Workbench.toggle_sidebar(socket.assigns.workbench))}
@@ -111,6 +138,35 @@ defmodule BDS.Desktop.ShellLive.Bridges do
     {:noreply,
      callbacks.refresh_sidebar.(socket, Workbench.click_activity(socket.assigns.workbench, view))}
   end
+
+  # ── Post editor cross-component messages (sent from OverlayManager) ─────
+
+  def handle_info({:post_editor_insert_content, post_id, content}, socket, _callbacks) do
+    send_update(PostEditor,
+      id: "post-editor-#{post_id}",
+      action: :insert_content,
+      content: content
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:post_editor_translate, post_id, language}, socket, _callbacks) do
+    send_update(PostEditor, id: "post-editor-#{post_id}", action: :translate, language: language)
+    {:noreply, socket}
+  end
+
+  def handle_info({:post_editor_apply_ai_suggestions, post_id, fields}, socket, _callbacks) do
+    send_update(PostEditor,
+      id: "post-editor-#{post_id}",
+      action: :apply_ai_suggestions,
+      fields: fields
+    )
+
+    {:noreply, socket}
+  end
+
+  # ── External system messages ─────────────────────────────────────────────
 
   def handle_info({:entity_changed, payload}, socket, callbacks) when is_map(payload) do
     {:noreply, CliSync.apply_entity_change(socket, payload, callbacks.refresh_content)}
@@ -153,127 +209,6 @@ defmodule BDS.Desktop.ShellLive.Bridges do
     end
 
     {:noreply, socket}
-  end
-
-  def handle_info({:tags_editor_output, title, message, level}, socket, callbacks) do
-    {:noreply, callbacks.append_output.(socket, title, message, nil, level)}
-  end
-
-  def handle_info(:tags_changed, socket, callbacks) do
-    {:noreply, callbacks.refresh_content.(socket, socket.assigns.workbench)}
-  end
-
-  def handle_info({:settings_output, title, message, level}, socket, callbacks) do
-    {:noreply, callbacks.append_output.(socket, title, message, nil, level)}
-  end
-
-  def handle_info(:settings_changed, socket, callbacks) do
-    {:noreply, callbacks.reload.(socket, socket.assigns.workbench)}
-  end
-
-  def handle_info({:menu_editor_output, title, message, level}, socket, callbacks) do
-    {:noreply, callbacks.append_output.(socket, title, message, nil, level)}
-  end
-
-  def handle_info({:script_editor_output, title, message, level}, socket, callbacks) do
-    {:noreply, callbacks.append_output.(socket, title, message, nil, level)}
-  end
-
-  def handle_info({:template_editor_output, title, message, level}, socket, callbacks) do
-    {:noreply, callbacks.append_output.(socket, title, message, nil, level)}
-  end
-
-  def handle_info({:misc_editor_output, title, message, _detail, level}, socket, callbacks) do
-    {:noreply, callbacks.append_output.(socket, title, message, nil, level)}
-  end
-
-  def handle_info({:misc_editor_command, action, params}, socket, callbacks) do
-    {:noreply, callbacks.apply_shell_command.(socket, action, params)}
-  end
-
-  def handle_info({:misc_editor_tab_meta, tab_type, tab_id, updates}, socket, _callbacks) do
-    key = {tab_type, tab_id}
-    current_meta = Map.get(socket.assigns.tab_meta, key, %{})
-    next_meta = Map.merge(current_meta, updates)
-    {:noreply, assign(socket, :tab_meta, Map.put(socket.assigns.tab_meta, key, next_meta))}
-  end
-
-  def handle_info({:post_editor_output, title, message, level}, socket, callbacks) do
-    {:noreply, callbacks.append_output.(socket, title, message, nil, level)}
-  end
-
-  def handle_info({:post_editor_dirty, post_id, dirty?}, socket, _callbacks) do
-    workbench =
-      if dirty? do
-        Workbench.mark_dirty(socket.assigns.workbench, :post, post_id)
-      else
-        Workbench.clear_dirty(socket.assigns.workbench, :post, post_id)
-      end
-
-    {:noreply, assign(socket, :workbench, workbench)}
-  end
-
-  def handle_info({:post_editor_tab_meta, post_id, title, subtitle}, socket, _callbacks) do
-    tab_meta =
-      Map.put(socket.assigns.tab_meta, {:post, post_id}, %{title: title, subtitle: subtitle})
-
-    {:noreply, assign(socket, :tab_meta, tab_meta)}
-  end
-
-  def handle_info({:post_editor_insert_content, post_id, content}, socket, _callbacks) do
-    send_update(PostEditor,
-      id: "post-editor-#{post_id}",
-      action: :insert_content,
-      content: content
-    )
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:post_editor_translate, post_id, language}, socket, _callbacks) do
-    send_update(PostEditor, id: "post-editor-#{post_id}", action: :translate, language: language)
-    {:noreply, socket}
-  end
-
-  def handle_info({:post_editor_apply_ai_suggestions, post_id, fields}, socket, _callbacks) do
-    send_update(PostEditor,
-      id: "post-editor-#{post_id}",
-      action: :apply_ai_suggestions,
-      fields: fields
-    )
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:media_editor_output, title, message, level}, socket, callbacks) do
-    {:noreply, callbacks.append_output.(socket, title, message, nil, level)}
-  end
-
-  def handle_info({:media_editor_dirty, media_id, dirty?}, socket, _callbacks) do
-    workbench =
-      if dirty? do
-        Workbench.mark_dirty(socket.assigns.workbench, :media, media_id)
-      else
-        Workbench.clear_dirty(socket.assigns.workbench, :media, media_id)
-      end
-
-    {:noreply, assign(socket, :workbench, workbench)}
-  end
-
-  def handle_info({:media_editor_tab_meta, media_id, title, subtitle}, socket, _callbacks) do
-    tab_meta =
-      Map.put(socket.assigns.tab_meta, {:media, media_id}, %{title: title, subtitle: subtitle})
-
-    {:noreply, assign(socket, :tab_meta, tab_meta)}
-  end
-
-  def handle_info(:reload_shell, socket, callbacks) do
-    {:noreply, callbacks.reload.(socket, socket.assigns.workbench)}
-  end
-
-  def handle_info({:close_tab, type, id}, socket, callbacks) do
-    {:noreply,
-     callbacks.refresh_layout.(socket, Workbench.close_tab(socket.assigns.workbench, type, id))}
   end
 
   def handle_info(_message, socket, _callbacks), do: {:noreply, socket}

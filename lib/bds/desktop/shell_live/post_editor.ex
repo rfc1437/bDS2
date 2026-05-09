@@ -5,6 +5,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   alias BDS.{AI, Posts, Preview}
   alias BDS.Desktop.ShellData
+  alias BDS.Desktop.ShellLive.Notify
   alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, ListValues, Persistence, PostMetadata}
   alias BDS.Posts.Post
   alias BDS.Tags
@@ -181,7 +182,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       |> build_data()
 
     if dirty? != was_dirty? do
-      notify_parent({:post_editor_dirty, post_id, dirty?})
+      Notify.dirty(:post, post_id, dirty?)
     end
 
     {:noreply, socket}
@@ -456,12 +457,10 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               |> assign(:dirty?, false)
               |> build_data()
 
-            notify_parent(
-              {:post_editor_tab_meta, post.id, record_title(record, refreshed_post),
-               Atom.to_string(record_status(record))}
-            )
+            Notify.tab_meta(:post, post.id, record_title(record, refreshed_post),
+              Atom.to_string(record_status(record)))
 
-            notify_parent({:post_editor_dirty, post.id, false})
+            Notify.dirty(:post, post.id, false)
             notify_output(socket, dgettext("ui", "Post"), dgettext("ui", "Post saved"))
             socket
 
@@ -497,12 +496,10 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               |> assign(:dirty?, false)
               |> build_data()
 
-            notify_parent(
-              {:post_editor_tab_meta, post.id, record_title(record, refreshed_post),
-               Atom.to_string(record_status(record))}
-            )
+            Notify.tab_meta(:post, post.id, record_title(record, refreshed_post),
+              Atom.to_string(record_status(record)))
 
-            notify_parent({:post_editor_dirty, post.id, false})
+            Notify.dirty(:post, post.id, false)
             notify_output(socket, dgettext("ui", "Post"), dgettext("ui", "Post published"))
             socket
 
@@ -534,13 +531,11 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               |> assign(:dirty?, false)
               |> build_data()
 
-            notify_parent(
-              {:post_editor_tab_meta, post.id,
-               restored_post.title || restored_post.slug || restored_post.id,
-               Atom.to_string(restored_post.status || :draft)}
-            )
+            Notify.tab_meta(:post, post.id,
+              restored_post.title || restored_post.slug || restored_post.id,
+              Atom.to_string(restored_post.status || :draft))
 
-            notify_parent({:post_editor_dirty, post.id, false})
+            Notify.dirty(:post, post.id, false)
             socket
 
           {:error, reason} ->
@@ -555,7 +550,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
     case Posts.delete_post(post_id) do
       {:ok, :deleted} ->
-        notify_parent({:close_tab, :post, post_id})
+        Notify.close_tab(:post, post_id)
         socket
 
       {:error, reason} ->
@@ -642,7 +637,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               |> assign(:quick_actions_open?, false)
               |> build_data()
 
-            notify_parent({:post_editor_dirty, post_id, false})
+            Notify.dirty(:post, post_id, false)
             socket
           else
             {:error, reason} ->
@@ -698,7 +693,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
                 |> assign(:shell_overlay, nil)
                 |> build_data()
 
-              notify_parent({:post_editor_dirty, post_id, true})
+              Notify.dirty(:post, post_id, true)
               socket
 
             {:error, reason} ->
@@ -741,7 +736,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
             |> put_component_draft_field(field_key(kind), updated)
             |> build_data()
 
-          notify_parent({:post_editor_dirty, socket.assigns.post_id, true})
+          Notify.dirty(:post, socket.assigns.post_id, true)
           assign(socket, :dirty?, true)
         end
     end
@@ -771,7 +766,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
           |> put_component_draft_field(field_key(kind), updated)
           |> build_data()
 
-        notify_parent({:post_editor_dirty, socket.assigns.post_id, true})
+        Notify.dirty(:post, socket.assigns.post_id, true)
         assign(socket, :dirty?, true)
     end
   end
@@ -807,12 +802,8 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   defp assign_query(socket, :tags, value), do: assign(socket, :tag_query, value)
   defp assign_query(socket, :categories, value), do: assign(socket, :category_query, value)
 
-  defp notify_parent(message) do
-    send(self(), message)
-  end
-
   defp notify_output(socket, title, message, level \\ "info") do
-    send(self(), {:post_editor_output, title, message, level})
+    Notify.output(title, message, level)
     socket
   end
 

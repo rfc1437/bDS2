@@ -7,6 +7,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   alias BDS.{AI, BoundedAtoms, MapUtils, Persistence}
   alias BDS.Desktop.ShellLive.ChatEditor.{MessageBuild, ModelSelection, ToolTracking}
+  alias BDS.Desktop.ShellLive.Notify
   alias BDS.Desktop.ShellLive.TabHelpers
   use Gettext, backend: BDS.Gettext
 
@@ -77,7 +78,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         {:noreply, assign(socket, :model_selector_open?, false) |> build_data()}
 
       {:error, reason} ->
-        notify_parent({:chat_editor_output, dgettext("ui", "Chat"), inspect(reason), "error"})
+        Notify.output(dgettext("ui", "Chat"), inspect(reason), "error")
         {:noreply, assign(socket, :model_selector_open?, false) |> build_data()}
     end
   end
@@ -129,14 +130,14 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   end
 
   def handle_event("open_chat_settings", _params, socket) do
-    notify_parent(
-      {:open_sidebar_item,
-       %{
-         "route" => "settings",
-         "id" => "settings-ai",
-         "title" => "Settings",
-         "subtitle" => "AI"
-       }, :pin}
+    Notify.open_sidebar_item(
+      %{
+        "route" => "settings",
+        "id" => "settings-ai",
+        "title" => "Settings",
+        "subtitle" => "AI"
+      },
+      :pin
     )
 
     {:noreply, socket}
@@ -203,10 +204,8 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         build_data(socket)
 
       socket.assigns.offline_mode ->
-        notify_parent(
-          {:chat_editor_output, dgettext("ui", "Chat"),
-           dgettext("ui", "Automatic AI actions stay gated by airplane mode."), "info"}
-        )
+        Notify.output(dgettext("ui", "Chat"),
+          dgettext("ui", "Automatic AI actions stay gated by airplane mode."), "info")
 
         build_data(socket)
 
@@ -227,7 +226,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
         :ok = allow_repo_sandbox(task.pid)
 
-        notify_parent({:chat_editor_task_started, conversation_id, task.ref})
+        Notify.parent({:chat_editor_task_started, conversation_id, task.ref})
 
         socket
         |> assign(:input, "")
@@ -254,7 +253,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
       %{ref: ref} = _request ->
         :ok = AI.cancel_chat(conversation_id)
 
-        notify_parent({:chat_editor_task_cancelled, conversation_id, ref})
+        Notify.parent({:chat_editor_task_cancelled, conversation_id, ref})
 
         socket
         |> assign(:request, nil)
@@ -293,9 +292,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         assign(socket, :request, nil) |> build_data()
 
       {:error, reason} ->
-        notify_parent(
-          {:chat_editor_output, dgettext("ui", "Chat"), format_error(reason), "error"}
-        )
+        Notify.output(dgettext("ui", "Chat"), format_error(reason), "error")
 
         assign(socket, :request, nil) |> build_data()
     end
@@ -347,7 +344,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
       |> MapUtils.attr(:title)
 
     if is_binary(title) and String.trim(title) != "" do
-      notify_parent({:chat_editor_tab_meta, socket.assigns.conversation_id, title, ""})
+      Notify.tab_meta(:chat, socket.assigns.conversation_id, title, "")
     end
 
     socket
@@ -368,14 +365,14 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
       :open_post ->
         case Map.get(payload, "postId") || Map.get(payload, "post_id") do
           post_id when is_binary(post_id) and post_id != "" ->
-            notify_parent(
-              {:open_sidebar_item,
-               %{
-                 "route" => "post",
-                 "id" => post_id,
-                 "title" => TabHelpers.post_title(post_id),
-                 "subtitle" => TabHelpers.post_subtitle(post_id)
-               }, :pin}
+            Notify.open_sidebar_item(
+              %{
+                "route" => "post",
+                "id" => post_id,
+                "title" => TabHelpers.post_title(post_id),
+                "subtitle" => TabHelpers.post_subtitle(post_id)
+              },
+              :pin
             )
 
             assign(socket, :action_error, nil) |> build_data()
@@ -387,14 +384,14 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
       :open_media ->
         case Map.get(payload, "mediaId") || Map.get(payload, "media_id") do
           media_id when is_binary(media_id) and media_id != "" ->
-            notify_parent(
-              {:open_sidebar_item,
-               %{
-                 "route" => "media",
-                 "id" => media_id,
-                 "title" => TabHelpers.media_title(media_id),
-                 "subtitle" => TabHelpers.media_subtitle(media_id)
-               }, :pin}
+            Notify.open_sidebar_item(
+              %{
+                "route" => "media",
+                "id" => media_id,
+                "title" => TabHelpers.media_title(media_id),
+                "subtitle" => TabHelpers.media_subtitle(media_id)
+              },
+              :pin
             )
 
             assign(socket, :action_error, nil) |> build_data()
@@ -404,14 +401,14 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         end
 
       :open_settings ->
-        notify_parent(
-          {:open_sidebar_item,
-           %{
-             "route" => "settings",
-             "id" => "settings-ai",
-             "title" => "Settings",
-             "subtitle" => "AI"
-           }, :pin}
+        Notify.open_sidebar_item(
+          %{
+            "route" => "settings",
+            "id" => "settings-ai",
+            "title" => "Settings",
+            "subtitle" => "AI"
+          },
+          :pin
         )
 
         assign(socket, :action_error, nil) |> build_data()
@@ -421,14 +418,14 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
           Map.get(payload, "conversationId") || Map.get(payload, "conversation_id") ||
             socket.assigns.conversation_id
 
-        notify_parent(
-          {:open_sidebar_item,
-           %{
-             "route" => "chat",
-             "id" => chat_id,
-             "title" => Map.get(payload, "title", "Chat"),
-             "subtitle" => Map.get(payload, "subtitle", "")
-           }, :pin}
+        Notify.open_sidebar_item(
+          %{
+            "route" => "chat",
+            "id" => chat_id,
+            "title" => Map.get(payload, "title", "Chat"),
+            "subtitle" => Map.get(payload, "subtitle", "")
+          },
+          :pin
         )
 
         assign(socket, :action_error, nil) |> build_data()
@@ -439,20 +436,20 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
             set_action_error(socket, "Invalid payload for switchView action")
 
           view ->
-            notify_parent({:chat_editor_switch_view, view})
+            Notify.parent({:chat_editor_switch_view, view})
             assign(socket, :action_error, nil) |> build_data()
         end
 
       :toggle_sidebar ->
-        notify_parent({:chat_editor_toggle_sidebar})
+        Notify.parent({:chat_editor_toggle_sidebar})
         assign(socket, :action_error, nil) |> build_data()
 
       :toggle_panel ->
-        notify_parent({:chat_editor_toggle_panel})
+        Notify.parent({:chat_editor_toggle_panel})
         assign(socket, :action_error, nil) |> build_data()
 
       :toggle_assistant_sidebar ->
-        notify_parent({:chat_editor_toggle_assistant_sidebar})
+        Notify.parent({:chat_editor_toggle_assistant_sidebar})
         assign(socket, :action_error, nil) |> build_data()
 
       :unknown ->
@@ -822,9 +819,6 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   # ── Private helpers ───────────────────────────────────────────────────────
 
-  defp notify_parent(message) do
-    send(self(), message)
-  end
 
   defp active_project_id(socket) do
     socket.assigns[:project_id]

@@ -5,6 +5,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   alias BDS.{AI, ImportAnalysis, ImportDefinitions, ImportExecution}
   alias BDS.Desktop.{FilePicker, FolderPicker, ShellData}
+  alias BDS.Desktop.ShellLive.Notify
 
   alias BDS.Desktop.ShellLive.ImportEditor.{
     AnalysisState,
@@ -641,12 +642,11 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   defp maybe_update_tab_meta(socket, name) do
     title = name || dgettext("ui", "Untitled Import")
 
-    notify_parent(
-      {:import_editor_tab_meta, socket.assigns.definition_id, title,
-       dgettext(
-         "ui",
-         "Select a WordPress export file (WXR) and an uploads folder to analyze what would be imported."
-       )}
+    Notify.tab_meta(:import, socket.assigns.definition_id, title,
+      dgettext(
+        "ui",
+        "Select a WordPress export file (WXR) and an uploads folder to analyze what would be imported."
+      )
     )
 
     socket
@@ -1404,12 +1404,8 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   # ── Private helpers ───────────────────────────────────────────────────────
 
-  defp notify_parent(message) do
-    send(self(), message)
-  end
-
   defp notify_output(socket, title, message, level \\ "info") do
-    notify_parent({:import_editor_output, title, message, level})
+    Notify.output(title, message, level)
     socket
   end
 

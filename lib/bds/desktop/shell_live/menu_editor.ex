@@ -5,6 +5,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
 
   use Gettext, backend: BDS.Gettext
 
+  alias BDS.Desktop.ShellLive.Notify
+
   alias BDS.Desktop.ShellLive.MenuEditor.{
     DraftManagement,
     PageCategory,
@@ -251,7 +253,7 @@ defmodule BDS.Desktop.ShellLive.MenuEditor do
   end
 
   defp notify_output(title, message, level) do
-    send(self(), {:menu_editor_output, title, message, level})
+    Notify.output(title, message, level)
   end
 
   attr(:menu_editor, :map, required: true)

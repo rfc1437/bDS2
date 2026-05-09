@@ -7,6 +7,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   import Ecto.Query
 
   alias BDS.{Embeddings, Generation, Git, HelpDocs, Posts, Repo}
+  alias BDS.Desktop.ShellLive.Notify
   alias BDS.MapUtils
   alias BDS.Settings.Setting
   use Gettext, backend: BDS.Gettext
@@ -358,19 +359,19 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   # ── Private helpers ────────────────────────────────────────────────────────
 
   defp notify_command(action, params \\ %{}) do
-    send(self(), {:misc_editor_command, action, params})
+    Notify.command(action, params)
   end
 
   defp notify_output(title, message, detail \\ nil, level \\ "info") do
-    send(self(), {:misc_editor_output, title, message, detail, level})
+    Notify.output(title, message, detail, level)
   end
 
   defp notify_tab_meta(tab_type, tab_id, updates) do
-    send(self(), {:misc_editor_tab_meta, tab_type, tab_id, updates})
+    Notify.tab_meta_merge(tab_type, tab_id, updates)
   end
 
   defp notify_open_sidebar_item(params, intent) do
-    send(self(), {:open_sidebar_item, params, intent})
+    Notify.open_sidebar_item(params, intent)
   end
 
   defp rerun_action(assigns) do

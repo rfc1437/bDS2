@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   import Ecto.Query
 
   alias BDS.Desktop.{FilePicker}
+  alias BDS.Desktop.ShellLive.Notify
   alias BDS.{AI, I18n, Media}
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Media.Translation
@@ -90,7 +91,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
       |> build_data()
 
     if dirty? != was_dirty? do
-      notify_parent({:media_editor_dirty, socket.assigns.media_id, dirty?})
+      Notify.dirty(:media, socket.assigns.media_id, dirty?)
     end
 
     {:noreply, socket}
@@ -123,12 +124,10 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
               |> assign(:dirty?, false)
               |> build_data()
 
-            notify_parent({:media_editor_dirty, media.id, false})
+            Notify.dirty(:media, media.id, false)
 
-            notify_parent(
-              {:media_editor_tab_meta, media.id, display_title(updated_media),
-               updated_media.original_name || updated_media.mime_type || ""}
-            )
+            Notify.tab_meta(:media, media.id, display_title(updated_media),
+              updated_media.original_name || updated_media.mime_type || "")
 
             {:noreply, socket}
 
@@ -483,12 +482,10 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
               |> assign(:save_state, :saved)
               |> build_data()
 
-            notify_parent({:media_editor_dirty, media.id, false})
+            Notify.dirty(:media, media.id, false)
 
-            notify_parent(
-              {:media_editor_tab_meta, media.id, display_title(updated_media),
-               updated_media.original_name || updated_media.mime_type || ""}
-            )
+            Notify.tab_meta(:media, media.id, display_title(updated_media),
+              updated_media.original_name || updated_media.mime_type || "")
 
             notify_output(socket, dgettext("ui", "Media"), dgettext("ui", "Media saved"))
             socket
@@ -528,7 +525,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
           |> assign(:quick_actions_open?, false)
           |> build_data()
 
-        notify_parent({:media_editor_dirty, media.id, dirty?})
+        Notify.dirty(:media, media.id, dirty?)
         socket
     end
   end
@@ -569,12 +566,8 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
     end
   end
 
-  defp notify_parent(message) do
-    send(self(), message)
-  end
-
   defp notify_output(socket, title, message, level \\ "info") do
-    send(self(), {:media_editor_output, title, message, level})
+    Notify.output(title, message, level)
     socket
   end
 

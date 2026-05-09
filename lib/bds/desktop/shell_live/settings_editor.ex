@@ -12,6 +12,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
   alias BDS.Desktop.ShellLive.SettingsEditor.AISettings
   alias BDS.Desktop.ShellLive.SettingsEditor.EditorSettings
   alias BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories
+  alias BDS.Desktop.ShellLive.Notify
   alias BDS.Desktop.ShellLive.SettingsEditor.MCPConfig
   alias BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings
   alias BDS.Desktop.ShellLive.SettingsEditor.PublishingSettings
@@ -308,13 +309,13 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
 
   defp append_output_callback do
     fn socket, title, message, _details, level ->
-      send(self(), {:settings_output, title, message, level})
+      Notify.output(title, message, level)
       socket
     end
   end
 
   defp notify_parent(message) do
-    send(self(), message)
+    Notify.parent(message)
   end
 
   defp current_settings_section(assigns) do
