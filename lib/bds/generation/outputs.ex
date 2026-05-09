@@ -207,14 +207,16 @@ defmodule BDS.Generation.Outputs do
     Enum.flat_map(posts_by_category, fn {category, posts} ->
       paginated_posts = Enum.chunk_every(posts, max(plan.max_posts_per_page, 1))
       category_slug = archive_route_segment(category)
+      total_pages = length(paginated_posts)
+      total_items = length(posts)
 
       Enum.with_index(paginated_posts, 1)
       |> Enum.flat_map(fn {page_posts, page_number} ->
         Enum.map(languages, fn language ->
           pagination = %{
             current_page: page_number,
-            total_pages: length(paginated_posts),
-            total_items: length(posts),
+            total_pages: total_pages,
+            total_items: total_items,
             items_per_page: max(plan.max_posts_per_page, 1),
             has_prev_page: page_number > 1,
             prev_page_href:
@@ -227,9 +229,9 @@ defmodule BDS.Generation.Outputs do
                   ),
                 else: ""
               ),
-            has_next_page: page_number < length(paginated_posts),
+            has_next_page: page_number < total_pages,
             next_page_href:
-              if(page_number < length(paginated_posts),
+              if(page_number < total_pages,
                 do:
                   archive_href(
                     route_language(plan.language, language),
@@ -436,7 +438,8 @@ defmodule BDS.Generation.Outputs do
 
   @spec build_root_outputs(map(), String.t(), [map()]) :: [{String.t(), iodata()}]
   def build_root_outputs(plan, language, posts) do
-    total_pages = page_count(length(posts), plan.max_posts_per_page)
+    total_items = length(posts)
+    total_pages = page_count(total_items, plan.max_posts_per_page)
 
     posts
     |> paginate_posts(plan.max_posts_per_page)
@@ -454,7 +457,7 @@ defmodule BDS.Generation.Outputs do
          pagination_for_page(
            page_number,
            total_pages,
-           length(posts),
+           total_items,
            plan.max_posts_per_page,
            route_language,
            []
@@ -468,7 +471,8 @@ defmodule BDS.Generation.Outputs do
                                                                                        iodata())) ::
           [{String.t(), iodata()}]
   def build_paginated_archive_outputs(plan, languages, segments, posts, render_fun) do
-    total_pages = page_count(length(posts), plan.max_posts_per_page)
+    total_items = length(posts)
+    total_pages = page_count(total_items, plan.max_posts_per_page)
 
     posts
     |> paginate_posts(plan.max_posts_per_page)
@@ -484,7 +488,7 @@ defmodule BDS.Generation.Outputs do
            pagination_for_page(
              page_number,
              total_pages,
-             length(posts),
+             total_items,
              plan.max_posts_per_page,
              route_language,
              segments

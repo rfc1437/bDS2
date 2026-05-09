@@ -120,11 +120,13 @@ defmodule BDS.Publishing do
   defp run_upload(job_id, credentials, targets, uploader, report) do
     update_job(job_id, %{status: :running, error: nil})
 
+    target_count = max(length(targets), 1)
+
     result =
       Enum.with_index(targets, 1)
       |> Enum.reduce_while(:ok, fn {target, index}, :ok ->
         files = list_target_files(target)
-        report.(index / max(length(targets), 1), "Uploading #{target.kind}")
+        report.(index / target_count, "Uploading #{target.kind}")
 
         case uploader.(target, files, credentials) do
           :ok -> {:cont, :ok}

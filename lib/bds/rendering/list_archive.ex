@@ -303,13 +303,15 @@ defmodule BDS.Rendering.ListArchive do
       )
       |> Enum.sort_by(fn {label, _posts} -> label end)
 
+    last_index = length(grouped_blocks) - 1
+
     grouped_blocks
     |> Enum.with_index()
     |> Enum.map(fn {{date_label, grouped_posts}, index} ->
       %{
         date_label: date_label,
         show_date_marker: true,
-        show_separator: index < length(grouped_blocks) - 1,
+        show_separator: index < last_index,
         posts: Enum.sort_by(grouped_posts, &Map.get(&1, :created_at))
       }
     end)

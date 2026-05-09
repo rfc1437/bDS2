@@ -241,15 +241,21 @@
 
 ---
 
-### CSM-014 — O(n²) Loops from `length/1` Inside Iteration
-- **Files:**
-  - `lib/bds/publishing.ex:127` — `length(targets)` inside `Enum.reduce_while` (typically 3 targets, negligible impact)
-  - `lib/bds/rendering/list_archive.ex:299` — `index < length(grouped_blocks) - 1` inside `Enum.map`
-  - `lib/bds/generation/outputs.ex:216,230,232` — repeated `length(paginated_posts)` and `length(posts)` inside comprehensions
-  - `lib/bds/ui/sidebar.ex:556-565` — `acc.draft ++ [post]` in `Enum.reduce` (also covered by CSM-024)
-- **Note:** In `publishing.ex` the O(n²) is negligible (3 targets). The real impact is in `outputs.ex` and `list_archive.ex` with large post sets.
-- **Fix:** Bind `total = length(list)` before the loop. For `acc ++ [item]`, use reverse-accumulate + `Enum.reverse`.
-- **Test:** Run the function with a list of 1,000 items; assert it completes in linear time.
+### ~~CSM-014 — O(n²) Loops from `length/1` Inside Iteration~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - **`lib/bds/generation/outputs.ex`** — `build_category_outputs`:
+    - Bound `total_pages = length(paginated_posts)` and `total_items = length(posts)` before the nested loop. Previously called `length/1` 4 times per page × language iteration.
+  - **`lib/bds/generation/outputs.ex`** — `build_root_outputs`:
+    - Bound `total_items = length(posts)` before the loop, reused by `pagination_for_page`. Previously called `length(posts)` on every page iteration.
+  - **`lib/bds/generation/outputs.ex`** — `build_paginated_archive_outputs`:
+    - Bound `total_items = length(posts)` before the loop. Previously called `length(posts)` inside the nested page × language loop.
+  - **`lib/bds/rendering/list_archive.ex`** — `build_day_blocks`:
+    - Bound `last_index = length(grouped_blocks) - 1` before the `Enum.map`. Previously called `length(grouped_blocks)` on every iteration.
+  - **`lib/bds/publishing.ex`** — `run_upload`:
+    - Bound `target_count = max(length(targets), 1)` before the `Enum.reduce_while`. Negligible impact (3 targets) but fixed for consistency.
+  - `lib/bds/ui/sidebar.ex` `acc.draft ++ [post]` was already fixed by CSM-005 (replaced with `Enum.group_by`).
+  - Added 3 tests in `test/bds/csm014_length_in_loop_test.exs`: multi-page pagination correctness, single-page pagination correctness, 1000-post linear time completion.
 
 ---
 
