@@ -31,7 +31,7 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
         socket
         |> assign(:shell_overlay, nil)
         |> callbacks.append_output.(delete_title(route), inspect(reason), nil, "error")
-        |> callbacks.reload.(socket.assigns.workbench)
+        |> callbacks.refresh_content.(socket.assigns.workbench)
     end
   end
 
@@ -74,7 +74,7 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
           nil,
           "error"
         )
-        |> callbacks.reload.(socket.assigns.workbench)
+        |> callbacks.refresh_content.(socket.assigns.workbench)
     end
   end
 
@@ -88,7 +88,7 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
         socket
         |> assign(:shell_overlay, nil)
         |> assign(:tab_meta, Map.delete(socket.assigns.tab_meta, {type, id}))
-        |> callbacks.reload.(workbench)
+        |> callbacks.refresh_content.(workbench)
 
       {:error, reason} ->
         socket
@@ -99,7 +99,7 @@ defmodule BDS.Desktop.ShellLive.SidebarDelete do
           nil,
           "error"
         )
-        |> callbacks.reload.(socket.assigns.workbench)
+        |> callbacks.refresh_content.(socket.assigns.workbench)
     end
   end
 

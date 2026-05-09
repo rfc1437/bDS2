@@ -82,18 +82,21 @@ defmodule BDS.Desktop.ShellLive do
     "load_more_sidebar"
   ]
 
-  @local_menu_actions MapSet.new([
-                        :toggle_sidebar,
-                        :toggle_panel,
-                        :toggle_assistant_sidebar,
-                        :view_posts,
-                        :view_media,
-                        :edit_preferences,
-                        :edit_menu,
-                        :documentation,
-                        :api_documentation,
-                        :close_tab
-                      ])
+  @layout_menu_actions MapSet.new([
+                         :toggle_sidebar,
+                         :toggle_panel,
+                         :toggle_assistant_sidebar,
+                         :close_tab
+                       ])
+  @sidebar_menu_actions MapSet.new([
+                          :view_posts,
+                          :view_media,
+                          :edit_preferences,
+                          :edit_menu,
+                          :documentation,
+                          :api_documentation
+                        ])
+  @local_menu_actions MapSet.union(@layout_menu_actions, @sidebar_menu_actions)
   @socket_menu_actions MapSet.new([
                          :new_post,
                          :import_media,
@@ -174,15 +177,15 @@ defmodule BDS.Desktop.ShellLive do
 
   @impl true
   def handle_event("toggle_sidebar", _params, socket) do
-    {:noreply, reload_shell(socket, Workbench.toggle_sidebar(socket.assigns.workbench))}
+    {:noreply, refresh_layout(socket, Workbench.toggle_sidebar(socket.assigns.workbench))}
   end
 
   def handle_event("toggle_panel", _params, socket) do
-    {:noreply, reload_shell(socket, Workbench.toggle_panel(socket.assigns.workbench))}
+    {:noreply, refresh_layout(socket, Workbench.toggle_panel(socket.assigns.workbench))}
   end
 
   def handle_event("toggle_assistant_sidebar", _params, socket) do
-    {:noreply, reload_shell(socket, Workbench.toggle_assistant_sidebar(socket.assigns.workbench))}
+    {:noreply, refresh_layout(socket, Workbench.toggle_assistant_sidebar(socket.assigns.workbench))}
   end
 
   def handle_event("select_view", %{"view" => view_id}, socket) do
@@ -192,7 +195,7 @@ defmodule BDS.Desktop.ShellLive do
         BoundedAtoms.sidebar_view(view_id, :posts)
       )
 
-    {:noreply, reload_shell(socket, workbench)}
+    {:noreply, refresh_sidebar(socket, workbench)}
   end
 
   def handle_event("select_panel_tab", %{"tab" => tab}, socket) do
@@ -201,7 +204,7 @@ defmodule BDS.Desktop.ShellLive do
       |> Workbench.set_panel_visible(true)
       |> Workbench.set_panel_tab(BoundedAtoms.panel_tab(tab, :tasks))
 
-    {:noreply, reload_shell(socket, workbench)}
+    {:noreply, refresh_layout(socket, workbench)}
   end
 
   def handle_event("open_sidebar_item", %{"route" => _route, "id" => _id} = params, socket) do
@@ -213,15 +216,15 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("sync_layout", params, socket) do
-    {:noreply, reload_shell(socket, Layout.sync(socket.assigns.workbench, params))}
+    {:noreply, refresh_layout(socket, Layout.sync(socket.assigns.workbench, params))}
   end
 
   def handle_event("resize_panel", %{"target" => target, "width" => width}, socket) do
-    {:noreply, reload_shell(socket, Layout.resize(socket.assigns.workbench, target, width))}
+    {:noreply, refresh_layout(socket, Layout.resize(socket.assigns.workbench, target, width))}
   end
 
   def handle_event(event, params, socket) when event in @sidebar_filter_events do
-    SidebarEvents.handle(socket, event, params, &reload_shell/2)
+    SidebarEvents.handle(socket, event, params, &refresh_sidebar/2)
   end
 
   def handle_event("create_sidebar_item", %{"kind" => kind}, socket) do
@@ -248,7 +251,12 @@ defmodule BDS.Desktop.ShellLive do
         :preview
       )
 
-    {:noreply, reload_shell(socket, workbench)}
+    tab_meta = TabHelpers.sync_tab_meta(workbench, socket.assigns[:tab_meta] || %{})
+
+    {:noreply,
+     socket
+     |> assign(:tab_meta, tab_meta)
+     |> refresh_layout(workbench)}
   end
 
   def handle_event("close_tab", %{"type" => type, "id" => id}, socket) do
@@ -259,7 +267,7 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply,
      socket
      |> assign(:tab_meta, tab_meta)
-     |> reload_shell(workbench)}
+     |> refresh_layout(workbench)}
   end
 
   def handle_event(
@@ -283,7 +291,7 @@ defmodule BDS.Desktop.ShellLive do
     :ok = AI.set_airplane_mode(next_mode)
     socket = assign(socket, :offline_mode, next_mode)
 
-    {:noreply, reload_shell(socket, socket.assigns.workbench)}
+    {:noreply, refresh_layout(socket, socket.assigns.workbench)}
   end
 
   def handle_event("update_assistant_prompt", %{"assistant" => %{"prompt" => prompt}}, socket) do
@@ -314,7 +322,7 @@ defmodule BDS.Desktop.ShellLive do
       |> Workbench.set_panel_visible(true)
       |> Workbench.set_panel_tab(:tasks)
 
-    {:noreply, reload_shell(socket, workbench)}
+    {:noreply, refresh_layout(socket, workbench)}
   end
 
   def handle_event("settings_shell_command", %{"action" => action}, socket) do
@@ -551,12 +559,57 @@ defmodule BDS.Desktop.ShellLive do
     index(assigns)
   end
 
-  defp reload_shell(socket, workbench) do
+  defp refresh_layout(socket, workbench) do
+    git_badge_count = socket.assigns[:git_badge_count] || 0
+    activity_buttons = Workbench.activity_buttons(workbench, git_badge_count)
+    task_status = socket.assigns[:task_status] || %{running_task_message: nil, running_task_overflow: nil}
+    dashboard = socket.assigns[:dashboard] || BDS.UI.Dashboard.empty_snapshot()
+    page_language = socket.assigns[:page_language] || ShellData.ui_language()
+    offline_mode = Map.get(socket.assigns, :offline_mode, true)
+    sidebar_data = socket.assigns[:sidebar_data] || %{}
+
+    socket
+    |> assign(:workbench, workbench)
+    |> assign(:activity_buttons, activity_buttons)
+    |> assign(
+      :sidebar_header,
+      active_sidebar_label(activity_buttons, workbench.active_view, sidebar_data)
+    )
+    |> assign(:panel_tabs, ShellData.panel_tabs(workbench))
+    |> assign(:current_tab, current_tab(workbench))
+    |> assign(:editor_meta, ShellData.editor_meta(task_status))
+    |> assign(
+      :status,
+      ShellData.status_bar(workbench, task_status, dashboard,
+        ui_language: page_language,
+        offline_mode: offline_mode
+      )
+    )
+  end
+
+  defp refresh_sidebar(socket, workbench) do
+    project_id = (socket.assigns[:projects] || %{})[:active_project_id]
+    active_view_id = Atom.to_string(workbench.active_view)
+
+    sidebar_data =
+      ShellData.sidebar_view(
+        project_id,
+        active_view_id,
+        ShellSidebarState.current_filters(socket, active_view_id)
+      )
+
+    sidebar_data = ShellSidebarState.merge_ui_state(socket, active_view_id, sidebar_data)
+
+    socket
+    |> assign(:sidebar_data, sidebar_data)
+    |> refresh_layout(workbench)
+  end
+
+  defp refresh_content(socket, workbench) do
     projects = ShellData.project_snapshot()
     dashboard = ShellData.dashboard(projects.active_project_id)
     git_badge_count = ShellData.git_badge_count(projects.active_project_id)
     active_view_id = Atom.to_string(workbench.active_view)
-    tab_meta = TabHelpers.sync_tab_meta(workbench, socket.assigns[:tab_meta] || %{})
 
     sidebar_data =
       ShellData.sidebar_view(
@@ -566,8 +619,26 @@ defmodule BDS.Desktop.ShellLive do
       )
 
     sidebar_data = ShellSidebarState.merge_ui_state(socket, active_view_id, sidebar_data)
+
+    socket
+    |> assign(:projects, projects)
+    |> assign(:current_project, ShellData.current_project(projects))
+    |> assign(:dashboard, dashboard)
+    |> assign(:dashboard_timeline_entries, Map.get(dashboard, :timeline_entries, []))
+    |> assign(:dashboard_category_counts, Map.get(dashboard, :category_counts, []))
+    |> assign(:dashboard_recent_posts, Map.get(dashboard, :recent_posts, []))
+    |> assign(
+      :dashboard_tag_cloud_items,
+      ShellData.dashboard_tag_cloud_items(Map.get(dashboard, :tag_cloud_items, []))
+    )
+    |> assign(:git_badge_count, git_badge_count)
+    |> assign(:sidebar_data, sidebar_data)
+    |> refresh_layout(workbench)
+  end
+
+  defp reload_shell(socket, workbench) do
+    tab_meta = TabHelpers.sync_tab_meta(workbench, socket.assigns[:tab_meta] || %{})
     raw_task_status = BDS.Tasks.status_snapshot()
-    activity_buttons = Workbench.activity_buttons(workbench, git_badge_count)
     page_language = socket.assigns[:page_language] || ShellData.ui_language()
 
     offline_mode =
@@ -581,38 +652,13 @@ defmodule BDS.Desktop.ShellLive do
 
     socket
     |> assign(:tab_meta, tab_meta)
-    |> assign(:workbench, workbench)
-    |> assign(:projects, projects)
-    |> assign(:current_project, ShellData.current_project(projects))
-    |> assign(:dashboard, dashboard)
-    |> assign(:dashboard_timeline_entries, Map.get(dashboard, :timeline_entries, []))
-    |> assign(:dashboard_category_counts, Map.get(dashboard, :category_counts, []))
-    |> assign(:dashboard_recent_posts, Map.get(dashboard, :recent_posts, []))
-    |> assign(
-      :dashboard_tag_cloud_items,
-      ShellData.dashboard_tag_cloud_items(Map.get(dashboard, :tag_cloud_items, []))
-    )
-    |> assign(:sidebar_data, sidebar_data)
-    |> assign(
-      :sidebar_header,
-      active_sidebar_label(activity_buttons, workbench.active_view, sidebar_data)
-    )
-    |> assign(:assistant_cards, ShellData.assistant_cards())
-    |> assign(:editor_meta, ShellData.editor_meta(task_status))
     |> assign(:task_status, task_status)
-    |> assign(
-      :status,
-      ShellData.status_bar(workbench, task_status, dashboard,
-        ui_language: page_language,
-        offline_mode: offline_mode
-      )
-    )
-    |> assign(:activity_buttons, activity_buttons)
-    |> assign(:panel_tabs, ShellData.panel_tabs(workbench))
+    |> assign(:offline_mode, offline_mode)
+    |> assign(:assistant_cards, ShellData.assistant_cards())
     |> assign(:supported_ui_languages, ShellData.supported_ui_languages())
     |> assign(:menu_groups, socket.assigns[:menu_groups] || TitlebarMenu.groups())
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])
-    |> assign(:current_tab, current_tab(workbench))
+    |> refresh_content(workbench)
   end
 
   defp encoded_shortcuts(shortcuts), do: Jason.encode!(shortcuts)
@@ -657,6 +703,7 @@ defmodule BDS.Desktop.ShellLive do
   defp sidebar_create_callbacks do
     %{
       reload: &reload_shell/2,
+      refresh_content: &refresh_content/2,
       open_sidebar: &open_sidebar_item/3,
       append_output: &append_output_entry/5
     }
@@ -681,9 +728,11 @@ defmodule BDS.Desktop.ShellLive do
         subtitle: Map.get(params, "subtitle", "")
       })
 
+    tab_meta = TabHelpers.sync_tab_meta(workbench, tab_meta)
+
     socket
     |> assign(:tab_meta, tab_meta)
-    |> reload_shell(workbench)
+    |> refresh_layout(workbench)
   end
 
   defp sidebar_create_action(view), do: SidebarCreate.action(view)
@@ -752,8 +801,16 @@ defmodule BDS.Desktop.ShellLive do
 
   defp handle_menu_action(socket, action) when is_atom(action) do
     cond do
-      MapSet.member?(@local_menu_actions, action) ->
-        reload_shell(socket, MenuBar.execute(socket.assigns.workbench, action))
+      MapSet.member?(@layout_menu_actions, action) ->
+        refresh_layout(socket, MenuBar.execute(socket.assigns.workbench, action))
+
+      MapSet.member?(@sidebar_menu_actions, action) ->
+        workbench = MenuBar.execute(socket.assigns.workbench, action)
+        tab_meta = TabHelpers.sync_tab_meta(workbench, socket.assigns[:tab_meta] || %{})
+
+        socket
+        |> assign(:tab_meta, tab_meta)
+        |> refresh_sidebar(workbench)
 
       MapSet.member?(@socket_menu_actions, action) ->
         handle_socket_menu_action(socket, action)
@@ -842,14 +899,14 @@ defmodule BDS.Desktop.ShellLive do
     socket
   end
 
-  defp save_current_tab(socket), do: reload_shell(socket, socket.assigns.workbench)
+  defp save_current_tab(socket), do: refresh_layout(socket, socket.assigns.workbench)
 
   defp publish_current_tab(%{assigns: %{current_tab: %{type: :post, id: post_id}}} = socket) do
     send_update(PostEditor, id: "post-editor-#{post_id}", action: :publish)
     socket
   end
 
-  defp publish_current_tab(socket), do: reload_shell(socket, socket.assigns.workbench)
+  defp publish_current_tab(socket), do: refresh_layout(socket, socket.assigns.workbench)
 
   defp apply_shell_command(socket, action, params \\ %{}),
     do: ShellCommandRunner.execute(socket, action, params, shell_command_callbacks())
@@ -860,6 +917,7 @@ defmodule BDS.Desktop.ShellLive do
   defp shell_command_callbacks do
     %{
       reload: &reload_shell/2,
+      refresh_content: &refresh_content/2,
       append_output: &append_output_entry/5
     }
   end
@@ -876,6 +934,7 @@ defmodule BDS.Desktop.ShellLive do
   defp overlay_callbacks,
     do: %{
       reload: &reload_shell/2,
+      refresh_content: &refresh_content/2,
       append_output: &append_output_entry/5,
       execute_sidebar_delete: fn socket, route, id ->
         SidebarDelete.execute_delete(socket, route, id, sidebar_delete_callbacks())
@@ -885,12 +944,16 @@ defmodule BDS.Desktop.ShellLive do
   defp sidebar_delete_callbacks,
     do: %{
       reload: &reload_shell/2,
+      refresh_content: &refresh_content/2,
       append_output: &append_output_entry/5
     }
 
   defp bridges_callbacks,
     do: %{
       reload: &reload_shell/2,
+      refresh_layout: &refresh_layout/2,
+      refresh_sidebar: &refresh_sidebar/2,
+      refresh_content: &refresh_content/2,
       append_output: &append_output_entry/5,
       open_sidebar: &open_sidebar_item/3,
       apply_shell_command: &apply_shell_command/3,

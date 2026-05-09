@@ -131,18 +131,23 @@
 
 ---
 
-### CSM-007 — Monolithic State Rebuild ("God Function")
-- **File:** `lib/bds/desktop/shell_live.ex:554-616`
-- **What:** `reload_shell/2` rebuilds sidebar, dashboard, git badge, tasks, status bar, tab meta, and panel data on almost every event. This function is called from most `handle_event` and `handle_info` callbacks, even for trivial state changes like sidebar toggle.
-- **Why it's bad:** Even a simple sidebar toggle triggers 5+ unrelated DB queries (project_snapshot, dashboard, git_badge_count, sidebar_view, task_status). The sidebar and dashboard data are rebuilt even when only the panel content changed. Output entries and editor meta are recalculated unnecessarily.
-- **Fix:** Decompose into focused updaters, each only querying what it needs:
-  - `refresh_sidebar/2` — only queries sidebar data
-  - `refresh_dashboard/2` — only queries dashboard data
-  - `refresh_git_badge/2` — only queries git status
-  - `refresh_task_status/2` — only queries task state
-  - `refresh_tab_meta/2` — only syncs tab metadata
-  Each `handle_event` / `handle_info` should call only the relevant updaters.
-- **Test:** Toggle sidebar; assert no dashboard or git queries are executed. Save a post; assert sidebar refreshes but dashboard does not.
+### ~~CSM-007 — Monolithic State Rebuild ("God Function")~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - Decomposed `reload_shell/2` into four focused updaters:
+    - `refresh_layout/2` — No DB queries. Recomputes workbench-derived assigns (activity_buttons, panel_tabs, current_tab, status_bar, sidebar_header, editor_meta) from existing socket.assigns.
+    - `refresh_sidebar/2` — Queries sidebar data only, then calls `refresh_layout`.
+    - `refresh_content/2` — Queries projects, dashboard, git badge, and sidebar data, then calls `refresh_layout`.
+    - `reload_shell/2` — Full refresh: tab_meta sync, task status, static data, then calls `refresh_content`. Kept for mount, project switch, session restore, and settings changes.
+  - Replaced all call sites with the minimal refresh needed:
+    - **Layout-only** (`refresh_layout`): toggle_sidebar, toggle_panel, toggle_assistant_sidebar, select_panel_tab, sync_layout, resize_panel, open_tasks_panel, select_tab, close_tab, toggle_offline_mode, layout menu actions (toggle, close_tab).
+    - **Sidebar** (`refresh_sidebar`): select_view, all sidebar filter events, sidebar menu actions (view_posts, view_media, edit_preferences, etc.), chat/import editor tab_meta updates.
+    - **Content** (`refresh_content`): entity_changed (CLI sync), tags_changed, sidebar create/delete.
+    - **Full reload** (`reload_shell`): mount, activate_project, restore_workbench_session, set_page_language, settings_changed.
+  - Updated Bridges callbacks to use focused refreshers: `refresh_layout` for toggle events and close_tab, `refresh_sidebar` for view switches and tab meta updates, `refresh_content` for entity/tag changes.
+  - Split `@local_menu_actions` into `@layout_menu_actions` and `@sidebar_menu_actions` for correct dispatch.
+  - Fixed `false || true` bug in `refresh_layout` where `offline_mode = assigns[:offline_mode] || true` incorrectly defaulted `false` to `true`.
+  - Added 7 tests in `test/bds/csm007_reload_shell_test.exs` using telemetry-based query counting: toggle_sidebar (0 queries), toggle_panel (0 queries), sync_layout (0 queries), select_panel_tab (0 queries), toggle_offline_mode (1 query — settings write only), select_view (sidebar queries but no dashboard/projects), sidebar_search (no dashboard queries).
 
 ---
 
@@ -419,9 +424,10 @@
   - CSM-004: Fixed. `attach_runner` moved to `handle_continue`, `terminate/2` added for cleanup, `restart: :temporary` set, JobStore `detach_runner` bug fixed.
 - [ ] All high-severity items (CSM-006 to CSM-010) have been addressed.
   - CSM-006: Fixed. Batch INSERT for reindexing, preloaded post records for rendering.
+  - CSM-007: Fixed. Decomposed into refresh_layout, refresh_sidebar, refresh_content, reload_shell.
 - [x] CSM-001 fix covers ALL 6 affected files, not just `import_definitions.ex`.
 - [x] CSM-003 fix covers ALL `Repo.delete!` call sites (posts, tags, scripts, media, projects, templates, translations).
-- [ ] CSM-007 decomposition is the prerequisite for fixing CSM-008 (render-path queries).
+- [x] CSM-007 decomposition is the prerequisite for fixing CSM-008 (render-path queries).
 - [x] Tests were written **before** implementation changes (Red → Green → Refactor).
 - [x] Full test suite passes: `mix test`.
 - [x] Dialyzer passes cleanly: `mix dialyzer` (zero warnings).

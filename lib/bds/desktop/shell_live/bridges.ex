@@ -25,7 +25,7 @@ defmodule BDS.Desktop.ShellLive.Bridges do
     {:noreply,
      socket
      |> assign(:tab_meta, tab_meta)
-     |> callbacks.reload.(socket.assigns.workbench)}
+     |> callbacks.refresh_sidebar.(socket.assigns.workbench)}
   end
 
   def handle_info({:chat_tool_call, conversation_id, tool_call}, socket, _callbacks) do
@@ -82,7 +82,7 @@ defmodule BDS.Desktop.ShellLive.Bridges do
     {:noreply,
      socket
      |> assign(:tab_meta, tab_meta)
-     |> callbacks.reload.(socket.assigns.workbench)}
+     |> callbacks.refresh_sidebar.(socket.assigns.workbench)}
   end
 
   def handle_info({:open_sidebar_item, params, intent}, socket, callbacks) do
@@ -90,25 +90,30 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   end
 
   def handle_info({:chat_editor_toggle_sidebar}, socket, callbacks) do
-    {:noreply, callbacks.reload.(socket, Workbench.toggle_sidebar(socket.assigns.workbench))}
+    {:noreply,
+     callbacks.refresh_layout.(socket, Workbench.toggle_sidebar(socket.assigns.workbench))}
   end
 
   def handle_info({:chat_editor_toggle_panel}, socket, callbacks) do
-    {:noreply, callbacks.reload.(socket, Workbench.toggle_panel(socket.assigns.workbench))}
+    {:noreply,
+     callbacks.refresh_layout.(socket, Workbench.toggle_panel(socket.assigns.workbench))}
   end
 
   def handle_info({:chat_editor_toggle_assistant_sidebar}, socket, callbacks) do
     {:noreply,
-     callbacks.reload.(socket, Workbench.toggle_assistant_sidebar(socket.assigns.workbench))}
+     callbacks.refresh_layout.(
+       socket,
+       Workbench.toggle_assistant_sidebar(socket.assigns.workbench)
+     )}
   end
 
   def handle_info({:chat_editor_switch_view, view}, socket, callbacks) do
     {:noreply,
-     callbacks.reload.(socket, Workbench.click_activity(socket.assigns.workbench, view))}
+     callbacks.refresh_sidebar.(socket, Workbench.click_activity(socket.assigns.workbench, view))}
   end
 
   def handle_info({:entity_changed, payload}, socket, callbacks) when is_map(payload) do
-    {:noreply, CliSync.apply_entity_change(socket, payload, callbacks.reload)}
+    {:noreply, CliSync.apply_entity_change(socket, payload, callbacks.refresh_content)}
   end
 
   def handle_info(:refresh_task_status, socket, callbacks) do
@@ -155,7 +160,7 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   end
 
   def handle_info(:tags_changed, socket, callbacks) do
-    {:noreply, callbacks.reload.(socket, socket.assigns.workbench)}
+    {:noreply, callbacks.refresh_content.(socket, socket.assigns.workbench)}
   end
 
   def handle_info({:settings_output, title, message, level}, socket, callbacks) do
@@ -267,7 +272,8 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   end
 
   def handle_info({:close_tab, type, id}, socket, callbacks) do
-    {:noreply, callbacks.reload.(socket, Workbench.close_tab(socket.assigns.workbench, type, id))}
+    {:noreply,
+     callbacks.refresh_layout.(socket, Workbench.close_tab(socket.assigns.workbench, type, id))}
   end
 
   def handle_info(_message, socket, _callbacks), do: {:noreply, socket}

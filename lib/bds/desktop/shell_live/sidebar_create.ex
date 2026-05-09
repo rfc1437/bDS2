@@ -19,7 +19,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
   def create(socket, kind, callbacks) do
     case socket.assigns.projects.active_project_id do
       project_id when is_binary(project_id) -> create(socket, project_id, kind, callbacks)
-      _other -> callbacks.reload.(socket, socket.assigns.workbench)
+      _other -> callbacks.refresh_content.(socket, socket.assigns.workbench)
     end
   end
 
@@ -32,12 +32,12 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
            categories: []
          }) do
       {:ok, _post} ->
-        callbacks.reload.(socket, socket.assigns.workbench)
+        callbacks.refresh_content.(socket, socket.assigns.workbench)
 
       {:error, reason} ->
         socket
         |> callbacks.append_output.(dgettext("ui", "New Post"), inspect(reason), nil, "error")
-        |> callbacks.reload.(socket.assigns.workbench)
+        |> callbacks.refresh_content.(socket.assigns.workbench)
     end
   end
 
@@ -46,7 +46,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
       {:ok, source_path} ->
         case BDS.Media.import_media(%{project_id: project_id, source_path: source_path}) do
           {:ok, _media} ->
-            callbacks.reload.(socket, socket.assigns.workbench)
+            callbacks.refresh_content.(socket, socket.assigns.workbench)
 
           {:error, reason} ->
             socket
@@ -56,16 +56,16 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
               nil,
               "error"
             )
-            |> callbacks.reload.(socket.assigns.workbench)
+            |> callbacks.refresh_content.(socket.assigns.workbench)
         end
 
       :cancel ->
-        callbacks.reload.(socket, socket.assigns.workbench)
+        callbacks.refresh_content.(socket, socket.assigns.workbench)
 
       {:error, %{message: message}} ->
         socket
         |> callbacks.append_output.(dgettext("ui", "Import media"), message, nil, "error")
-        |> callbacks.reload.(socket.assigns.workbench)
+        |> callbacks.refresh_content.(socket.assigns.workbench)
     end
   end
 
@@ -98,7 +98,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
           nil,
           "error"
         )
-        |> callbacks.reload.(socket.assigns.workbench)
+        |> callbacks.refresh_content.(socket.assigns.workbench)
     end
   end
 
@@ -130,7 +130,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
           nil,
           "error"
         )
-        |> callbacks.reload.(socket.assigns.workbench)
+        |> callbacks.refresh_content.(socket.assigns.workbench)
     end
   end
 
@@ -151,7 +151,7 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
       {:error, reason} ->
         socket
         |> callbacks.append_output.(dgettext("ui", "New Chat"), inspect(reason), nil, "error")
-        |> callbacks.reload.(socket.assigns.workbench)
+        |> callbacks.refresh_content.(socket.assigns.workbench)
     end
   end
 
@@ -180,12 +180,12 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
           nil,
           "error"
         )
-        |> callbacks.reload.(socket.assigns.workbench)
+        |> callbacks.refresh_content.(socket.assigns.workbench)
     end
   end
 
   def create(socket, _project_id, _kind, callbacks),
-    do: callbacks.reload.(socket, socket.assigns.workbench)
+    do: callbacks.refresh_content.(socket, socket.assigns.workbench)
 
   def action(:posts), do: %{kind: "post", label: "sidebar.newPost"}
   def action(:media), do: %{kind: "media", label: "sidebar.importMedia"}
