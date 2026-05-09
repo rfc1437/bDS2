@@ -186,13 +186,15 @@
 
 ---
 
-### CSM-010 — `rescue` for Control Flow in Data Layer
-- **File:** `lib/bds/desktop/shell_data.ex:64-74, 81-103, 152-182`
-- **What:** `rescue Exqlite.Error`, `rescue DBConnection.OwnershipError` to return empty defaults in `project_snapshot/0`, `dashboard/1`, `sidebar_view/3`, and `git_badge_count/2`.
-- **Why it's bad:** Exceptions are for exceptional conditions. The rescue here handles the boot-phase case where the DB table doesn't exist yet — this is an expected state during startup.
-- **Nuance:** The code does check `Exception.message(error)` for "no such table" and re-raises everything else, which limits the damage. But it's still control-flow-via-exception.
-- **Fix:** Add an explicit `DB.ready?/0` check (or `Ecto.Adapters.SQL.query!/2` with a lightweight probe) before calling the data functions. Return `{:ok, result}` / `{:error, :not_ready}` tuples from the lowest-level callers and handle them upstream. Only `rescue` for truly unexpected DB errors.
-- **Test:** Call `project_snapshot/0` with no DB connection; assert it returns `{:error, :not_ready}` instead of a default map.
+### ~~CSM-010 — `rescue` for Control Flow in Data Layer~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - Added `BDS.Repo.ready?/0` — a lightweight probe that queries `sqlite_master` (parameterized) to check if core tables exist, without raising exceptions.
+  - Replaced all 4 `rescue` blocks in `ShellData` (`project_snapshot/0`, `dashboard/1`, `sidebar_view/3`, `git_badge_count/2`) with upfront `Repo.ready?()` checks.
+  - All four functions now return `{:ok, result}` / `{:error, :not_ready}` tuples instead of silently returning defaults via rescue.
+  - Updated callers in `ShellLive.refresh_content/2` and `ShellLive.refresh_sidebar/2` to pattern-match the new tuples and fall back to empty defaults only on `{:error, :not_ready}`.
+  - Made `default_project_snapshot/0` public for use by callers handling the not-ready case.
+  - Added 10 tests in `test/bds/csm010_rescue_control_flow_test.exs`: `Repo.ready?` returns true when DB is available, each of the 4 functions returns `{:ok, _}` when DB is ready and `{:error, :not_ready}` when the Repo is stopped.
 
 ---
 
@@ -430,11 +432,12 @@
   - CSM-001: Fixed. All `String.to_atom` on dynamic data replaced with `MapUtils.safe_atomize_key/keys` or `String.to_existing_atom`.
   - CSM-002: Fixed. Search now pushes all filtering and pagination into SQL via Ecto queries and CTEs.
   - CSM-004: Fixed. `attach_runner` moved to `handle_continue`, `terminate/2` added for cleanup, `restart: :temporary` set, JobStore `detach_runner` bug fixed.
-- [ ] All high-severity items (CSM-006 to CSM-010) have been addressed.
+- [x] All high-severity items (CSM-006 to CSM-010) have been addressed.
   - CSM-006: Fixed. Batch INSERT for reindexing, preloaded post records for rendering.
   - CSM-007: Fixed. Decomposed into refresh_layout, refresh_sidebar, refresh_content, reload_shell.
   - CSM-008: Fixed. Panel data pre-computed in event handlers, tab meta skips DB for complete entries.
   - CSM-009: Fixed. All bang Image/File variants replaced with error-tuple handling, `ensure_thumbnails` returns `{:error, _}` instead of crashing.
+  - CSM-010: Fixed. Replaced rescue blocks with `Repo.ready?/0` probe and `{:ok, _}`/`{:error, :not_ready}` tuples.
 - [x] CSM-001 fix covers ALL 6 affected files, not just `import_definitions.ex`.
 - [x] CSM-003 fix covers ALL `Repo.delete!` call sites (posts, tags, scripts, media, projects, templates, translations).
 - [x] CSM-007 decomposition is the prerequisite for fixing CSM-008 (render-path queries).

@@ -633,11 +633,14 @@ defmodule BDS.Desktop.ShellLive do
     active_view_id = Atom.to_string(workbench.active_view)
 
     sidebar_data =
-      ShellData.sidebar_view(
-        project_id,
-        active_view_id,
-        ShellSidebarState.current_filters(socket, active_view_id)
-      )
+      case ShellData.sidebar_view(
+             project_id,
+             active_view_id,
+             ShellSidebarState.current_filters(socket, active_view_id)
+           ) do
+        {:ok, data} -> data
+        {:error, :not_ready} -> BDS.UI.Sidebar.view(nil, active_view_id, %{})
+      end
 
     sidebar_data = ShellSidebarState.merge_ui_state(socket, active_view_id, sidebar_data)
 
@@ -647,17 +650,35 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp refresh_content(socket, workbench) do
-    projects = ShellData.project_snapshot()
-    dashboard = ShellData.dashboard(projects.active_project_id)
-    git_badge_count = ShellData.git_badge_count(projects.active_project_id)
+    projects =
+      case ShellData.project_snapshot() do
+        {:ok, data} -> data
+        {:error, :not_ready} -> ShellData.default_project_snapshot()
+      end
+
+    dashboard =
+      case ShellData.dashboard(projects.active_project_id) do
+        {:ok, data} -> data
+        {:error, :not_ready} -> BDS.UI.Dashboard.empty_snapshot()
+      end
+
+    git_badge_count =
+      case ShellData.git_badge_count(projects.active_project_id) do
+        {:ok, count} -> count
+        {:error, :not_ready} -> 0
+      end
+
     active_view_id = Atom.to_string(workbench.active_view)
 
     sidebar_data =
-      ShellData.sidebar_view(
-        projects.active_project_id,
-        active_view_id,
-        ShellSidebarState.current_filters(socket, active_view_id)
-      )
+      case ShellData.sidebar_view(
+             projects.active_project_id,
+             active_view_id,
+             ShellSidebarState.current_filters(socket, active_view_id)
+           ) do
+        {:ok, data} -> data
+        {:error, :not_ready} -> BDS.UI.Sidebar.view(nil, active_view_id, %{})
+      end
 
     sidebar_data = ShellSidebarState.merge_ui_state(socket, active_view_id, sidebar_data)
 

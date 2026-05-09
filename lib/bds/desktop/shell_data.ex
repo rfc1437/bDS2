@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellData do
   alias BDS.Git
   alias BDS.I18n
   alias BDS.Projects
+  alias BDS.Repo
   alias BDS.UI.Dashboard
   alias BDS.UI.Sidebar
   alias BDS.UI.Workbench
@@ -62,15 +63,11 @@ defmodule BDS.Desktop.ShellData do
   end
 
   def project_snapshot do
-    Projects.shell_snapshot()
-  rescue
-    error in [Exqlite.Error, DBConnection.OwnershipError] ->
-      if match?(%Exqlite.Error{}, error) and
-           not String.contains?(Exception.message(error), "no such table: projects") do
-        reraise error, __STACKTRACE__
-      end
-
-      default_project_snapshot()
+    if Repo.ready?() do
+      {:ok, Projects.shell_snapshot()}
+    else
+      {:error, :not_ready}
+    end
   end
 
   def current_project(projects_snapshot) do
@@ -79,27 +76,19 @@ defmodule BDS.Desktop.ShellData do
   end
 
   def dashboard(project_id) do
-    Dashboard.snapshot(project_id)
-  rescue
-    error in [Exqlite.Error, DBConnection.OwnershipError] ->
-      if match?(%Exqlite.Error{}, error) and
-           not String.contains?(Exception.message(error), "no such table") do
-        reraise error, __STACKTRACE__
-      end
-
-      Dashboard.empty_snapshot()
+    if Repo.ready?() do
+      {:ok, Dashboard.snapshot(project_id)}
+    else
+      {:error, :not_ready}
+    end
   end
 
   def sidebar_view(project_id, view_id, params \\ %{}) do
-    Sidebar.view(project_id, view_id, params)
-  rescue
-    error in [Exqlite.Error, DBConnection.OwnershipError] ->
-      if match?(%Exqlite.Error{}, error) and
-           not String.contains?(Exception.message(error), "no such table") do
-        reraise error, __STACKTRACE__
-      end
-
-      Sidebar.view(nil, view_id, params)
+    if Repo.ready?() do
+      {:ok, Sidebar.view(project_id, view_id, params)}
+    else
+      {:error, :not_ready}
+    end
   end
 
   def assistant_cards do
@@ -146,14 +135,16 @@ defmodule BDS.Desktop.ShellData do
 
   def git_badge_count(project_id, opts \\ [])
 
-  def git_badge_count(nil, _opts), do: 0
-  def git_badge_count("default", _opts), do: 0
+  def git_badge_count(nil, _opts), do: {:ok, 0}
+  def git_badge_count("default", _opts), do: {:ok, 0}
 
   def git_badge_count(project_id, opts) when is_binary(project_id) do
-    provider = Keyword.get(opts, :provider, git_remote_state_provider())
-    custom_provider? = provider != (&BDS.Git.remote_state/2)
+    if not Repo.ready?() do
+      {:error, :not_ready}
+    else
+      provider = Keyword.get(opts, :provider, git_remote_state_provider())
+      custom_provider? = provider != (&BDS.Git.remote_state/2)
 
-    try do
       has_git =
         custom_provider? ||
           case BDS.Projects.get_project(project_id) do
@@ -161,23 +152,18 @@ defmodule BDS.Desktop.ShellData do
             project -> File.dir?(Path.join(BDS.Projects.project_data_dir(project), ".git"))
           end
 
-      if has_git do
-        case provider.(project_id, []) do
-          {:ok, %{behind: behind}} when is_integer(behind) and behind > 0 -> behind
-          {:ok, %{behind: behind}} when is_binary(behind) -> parse_positive_count(behind)
-          _other -> 0
-        end
-      else
-        0
-      end
-    rescue
-      error in [DBConnection.OwnershipError, Exqlite.Error] ->
-        if match?(%Exqlite.Error{}, error) and
-             not String.contains?(Exception.message(error), "no such table") do
-          reraise error, __STACKTRACE__
+      count =
+        if has_git do
+          case provider.(project_id, []) do
+            {:ok, %{behind: behind}} when is_integer(behind) and behind > 0 -> behind
+            {:ok, %{behind: behind}} when is_binary(behind) -> parse_positive_count(behind)
+            _other -> 0
+          end
+        else
+          0
         end
 
-        0
+      {:ok, count}
     end
   end
 
@@ -303,7 +289,7 @@ defmodule BDS.Desktop.ShellData do
 
   defp maybe_add_panel_tab(tabs, _route, _tab), do: tabs
 
-  defp default_project_snapshot do
+  def default_project_snapshot do
     %{
       active_project_id: "default",
       projects: [
