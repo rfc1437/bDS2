@@ -167,19 +167,22 @@
 
 ---
 
-### CSM-009 — Thumbnail Generation: Missing Error Handling
-- **File:** `lib/bds/media/thumbnails.ex:107-165`
-- **What:**
-  - `Image.thumbnail!` (Z. 149,154) and `Image.write!` (Z. 159,164) are bang variants that crash on failure.
-  - `File.mkdir_p/1` (Z. 133) result is discarded — if directory creation fails, the write will crash with a confusing error.
-  - `Image.embed!` (Z. 150) and `Image.flatten!` (Z. 158) are also bang variants.
-- **Note on scheduler blocking:** The `Image` library uses libvips NIFs which run image processing in a C thread pool, not on the BEAM scheduler. The original concern about scheduler blocking is **not substantiated** for this library. The real issues are the bang variants and unchecked `File.mkdir_p`.
-- **Fix:**
-  - Replace `File.mkdir_p/1` with `case File.mkdir_p(dir) do :ok -> ...; {:error, reason} -> {:error, reason}`.
-  - Replace bang `Image.thumbnail!` with `Image.thumbnail` and handle `{:error, _}`.
-  - Replace bang `Image.write!` with `Image.write` and handle `{:error, _}`.
-  - Wrap the whole `write_all_thumbnails` in a try/return-error-tuple pattern.
-- **Test:** Feed a corrupt image; assert `ensure_thumbnails` returns `{:error, _}` instead of crashing.
+### ~~CSM-009 — Thumbnail Generation: Missing Error Handling~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - Replaced all bang variants with non-bang error-tuple handling:
+    - `Image.autorotate!` → `Image.autorotate` with `{:ok, {image, rotation_info}}` destructuring.
+    - `Image.thumbnail!` → `Image.thumbnail` returning `{:ok, image}` / `{:error, reason}`.
+    - `Image.embed!` → `Image.embed` with `with` chain.
+    - `Image.flatten!` → `Image.flatten` with `with` chain.
+    - `Image.write!` → `Image.write` with `{:ok, _}` / `{:error, reason}` handling.
+  - `File.mkdir_p` result is now checked — errors halt thumbnail generation with `{:error, reason}`.
+  - `write_all_thumbnails` uses `Enum.reduce_while` to stop on first error and return `{:error, reason}`.
+  - `ensure_thumbnails` spec updated to `:ok | {:error, term()}`.
+  - `regenerate_thumbnails` propagates `{:error, reason}` from `ensure_thumbnails`.
+  - `regenerate_missing_thumbnails` replaced `try/rescue` with `case` on the new error tuples.
+  - Call sites in `BDS.Media` (`import_media`, `replace_media_binary`) use `log_thumbnail_error/2` — media operations succeed even if thumbnails fail, with a warning logged.
+  - Added 6 tests in `test/bds/csm009_thumbnail_error_handling_test.exs`: corrupt image returns `{:error, _}`, non-image returns `:ok`, missing source returns `{:error, _}`, regenerate corrupt returns `{:error, _}`, regenerate_missing counts failures, import succeeds despite thumbnail failure.
 
 ---
 
@@ -431,6 +434,7 @@
   - CSM-006: Fixed. Batch INSERT for reindexing, preloaded post records for rendering.
   - CSM-007: Fixed. Decomposed into refresh_layout, refresh_sidebar, refresh_content, reload_shell.
   - CSM-008: Fixed. Panel data pre-computed in event handlers, tab meta skips DB for complete entries.
+  - CSM-009: Fixed. All bang Image/File variants replaced with error-tuple handling, `ensure_thumbnails` returns `{:error, _}` instead of crashing.
 - [x] CSM-001 fix covers ALL 6 affected files, not just `import_definitions.ex`.
 - [x] CSM-003 fix covers ALL `Repo.delete!` call sites (posts, tags, scripts, media, projects, templates, translations).
 - [x] CSM-007 decomposition is the prerequisite for fixing CSM-008 (render-path queries).

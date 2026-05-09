@@ -38,8 +38,11 @@ defmodule BDS.Media.Thumbnails do
 
       media ->
         project = Projects.get_project!(media.project_id)
-        :ok = ensure_thumbnails(project, media)
-        {:ok, media}
+
+        case ensure_thumbnails(project, media) do
+          :ok -> {:ok, media}
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
 
@@ -79,16 +82,15 @@ defmodule BDS.Media.Thumbnails do
         if missing_paths == [] do
           %{acc | processed: acc.processed + 1}
         else
-          try do
-            :ok = ensure_thumbnails(project, media)
+          case ensure_thumbnails(project, media) do
+            :ok ->
+              %{
+                processed: acc.processed + 1,
+                generated: acc.generated + length(missing_paths),
+                failed: acc.failed
+              }
 
-            %{
-              processed: acc.processed + 1,
-              generated: acc.generated + length(missing_paths),
-              failed: acc.failed
-            }
-          rescue
-            _error ->
+            {:error, _reason} ->
               %{acc | processed: acc.processed + 1, failed: acc.failed + 1}
           end
         end
@@ -98,23 +100,19 @@ defmodule BDS.Media.Thumbnails do
     end)
   end
 
-  @spec ensure_thumbnails(BDS.Projects.Project.t(), Media.t()) :: :ok
+  @spec ensure_thumbnails(BDS.Projects.Project.t(), Media.t()) :: :ok | {:error, term()}
   def ensure_thumbnails(project, media) do
     if image_mime?(media.mime_type) do
       source_path = Path.join(Projects.project_data_dir(project), media.file_path)
 
-      case Image.open(source_path) do
-        {:ok, image} ->
-          image
-          |> Image.autorotate!()
-          |> write_all_thumbnails(project, media)
-
-        {:error, _reason} ->
-          :ok
+      with {:ok, image} <- Image.open(source_path),
+           {:ok, {rotated, _rotation_info}} <- Image.autorotate(image),
+           :ok <- write_all_thumbnails(rotated, project, media) do
+        :ok
       end
+    else
+      :ok
     end
-
-    :ok
   end
 
   @spec delete_thumbnail_files(String.t(), Media.t()) :: :ok
@@ -128,16 +126,17 @@ defmodule BDS.Media.Thumbnails do
 
   defp write_all_thumbnails(image, project, media) do
     thumbnail_paths(media)
-    |> Enum.each(fn {size, relative_path} ->
+    |> Enum.reduce_while(:ok, fn {size, relative_path}, :ok ->
       destination = Path.join(Projects.project_data_dir(project), relative_path)
-      :ok = File.mkdir_p(Path.dirname(destination))
 
-      image
-      |> render_thumbnail(size)
-      |> write_thumbnail(destination, size)
+      with :ok <- File.mkdir_p(Path.dirname(destination)),
+           {:ok, rendered} <- render_thumbnail(image, size),
+           :ok <- write_thumbnail(rendered, destination, size) do
+        {:cont, :ok}
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
     end)
-
-    :ok
   end
 
   defp render_thumbnail(image, :small), do: bounded_thumbnail(image, 150, 150)
@@ -145,23 +144,41 @@ defmodule BDS.Media.Thumbnails do
   defp render_thumbnail(image, :large), do: bounded_thumbnail(image, 800, 800)
 
   defp render_thumbnail(image, :ai) do
-    image
-    |> Image.thumbnail!("448x448", fit: :contain, resize: :both, autorotate: false)
-    |> Image.embed!(448, 448, x: :center, y: :center, background_color: :black)
+    with {:ok, thumbnail} <-
+           Image.thumbnail(image, "448x448",
+             fit: :contain,
+             resize: :both,
+             autorotate: false
+           ),
+         {:ok, embedded} <-
+           Image.embed(thumbnail, 448, 448,
+             x: :center,
+             y: :center,
+             background_color: :black
+           ) do
+      {:ok, embedded}
+    end
   end
 
   defp bounded_thumbnail(image, width, height) do
-    Image.thumbnail!(image, "#{width}x#{height}", fit: :contain, resize: :down, autorotate: false)
+    Image.thumbnail(image, "#{width}x#{height}",
+      fit: :contain,
+      resize: :down,
+      autorotate: false
+    )
   end
 
   defp write_thumbnail(image, destination, :ai) do
-    flattened = Image.flatten!(image, background_color: :black)
-    Image.write!(flattened, destination, quality: 85, strip_metadata: true)
-    :ok
+    with {:ok, flattened} <- Image.flatten(image, background_color: :black),
+         {:ok, _} <- Image.write(flattened, destination, quality: 85, strip_metadata: true) do
+      :ok
+    end
   end
 
   defp write_thumbnail(image, destination, _size) do
-    Image.write!(image, destination, quality: 80, strip_metadata: true)
-    :ok
+    case Image.write(image, destination, quality: 80, strip_metadata: true) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
   end
 end

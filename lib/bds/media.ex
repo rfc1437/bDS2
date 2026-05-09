@@ -24,6 +24,8 @@ defmodule BDS.Media do
       ensure_thumbnails: 2
     ]
 
+  require Logger
+
   import Ecto.Query
 
   alias BDS.Media.Media
@@ -105,7 +107,7 @@ defmodule BDS.Media do
          end) do
       {:ok, media} ->
         :ok = write_sidecar(project, media)
-        :ok = ensure_thumbnails(project, media)
+        log_thumbnail_error(ensure_thumbnails(project, media), media.id)
         :ok = Search.sync_media(media)
         {:ok, media}
 
@@ -321,7 +323,7 @@ defmodule BDS.Media do
               {:ok, updated_media} ->
                 _ = File.rm(previous_destination_backup)
                 :ok = write_sidecar(project, updated_media)
-                :ok = ensure_thumbnails(project, updated_media)
+                log_thumbnail_error(ensure_thumbnails(project, updated_media), updated_media.id)
                 :ok = Search.sync_media(updated_media)
                 {:ok, updated_media}
 
@@ -341,5 +343,11 @@ defmodule BDS.Media do
         where: translation.translation_for == ^media_id,
         order_by: [asc: translation.language]
     )
+  end
+
+  defp log_thumbnail_error(:ok, _media_id), do: :ok
+
+  defp log_thumbnail_error({:error, reason}, media_id) do
+    Logger.warning("Thumbnail generation failed for media #{media_id}: #{inspect(reason)}")
   end
 end
