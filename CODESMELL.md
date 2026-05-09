@@ -259,20 +259,14 @@
 
 ---
 
-### CSM-015 — Missing DB Indexes on Foreign Keys
-- **Files:** `priv/repo/migrations/20260423120000_create_persistence_contract.exs`
-- **What:** The initial migration uses `references(...)` which creates FK constraints but does NOT create dedicated indexes for most FKs. Missing indexes on:
-  - `media.project_id` (queried in every sidebar/dashboard load)
-  - `post_media.post_id`, `post_media.media_id`
-  - `chat_messages.conversation_id`
-  - `embedding_keys.post_id`, `embedding_keys.project_id`
-  - `dismissed_duplicate_pairs.project_id`
-  - `import_definitions.project_id`
-  - `db_notifications.entity_type`, `db_notifications.entity_id`
-  - `posts.status`, `posts.published_at`, `posts.language` — frequently filtered columns
-- **Note:** SQLite is more forgiving than PostgreSQL for missing FK indexes, but with growing data the query plans will degrade.
-- **Fix:** Add a new migration with `create index` for every foreign key and frequently filtered column.
-- **Test:** Verify with `sqlite3` `EXPLAIN QUERY PLAN` that key lookups use indexes.
+### ~~CSM-015 — Missing DB Indexes on Foreign Keys~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - Added migration `20260509145208_add_missing_indexes.exs` with indexes for all missing foreign keys and frequently filtered columns:
+    - FK indexes: `media.project_id`, `post_media.post_id`, `post_media.media_id`, `chat_messages.conversation_id`, `embedding_keys.post_id`, `embedding_keys.project_id`, `dismissed_duplicate_pairs.project_id`, `import_definitions.project_id`, `publish_jobs.project_id`.
+    - Filter indexes: `posts.status`, `posts.published_at`, `posts.language`.
+    - Composite index: `db_notifications(entity_type, entity_id)`.
+  - Added 12 tests in `test/bds/csm015_missing_indexes_test.exs` verifying via `EXPLAIN QUERY PLAN` that all indexed columns use index lookups.
 
 ---
 
