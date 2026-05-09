@@ -200,13 +200,15 @@
 
 ## Medium Severity
 
-### CSM-011 — No URL State / Deep Linking
-- **File:** `lib/bds/desktop/shell_live.ex`, `lib/bds/desktop/router.ex`
-- **What:** Tabs, filters, and selected items are never reflected in the URL. No `handle_params/3` or `push_patch/2` is used anywhere in the codebase.
-- **Why it's bad:** Users cannot bookmark or use the back button. Harder to debug.
-- **Mitigating factor:** This is a desktop app (wx container), not a web app. URL-based navigation is less critical but still valuable for debuggability and for when the app is accessed via a browser during development.
-- **Fix:** Add `handle_params/3` for at least `?tab=` and `?view=` params. Use `push_patch` on state changes.
-- **Test:** Click a tab; assert the URL updates to `/?tab=posts`; refresh; assert the same tab is active.
+### ~~CSM-011 — No URL State / Deep Linking~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - `mount/3` now reads `?view=` and `?tab=<type>:<id>` query params and applies them to the initial workbench state, enabling deep linking on page load.
+  - Added `push_url_state/1` — after state-changing events (`select_view`, `select_tab`, `close_tab`, `open_sidebar_item`, sidebar menu actions, project switch), pushes a `url-state` event to the client with the serialized URL.
+  - Added JS handler in the `AppShell` hook that calls `history.replaceState` to update the browser URL without triggering navigation.
+  - URL encoding: `?view=<sidebar_view>` (omitted when `posts`, the default) and `?tab=<type>:<id>` (omitted when no tab is active). Invalid or unknown params are silently ignored.
+  - Used `push_event` + `history.replaceState` instead of `push_patch`/`handle_params` to maintain compatibility with existing `live_isolated` tests.
+  - Added 10 tests in `test/bds/csm011_url_state_test.exs`: mount with `?view=media`, mount with default, mount with invalid view, mount with `?tab=post:<id>`, mount with both params, `select_view` pushes url-state, `select_view` posts pushes clean URL, `select_tab` pushes url-state, `close_tab` removes tab from URL, `open_sidebar_item` pushes url-state.
 
 ---
 

@@ -142,7 +142,7 @@ defmodule BDS.Desktop.ShellLive do
   embed_templates("shell_live/*")
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     connected = connected?(socket)
 
     if connected do
@@ -175,6 +175,7 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:panel_post_links, %{backlinks: [], outlinks: []})
      |> assign(:panel_git_entries, [])
      |> reload_shell(workbench)
+     |> apply_url_params(params)
      |> tap(&sync_menu_bar_locale/1)}
   end
 
@@ -198,7 +199,10 @@ defmodule BDS.Desktop.ShellLive do
         BoundedAtoms.sidebar_view(view_id, :posts)
       )
 
-    {:noreply, refresh_sidebar(socket, workbench)}
+    {:noreply,
+     socket
+     |> refresh_sidebar(workbench)
+     |> push_url_state()}
   end
 
   def handle_event("select_panel_tab", %{"tab" => tab}, socket) do
@@ -259,7 +263,8 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply,
      socket
      |> assign(:tab_meta, tab_meta)
-     |> refresh_layout(workbench)}
+     |> refresh_layout(workbench)
+     |> push_url_state()}
   end
 
   def handle_event("close_tab", %{"type" => type, "id" => id}, socket) do
@@ -270,7 +275,8 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply,
      socket
      |> assign(:tab_meta, tab_meta)
-     |> refresh_layout(workbench)}
+     |> refresh_layout(workbench)
+     |> push_url_state()}
   end
 
   def handle_event(
@@ -628,6 +634,77 @@ defmodule BDS.Desktop.ShellLive do
     )
   end
 
+  defp push_url_state(socket) do
+    workbench = socket.assigns.workbench
+
+    params =
+      %{}
+      |> put_url_view(workbench.active_view)
+      |> put_url_tab(workbench.active_tab)
+
+    query = URI.encode_query(params)
+    path = if query == "", do: "/", else: "/?" <> query
+
+    push_event(socket, "url-state", %{path: path})
+  end
+
+  defp put_url_view(params, :posts), do: params
+  defp put_url_view(params, view), do: Map.put(params, "view", Atom.to_string(view))
+
+  defp put_url_tab(params, nil), do: params
+
+  defp put_url_tab(params, {type, id}),
+    do: Map.put(params, "tab", Atom.to_string(type) <> ":" <> id)
+
+  defp apply_url_params(socket, params) when is_map(params) and map_size(params) > 0 do
+    workbench = socket.assigns.workbench
+
+    workbench = apply_url_view(workbench, Map.get(params, "view"))
+    workbench = apply_url_tab(workbench, Map.get(params, "tab"))
+
+    if workbench == socket.assigns.workbench do
+      socket
+    else
+      tab_meta = TabHelpers.sync_tab_meta(workbench, socket.assigns[:tab_meta] || %{})
+
+      socket
+      |> assign(:tab_meta, tab_meta)
+      |> refresh_sidebar(workbench)
+    end
+  end
+
+  defp apply_url_params(socket, _params), do: socket
+
+  defp apply_url_view(workbench, nil), do: workbench
+
+  defp apply_url_view(workbench, view_str) do
+    view = BoundedAtoms.sidebar_view(view_str, nil)
+
+    if view && view != workbench.active_view do
+      Workbench.click_activity(workbench, view)
+    else
+      workbench
+    end
+  end
+
+  defp apply_url_tab(workbench, nil), do: workbench
+
+  defp apply_url_tab(workbench, tab_str) do
+    case String.split(tab_str, ":", parts: 2) do
+      [type_str, id] ->
+        type = BoundedAtoms.editor_route(type_str, nil)
+
+        if type && workbench.active_tab != {type, id} do
+          Workbench.open_tab(workbench, type, id, :preview)
+        else
+          workbench
+        end
+
+      _ ->
+        workbench
+    end
+  end
+
   defp refresh_sidebar(socket, workbench) do
     project_id = (socket.assigns[:projects] || %{})[:active_project_id]
     active_view_id = Atom.to_string(workbench.active_view)
@@ -795,6 +872,7 @@ defmodule BDS.Desktop.ShellLive do
     socket
     |> assign(:tab_meta, tab_meta)
     |> refresh_layout(workbench)
+    |> push_url_state()
   end
 
   defp sidebar_create_action(view), do: SidebarCreate.action(view)
@@ -839,6 +917,7 @@ defmodule BDS.Desktop.ShellLive do
             |> assign(:sidebar_filters_by_view, %{})
             |> append_output_entry(title, message_fun.(project))
             |> reload_shell(Workbench.new())
+            |> push_url_state()
 
           {:error, reason} ->
             socket
@@ -873,6 +952,7 @@ defmodule BDS.Desktop.ShellLive do
         socket
         |> assign(:tab_meta, tab_meta)
         |> refresh_sidebar(workbench)
+        |> push_url_state()
 
       MapSet.member?(@socket_menu_actions, action) ->
         handle_socket_menu_action(socket, action)

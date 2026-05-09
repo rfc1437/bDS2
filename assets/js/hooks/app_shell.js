@@ -173,6 +173,12 @@ export const AppShell = {
       }
     });
 
+    this.handleEvent("url-state", ({ path }) => {
+      if (path && window.location.pathname + window.location.search !== path) {
+        window.history.replaceState({}, "", path);
+      }
+    });
+
     window.addEventListener("bds:native-menu-action", this.handleNativeMenuAction);
     window.addEventListener("keydown", this.handleShortcutKeyDown, true);
     this.el.addEventListener("load", this.handleThumbnailLoad, true);
