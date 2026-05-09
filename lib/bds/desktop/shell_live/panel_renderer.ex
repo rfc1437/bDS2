@@ -105,12 +105,12 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
   end
 
   defp render_post_links(assigns) do
-    links = post_link_entries(assigns)
+    panel_links = assigns[:panel_post_links] || %{backlinks: [], outlinks: []}
 
     assigns =
       assigns
-      |> assign(:backlinks, Map.get(links, :backlinks, []))
-      |> assign(:outlinks, Map.get(links, :outlinks, []))
+      |> assign(:backlinks, Map.get(panel_links, :backlinks, []))
+      |> assign(:outlinks, Map.get(panel_links, :outlinks, []))
 
     ~H"""
     <%= if Enum.empty?(@backlinks) and Enum.empty?(@outlinks) do %>
@@ -161,7 +161,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
   end
 
   defp render_git_log(assigns) do
-    entries = git_log_entries(assigns)
+    entries = assigns[:panel_git_entries] || []
     assigns = assign(assigns, :git_entries, entries)
 
     ~H"""
@@ -196,7 +196,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     """
   end
 
-  defp post_link_entries(assigns) do
+  def fetch_post_link_entries(assigns) do
     case assigns.current_tab do
       %{type: :post, id: post_id} ->
         %{
@@ -226,7 +226,7 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     |> Enum.reject(&is_nil/1)
   end
 
-  defp git_log_entries(assigns) do
+  def fetch_git_log_entries(assigns) do
     case git_history_target(assigns.current_tab) do
       nil ->
         []

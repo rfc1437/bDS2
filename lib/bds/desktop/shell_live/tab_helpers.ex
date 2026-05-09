@@ -30,7 +30,13 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
     Enum.reduce(tabs, %{}, fn tab, acc ->
       key = {tab.type, tab.id}
       existing_meta = Map.get(tab_meta, key, %{})
-      synced_meta = merge_missing_meta(existing_meta, derived_tab_meta(tab))
+
+      synced_meta =
+        if meta_complete?(existing_meta) do
+          existing_meta
+        else
+          merge_missing_meta(existing_meta, derived_tab_meta(tab))
+        end
 
       if map_size(synced_meta) == 0 do
         acc
@@ -197,6 +203,12 @@ defmodule BDS.Desktop.ShellLive.TabHelpers do
   end
 
   defp derived_tab_meta(_tab), do: %{}
+
+  defp meta_complete?(%{title: title, subtitle: subtitle})
+       when is_binary(title) and title != "" and is_binary(subtitle) and subtitle != "",
+       do: true
+
+  defp meta_complete?(_), do: false
 
   defp merge_missing_meta(existing_meta, fresh_meta) do
     existing_meta

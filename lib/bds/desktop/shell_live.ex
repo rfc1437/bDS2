@@ -33,6 +33,7 @@ defmodule BDS.Desktop.ShellLive do
   alias BDS.Desktop.ShellLive.{
     ChatSurface,
     Layout,
+    PanelRenderer,
     SessionUtil,
     ShellCommandRunner,
     SidebarCreate,
@@ -171,6 +172,8 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:chat_editor_request_refs, %{})
      |> assign(:shell_overlay, nil)
      |> assign(:output_entries, [])
+     |> assign(:panel_post_links, %{backlinks: [], outlinks: []})
+     |> assign(:panel_git_entries, [])
      |> reload_shell(workbench)
      |> tap(&sync_menu_bar_locale/1)}
   end
@@ -567,22 +570,60 @@ defmodule BDS.Desktop.ShellLive do
     page_language = socket.assigns[:page_language] || ShellData.ui_language()
     offline_mode = Map.get(socket.assigns, :offline_mode, true)
     sidebar_data = socket.assigns[:sidebar_data] || %{}
+    current_tab = current_tab(workbench)
+    prev_tab = socket.assigns[:current_tab]
+    prev_panel_tab =
+      case socket.assigns[:workbench] do
+        %Workbench{panel: %{active_tab: tab}} -> tab
+        _ -> nil
+      end
+
+    socket =
+      socket
+      |> assign(:workbench, workbench)
+      |> assign(:activity_buttons, activity_buttons)
+      |> assign(
+        :sidebar_header,
+        active_sidebar_label(activity_buttons, workbench.active_view, sidebar_data)
+      )
+      |> assign(:panel_tabs, ShellData.panel_tabs(workbench))
+      |> assign(:current_tab, current_tab)
+      |> assign(:editor_meta, ShellData.editor_meta(task_status))
+      |> assign(
+        :status,
+        ShellData.status_bar(workbench, task_status, dashboard,
+          ui_language: page_language,
+          offline_mode: offline_mode
+        )
+      )
+
+    if panel_data_stale?(current_tab, prev_tab, workbench.panel.active_tab, prev_panel_tab) do
+      refresh_panel_data(socket)
+    else
+      socket
+    end
+  end
+
+  defp panel_data_stale?(current_tab, prev_tab, panel_tab, prev_panel_tab) do
+    current_tab != prev_tab or panel_tab != prev_panel_tab
+  end
+
+  defp refresh_panel_data(socket) do
+    panel_tab = socket.assigns.workbench.panel.active_tab
 
     socket
-    |> assign(:workbench, workbench)
-    |> assign(:activity_buttons, activity_buttons)
     |> assign(
-      :sidebar_header,
-      active_sidebar_label(activity_buttons, workbench.active_view, sidebar_data)
+      :panel_post_links,
+      if(panel_tab == :post_links,
+        do: PanelRenderer.fetch_post_link_entries(socket.assigns),
+        else: socket.assigns[:panel_post_links] || %{backlinks: [], outlinks: []}
+      )
     )
-    |> assign(:panel_tabs, ShellData.panel_tabs(workbench))
-    |> assign(:current_tab, current_tab(workbench))
-    |> assign(:editor_meta, ShellData.editor_meta(task_status))
     |> assign(
-      :status,
-      ShellData.status_bar(workbench, task_status, dashboard,
-        ui_language: page_language,
-        offline_mode: offline_mode
+      :panel_git_entries,
+      if(panel_tab == :git_log,
+        do: PanelRenderer.fetch_git_log_entries(socket.assigns),
+        else: socket.assigns[:panel_git_entries] || []
       )
     )
   end

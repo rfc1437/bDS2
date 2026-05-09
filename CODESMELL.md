@@ -151,14 +151,19 @@
 
 ---
 
-### CSM-008 — DB Queries During Render Path
-- **Files:** `lib/bds/desktop/shell_live/panel_renderer.ex`, `lib/bds/desktop/shell_live/tab_helpers.ex`
-- **What:**
-  - `panel_renderer.ex:199-209` — `post_link_entries/1` calls `PostLinks.list_incoming_links/1` and `Posts.get_post/1` per link during render.
-  - `panel_renderer.ex:229-240` — `git_log_entries/1` calls `Git.file_history/2` and `Posts.get_post/1` during render.
-  - `tab_helpers.ex:120-135` — `derived_tab_meta/1` queries posts, media, scripts, templates, chat conversations, and import definitions from within the render-prep path.
-- **Fix:** Move all data fetching into event handlers (`handle_event`) or the decomposed `reload_shell` updaters from CSM-007. Pre-compute link entries and git log entries when a tab becomes active and store them in assigns. Render should be a pure function of assigns.
-- **Test:** Render a panel 10 times; assert no DB queries fire on re-renders.
+### ~~CSM-008 — DB Queries During Render Path~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - **Panel renderer** (`lib/bds/desktop/shell_live/panel_renderer.ex`):
+    - `render_post_links` and `render_git_log` no longer call DB functions during render. Instead they read from pre-computed assigns (`panel_post_links`, `panel_git_entries`).
+    - Renamed `post_link_entries/1` → `fetch_post_link_entries/1` and `git_log_entries/1` → `fetch_git_log_entries/1`, made them public for use by event handlers.
+  - **Shell LiveView** (`lib/bds/desktop/shell_live.ex`):
+    - Added `refresh_panel_data/1` that fetches panel data (post links or git log) based on the active panel tab and stores results in assigns.
+    - `refresh_layout/2` detects when `current_tab` or `panel.active_tab` changed and calls `refresh_panel_data/1` only when stale — no DB queries on re-renders.
+    - Initialized `panel_post_links` and `panel_git_entries` assigns in mount.
+  - **Tab meta** (`lib/bds/desktop/shell_live/tab_helpers.ex`):
+    - `sync_tab_meta` now skips `derived_tab_meta` DB queries when existing meta already has both title and subtitle populated (`meta_complete?/1` guard).
+  - Added 5 tests in `test/bds/csm008_render_path_test.exs`: post_links re-render (0 queries), git_log re-render (0 queries), output panel switch (0 queries), tasks panel switch (0 queries), tab meta skip for complete meta (0 queries).
 
 ---
 
@@ -425,6 +430,7 @@
 - [ ] All high-severity items (CSM-006 to CSM-010) have been addressed.
   - CSM-006: Fixed. Batch INSERT for reindexing, preloaded post records for rendering.
   - CSM-007: Fixed. Decomposed into refresh_layout, refresh_sidebar, refresh_content, reload_shell.
+  - CSM-008: Fixed. Panel data pre-computed in event handlers, tab meta skips DB for complete entries.
 - [x] CSM-001 fix covers ALL 6 affected files, not just `import_definitions.ex`.
 - [x] CSM-003 fix covers ALL `Repo.delete!` call sites (posts, tags, scripts, media, projects, templates, translations).
 - [x] CSM-007 decomposition is the prerequisite for fixing CSM-008 (render-path queries).
