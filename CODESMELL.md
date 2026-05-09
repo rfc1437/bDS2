@@ -212,13 +212,15 @@
 
 ---
 
-### CSM-012 — Desktop File Dialog Blocks Event Handler
-- **File:** `lib/bds/desktop/shell_live/sidebar_create.ex:44-69`
-- **What:** `FilePicker.choose_file/1` is called directly inside `handle_event`.
-- **Why it's bad:** Can freeze the socket process while the native dialog is open.
-- **Mitigating factor:** In a desktop app, the user flow naturally waits for the dialog result. The risk is low in practice.
-- **Fix:** Spawn a short-lived `Task` or use Desktop library's non-blocking async APIs.
-- **Test:** Trigger a file picker; send another event immediately; assert the second event is handled within 100ms.
+### ~~CSM-012 — Desktop File Dialog Blocks Event Handler~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - Replaced synchronous `FilePicker.choose_file/1` call in `SidebarCreate.create/4` for the "media" kind with `Task.async`, storing the task ref in a new `file_picker_task` socket assign.
+  - Added `handle_file_picker_result/2` private function in `ShellLive` with clauses for `{:ok, _media}`, `:cancel`, `{:error, %{message: _}}`, and `{:error, reason}`.
+  - Extended the existing `handle_info({ref, result}, socket)` and `handle_info({:DOWN, ref, ...}, socket)` handlers to match on `file_picker_task` ref.
+  - Added `BDS_DESKTOP_AUTOMATION` guard to `FilePicker.choose_file/1` — returns `:cancel` immediately in automation/test mode, preventing native dialogs from opening during tests.
+  - Initialized `file_picker_task: nil` assign in mount.
+  - Added 5 tests in `test/bds/csm012_file_picker_async_test.exs`: event handler returns within 100ms, LiveView handles other events while task is pending, task completion doesn't crash LiveView, cancel is handled gracefully, error results don't crash LiveView.
 
 ---
 

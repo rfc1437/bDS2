@@ -170,6 +170,7 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:sidebar_filters_by_view, %{})
      |> assign(:sidebar_filter_panels, %{})
      |> assign(:chat_editor_request_refs, %{})
+     |> assign(:file_picker_task, nil)
      |> assign(:shell_overlay, nil)
      |> assign(:output_entries, [])
      |> assign(:panel_post_links, %{backlinks: [], outlinks: []})
@@ -508,6 +509,12 @@ defmodule BDS.Desktop.ShellLive do
     Process.demonitor(ref, [:flush])
 
     cond do
+      socket.assigns.file_picker_task == ref ->
+        {:noreply,
+         socket
+         |> assign(:file_picker_task, nil)
+         |> handle_file_picker_result(result)}
+
       Map.has_key?(socket.assigns.chat_editor_request_refs, ref) ->
         {conversation_id, remaining_refs} = Map.pop(socket.assigns.chat_editor_request_refs, ref)
 
@@ -527,6 +534,21 @@ defmodule BDS.Desktop.ShellLive do
   def handle_info({:DOWN, ref, :process, _pid, reason}, socket) when is_reference(ref) do
     next_socket =
       cond do
+        socket.assigns.file_picker_task == ref ->
+          if reason == :normal do
+            assign(socket, :file_picker_task, nil)
+          else
+            socket
+            |> assign(:file_picker_task, nil)
+            |> append_output_entry(
+              dgettext("ui", "Import media"),
+              inspect(reason),
+              nil,
+              "error"
+            )
+            |> refresh_content(socket.assigns.workbench)
+          end
+
         Map.has_key?(socket.assigns.chat_editor_request_refs, ref) ->
           {conversation_id, remaining_refs} =
             Map.pop(socket.assigns.chat_editor_request_refs, ref)
@@ -838,6 +860,23 @@ defmodule BDS.Desktop.ShellLive do
 
   defp create_sidebar_item(socket, kind),
     do: SidebarCreate.create(socket, kind, sidebar_create_callbacks())
+
+  defp handle_file_picker_result(socket, {:ok, _media}),
+    do: refresh_content(socket, socket.assigns.workbench)
+
+  defp handle_file_picker_result(socket, :cancel), do: socket
+
+  defp handle_file_picker_result(socket, {:error, %{message: message}}),
+    do:
+      socket
+      |> append_output_entry(dgettext("ui", "Import media"), message, nil, "error")
+      |> refresh_content(socket.assigns.workbench)
+
+  defp handle_file_picker_result(socket, {:error, reason}),
+    do:
+      socket
+      |> append_output_entry(dgettext("ui", "Import media"), inspect(reason), nil, "error")
+      |> refresh_content(socket.assigns.workbench)
 
   defp sidebar_create_callbacks do
     %{

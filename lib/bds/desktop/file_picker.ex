@@ -2,9 +2,13 @@ defmodule BDS.Desktop.FilePicker do
   @moduledoc false
 
   def choose_file(prompt) when is_binary(prompt) do
-    case :os.type() do
-      {:unix, :darwin} -> choose_file_macos(prompt)
-      _other -> {:error, %{message: "File selection is only supported on macOS desktop"}}
+    if System.get_env("BDS_DESKTOP_AUTOMATION") == "1" do
+      :cancel
+    else
+      case :os.type() do
+        {:unix, :darwin} -> choose_file_macos(prompt)
+        _other -> {:error, %{message: "File selection is only supported on macOS desktop"}}
+      end
     end
   end
 

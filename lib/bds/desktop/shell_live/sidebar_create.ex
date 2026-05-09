@@ -1,6 +1,8 @@
 defmodule BDS.Desktop.ShellLive.SidebarCreate do
   @moduledoc false
 
+  import Phoenix.Component, only: [assign: 3]
+
   alias BDS.Desktop.{FilePicker}
   alias BDS.AI
   alias BDS.ImportDefinitions
@@ -41,32 +43,24 @@ defmodule BDS.Desktop.ShellLive.SidebarCreate do
     end
   end
 
-  def create(socket, project_id, "media", callbacks) do
-    case FilePicker.choose_file(dgettext("ui", "Import media")) do
-      {:ok, source_path} ->
-        case BDS.Media.import_media(%{project_id: project_id, source_path: source_path}) do
-          {:ok, _media} ->
-            callbacks.refresh_content.(socket, socket.assigns.workbench)
+  def create(socket, project_id, "media", _callbacks) do
+    prompt = dgettext("ui", "Import media")
+
+    task =
+      Task.async(fn ->
+        case FilePicker.choose_file(prompt) do
+          {:ok, source_path} ->
+            BDS.Media.import_media(%{project_id: project_id, source_path: source_path})
+
+          :cancel ->
+            :cancel
 
           {:error, reason} ->
-            socket
-            |> callbacks.append_output.(
-              dgettext("ui", "Import media"),
-              inspect(reason),
-              nil,
-              "error"
-            )
-            |> callbacks.refresh_content.(socket.assigns.workbench)
+            {:error, reason}
         end
+      end)
 
-      :cancel ->
-        callbacks.refresh_content.(socket, socket.assigns.workbench)
-
-      {:error, %{message: message}} ->
-        socket
-        |> callbacks.append_output.(dgettext("ui", "Import media"), message, nil, "error")
-        |> callbacks.refresh_content.(socket.assigns.workbench)
-    end
+    assign(socket, :file_picker_task, task.ref)
   end
 
   def create(socket, project_id, "script", callbacks) do
