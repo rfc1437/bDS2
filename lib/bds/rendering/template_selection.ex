@@ -99,11 +99,15 @@ defmodule BDS.Rendering.TemplateSelection do
           file_system: FileSystem.new(StarterTemplates.template_roots(project))
         )
 
-      {result, _context} = Liquex.render!(template_ast, context)
-      {:ok, IO.iodata_to_binary(result)}
+      try do
+        {result, _context} = Liquex.render!(template_ast, context)
+        {:ok, IO.iodata_to_binary(result)}
+      rescue
+        e in Liquex.Error -> {:error, e.message}
+      end
+    else
+      {:error, reason, line} -> {:error, "#{reason} at line #{line}"}
     end
-  rescue
-    error -> {:error, error}
   end
 
   defp load_bundled_template_source(project, kind, slug) do

@@ -224,11 +224,20 @@
 
 ---
 
-### CSM-013 — Bang Functions in Rendering Pipelines
-- **Files:** `lib/bds/rendering/post_rendering.ex:151`, `lib/bds/rendering/filters.ex:125,127`, `lib/bds/rendering/template_selection.ex:92,102`
-- **What:** `Jason.encode!`, `Liquex.parse!`, `Liquex.render!` crash on bad data instead of returning errors.
-- **Fix:** Use non-bang variants, wrap in `case`, and propagate `{:error, reason}` to the caller.
-- **Test:** Feed a template with a syntax error; assert the renderer returns `{:error, _}` rather than raising.
+### ~~CSM-013 — Bang Functions in Rendering Pipelines~~ ✅ FIXED
+- **Fixed:** 2026-05-09
+- **What was done:**
+  - **`lib/bds/rendering/filters.ex`** — `render_macro_template`:
+    - Replaced `Liquex.parse!` with `Liquex.parse` (non-bang) and `case` match on `{:ok, ast}` / `{:error, reason, line}`.
+    - Wrapped `Liquex.render!` in `try/rescue` catching `Liquex.Error` specifically (no non-bang `render` exists in Liquex).
+    - Removed broad `rescue _error -> ""` — errors now log via `Logger.warning` with template path and reason before returning `""`.
+  - **`lib/bds/rendering/template_selection.ex`** — `render_template`:
+    - `Liquex.parse` was already non-bang; added `else` clause to normalize the 3-tuple `{:error, reason, line}` into `{:error, "reason at line N"}`.
+    - Wrapped `Liquex.render!` in `try/rescue` catching `Liquex.Error` specifically, returning `{:error, message}`.
+    - Removed broad `rescue error -> {:error, error}`.
+  - **`lib/bds/rendering/post_rendering.ex`** — `post_data_json_value`:
+    - Replaced `Jason.encode!` with `Jason.encode` and `case` match — returns `"{}"` on encode failure instead of crashing.
+  - Added 5 tests in `test/bds/csm013_bang_rendering_test.exs`: template syntax error returns `{:error, _}` from `render_template`, broken template in `render_post_page` returns `{:error, _}`, `{% break %}` render error returns `{:error, _}`, normal post context produces valid JSON, non-encodable data returns `"{}"` fallback.
 
 ---
 

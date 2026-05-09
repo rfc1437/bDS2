@@ -181,19 +181,22 @@ defmodule BDS.Rendering.PostRendering do
   end
 
   def post_data_json_value(post_context) do
-    Jason.encode!(%{
-      id: Map.get(post_context, :id),
-      title: Map.get(post_context, :title),
-      slug: Map.get(post_context, :slug),
-      excerpt: Map.get(post_context, :excerpt),
-      author: Map.get(post_context, :author),
-      language: Map.get(post_context, :language),
-      published_at: Map.get(post_context, :published_at),
-      created_at: Map.get(post_context, :created_at),
-      updated_at: Map.get(post_context, :updated_at),
-      tags: Map.get(post_context, :tags, []),
-      categories: Map.get(post_context, :categories, [])
-    })
+    case Jason.encode(%{
+           id: Map.get(post_context, :id),
+           title: Map.get(post_context, :title),
+           slug: Map.get(post_context, :slug),
+           excerpt: Map.get(post_context, :excerpt),
+           author: Map.get(post_context, :author),
+           language: Map.get(post_context, :language),
+           published_at: Map.get(post_context, :published_at),
+           created_at: Map.get(post_context, :created_at),
+           updated_at: Map.get(post_context, :updated_at),
+           tags: Map.get(post_context, :tags, []),
+           categories: Map.get(post_context, :categories, [])
+         }) do
+      {:ok, json} -> json
+      {:error, _reason} -> "{}"
+    end
   end
 
   defp build_post_context(assigns, post_record, incoming_links, outgoing_links) do
