@@ -1,5 +1,8 @@
 defmodule BDS.Templates do
-  @moduledoc false
+  @moduledoc """
+  CRUD and lifecycle management for Liquid templates (posts, lists, partials, 404 pages),
+  including slug derivation, status transitions, and filesystem synchronization.
+  """
 
   import Ecto.Query
   import BDS.MapUtils, only: [attr: 2, maybe_put: 3]

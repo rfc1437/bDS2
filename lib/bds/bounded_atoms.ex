@@ -1,5 +1,8 @@
 defmodule BDS.BoundedAtoms do
-  @moduledoc false
+  @moduledoc """
+  Safe conversion of dynamic values to atoms from pre-defined allow-lists,
+  preventing atom table exhaustion from untrusted input.
+  """
 
   alias BDS.UI.Registry
   alias BDS.UI.MenuBar

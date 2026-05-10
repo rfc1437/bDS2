@@ -1,5 +1,7 @@
 defmodule BDS.Settings do
-  @moduledoc false
+  @moduledoc """
+  Persistence layer for global application settings stored as key-value pairs in the database.
+  """
 
   alias BDS.Persistence
   alias BDS.Repo

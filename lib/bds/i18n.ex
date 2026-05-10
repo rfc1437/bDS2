@@ -1,5 +1,7 @@
 defmodule BDS.I18n do
-  @moduledoc false
+  @moduledoc """
+  Internationalization helpers for supported languages, locale resolution, and flag emoji mapping.
+  """
 
   @supported_languages [
     %{code: "en", flag: "GB"},

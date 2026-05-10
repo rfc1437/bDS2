@@ -1,5 +1,8 @@
 defmodule BDS.Scripting.Capabilities do
-  @moduledoc false
+  @moduledoc """
+  Builds the capability map exposed to Lua scripts, binding each scripting API
+  method to its Elixir implementation for a given project context.
+  """
 
   alias BDS.I18n
   alias BDS.Tasks

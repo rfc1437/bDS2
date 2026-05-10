@@ -1,5 +1,8 @@
 defmodule BDS.AI do
-  @moduledoc false
+  @moduledoc """
+  Public interface for AI features — endpoint configuration, secret management,
+  model catalog access, and dispatching chat and one-shot inference requests.
+  """
 
   alias BDS.AI.Catalog
   alias BDS.AI.Chat

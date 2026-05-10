@@ -1,5 +1,8 @@
 defmodule BDS.Scripting.ApiDocs do
-  @moduledoc false
+  @moduledoc """
+  Machine-readable documentation for the Lua scripting API, used to generate
+  help text, autocompletion data, and the published API reference.
+  """
 
   @version "0.4.0"
 

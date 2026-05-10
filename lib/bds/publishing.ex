@@ -1,5 +1,8 @@
 defmodule BDS.Publishing do
-  @moduledoc false
+  @moduledoc """
+  GenServer that manages site upload jobs, coordinating file transfers to
+  configured hosting destinations and tracking progress via the task system.
+  """
 
   use GenServer
 

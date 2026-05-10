@@ -1,5 +1,8 @@
 defmodule BDS.DocumentFields do
-  @moduledoc false
+  @moduledoc """
+  Accessor functions for document frontmatter fields, supporting key aliases
+  (e.g. "date" and "published_at" resolve to the same value).
+  """
 
   def get(fields, key, default \\ nil) when is_map(fields) and is_binary(key) do
     case fetch(fields, key) do

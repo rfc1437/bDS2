@@ -1,5 +1,8 @@
 defmodule BDS.MapUtils do
-  @moduledoc false
+  @moduledoc """
+  Utility functions for working with maps that may have atom or string keys,
+  including safe atom conversion for untrusted input.
+  """
 
   @typedoc "An attribute map that may use atom or string keys."
   @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}

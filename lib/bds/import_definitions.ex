@@ -1,5 +1,8 @@
 defmodule BDS.ImportDefinitions do
-  @moduledoc false
+  @moduledoc """
+  CRUD operations for import definitions — saved configurations for importing
+  content from WordPress WXR exports.
+  """
 
   import Ecto.Query
 

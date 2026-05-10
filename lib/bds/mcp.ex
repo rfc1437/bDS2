@@ -1,5 +1,8 @@
 defmodule BDS.MCP do
-  @moduledoc false
+  @moduledoc """
+  Facade for the Model Context Protocol server, exposing tools and resources
+  that external AI agents can invoke to read and manipulate blog content.
+  """
 
   alias BDS.MCP.Resources
   alias BDS.MCP.Tools

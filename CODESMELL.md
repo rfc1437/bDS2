@@ -307,9 +307,22 @@
 
 ## Low Severity / Code Quality
 
-### CSM-018 — `@moduledoc false` Epidemic
-- **Files:** `lib/bds/i18n.ex`, `lib/bds/map_utils.ex`, `lib/bds/bounded_atoms.ex`, `lib/bds/document_fields.ex`, `lib/bds/import_definitions.ex`, `lib/bds/publishing.ex`, `lib/bds/settings.ex`, `lib/bds/templates.ex`, `lib/bds/ai.ex`, `lib/bds/mcp.ex`, `lib/bds/scripting/capabilities.ex`, `lib/bds/scripting/api_docs.ex`
-- **Fix:** Write `@moduledoc` descriptions for all public modules. Keep internal helpers documented or mark them `@moduledoc false` only if truly private.
+### ~~CSM-018 — `@moduledoc false` Epidemic~~ ✅ FIXED
+- **Fixed:** 2026-05-10
+- **What was done:**
+  - Replaced `@moduledoc false` with descriptive `@moduledoc` strings in all 12 listed public modules:
+    - `lib/bds/i18n.ex` — language support, locale resolution, flag emoji mapping
+    - `lib/bds/map_utils.ex` — mixed-key map utilities and safe atom conversion
+    - `lib/bds/bounded_atoms.ex` — allow-list-based dynamic atom conversion
+    - `lib/bds/document_fields.ex` — frontmatter field access with key aliases
+    - `lib/bds/import_definitions.ex` — CRUD for WXR import configurations
+    - `lib/bds/publishing.ex` — GenServer for site upload job coordination
+    - `lib/bds/settings.ex` — global key-value settings persistence
+    - `lib/bds/templates.ex` — Liquid template lifecycle management
+    - `lib/bds/ai.ex` — AI endpoint config, secrets, and inference dispatch
+    - `lib/bds/mcp.ex` — MCP server facade for external AI agents
+    - `lib/bds/scripting/capabilities.ex` — Lua scripting capability map builder
+    - `lib/bds/scripting/api_docs.ex` — machine-readable Lua API documentation
 
 ---
 
