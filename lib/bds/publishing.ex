@@ -47,18 +47,12 @@ defmodule BDS.Publishing do
   end
 
   def handle_call({:update_job, job_id, attrs}, _from, state) do
-    reply =
-      case Repo.get(PublishJob, job_id) do
-        nil ->
-          :ok
+    with %PublishJob{} = job <- Repo.get(PublishJob, job_id) do
+      attrs = Map.put(attrs, :updated_at, Persistence.now_ms())
+      job |> PublishJob.changeset(attrs) |> Repo.update()
+    end
 
-        job ->
-          attrs = Map.put(attrs, :updated_at, Persistence.now_ms())
-          job |> PublishJob.changeset(attrs) |> Repo.update!()
-          :ok
-      end
-
-    {:reply, reply, state}
+    {:reply, :ok, state}
   end
 
   def handle_call({:should_upload_scp_file, upload_key, local_mtime}, _from, state) do

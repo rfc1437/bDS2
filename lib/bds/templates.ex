@@ -87,82 +87,77 @@ defmodule BDS.Templates do
 
   @spec update_template(String.t(), attrs()) :: template_result() | {:error, :not_found}
   def update_template(template_id, attrs) do
-    case Repo.get(Template, template_id) do
-      nil ->
-        {:error, :not_found}
+    with %Template{} = template <- Repo.get(Template, template_id) do
+      do_update_template(template, attrs)
+    else
+      nil -> {:error, :not_found}
+    end
+  end
 
-      template ->
-        next_slug =
-          if has_attr?(attrs, :slug) do
-            unique_slug(
-              template.project_id,
-              Slug.slugify(attr(attrs, :slug)),
-              "template",
-              template.id
-            )
-          else
-            template.slug
-          end
+  defp do_update_template(template, attrs) do
+    next_slug =
+      if has_attr?(attrs, :slug) do
+        unique_slug(
+          template.project_id,
+          Slug.slugify(attr(attrs, :slug)),
+          "template",
+          template.id
+        )
+      else
+        template.slug
+      end
 
-        content_changed? =
-          has_attr?(attrs, :content) and
-            attr(attrs, :content) != effective_template_content(template)
+    content_changed? =
+      has_attr?(attrs, :content) and
+        attr(attrs, :content) != effective_template_content(template)
 
-        slug_changed? = next_slug != template.slug
-        now = Persistence.now_ms()
+    slug_changed? = next_slug != template.slug
+    now = Persistence.now_ms()
 
-        next_status =
-          if(template.status == :published and content_changed?,
-            do: :draft,
-            else: template.status
-          )
+    next_status =
+      if(template.status == :published and content_changed?,
+        do: :draft,
+        else: template.status
+      )
 
-        next_file_path = next_template_file_path(template, next_slug)
+    next_file_path = next_template_file_path(template, next_slug)
 
-        updates =
-          %{}
-          |> maybe_put(:title, attr(attrs, :title))
-          |> maybe_put(:kind, attr(attrs, :kind))
-          |> maybe_put(:enabled, attr(attrs, :enabled))
-          |> maybe_put(:content, attr(attrs, :content))
-          |> Map.put(:file_path, next_file_path)
-          |> Map.put(:slug, next_slug)
-          |> Map.put(:version, template.version + 1)
-          |> Map.put(:updated_at, now)
-          |> Map.put(:status, next_status)
+    updates =
+      %{}
+      |> maybe_put(:title, attr(attrs, :title))
+      |> maybe_put(:kind, attr(attrs, :kind))
+      |> maybe_put(:enabled, attr(attrs, :enabled))
+      |> maybe_put(:content, attr(attrs, :content))
+      |> Map.put(:file_path, next_file_path)
+      |> Map.put(:slug, next_slug)
+      |> Map.put(:version, template.version + 1)
+      |> Map.put(:updated_at, now)
+      |> Map.put(:status, next_status)
 
-        transaction_result =
-          Repo.transaction(fn ->
-            updated_template =
-              template
-              |> Template.changeset(updates)
-              |> Repo.update!()
+    with {:ok, {updated_template, affected_posts}} <-
+           Repo.transaction(fn ->
+             updated_template =
+               template
+               |> Template.changeset(updates)
+               |> Repo.update!()
 
-            affected_posts =
-              if slug_changed? do
-                cascade_template_slug_change(template, updated_template, now)
-              else
-                []
-              end
+             affected_posts =
+               if slug_changed? do
+                 cascade_template_slug_change(template, updated_template, now)
+               else
+                 []
+               end
 
-            {updated_template, affected_posts}
-          end)
-
-        case transaction_result do
-          {:ok, {updated_template, affected_posts}} ->
-            case sync_template_update_side_effects(
-                   template,
-                   updated_template,
-                   affected_posts,
-                   slug_changed?
-                 ) do
-              :ok -> {:ok, updated_template}
-              {:error, reason} -> {:error, reason}
-            end
-
-          {:error, reason} ->
-            {:error, reason}
-        end
+             {updated_template, affected_posts}
+           end),
+         :ok <-
+           sync_template_update_side_effects(
+             template,
+             updated_template,
+             affected_posts,
+             slug_changed?
+           ) do
+      {:ok, updated_template}
     end
   end
 

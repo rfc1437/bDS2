@@ -340,18 +340,13 @@
 
 ---
 
-### CSM-020 — Deeply Nested `case` Instead of `with`
-- **Files:** `lib/bds/import_definitions.ex:54-66`, `lib/bds/publishing.ex:47-58`, `lib/bds/templates.ex:86-163`
-- **Fix:** Flatten with `with`:
-  ```elixir
-  with {:ok, record} <- Repo.get(Model, id),
-       {:ok, updated} <- Repo.update(changeset) do
-    {:ok, updated}
-  else
-    nil -> {:error, :not_found}
-    {:error, changeset} -> {:error, changeset}
-  end
-  ```
+### ~~CSM-020 — Deeply Nested `case` Instead of `with`~~ ✅ FIXED
+- **Fixed:** 2026-05-10
+- **What was done:**
+  - **`lib/bds/import_definitions.ex`** — `delete_definition/1`: Replaced nested `case` piped into another `case` with a flat `with` chain: `Repo.get` → `Repo.delete` → `{:ok, :deleted}`, with `else` clauses for `nil` and `{:error, _}`.
+  - **`lib/bds/publishing.ex`** — `handle_call({:update_job, ...})`: Replaced `case Repo.get` with `with %PublishJob{} = job <- Repo.get(...)`. Also replaced `Repo.update!()` with `Repo.update()` to avoid crashes on changeset errors.
+  - **`lib/bds/templates.ex`** — `update_template/2`: Replaced outer `case Repo.get` with `with` + extracted `do_update_template/2` private function. Collapsed three levels of nested `case` (Repo.get → transaction_result → sync_side_effects) into a single flat `with` chain.
+  - Added 7 tests in `test/bds/csm020_nested_case_test.exs`: delete_definition success and not-found, update_template success and not-found, source-level assertions that all three files use `with` instead of nested `case`.
 
 ---
 

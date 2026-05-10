@@ -55,16 +55,12 @@ defmodule BDS.ImportDefinitions do
   end
 
   def delete_definition(definition_id) when is_binary(definition_id) do
-    case Repo.get(ImportDefinition, definition_id) do
-      nil ->
-        {:error, :not_found}
-
-      %ImportDefinition{} = definition ->
-        Repo.delete(definition)
-        |> case do
-          {:ok, _deleted} -> {:ok, :deleted}
-          error -> error
-        end
+    with %ImportDefinition{} = definition <- Repo.get(ImportDefinition, definition_id),
+         {:ok, _deleted} <- Repo.delete(definition) do
+      {:ok, :deleted}
+    else
+      nil -> {:error, :not_found}
+      {:error, _} = error -> error
     end
   end
 
