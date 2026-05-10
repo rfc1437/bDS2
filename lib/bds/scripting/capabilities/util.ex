@@ -3,12 +3,14 @@ defmodule BDS.Scripting.Capabilities.Util do
 
   alias BDS.Projects
 
+  @spec project_path(String.t()) :: String.t()
   def project_path(project_id) do
     project_id
     |> Projects.get_project()
     |> Projects.project_data_dir()
   end
 
+  @spec sanitize(term()) :: term()
   def sanitize(%DateTime{} = value), do: DateTime.to_iso8601(value)
 
   def sanitize(%_struct{} = struct) do
@@ -27,9 +29,11 @@ defmodule BDS.Scripting.Capabilities.Util do
   def sanitize(value) when is_atom(value), do: Atom.to_string(value)
   def sanitize(value), do: value
 
+  @spec sanitize_nilable(term()) :: term()
   def sanitize_nilable(nil), do: nil
   def sanitize_nilable(value), do: sanitize(value)
 
+  @spec normalize_input(term()) :: term()
   def normalize_input(%_struct{} = struct), do: struct |> Map.from_struct() |> normalize_input()
 
   def normalize_input(map) when is_map(map) do
@@ -71,6 +75,7 @@ defmodule BDS.Scripting.Capabilities.Util do
   def normalize_input(value) when is_atom(value), do: Atom.to_string(value)
   def normalize_input(value), do: value
 
+  @spec normalize_input_key(term()) :: term()
   def normalize_input_key(key) when is_integer(key), do: key
   def normalize_input_key(key) when is_float(key) and trunc(key) == key, do: trunc(key)
 
@@ -84,6 +89,7 @@ defmodule BDS.Scripting.Capabilities.Util do
   def normalize_input_key(key) when is_atom(key), do: Atom.to_string(key)
   def normalize_input_key(key), do: key
 
+  @spec numeric_sequence_map?(map()) :: boolean()
   def numeric_sequence_map?(map) when map == %{}, do: false
 
   def numeric_sequence_map?(map) do
@@ -91,6 +97,7 @@ defmodule BDS.Scripting.Capabilities.Util do
     Enum.all?(keys, &is_integer/1) and Enum.sort(keys) == Enum.to_list(1..length(keys))
   end
 
+  @spec normalize_map(term()) :: map()
   def normalize_map(value) when is_map(value) do
     case normalize_input(value) do
       normalized when is_map(normalized) -> normalized
@@ -108,6 +115,7 @@ defmodule BDS.Scripting.Capabilities.Util do
 
   def normalize_map(_value), do: %{}
 
+  @spec normalize_string_list(term()) :: [String.t()]
   def normalize_string_list(value) when is_list(value), do: Enum.map(value, &to_string/1)
 
   def normalize_string_list(value) when is_map(value) do
@@ -121,6 +129,7 @@ defmodule BDS.Scripting.Capabilities.Util do
 
   def normalize_string_list(_value), do: []
 
+  @spec normalize_search_filters(term()) :: map()
   def normalize_search_filters(filters) do
     filters
     |> normalize_map()
@@ -136,19 +145,24 @@ defmodule BDS.Scripting.Capabilities.Util do
     end)
   end
 
+  @spec integer_or_default(term(), integer()) :: integer()
   def integer_or_default(value, _default) when is_integer(value), do: value
   def integer_or_default(value, _default) when is_float(value), do: trunc(value)
   def integer_or_default(_value, default), do: default
 
+  @spec string_or_nil(term()) :: String.t() | nil
   def string_or_nil(value) when is_binary(value), do: value
   def string_or_nil(value) when is_atom(value), do: Atom.to_string(value)
   def string_or_nil(value) when is_number(value), do: to_string(value)
   def string_or_nil(_value), do: nil
 
+  @spec truthy?(term()) :: boolean()
   def truthy?(value), do: value in [true, "true", 1, 1.0, "1"]
 
+  @spec pad2(integer()) :: String.t()
   def pad2(value), do: value |> Integer.to_string() |> String.pad_leading(2, "0")
 
+  @spec blank_to_nil(term()) :: term()
   def blank_to_nil(nil), do: nil
 
   def blank_to_nil(value) when is_binary(value) do
@@ -157,13 +171,16 @@ defmodule BDS.Scripting.Capabilities.Util do
 
   def blank_to_nil(value), do: value
 
+  @spec maybe_put_query(map(), term(), term()) :: map()
   def maybe_put_query(query, _key, false), do: query
   def maybe_put_query(query, _key, nil), do: query
   def maybe_put_query(query, key, value), do: Map.put(query, key, value)
 
+  @spec maybe_put_opt(keyword(), atom(), term()) :: keyword()
   def maybe_put_opt(opts, _key, nil), do: opts
   def maybe_put_opt(opts, key, value), do: Keyword.put(opts, key, value)
 
+  @spec maybe_put_normalized_list(map(), atom() | String.t()) :: map()
   def maybe_put_normalized_list(attrs, key) do
     case Map.fetch(attrs, key) do
       {:ok, value} -> Map.put(attrs, key, normalize_string_list(value))
@@ -171,9 +188,11 @@ defmodule BDS.Scripting.Capabilities.Util do
     end
   end
 
+  @spec compare_optional(term(), (term() -> boolean())) :: boolean()
   def compare_optional(nil, _fun), do: true
   def compare_optional(value, fun) when is_function(fun, 1), do: fun.(value)
 
+  @spec parse_datetime(term()) :: DateTime.t() | nil
   def parse_datetime(nil), do: nil
   def parse_datetime(value) when is_integer(value), do: DateTime.from_unix!(value, :millisecond)
 
@@ -186,16 +205,20 @@ defmodule BDS.Scripting.Capabilities.Util do
 
   def parse_datetime(_value), do: nil
 
+  @spec unwrap_result({:ok, term()} | {:error, term()}, (term() -> term())) :: term()
   def unwrap_result(result, transform \\ &sanitize/1)
   def unwrap_result({:ok, value}, transform), do: transform.(value)
   def unwrap_result({:error, _reason}, _transform), do: nil
 
+  @spec boolean_result({:ok, term()} | {:error, term()}) :: boolean()
   def boolean_result({:ok, _value}), do: true
   def boolean_result({:error, _reason}), do: false
 
+  @spec atom_result({:ok, term()} | {:error, term()}, term()) :: boolean()
   def atom_result({:ok, value}, expected_value), do: value == expected_value
   def atom_result(_result, _expected_value), do: false
 
+  @spec thumbnail_size(term()) :: :small | :medium | :large | :ai
   def thumbnail_size(size) do
     case blank_to_nil(size) do
       "medium" -> :medium
@@ -205,6 +228,7 @@ defmodule BDS.Scripting.Capabilities.Util do
     end
   end
 
+  @spec thumbnail_mime(String.t()) :: String.t()
   def thumbnail_mime(path) do
     case Path.extname(path) do
       ".jpg" -> "image/jpeg"
@@ -213,6 +237,7 @@ defmodule BDS.Scripting.Capabilities.Util do
     end
   end
 
+  @spec shell_open_system_path(String.t()) :: :ok | {:error, term()}
   def shell_open_system_path(path) do
     {command, args} =
       case :os.type() do
@@ -229,6 +254,7 @@ defmodule BDS.Scripting.Capabilities.Util do
     error -> {:error, error}
   end
 
+  @spec shell_reveal_system_path(String.t()) :: :ok | {:error, term()}
   def shell_reveal_system_path(path) do
     {command, args} =
       case :os.type() do
@@ -245,6 +271,7 @@ defmodule BDS.Scripting.Capabilities.Util do
     error -> {:error, error}
   end
 
+  @spec zero_or_one_arg((term() -> term())) :: (list(), tuple() -> {list(), tuple()})
   def zero_or_one_arg(callback) when is_function(callback, 1) do
     fn args, state ->
       decoded_args = :luerl.decode_list(args, state)
@@ -253,6 +280,7 @@ defmodule BDS.Scripting.Capabilities.Util do
     end
   end
 
+  @spec one_arg((term() -> term())) :: (list(), tuple() -> {list(), tuple()})
   def one_arg(callback) when is_function(callback, 1) do
     fn args, state ->
       decoded_args = :luerl.decode_list(args, state)
@@ -267,6 +295,7 @@ defmodule BDS.Scripting.Capabilities.Util do
     end
   end
 
+  @spec two_arg((term(), term() -> term())) :: (list(), tuple() -> {list(), tuple()})
   def two_arg(callback) when is_function(callback, 2) do
     fn args, state ->
       decoded_args = :luerl.decode_list(args, state)
@@ -282,6 +311,7 @@ defmodule BDS.Scripting.Capabilities.Util do
     end
   end
 
+  @spec three_arg((term(), term(), term() -> term())) :: (list(), tuple() -> {list(), tuple()})
   def three_arg(callback) when is_function(callback, 3) do
     fn args, state ->
       decoded_args = :luerl.decode_list(args, state)

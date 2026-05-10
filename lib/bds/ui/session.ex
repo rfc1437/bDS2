@@ -4,6 +4,7 @@ defmodule BDS.UI.Session do
   alias BDS.BoundedAtoms
   alias BDS.UI.Workbench
 
+  @spec serialize(Workbench.t()) :: map()
   def serialize(state) do
     %{
       "sidebar_visible" => state.sidebar_visible,
@@ -28,6 +29,7 @@ defmodule BDS.UI.Session do
     }
   end
 
+  @spec restore(map()) :: Workbench.t()
   def restore(payload) when is_map(payload) do
     state =
       Workbench.new(

@@ -19,6 +19,8 @@ defmodule BDS.UI.Workbench do
                     :find_duplicates
                   ])
 
+  @type t :: %__MODULE__{}
+
   defstruct sidebar_visible: true,
             sidebar_width: 280,
             active_view: :posts,
@@ -30,6 +32,7 @@ defmodule BDS.UI.Workbench do
             editor_route: :dashboard,
             dirty_tabs: MapSet.new()
 
+  @spec new(keyword()) :: t()
   def new(opts \\ []) do
     %__MODULE__{
       sidebar_visible: Keyword.get(opts, :sidebar_visible, true),
@@ -48,14 +51,17 @@ defmodule BDS.UI.Workbench do
     |> normalize_panel()
   end
 
+  @spec set_sidebar_width(t(), integer()) :: t()
   def set_sidebar_width(state, width) when is_integer(width) do
     %{state | sidebar_width: clamp_sidebar_width(width)}
   end
 
+  @spec set_assistant_sidebar_width(t(), integer()) :: t()
   def set_assistant_sidebar_width(state, width) when is_integer(width) do
     %{state | assistant_sidebar_width: clamp_assistant_sidebar_width(width)}
   end
 
+  @spec open_tab(t(), atom() | String.t(), String.t(), atom()) :: t()
   def open_tab(state, type, id, intent) do
     {tabs, opened_tab} = upsert_tab(state.tabs, normalize_type(type), id, intent)
 
@@ -66,6 +72,7 @@ defmodule BDS.UI.Workbench do
     |> normalize_panel()
   end
 
+  @spec open_tab_in_background(t(), atom() | String.t(), String.t(), atom()) :: t()
   def open_tab_in_background(state, type, id, intent) do
     current_active = state.active_tab
     {tabs, _opened_tab} = upsert_tab(state.tabs, normalize_type(type), id, intent)
@@ -77,6 +84,7 @@ defmodule BDS.UI.Workbench do
     |> normalize_panel()
   end
 
+  @spec close_tab(t(), atom() | String.t(), String.t()) :: t()
   def close_tab(state, type, id) do
     type = normalize_type(type)
     target = {type, id}
@@ -103,6 +111,7 @@ defmodule BDS.UI.Workbench do
     end
   end
 
+  @spec pin_tab(t(), atom() | String.t(), String.t()) :: t()
   def pin_tab(state, type, id) do
     type = normalize_type(type)
 
@@ -114,11 +123,13 @@ defmodule BDS.UI.Workbench do
     %{state | tabs: tabs}
   end
 
+  @spec clear_tabs(t()) :: t()
   def clear_tabs(state) do
     %{state | tabs: [], active_tab: nil, editor_route: :dashboard, dirty_tabs: MapSet.new()}
     |> normalize_panel()
   end
 
+  @spec mark_dirty(t(), atom() | String.t(), String.t()) :: t()
   def mark_dirty(state, type, id) do
     if normalize_type(type) == :post do
       %{state | dirty_tabs: MapSet.put(state.dirty_tabs, {normalize_type(type), id})}
@@ -127,32 +138,40 @@ defmodule BDS.UI.Workbench do
     end
   end
 
+  @spec clear_dirty(t(), atom() | String.t(), String.t()) :: t()
   def clear_dirty(state, type, id) do
     %{state | dirty_tabs: MapSet.delete(state.dirty_tabs, {normalize_type(type), id})}
   end
 
+  @spec dirty?(t(), atom() | String.t(), String.t()) :: boolean()
   def dirty?(state, type, id) do
     MapSet.member?(state.dirty_tabs, {normalize_type(type), id})
   end
 
+  @spec toggle_sidebar(t()) :: t()
   def toggle_sidebar(state), do: %{state | sidebar_visible: not state.sidebar_visible}
 
+  @spec set_panel_visible(t(), boolean()) :: t()
   def set_panel_visible(state, visible) when is_boolean(visible) do
     %{state | panel: %{state.panel | visible: visible}}
   end
 
+  @spec toggle_panel(t()) :: t()
   def toggle_panel(state) do
     set_panel_visible(state, not state.panel.visible)
   end
 
+  @spec toggle_assistant_sidebar(t()) :: t()
   def toggle_assistant_sidebar(state) do
     %{state | assistant_sidebar_visible: not state.assistant_sidebar_visible}
   end
 
+  @spec set_panel_tab(t(), atom()) :: t()
   def set_panel_tab(state, tab) when tab in [:tasks, :output, :post_links, :git_log] do
     %{state | panel: %{state.panel | active_tab: tab}}
   end
 
+  @spec click_activity(t(), atom() | String.t()) :: t()
   def click_activity(state, activity_id) do
     activity_id = normalize_type(activity_id)
 
@@ -163,6 +182,7 @@ defmodule BDS.UI.Workbench do
     end
   end
 
+  @spec activity_buttons(t(), integer()) :: [map()]
   def activity_buttons(state, git_badge_count \\ 0) do
     Registry.sidebar_views()
     |> Enum.map(fn view ->
@@ -176,6 +196,7 @@ defmodule BDS.UI.Workbench do
     end)
   end
 
+  @spec status_bar(t(), keyword()) :: map()
   def status_bar(state, opts) do
     post_count = Keyword.get(opts, :post_count, 0)
     media_count = Keyword.get(opts, :media_count, 0)

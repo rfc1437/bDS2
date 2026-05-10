@@ -3,30 +3,37 @@ defmodule BDS.Scripting.JobStore do
 
   use GenServer
 
+  @spec start_link(term()) :: GenServer.on_start()
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
+  @spec put_job(map()) :: :ok
   def put_job(job) when is_map(job) do
     GenServer.call(__MODULE__, {:put_job, job})
   end
 
+  @spec update_job(String.t(), map()) :: :ok
   def update_job(job_id, attrs) when is_binary(job_id) and is_map(attrs) do
     GenServer.call(__MODULE__, {:update_job, job_id, attrs})
   end
 
+  @spec attach_runner(String.t(), pid()) :: :ok
   def attach_runner(job_id, pid) when is_binary(job_id) and is_pid(pid) do
     GenServer.call(__MODULE__, {:attach_runner, job_id, pid})
   end
 
+  @spec detach_runner(String.t()) :: :ok
   def detach_runner(job_id) when is_binary(job_id) do
     GenServer.call(__MODULE__, {:detach_runner, job_id})
   end
 
+  @spec fetch_job(String.t()) :: map() | nil
   def fetch_job(job_id) when is_binary(job_id) do
     GenServer.call(__MODULE__, {:fetch_job, job_id})
   end
 
+  @spec fetch_job!(String.t()) :: map()
   def fetch_job!(job_id) when is_binary(job_id) do
     case fetch_job(job_id) do
       nil -> raise KeyError, key: job_id, term: :jobs
@@ -34,6 +41,7 @@ defmodule BDS.Scripting.JobStore do
     end
   end
 
+  @spec runner_for(String.t()) :: pid() | nil
   def runner_for(job_id) when is_binary(job_id) do
     GenServer.call(__MODULE__, {:runner_for, job_id})
   end

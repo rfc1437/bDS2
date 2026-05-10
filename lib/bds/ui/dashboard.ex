@@ -8,6 +8,7 @@ defmodule BDS.UI.Dashboard do
   alias BDS.Repo
   alias BDS.Tags.Tag
 
+  @spec snapshot(String.t() | nil) :: map()
   def snapshot(nil), do: empty_snapshot()
 
   def snapshot(project_id) when is_binary(project_id) do
@@ -23,6 +24,7 @@ defmodule BDS.UI.Dashboard do
     }
   end
 
+  @spec empty_snapshot() :: map()
   def empty_snapshot do
     %{
       title: "dashboard.title",

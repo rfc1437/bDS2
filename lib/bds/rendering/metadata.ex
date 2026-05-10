@@ -14,16 +14,19 @@ defmodule BDS.Rendering.Metadata do
   alias BDS.Posts.Translation
   alias BDS.Tags.Tag
 
+  @spec project_metadata(String.t()) :: map()
   def project_metadata(project_id) do
     {:ok, metadata} = ProjectMetadata.get_project_metadata(project_id)
     metadata
   end
 
+  @spec menu_items(String.t()) :: [map()]
   def menu_items(project_id) do
     {:ok, %{items: items}} = Menu.get_menu(project_id)
     Enum.map(items, &to_template_menu_item/1)
   end
 
+  @spec menu_items_from_raw([map()]) :: [map()]
   def menu_items_from_raw(items) when is_list(items) do
     Enum.map(items, &to_template_menu_item/1)
   end
@@ -52,6 +55,7 @@ defmodule BDS.Rendering.Metadata do
   defp menu_item_href(%{kind: :submenu}), do: "#"
   defp menu_item_href(_item), do: "#"
 
+  @spec blog_languages(map(), String.t()) :: [map()]
   def blog_languages(metadata, current_language) do
     ([metadata.main_language] ++ (metadata.blog_languages || []))
     |> Enum.reject(&(&1 in [nil, ""]))
@@ -72,11 +76,13 @@ defmodule BDS.Rendering.Metadata do
     end)
   end
 
+  @spec tag_color_by_name(String.t()) :: %{String.t() => String.t() | nil}
   def tag_color_by_name(project_id) do
     Repo.all(from tag in Tag, where: tag.project_id == ^project_id, select: {tag.name, tag.color})
     |> Enum.into(%{}, fn {name, color} -> {name, color} end)
   end
 
+  @spec alternate_links(Post.t() | nil, String.t(), String.t()) :: [map()]
   def alternate_links(nil, _project_id, _main_language), do: []
 
   def alternate_links(%Post{} = post, project_id, main_language) do
@@ -104,22 +110,27 @@ defmodule BDS.Rendering.Metadata do
       end)
   end
 
+  @spec backlinks([map()]) :: [map()]
   def backlinks(incoming_links) do
     Enum.map(incoming_links, fn link ->
       %{path: link.href, display_slug: link.display_slug, title: link.title}
     end)
   end
 
+  @spec default_pico_stylesheet_href(String.t() | nil) :: String.t()
   def default_pico_stylesheet_href(theme), do: PreviewAssets.stylesheet_href(theme)
 
+  @spec href_for_language(String.t()) :: String.t()
   def href_for_language(""), do: "/"
   def href_for_language(prefix), do: String.trim_trailing(prefix, "/") <> "/"
 
+  @spec calendar_initial_year(map() | nil) :: integer() | nil
   def calendar_initial_year(%{created_at: created_at}) when is_integer(created_at),
     do: Persistence.from_unix_ms!(created_at).year
 
   def calendar_initial_year(_post), do: nil
 
+  @spec calendar_initial_month(map() | nil) :: integer() | nil
   def calendar_initial_month(%{created_at: created_at}) when is_integer(created_at),
     do: Persistence.from_unix_ms!(created_at).month
 

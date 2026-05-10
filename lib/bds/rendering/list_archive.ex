@@ -10,6 +10,7 @@ defmodule BDS.Rendering.ListArchive do
   alias BDS.Rendering.TemplateSelection
   use Gettext, backend: BDS.Gettext
 
+  @spec list_assigns(String.t(), map()) :: map()
   def list_assigns(project_id, assigns) do
     metadata = RenderMetadata.project_metadata(project_id)
     template_context = TemplateSelection.template_render_context(project_id)
@@ -114,6 +115,7 @@ defmodule BDS.Rendering.ListArchive do
     }
   end
 
+  @spec not_found_assigns(String.t(), map()) :: map()
   def not_found_assigns(project_id, assigns) do
     metadata = RenderMetadata.project_metadata(project_id)
 

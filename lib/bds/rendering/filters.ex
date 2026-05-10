@@ -5,6 +5,7 @@ defmodule BDS.Rendering.Filters do
 
   alias BDS.Slug
 
+  @spec i18n(term(), String.t(), Liquex.Context.t()) :: String.t()
   def i18n(value, language, _context) do
     key = value |> to_string() |> String.trim()
 
@@ -15,6 +16,16 @@ defmodule BDS.Rendering.Filters do
     end
   end
 
+  @spec markdown(
+          term(),
+          term(),
+          term(),
+          map(),
+          map(),
+          String.t(),
+          term(),
+          Liquex.Context.t()
+        ) :: String.t()
   def markdown(
         value,
         _post_id,
@@ -28,6 +39,8 @@ defmodule BDS.Rendering.Filters do
     render_markdown(value, canonical_post_paths, canonical_media_paths, language, context)
   end
 
+  @spec render_markdown(term(), map() | nil, map() | nil, String.t(), Liquex.Context.t()) ::
+          String.t()
   def render_markdown(value, canonical_post_paths, canonical_media_paths, language, context) do
     value
     |> to_string()
@@ -36,6 +49,7 @@ defmodule BDS.Rendering.Filters do
     |> rewrite_rendered_html_urls(canonical_post_paths || %{}, canonical_media_paths || %{})
   end
 
+  @spec slugify(term(), Liquex.Context.t()) :: String.t()
   def slugify(value, _context) do
     value
     |> to_string()

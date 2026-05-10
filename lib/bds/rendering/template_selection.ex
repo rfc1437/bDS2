@@ -11,6 +11,8 @@ defmodule BDS.Rendering.TemplateSelection do
   alias BDS.StarterTemplates
   alias BDS.Templates.Template
 
+  @spec load_template_source(String.t(), atom(), String.t() | nil) ::
+          {:ok, String.t()} | {:error, term()}
   def load_template_source(project_id, kind, slug) do
     project = Projects.get_project!(project_id)
 
@@ -88,6 +90,8 @@ defmodule BDS.Rendering.TemplateSelection do
     end
   end
 
+  @spec render_template(String.t(), String.t(), map()) ::
+          {:ok, String.t()} | {:error, String.t()}
   def render_template(project_id, source, assigns) do
     with {:ok, template_ast} <- Liquex.parse(source) do
       project = Projects.get_project!(project_id)
@@ -145,6 +149,7 @@ defmodule BDS.Rendering.TemplateSelection do
   defp bundled_template_slug(_kind, slug) when is_binary(slug) and slug != "", do: slug
   defp bundled_template_slug(kind, _slug), do: StarterTemplates.default_slug(kind)
 
+  @spec template_render_context(String.t()) :: Liquex.Context.t()
   def template_render_context(project_id) do
     project = Projects.get_project!(project_id)
 

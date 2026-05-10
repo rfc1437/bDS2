@@ -22,6 +22,7 @@ defmodule BDS.Scripting.Capabilities do
   import PostsCaps
   import ProjectsCaps
 
+  @spec for_project(String.t(), keyword()) :: map()
   def for_project(project_id, opts \\ []) when is_binary(project_id) and is_list(opts) do
     %{
       app: %{

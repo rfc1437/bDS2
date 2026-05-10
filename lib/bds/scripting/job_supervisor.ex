@@ -3,6 +3,7 @@ defmodule BDS.Scripting.JobSupervisor do
 
   use DynamicSupervisor
 
+  @spec start_link(term()) :: Supervisor.on_start()
   def start_link(_opts) do
     DynamicSupervisor.start_link(__MODULE__, :ok, name: __MODULE__)
   end

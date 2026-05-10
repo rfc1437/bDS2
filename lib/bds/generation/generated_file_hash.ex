@@ -14,6 +14,7 @@ defmodule BDS.Generation.GeneratedFileHash do
     field :updated_at, :integer
   end
 
+  @spec changeset(%__MODULE__{}, map()) :: Ecto.Changeset.t()
   def changeset(record, attrs) do
     record
     |> cast(attrs, [:project_id, :relative_path, :content_hash, :updated_at], empty_values: [nil])

@@ -16,6 +16,7 @@ defmodule BDS.UI.Sidebar do
 
   @default_page_size 500
 
+  @spec snapshot(String.t() | nil) :: map()
   def snapshot(nil), do: empty_snapshot()
 
   def snapshot(project_id) when is_binary(project_id) do
@@ -39,6 +40,7 @@ defmodule BDS.UI.Sidebar do
     }
   end
 
+  @spec view(String.t() | nil, String.t() | atom(), map()) :: map()
   def view(project_id, view_id, params \\ %{})
 
   def view(nil, view_id, _params), do: empty_view(view_id)
@@ -102,6 +104,7 @@ defmodule BDS.UI.Sidebar do
     end
   end
 
+  @spec empty_snapshot() :: map()
   def empty_snapshot do
     %{
       "posts" => empty_view("posts"),

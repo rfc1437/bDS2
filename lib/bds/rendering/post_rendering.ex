@@ -13,6 +13,7 @@ defmodule BDS.Rendering.PostRendering do
   alias BDS.Posts.Translation
   alias BDS.Repo
 
+  @spec post_assigns(String.t(), map()) :: map()
   def post_assigns(project_id, assigns) do
     metadata = RenderMetadata.project_metadata(project_id)
     template_context = TemplateSelection.template_render_context(project_id)
@@ -180,6 +181,7 @@ defmodule BDS.Rendering.PostRendering do
     end
   end
 
+  @spec post_data_json_value(map()) :: String.t()
   def post_data_json_value(post_context) do
     case Jason.encode(%{
            id: Map.get(post_context, :id),
@@ -238,6 +240,13 @@ defmodule BDS.Rendering.PostRendering do
     }
   end
 
+  @spec render_post_content(
+          String.t() | nil,
+          map(),
+          map(),
+          String.t(),
+          Liquex.Context.t()
+        ) :: String.t()
   def render_post_content(
         content,
         canonical_post_paths,

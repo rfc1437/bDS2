@@ -4,6 +4,7 @@ defmodule BDS.UI.MenuBar do
   alias BDS.UI.Registry
   alias BDS.UI.Workbench
 
+  @spec default_groups(keyword()) :: [map()]
   def default_groups(opts \\ []) do
     dev_mode? = Keyword.get(opts, :dev_mode?, false)
 
@@ -80,6 +81,7 @@ defmodule BDS.UI.MenuBar do
     ]
   end
 
+  @spec execute(Workbench.t(), atom()) :: Workbench.t()
   def execute(state, :toggle_sidebar), do: Workbench.toggle_sidebar(state)
   def execute(state, :toggle_panel), do: Workbench.toggle_panel(state)
   def execute(state, :toggle_assistant_sidebar), do: Workbench.toggle_assistant_sidebar(state)

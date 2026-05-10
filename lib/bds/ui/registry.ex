@@ -3,8 +3,10 @@ defmodule BDS.UI.Registry do
 
   use Gettext, backend: BDS.Gettext
 
+  @spec default_sidebar_view() :: atom()
   def default_sidebar_view, do: :posts
 
+  @spec sidebar_views() :: [map()]
   def sidebar_views do
     [
       %{
@@ -90,6 +92,7 @@ defmodule BDS.UI.Registry do
     ]
   end
 
+  @spec editor_routes() :: [map()]
   def editor_routes do
     [
       %{id: :dashboard, singleton: true, entity_tab: false, title: dgettext("ui", "Dashboard")},
@@ -138,6 +141,8 @@ defmodule BDS.UI.Registry do
     ]
   end
 
+  @spec sidebar_view(atom()) :: map() | nil
   def sidebar_view(id) when is_atom(id), do: Enum.find(sidebar_views(), &(&1.id == id))
+  @spec editor_route(atom()) :: map() | nil
   def editor_route(id) when is_atom(id), do: Enum.find(editor_routes(), &(&1.id == id))
 end

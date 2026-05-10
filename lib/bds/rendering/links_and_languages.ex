@@ -9,6 +9,7 @@ defmodule BDS.Rendering.LinksAndLanguages do
   alias BDS.Posts.Post
   alias BDS.Repo
 
+  @spec canonical_post_path_by_slug(String.t(), String.t()) :: %{String.t() => String.t()}
   def canonical_post_path_by_slug(project_id, main_language) do
     posts =
       Repo.all(
@@ -36,6 +37,7 @@ defmodule BDS.Rendering.LinksAndLanguages do
     end)
   end
 
+  @spec canonical_media_path_by_source_path(String.t()) :: %{String.t() => String.t()}
   def canonical_media_path_by_source_path(project_id) do
     Repo.all(from media in MediaAsset, where: media.project_id == ^project_id)
     |> Enum.reduce(%{}, fn media, acc ->
@@ -54,6 +56,7 @@ defmodule BDS.Rendering.LinksAndLanguages do
     end)
   end
 
+  @spec post_path(map(), String.t() | nil) :: String.t()
   def post_path(post, language_prefix)
       when is_binary(language_prefix) and language_prefix != "" do
     String.trim_trailing(language_prefix, "/") <> post_path(post, nil)
@@ -73,11 +76,15 @@ defmodule BDS.Rendering.LinksAndLanguages do
     ]) <> "/"
   end
 
+  @spec post_path(map(), String.t() | nil, String.t()) :: String.t()
   def post_path(post, language, main_language) do
     prefix = language_prefix(language, main_language)
     post_path(post, prefix)
   end
 
+  @spec link_contexts(String.t() | nil, String.t() | nil, :incoming | :outgoing, String.t()) :: [
+          map()
+        ]
   def link_contexts(_project_id, nil, _direction, _main_language), do: []
 
   def link_contexts(project_id, post_id, :incoming, main_language) do
@@ -113,10 +120,12 @@ defmodule BDS.Rendering.LinksAndLanguages do
     end
   end
 
+  @spec language_prefix(String.t() | nil, String.t()) :: String.t()
   def language_prefix(language, main_language) when language == main_language, do: ""
   def language_prefix(nil, _main_language), do: ""
   def language_prefix(language, _main_language), do: "/#{language}"
 
+  @spec normalize_language(String.t() | nil, String.t()) :: String.t()
   def normalize_language(nil, fallback), do: fallback
   def normalize_language("", fallback), do: fallback
 

@@ -326,9 +326,17 @@
 
 ---
 
-### CSM-019 — Missing `@spec` on Public Functions
-- **Files:** Widespread across rendering, generation, publishing, UI, and scripting modules.
-- **Fix:** Add `@spec` to every public function. This is a Dialyzer prerequisite (the project already runs Dialyzer; the report notes it should be clean).
+### ~~CSM-019 — Missing `@spec` on Public Functions~~ ✅ FIXED
+- **Fixed:** 2026-05-10
+- **What was done:**
+  - Added `@spec` annotations to every public function across 25 files in rendering, generation, publishing, UI, and scripting modules.
+  - Added `@type t :: %__MODULE__{}` to `workbench.ex` and `file_system.ex` to support struct-based specs.
+  - Rendering: `post_rendering.ex`, `links_and_languages.ex`, `labels.ex`, `metadata.ex`, `file_system.ex`, `filters.ex`, `list_archive.ex`, `template_selection.ex`
+  - Generation: `generated_file_hash.ex`
+  - Publishing: `publishing.ex`
+  - UI: `registry.ex`, `session.ex`, `sidebar.ex`, `menu_bar.ex`, `commands.ex`, `dashboard.ex`, `workbench.ex`
+  - Scripting: `job_store.ex`, `job_runner.ex`, `job_supervisor.ex`, `capabilities.ex`, `capabilities/util.ex`, `api_docs.ex`
+  - Dialyzer passes with 0 errors; all 619 tests pass.
 
 ---
 

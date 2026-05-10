@@ -31,6 +31,7 @@ defmodule BDS.UI.Commands do
     %{id: :upload_site, accelerator: "CTRL+SHIFT+U"}
   ]
 
+  @spec handle_shortcut(BDS.UI.Workbench.t(), map()) :: BDS.UI.Workbench.t()
   def handle_shortcut(state, shortcut) when is_map(shortcut) do
     case command_for_shortcut(shortcut) do
       nil -> state
@@ -38,6 +39,7 @@ defmodule BDS.UI.Commands do
     end
   end
 
+  @spec command_for_shortcut(map()) :: atom() | nil
   def command_for_shortcut(shortcut) when is_map(shortcut) do
     key = shortcut |> BDS.MapUtils.attr(:key, "") |> String.downcase()
 
@@ -54,6 +56,7 @@ defmodule BDS.UI.Commands do
     end
   end
 
+  @spec client_shortcuts() :: [map()]
   def client_shortcuts do
     @menu_shortcuts
     |> Enum.filter(&Map.has_key?(&1, :key))
@@ -67,6 +70,7 @@ defmodule BDS.UI.Commands do
     end)
   end
 
+  @spec accelerator_label(atom()) :: String.t() | nil
   def accelerator_label(command_id) when is_atom(command_id) do
     case Enum.find(@menu_shortcuts, &(&1.id == command_id)) do
       %{accelerator: accelerator} -> accelerator

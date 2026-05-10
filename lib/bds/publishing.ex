@@ -286,6 +286,7 @@ defmodule BDS.Publishing do
   defp rsync_excludes(%{kind: :media}), do: ["--exclude=*.meta"]
   defp rsync_excludes(_target), do: []
 
+  @spec ensure_trailing_slash(String.t()) :: String.t()
   def ensure_trailing_slash(path), do: String.trim_trailing(path, "/") <> "/"
 
   defp remote_dir_spec(credentials, remote_dir) do

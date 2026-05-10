@@ -8,6 +8,7 @@ defmodule BDS.Rendering.Labels do
 
   use Gettext, backend: BDS.Gettext
 
+  @spec for_language(String.t()) :: map()
   def for_language(language) do
     Gettext.with_locale(BDS.Gettext, language, fn ->
       %{
@@ -34,6 +35,7 @@ defmodule BDS.Rendering.Labels do
     end)
   end
 
+  @spec month_name(integer() | nil, String.t()) :: String.t() | nil
   def month_name(nil, _language), do: nil
 
   def month_name(1, language) do

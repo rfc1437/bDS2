@@ -3,10 +3,12 @@ defmodule BDS.Scripting.JobRunner do
 
   use GenServer, restart: :temporary
 
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts)
   end
 
+  @spec cancel(pid()) :: :ok
   def cancel(pid) when is_pid(pid) do
     GenServer.call(pid, :cancel)
   end

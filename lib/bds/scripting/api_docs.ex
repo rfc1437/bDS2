@@ -1207,6 +1207,7 @@ defmodule BDS.Scripting.ApiDocs do
     }
   ]
 
+  @spec render() :: String.t()
   def render do
     [
       "# API Documentation",

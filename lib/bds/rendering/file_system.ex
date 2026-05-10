@@ -1,8 +1,10 @@
 defmodule BDS.Rendering.FileSystem do
   @moduledoc false
 
+  @type t :: %__MODULE__{root_paths: [String.t()]}
   defstruct [:root_paths]
 
+  @spec new([String.t()] | String.t()) :: t()
   def new(root_paths) when is_list(root_paths) do
     %__MODULE__{root_paths: Enum.uniq(root_paths)}
   end
@@ -11,6 +13,7 @@ defmodule BDS.Rendering.FileSystem do
     new([root_path])
   end
 
+  @spec full_path(t(), String.t()) :: String.t()
   def full_path(%__MODULE__{root_paths: root_paths}, template_path) do
     normalized_path = to_string(template_path)
 
