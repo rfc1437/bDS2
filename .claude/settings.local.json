@@ -4,7 +4,8 @@
       "Bash(mix compile *)",
       "Bash(mix test *)",
       "Bash(mix dialyzer *)",
-      "Bash(mix ecto.migrate)"
+      "Bash(mix ecto.migrate)",
+      "Bash(git add *)"
     ]
   }
 }
