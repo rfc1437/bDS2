@@ -6,7 +6,8 @@
       "Bash(mix dialyzer *)",
       "Bash(mix ecto.migrate)",
       "Bash(git add *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git -C /Users/gb/Projects/bDS2 status)"
     ]
   }
 }

@@ -1,1 +1,2 @@
-- [Fix all test failures](feedback_fix_all_failures.md) — Never dismiss failures as pre-existing; fix everything
+- [Fix all test failures](feedback_fix_all_failures.md) — Never dismiss failures as pre-existing or flaky; investigate and fix
+- [Debug targeted](feedback_targeted_debugging.md) — Analyze the code and fix; don't brute-force with repeated suite runs

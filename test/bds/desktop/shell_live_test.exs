@@ -443,15 +443,27 @@ defmodule BDS.Desktop.ShellLiveTest do
     def get(_url, _headers), do: {:error, :not_found}
   end
 
-  defmodule DelayedChatServer do
+  defmodule GatedChatServer do
+    @moduledoc false
     use Plug.Router
     import Phoenix.ConnTest, except: [post: 2]
 
     plug(:match)
     plug(:dispatch)
 
+    def hold_gate do
+      case GenServer.whereis(__MODULE__) do
+        nil -> :ok
+        pid -> Agent.stop(pid)
+      end
+
+      Agent.start_link(fn -> :hold end, name: __MODULE__)
+    end
+
+    def release_gate, do: Agent.update(__MODULE__, fn _ -> :release end)
+
     post "/v1/chat/completions" do
-      Process.sleep(300)
+      wait_for_release()
 
       body =
         Jason.encode!(%{
@@ -466,6 +478,19 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     match _ do
       send_resp(conn, 404, "not found")
+    end
+
+    defp wait_for_release do
+      case GenServer.whereis(__MODULE__) do
+        nil ->
+          Process.sleep(:infinity)
+
+        _pid ->
+          case Agent.get(__MODULE__, & &1) do
+            :release -> :ok
+            :hold -> Process.sleep(50) && wait_for_release()
+          end
+      end
     end
   end
 
@@ -3915,9 +3940,10 @@ defmodule BDS.Desktop.ShellLiveTest do
 
   test "chat editor keeps previous surfaces visible while a new update surface streams" do
     assert :ok = AI.set_airplane_mode(false)
+    {:ok, _} = GatedChatServer.hold_gate()
 
     server =
-      start_supervised!({Bandit, plug: DelayedChatServer, port: 0, startup_log: false})
+      start_supervised!({Bandit, plug: GatedChatServer, port: 0, startup_log: false})
 
     {:ok, {_address, port}} = ThousandIsland.listener_info(server)
 
@@ -4000,8 +4026,6 @@ defmodule BDS.Desktop.ShellLiveTest do
       view
       |> element("[data-testid='chat-abort-button']")
       |> render_click()
-
-    Process.sleep(350)
   end
 
   test "chat editor hook reopens server-expanded A2UI surfaces after patches" do
@@ -4356,9 +4380,10 @@ defmodule BDS.Desktop.ShellLiveTest do
 
   test "chat editor shows in-flight stop state and can abort a running turn" do
     assert :ok = AI.set_airplane_mode(false)
+    {:ok, _} = GatedChatServer.hold_gate()
 
     server =
-      start_supervised!({Bandit, plug: DelayedChatServer, port: 0, startup_log: false})
+      start_supervised!({Bandit, plug: GatedChatServer, port: 0, startup_log: false})
 
     {:ok, {_address, port}} = ThousandIsland.listener_info(server)
 
@@ -4401,15 +4426,17 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     refute html =~ ~s(data-testid="chat-abort-button")
 
-    Process.sleep(350)
+    GatedChatServer.release_gate()
+    Process.sleep(100)
     refute render(view) =~ "Delayed response"
   end
 
   test "chat editor keeps the in-flight user turn visible and disables input while streaming" do
     assert :ok = AI.set_airplane_mode(false)
+    {:ok, _} = GatedChatServer.hold_gate()
 
     server =
-      start_supervised!({Bandit, plug: DelayedChatServer, port: 0, startup_log: false})
+      start_supervised!({Bandit, plug: GatedChatServer, port: 0, startup_log: false})
 
     {:ok, {_address, port}} = ThousandIsland.listener_info(server)
 
@@ -4483,15 +4510,17 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     refute html =~ ~s(data-testid="chat-abort-button")
 
-    Process.sleep(350)
+    GatedChatServer.release_gate()
+    Process.sleep(100)
     refute render(view) =~ "Delayed response"
   end
 
   test "chat editor does not duplicate persisted turn artifacts while the request is still active" do
     assert :ok = AI.set_airplane_mode(false)
+    {:ok, _} = GatedChatServer.hold_gate()
 
     server =
-      start_supervised!({Bandit, plug: DelayedChatServer, port: 0, startup_log: false})
+      start_supervised!({Bandit, plug: GatedChatServer, port: 0, startup_log: false})
 
     {:ok, {_address, port}} = ThousandIsland.listener_info(server)
 
@@ -4575,8 +4604,6 @@ defmodule BDS.Desktop.ShellLiveTest do
       view
       |> element("[data-testid='chat-abort-button']")
       |> render_click()
-
-    Process.sleep(350)
   end
 
   test "translation validation route renders dedicated cards and fix controls", %{
