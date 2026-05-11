@@ -403,10 +403,14 @@
 
 ---
 
-### CSM-026 — TOCTOU Race Condition in Template File System
-- **File:** `lib/bds/rendering/file_system.ex:28-37`
-- **What:** `Enum.find(&File.regular?/1)` checks existence, then the file is read later (in the `Liquex.FileSystem` impl, Z. 43-49). Between check and read the file can vanish.
-- **Fix:** Just try to read and handle `{:error, :enoent}`. Remove the `Enum.find` existence check and attempt reads directly.
+### ~~CSM-026 — TOCTOU Race Condition in Template File System~~ ✅ FIXED
+- **Fixed:** 2026-05-11
+- **What was done:**
+  - Extracted `candidate_paths/2` — validates the template path and returns all candidate file paths without checking existence.
+  - Added `try_read/2` — attempts `File.read` on each candidate path sequentially, returning `{:ok, contents}` on first success or `{:error, :enoent}` when all fail. No separate existence check.
+  - Simplified `full_path/2` to delegate to `candidate_paths/2` (returns first candidate for backward compatibility with tests).
+  - Rewrote `Liquex.FileSystem` protocol impl to use `try_read/2` directly, eliminating the TOCTOU window between `File.regular?` and `File.read`.
+  - Added 10 tests in `test/bds/csm026_toctou_file_system_test.exs`: atomic read, missing template, multi-root fallthrough, first-root-wins priority, file-deleted-between-calls safety, protocol read, protocol raise on missing, and path validation (empty, absolute, traversal).
 
 ---
 

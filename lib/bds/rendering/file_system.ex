@@ -13,8 +13,8 @@ defmodule BDS.Rendering.FileSystem do
     new([root_path])
   end
 
-  @spec full_path(t(), String.t()) :: String.t()
-  def full_path(%__MODULE__{root_paths: root_paths}, template_path) do
+  @spec candidate_paths(t(), String.t()) :: [String.t()]
+  def candidate_paths(%__MODULE__{root_paths: root_paths}, template_path) do
     normalized_path = to_string(template_path)
 
     cond do
@@ -29,17 +29,29 @@ defmodule BDS.Rendering.FileSystem do
 
       true ->
         filename = ensure_liquid_ext(normalized_path)
+        Enum.map(root_paths, &Path.expand(Path.join(&1, filename)))
+    end
+  end
 
-        root_paths
-        |> Enum.map(&Path.expand(Path.join(&1, filename)))
-        |> Enum.find(&File.regular?/1)
-        |> case do
-          nil ->
-            Path.expand(Path.join(List.first(root_paths) || ".", filename))
+  @spec full_path(t(), String.t()) :: String.t()
+  def full_path(%__MODULE__{} = fs, template_path) do
+    List.first(candidate_paths(fs, template_path))
+  end
 
-          path ->
-            path
-        end
+  @spec try_read(t(), String.t()) :: {:ok, String.t()} | {:error, :enoent}
+  def try_read(%__MODULE__{} = fs, template_path) do
+    fs
+    |> candidate_paths(template_path)
+    |> try_read_from_paths()
+  end
+
+  defp try_read_from_paths([]), do: {:error, :enoent}
+
+  defp try_read_from_paths([path | rest]) do
+    case File.read(path) do
+      {:ok, contents} -> {:ok, contents}
+      {:error, :enoent} -> try_read_from_paths(rest)
+      {:error, _reason} -> try_read_from_paths(rest)
     end
   end
 
@@ -50,12 +62,9 @@ end
 
 defimpl Liquex.FileSystem, for: BDS.Rendering.FileSystem do
   def read_template_file(file_system, template_path) do
-    file_system
-    |> BDS.Rendering.FileSystem.full_path(template_path)
-    |> File.read()
-    |> case do
+    case BDS.Rendering.FileSystem.try_read(file_system, template_path) do
       {:ok, contents} -> contents
-      _error -> raise Liquex.Error, message: "No such template '#{template_path}'"
+      {:error, :enoent} -> raise Liquex.Error, message: "No such template '#{template_path}'"
     end
   end
 end
