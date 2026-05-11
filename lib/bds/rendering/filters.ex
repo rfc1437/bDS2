@@ -135,27 +135,37 @@ defmodule BDS.Rendering.Filters do
         ""
 
       _id ->
-        template_source = Liquex.FileSystem.read_template_file(context.file_system, template_path)
+        case BDS.Rendering.FileSystem.try_read(context.file_system, template_path) do
+          {:ok, template_source} ->
+            render_macro_source(template_path, template_source, assigns, context)
 
-        case Liquex.parse(template_source) do
-          {:ok, template_ast} ->
-            isolated_context = Liquex.Context.new_isolated_subscope(context, assigns)
-
-            try do
-              {result, _context} = Liquex.render!(template_ast, isolated_context)
-              IO.iodata_to_binary(result)
-            rescue
-              e in Liquex.Error ->
-                require Logger
-                Logger.warning("Macro template render failed (#{template_path}): #{e.message}")
-                ""
-            end
-
-          {:error, reason, line} ->
+          {:error, :enoent} ->
             require Logger
-            Logger.warning("Macro template parse failed (#{template_path}): #{reason} at line #{line}")
+            Logger.warning("Macro template not found: #{template_path}")
             ""
         end
+    end
+  end
+
+  defp render_macro_source(template_path, template_source, assigns, context) do
+    case Liquex.parse(template_source) do
+      {:ok, template_ast} ->
+        isolated_context = Liquex.Context.new_isolated_subscope(context, assigns)
+
+        try do
+          {result, _context} = Liquex.render!(template_ast, isolated_context)
+          IO.iodata_to_binary(result)
+        rescue
+          e in Liquex.Error ->
+            require Logger
+            Logger.warning("Macro template render failed (#{template_path}): #{e.message}")
+            ""
+        end
+
+      {:error, reason, line} ->
+        require Logger
+        Logger.warning("Macro template parse failed (#{template_path}): #{reason} at line #{line}")
+        ""
     end
   end
 

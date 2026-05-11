@@ -422,10 +422,15 @@
 
 ---
 
-### CSM-028 — Broad `rescue` Swallowing Template Errors
-- **File:** `lib/bds/rendering/filters.ex:130-132`
-- **What:** `rescue _error -> ""` swallows all macro template failures silently.
-- **Fix:** Rescue only specific exceptions, or return `{:error, exception}` and let the caller decide.
+### ~~CSM-028 — Broad `rescue` Swallowing Template Errors~~ ✅ FIXED
+- **Fixed:** 2026-05-11
+- **What was done:**
+  - Replaced `Liquex.FileSystem.read_template_file` (which raises on missing templates) with `BDS.Rendering.FileSystem.try_read` (returns `{:ok, source}` / `{:error, :enoent}`).
+  - Missing template now logs a warning and returns `""` without raising.
+  - Extracted `render_macro_source/4` to separate file reading from template parsing/rendering.
+  - `Liquex.render!` rescue remains specific to `Liquex.Error` (no non-bang variant exists in Liquex).
+  - No broad `rescue _error ->` or `rescue _ ->` clauses remain in `filters.ex`.
+  - Added 3 source-level tests in `test/bds/csm028_broad_rescue_test.exs`: no broad rescue clauses, no `read_template_file` usage, `try_read` is used instead.
 
 ---
 
