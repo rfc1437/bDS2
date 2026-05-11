@@ -14,11 +14,16 @@ defmodule BDS.Generation.Pagefind do
   """
   @spec build_outputs(map(), [html_output()]) :: [generated_file()]
   def build_outputs(plan, html_outputs) do
-    plan.blog_languages
-    |> Enum.uniq()
-    |> Enum.flat_map(fn language ->
+    languages = Enum.uniq(plan.blog_languages)
+
+    other_prefixes =
+      languages
+      |> Enum.reject(&(&1 == plan.language))
+      |> Enum.map(&(&1 <> "/"))
+
+    Enum.flat_map(languages, fn language ->
       route_language = route_language(plan.language, language)
-      pages = pages_for_language(html_outputs, route_language)
+      pages = pages_for_language(html_outputs, route_language, other_prefixes)
 
       prefix =
         if route_language in [nil, ""], do: ["pagefind"], else: [route_language, "pagefind"]
@@ -32,10 +37,11 @@ defmodule BDS.Generation.Pagefind do
     end)
   end
 
-  defp pages_for_language(html_outputs, route_language) do
+  defp pages_for_language(html_outputs, route_language, other_prefixes) do
     html_outputs
     |> Enum.filter(fn {relative_path, _content} ->
-      String.ends_with?(relative_path, ".html") and language_match?(relative_path, route_language)
+      String.ends_with?(relative_path, ".html") and
+        language_match?(relative_path, route_language, other_prefixes)
     end)
     |> Enum.map(fn {relative_path, content} ->
       %{
@@ -45,12 +51,13 @@ defmodule BDS.Generation.Pagefind do
     end)
   end
 
-  defp language_match?(relative_path, nil),
-    do: not String.starts_with?(relative_path, ["de/", "fr/", "it/", "es/"])
+  defp language_match?(relative_path, nil, other_prefixes),
+    do: not String.starts_with?(relative_path, other_prefixes)
 
-  defp language_match?(relative_path, ""), do: language_match?(relative_path, nil)
+  defp language_match?(relative_path, "", other_prefixes),
+    do: language_match?(relative_path, nil, other_prefixes)
 
-  defp language_match?(relative_path, route_language),
+  defp language_match?(relative_path, route_language, _other_prefixes),
     do: String.starts_with?(relative_path, route_language <> "/")
 
   defp text(content) do

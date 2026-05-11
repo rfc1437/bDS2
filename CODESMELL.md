@@ -386,16 +386,20 @@
 
 ---
 
-### CSM-024 — `Enum.reduce` with `acc.draft ++ [post]` (O(n²))
-- **File:** `lib/bds/ui/sidebar.ex:556-565`
-- **Fix:** Use `Enum.group_by/3` or reverse-accumulate and `Enum.reverse`.
+### ~~CSM-024 — `Enum.reduce` with `acc.draft ++ [post]` (O(n²))~~ ✅ FIXED
+- **Fixed:** 2026-05-08 (as part of CSM-005)
+- **What was done:** Replaced `acc.draft ++ [post]` with `Enum.group_by/2` in `group_posts/1`. See CSM-005 entry for details.
 
 ---
 
-### CSM-025 — Hardcoded Language Prefixes
-- **File:** `lib/bds/generation/pagefind.ex:48-54`
-- **What:** `["de/", "fr/", "it/", "es/"]` hardcoded instead of derived from project settings.
-- **Fix:** Derive from project settings (`mainLanguage` and supported languages).
+### ~~CSM-025 — Hardcoded Language Prefixes~~ ✅ FIXED
+- **Fixed:** 2026-05-11
+- **What was done:**
+  - Replaced hardcoded `["de/", "fr/", "it/", "es/"]` in `language_match?/2` with dynamically derived prefixes from `plan.blog_languages` and `plan.language`.
+  - `build_outputs/2` now computes `other_prefixes` by rejecting the main language from `blog_languages` and appending `"/"` to each.
+  - `pages_for_language/3` and `language_match?/3` now accept the computed prefixes as a parameter instead of using a hardcoded list.
+  - Works correctly with arbitrary language codes (e.g. `pt-br`, `zh-cn`, `ja`) that were not in the old hardcoded list.
+  - Added 5 tests in `test/bds/csm025_hardcoded_languages_test.exs`: source-level assertion for no hardcoded prefixes, main language exclusion, non-main language inclusion, arbitrary language codes, single-language blog.
 
 ---
 
