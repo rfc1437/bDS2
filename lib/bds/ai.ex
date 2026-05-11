@@ -62,14 +62,12 @@ defmodule BDS.AI do
     model = get_setting("ai.#{kind_key}.model")
     encrypted_api_key = get_setting(encrypted_key("ai.#{kind_key}.api_key"))
 
-    cond do
-      is_nil(url) and is_nil(model) and is_nil(encrypted_api_key) ->
-        {:ok, nil}
-
-      true ->
-        with {:ok, api_key} <- get_secret(encrypted_api_key, backend) do
-          {:ok, %{kind: kind, url: url, api_key: api_key, model: model}}
-        end
+    if is_nil(url) and is_nil(model) and is_nil(encrypted_api_key) do
+      {:ok, nil}
+    else
+      with {:ok, api_key} <- get_secret(encrypted_api_key, backend) do
+        {:ok, %{kind: kind, url: url, api_key: api_key, model: model}}
+      end
     end
   end
 

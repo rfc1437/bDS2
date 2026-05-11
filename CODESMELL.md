@@ -350,9 +350,13 @@
 
 ---
 
-### CSM-021 — `cond` Where Pattern Matching Suffices
-- **Files:** `lib/bds/ai.ex:62-70`, `lib/bds/scripting/api_docs.ex:1345-1398`, `lib/bds/scripting/api_docs.ex:1433-1447`
-- **Fix:** Replace `cond do x == nil -> ...; true -> ... end` with multiple function-head clauses.
+### ~~CSM-021 — `cond` Where Pattern Matching Suffices~~ ✅ FIXED
+- **Fixed:** 2026-05-11
+- **What was done:**
+  - **`lib/bds/ai.ex`** — `get_endpoint/2`: Replaced `cond do is_nil(x) and ...; true -> ... end` with a simple `if/else` since there are only two branches.
+  - **`lib/bds/scripting/api_docs.ex`** — `example_response_value/1`: Extracted `"nil"` literal match into a separate function head. Replaced remaining `cond` with `case` on a tuple of guard results.
+  - **`lib/bds/scripting/api_docs.ex`** — `example_field_value/1`: Replaced `cond` with `case` on a tuple of `String.contains?`/`String.ends_with?` results.
+  - Added 2 source-level tests in `test/bds/csm021_cond_pattern_match_test.exs` asserting no `cond do` blocks remain in either file.
 
 ---
 

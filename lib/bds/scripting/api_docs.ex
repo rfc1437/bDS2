@@ -1434,18 +1434,17 @@ defmodule BDS.Scripting.ApiDocs do
     |> Enum.uniq()
   end
 
-  defp example_response_value(returns) do
-    cond do
-      returns == "nil" ->
-        nil
+  defp example_response_value("nil"), do: nil
 
-      nullable_return?(returns) ->
+  defp example_response_value(returns) do
+    case {nullable_return?(returns), String.ends_with?(returns, "[]")} do
+      {true, _} ->
         {:nullable, example_response_value(non_nil_return(returns))}
 
-      String.ends_with?(returns, "[]") ->
+      {_, true} ->
         [example_value_for_type(String.trim_trailing(returns, "[]"))]
 
-      true ->
+      _ ->
         example_value_for_type(returns)
     end
   end
@@ -1475,10 +1474,10 @@ defmodule BDS.Scripting.ApiDocs do
   end
 
   defp example_field_value(type) do
-    cond do
-      String.contains?(type, " | nil") -> nil
-      String.ends_with?(type, "[]") -> [example_value_for_type(String.trim_trailing(type, "[]"))]
-      true -> example_value_for_type(type)
+    case {String.contains?(type, " | nil"), String.ends_with?(type, "[]")} do
+      {true, _} -> nil
+      {_, true} -> [example_value_for_type(String.trim_trailing(type, "[]"))]
+      _ -> example_value_for_type(type)
     end
   end
 
