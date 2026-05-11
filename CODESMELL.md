@@ -414,9 +414,11 @@
 
 ---
 
-### CSM-027 — `if result == :ok` Instead of Pattern Matching
-- **File:** `lib/bds/templates.ex:445`
-- **Fix:** Use `case result do :ok -> ...; _ -> ... end`.
+### ~~CSM-027 — `if result == :ok` Instead of Pattern Matching~~ ✅ FIXED
+- **Fixed:** 2026-05-11
+- **What was done:**
+  - Replaced `if result == :ok and ...` in `rewrite_template_file/2` with a `case` expression using pattern matching and a `when` guard.
+  - `Persistence.atomic_write` result is now matched directly: `:ok when file_path changed` triggers old file cleanup, `other` (including `{:error, _}`) is returned as-is.
 
 ---
 

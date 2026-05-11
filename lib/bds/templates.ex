@@ -448,13 +448,12 @@ defmodule BDS.Templates do
     body = published_template_body(original_template)
     new_full_path = full_file_path(updated_template.project_id, updated_template.file_path)
 
-    result =
-      Persistence.atomic_write(new_full_path, serialize_template_file(updated_template, body))
+    case Persistence.atomic_write(new_full_path, serialize_template_file(updated_template, body)) do
+      :ok when original_template.file_path != updated_template.file_path ->
+        delete_file_if_present(original_template.project_id, original_template.file_path)
 
-    if result == :ok and original_template.file_path != updated_template.file_path do
-      delete_file_if_present(original_template.project_id, original_template.file_path)
-    else
-      result
+      other ->
+        other
     end
   end
 
