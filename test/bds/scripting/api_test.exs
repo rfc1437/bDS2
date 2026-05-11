@@ -106,7 +106,7 @@ defmodule BDS.Scripting.ApiTest do
 
     bad_source = "function render() error('boom') end"
 
-    assert {:ok, ""} = BDS.Scripting.execute_macro(project.id, bad_source, [])
+    assert {:error, _reason} = BDS.Scripting.execute_macro(project.id, bad_source, [])
   end
 
   test "project scripting exposes project, post, script, template, metadata, and task namespaces",

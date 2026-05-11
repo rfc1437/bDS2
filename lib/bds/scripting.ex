@@ -3,6 +3,8 @@ defmodule BDS.Scripting do
   Facade for the configured user-script runtime.
   """
 
+  require Logger
+
   alias BDS.Scripting.Capabilities
   alias BDS.Scripting.Runtime
 
@@ -63,7 +65,9 @@ defmodule BDS.Scripting do
          ) do
       {:ok, nil} -> {:ok, ""}
       {:ok, value} -> {:ok, to_string(value)}
-      {:error, _reason} -> {:ok, ""}
+      {:error, reason} ->
+        Logger.warning("execute_macro failed for project #{project_id}: #{inspect(reason)}")
+        {:error, reason}
     end
   end
 

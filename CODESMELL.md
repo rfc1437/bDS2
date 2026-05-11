@@ -360,10 +360,12 @@
 
 ---
 
-### CSM-022 — Silent Error Swallowing
-- **File:** `lib/bds/scripting.ex:64-66`
-- **What:** `execute_macro/4` returns `{:ok, ""}` on `{:error, _reason}` with no logging. The caller cannot distinguish success from failure.
-- **Fix:** Return the actual error tuple or at least log the failure with `Logger.error/1`.
+### ~~CSM-022 — Silent Error Swallowing~~ ✅ FIXED
+- **Fixed:** 2026-05-11
+- **What was done:**
+  - `execute_macro/4` now returns `{:error, reason}` instead of `{:ok, ""}` when the underlying script execution fails.
+  - Added `Logger.warning/1` call that logs the project ID and error reason before returning the error tuple.
+  - Updated test in `api_test.exs` to assert `{:error, _reason}` instead of `{:ok, ""}` for failing macros.
 
 ---
 
