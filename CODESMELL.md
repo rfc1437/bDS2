@@ -369,11 +369,20 @@
 
 ---
 
-### CSM-023 — SRP Violations
-- **Files:**
-  - `lib/bds/templates.ex:86-163` — `update_template/2` does slug changes, content changes, status transitions, file paths, transactions, cascades, and filesystem sync.
-  - `lib/bds/scripting/capabilities.ex:22-248` — `for_project/2` returns a 200+ line map literal.
-- **Fix:** Decompose into smaller private pipelines or domain-specific builder functions.
+### ~~CSM-023 — SRP Violations~~ ✅ FIXED
+- **Fixed:** 2026-05-11
+- **What was done:**
+  - **`lib/bds/templates.ex`** — `do_update_template/2`:
+    - Extracted `resolve_next_slug/2` — determines slug from attrs or keeps current.
+    - Extracted `content_changed?/2` — checks if content attr differs from effective content.
+    - Extracted `resolve_next_status/2` — pattern-matched function heads for status transition (published + content change → draft).
+    - Extracted `build_update_attrs/5` — assembles the changeset map from resolved values.
+    - Extracted `commit_update_transaction/4` — runs the Repo transaction with cascade logic.
+    - `do_update_template/2` is now a concise pipeline: resolve → build → commit → sync.
+  - **`lib/bds/scripting/capabilities.ex`** — `for_project/2`:
+    - Extracted 13 domain-specific builder functions: `app_capabilities/2`, `project_capabilities/1`, `meta_capabilities/1`, `post_capabilities/1`, `media_capabilities/1`, `script_capabilities/1`, `template_capabilities/1`, `tag_capabilities/1`, `task_capabilities/0`, `sync_capabilities/2`, `publish_capabilities/2`, `chat_capabilities/1`, `embedding_capabilities/1`.
+    - `for_project/2` is now a 15-line dispatch map.
+  - Added 5 tests in `test/bds/csm023_srp_violations_test.exs`: source-level assertions for helper extraction in templates, delegation in do_update_template, builder function presence in capabilities, concise for_project body (≤20 lines), no inline capability definitions in for_project.
 
 ---
 

@@ -95,61 +95,15 @@ defmodule BDS.Templates do
   end
 
   defp do_update_template(template, attrs) do
-    next_slug =
-      if has_attr?(attrs, :slug) do
-        unique_slug(
-          template.project_id,
-          Slug.slugify(attr(attrs, :slug)),
-          "template",
-          template.id
-        )
-      else
-        template.slug
-      end
-
-    content_changed? =
-      has_attr?(attrs, :content) and
-        attr(attrs, :content) != effective_template_content(template)
-
-    slug_changed? = next_slug != template.slug
     now = Persistence.now_ms()
-
-    next_status =
-      if(template.status == :published and content_changed?,
-        do: :draft,
-        else: template.status
-      )
-
-    next_file_path = next_template_file_path(template, next_slug)
-
-    updates =
-      %{}
-      |> maybe_put(:title, attr(attrs, :title))
-      |> maybe_put(:kind, attr(attrs, :kind))
-      |> maybe_put(:enabled, attr(attrs, :enabled))
-      |> maybe_put(:content, attr(attrs, :content))
-      |> Map.put(:file_path, next_file_path)
-      |> Map.put(:slug, next_slug)
-      |> Map.put(:version, template.version + 1)
-      |> Map.put(:updated_at, now)
-      |> Map.put(:status, next_status)
+    next_slug = resolve_next_slug(template, attrs)
+    slug_changed? = next_slug != template.slug
+    content_changed? = content_changed?(template, attrs)
+    next_status = resolve_next_status(template, content_changed?)
+    updates = build_update_attrs(template, attrs, next_slug, next_status, now)
 
     with {:ok, {updated_template, affected_posts}} <-
-           Repo.transaction(fn ->
-             updated_template =
-               template
-               |> Template.changeset(updates)
-               |> Repo.update!()
-
-             affected_posts =
-               if slug_changed? do
-                 cascade_template_slug_change(template, updated_template, now)
-               else
-                 []
-               end
-
-             {updated_template, affected_posts}
-           end),
+           commit_update_transaction(template, updates, slug_changed?, now),
          :ok <-
            sync_template_update_side_effects(
              template,
@@ -159,6 +113,58 @@ defmodule BDS.Templates do
            ) do
       {:ok, updated_template}
     end
+  end
+
+  defp resolve_next_slug(template, attrs) do
+    if has_attr?(attrs, :slug) do
+      unique_slug(
+        template.project_id,
+        Slug.slugify(attr(attrs, :slug)),
+        "template",
+        template.id
+      )
+    else
+      template.slug
+    end
+  end
+
+  defp content_changed?(template, attrs) do
+    has_attr?(attrs, :content) and
+      attr(attrs, :content) != effective_template_content(template)
+  end
+
+  defp resolve_next_status(%Template{status: :published}, true = _content_changed?), do: :draft
+  defp resolve_next_status(%Template{status: status}, _content_changed?), do: status
+
+  defp build_update_attrs(template, attrs, next_slug, next_status, now) do
+    %{}
+    |> maybe_put(:title, attr(attrs, :title))
+    |> maybe_put(:kind, attr(attrs, :kind))
+    |> maybe_put(:enabled, attr(attrs, :enabled))
+    |> maybe_put(:content, attr(attrs, :content))
+    |> Map.put(:file_path, next_template_file_path(template, next_slug))
+    |> Map.put(:slug, next_slug)
+    |> Map.put(:version, template.version + 1)
+    |> Map.put(:updated_at, now)
+    |> Map.put(:status, next_status)
+  end
+
+  defp commit_update_transaction(template, updates, slug_changed?, now) do
+    Repo.transaction(fn ->
+      updated_template =
+        template
+        |> Template.changeset(updates)
+        |> Repo.update!()
+
+      affected_posts =
+        if slug_changed? do
+          cascade_template_slug_change(template, updated_template, now)
+        else
+          []
+        end
+
+      {updated_template, affected_posts}
+    end)
   end
 
   @spec rebuild_templates_from_files(String.t(), keyword()) :: {:ok, [Template.t()]}
