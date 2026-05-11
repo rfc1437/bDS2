@@ -821,11 +821,13 @@ defmodule BDS.UI.Sidebar do
   # ---------------------------------------------------------------------------
 
   defp build_post_section(title, status, posts, translation_counts, published_meta?) do
+    post_count = length(posts)
+
     %{
       id: Atom.to_string(status),
       title: title,
       status: Atom.to_string(status),
-      count: length(posts),
+      count: post_count,
       items:
         Enum.map(posts, fn post ->
           %{

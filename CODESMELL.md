@@ -434,10 +434,14 @@
 
 ---
 
-### CSM-029 — `length/1` in Guards or Comparisons
-- **Files:** `lib/bds/generation/outputs.ex`, `lib/bds/ui/sidebar.ex`
-- **What:** `length(list)` is O(n). Using it inside a loop makes the whole loop O(n²).
-- **Fix:** Bind the length before the loop.
+### ~~CSM-029 — `length/1` in Guards or Comparisons~~ ✅ FIXED
+- **Fixed:** 2026-05-11
+- **What was done:**
+  - **`lib/bds/generation/outputs.ex`** — `category_route_paths`, `tag_route_paths`, `date_route_paths`:
+    - Bound `post_count = length(posts)` at the start of each `Enum.flat_map` callback, before passing to `paginated_archive_paths`. Eliminates inline `length/1` calls inside loop bodies.
+  - **`lib/bds/ui/sidebar.ex`** — `build_post_section`:
+    - Bound `post_count = length(posts)` before the map literal instead of computing `length(posts)` inline in the `count:` field.
+  - Added 3 source-level tests in `test/bds/csm029_length_in_guards_test.exs`: no inline `length(posts)` in `paginated_archive_paths` calls, no inline `length()` in `build_post_section` map literal, no inline `length(posts)` in route path function callbacks.
 
 ---
 

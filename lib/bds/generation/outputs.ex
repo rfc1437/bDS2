@@ -80,10 +80,12 @@ defmodule BDS.Generation.Outputs do
   def category_route_paths(plan, posts_by_category, route_language) do
     if :category in plan.sections do
       Enum.flat_map(posts_by_category, fn {category, posts} ->
+        post_count = length(posts)
+
         paginated_archive_paths(
           route_language,
           ["category", archive_route_segment(category)],
-          length(posts),
+          post_count,
           plan.max_posts_per_page
         )
       end)
@@ -96,10 +98,12 @@ defmodule BDS.Generation.Outputs do
   def tag_route_paths(plan, posts_by_tag, route_language) do
     if :tag in plan.sections do
       Enum.flat_map(posts_by_tag, fn {tag, posts} ->
+        post_count = length(posts)
+
         paginated_archive_paths(
           route_language,
           ["tag", archive_route_segment(tag)],
-          length(posts),
+          post_count,
           plan.max_posts_per_page
         )
       end)
@@ -113,10 +117,12 @@ defmodule BDS.Generation.Outputs do
     if :date in plan.sections do
       year_paths =
         Enum.flat_map(post_index.posts_by_year, fn {year, posts} ->
+          post_count = length(posts)
+
           paginated_archive_paths(
             route_language,
             [Integer.to_string(year)],
-            length(posts),
+            post_count,
             plan.max_posts_per_page
           )
         end)
@@ -124,11 +130,12 @@ defmodule BDS.Generation.Outputs do
       month_paths =
         Enum.flat_map(post_index.posts_by_year_month, fn {year_month, posts} ->
           [year, month] = String.split(year_month, "/", parts: 2)
+          post_count = length(posts)
 
           paginated_archive_paths(
             route_language,
             [year, month],
-            length(posts),
+            post_count,
             plan.max_posts_per_page
           )
         end)
@@ -136,11 +143,12 @@ defmodule BDS.Generation.Outputs do
       day_paths =
         Enum.flat_map(post_index.posts_by_year_month_day, fn {year_month_day, posts} ->
           [year, month, day] = String.split(year_month_day, "/", parts: 3)
+          post_count = length(posts)
 
           paginated_archive_paths(
             route_language,
             [year, month, day],
-            length(posts),
+            post_count,
             plan.max_posts_per_page
           )
         end)
