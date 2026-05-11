@@ -1,6 +1,8 @@
 defmodule BDS.Media.Linking do
   @moduledoc false
 
+  require Logger
+
   import Ecto.Query
 
   alias BDS.Media.Media
@@ -64,7 +66,7 @@ defmodule BDS.Media.Linking do
                end
              end) do
           {:ok, _result} ->
-            :ok = Sidecars.write_sidecar(project, media)
+            log_sidecar_error(Sidecars.write_sidecar(project, media), media.id)
             {:ok, :linked}
 
           {:error, reason} ->
@@ -93,7 +95,7 @@ defmodule BDS.Media.Linking do
                :ok
              end) do
           {:ok, :ok} ->
-            :ok = Sidecars.write_sidecar(project, media)
+            log_sidecar_error(Sidecars.write_sidecar(project, media), media.id)
             {:ok, :unlinked}
 
           {:error, reason} ->
@@ -110,6 +112,12 @@ defmodule BDS.Media.Linking do
         order_by: [asc: pm.sort_order, asc: pm.post_id],
         select: pm.post_id
     )
+  end
+
+  defp log_sidecar_error(:ok, _media_id), do: :ok
+
+  defp log_sidecar_error({:error, reason}, media_id) do
+    Logger.warning("Sidecar write failed for media #{media_id}: #{inspect(reason)}")
   end
 
   defp next_sort_order(media_id) do

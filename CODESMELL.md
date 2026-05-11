@@ -445,10 +445,15 @@
 
 ---
 
-### CSM-030 — Unchecked `File.mkdir_p` / `File.mkdir_p!`
-- **Files:** `lib/bds/media/thumbnails.ex:133`, `lib/bds/media/sidecars.ex:24,56`, `lib/bds/release_packaging.ex:80,85`
-- **What:** Result of `File.mkdir_p/1` is discarded. `File.mkdir_p!/1` in `release_packaging` can crash on permission errors.
-- **Fix:** Pattern-match `File.mkdir_p/1` or use `with`; replace bang variants with non-bang and handle errors.
+### ~~CSM-030 — Unchecked `File.mkdir_p` / `File.mkdir_p!`~~ ✅ FIXED
+- **Fixed:** 2026-05-11
+- **What was done:**
+  - **`lib/bds/media/thumbnails.ex`** — Already fixed in CSM-009; `File.mkdir_p` is inside a `with` chain in `write_all_thumbnails`.
+  - **`lib/bds/media/sidecars.ex`** — Removed redundant `File.mkdir_p` calls from `write_sidecar/2` and `write_translation_sidecar/3` (the underlying `Persistence.atomic_write` already handles `mkdir_p`). Updated specs to return `:ok | {:error, File.posix()}`. Updated callers (`sync_media_sidecar`, `sync_media_translation_sidecar`) to propagate errors.
+  - **`lib/bds/media.ex`** — Replaced all `:ok = write_sidecar(...)` and `:ok = write_translation_sidecar(...)` match assertions with `log_sidecar_error/2` (mirrors existing `log_thumbnail_error/2` pattern). Sidecar write failures are logged as warnings but don't fail the DB operation.
+  - **`lib/bds/media/linking.ex`** — Same `log_sidecar_error/2` pattern for post link/unlink sidecar writes.
+  - **`lib/bds/release_packaging.ex`** — Replaced `File.mkdir_p!` with `File.mkdir_p` in `reset_output/1` (return value propagated through `with` chain in `package/1`). Replaced `File.mkdir_p!` with `with :ok <- File.mkdir_p(...)` in `copy_release/2`. Replaced `File.write!` with `File.write` in `write_manifest/1`.
+  - Added 6 tests in `test/bds/csm030_unchecked_mkdir_test.exs`: source-level assertions for no unchecked `File.mkdir_p`, no bang variants, no `:ok =` match assertions on sidecar writes.
 
 ---
 

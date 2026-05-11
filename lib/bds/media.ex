@@ -106,7 +106,7 @@ defmodule BDS.Media do
            |> Repo.insert!()
          end) do
       {:ok, media} ->
-        :ok = write_sidecar(project, media)
+        log_sidecar_error(write_sidecar(project, media), media.id)
         log_thumbnail_error(ensure_thumbnails(project, media), media.id)
         :ok = Search.sync_media(media)
         {:ok, media}
@@ -148,7 +148,7 @@ defmodule BDS.Media do
                |> Repo.update!()
              end) do
           {:ok, updated_media} ->
-            :ok = write_sidecar(project, updated_media)
+            log_sidecar_error(write_sidecar(project, updated_media), updated_media.id)
             :ok = Search.sync_media(updated_media)
             {:ok, updated_media}
 
@@ -240,7 +240,7 @@ defmodule BDS.Media do
                |> Repo.insert_or_update!()
              end) do
           {:ok, updated_translation} ->
-            :ok = write_translation_sidecar(project, media, updated_translation)
+            log_sidecar_error(write_translation_sidecar(project, media, updated_translation), media.id)
             :ok = Search.sync_media(media.id)
             {:ok, updated_translation}
 
@@ -275,7 +275,7 @@ defmodule BDS.Media do
                 )
 
                 :ok = Search.sync_media(media)
-                :ok = write_sidecar(project, media)
+                log_sidecar_error(write_sidecar(project, media), media.id)
                 {:ok, true}
 
               {:error, changeset} ->
@@ -322,7 +322,7 @@ defmodule BDS.Media do
                  end) do
               {:ok, updated_media} ->
                 _ = File.rm(previous_destination_backup)
-                :ok = write_sidecar(project, updated_media)
+                log_sidecar_error(write_sidecar(project, updated_media), updated_media.id)
                 log_thumbnail_error(ensure_thumbnails(project, updated_media), updated_media.id)
                 :ok = Search.sync_media(updated_media)
                 {:ok, updated_media}
@@ -349,5 +349,11 @@ defmodule BDS.Media do
 
   defp log_thumbnail_error({:error, reason}, media_id) do
     Logger.warning("Thumbnail generation failed for media #{media_id}: #{inspect(reason)}")
+  end
+
+  defp log_sidecar_error(:ok, _media_id), do: :ok
+
+  defp log_sidecar_error({:error, reason}, media_id) do
+    Logger.warning("Sidecar write failed for media #{media_id}: #{inspect(reason)}")
   end
 end

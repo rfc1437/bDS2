@@ -18,10 +18,9 @@ defmodule BDS.Media.Sidecars do
   alias BDS.Search
   alias BDS.Sidecar
 
-  @spec write_sidecar(BDS.Projects.Project.t(), Media.t()) :: :ok
+  @spec write_sidecar(BDS.Projects.Project.t(), Media.t()) :: :ok | {:error, File.posix()}
   def write_sidecar(project, media) do
     path = Path.join(Projects.project_data_dir(project), media.sidecar_path)
-    :ok = File.mkdir_p(Path.dirname(path))
 
     atomic_write(
       path,
@@ -45,15 +44,14 @@ defmodule BDS.Media.Sidecars do
     )
   end
 
-  @spec write_translation_sidecar(BDS.Projects.Project.t(), Media.t(), Translation.t()) :: :ok
+  @spec write_translation_sidecar(BDS.Projects.Project.t(), Media.t(), Translation.t()) ::
+          :ok | {:error, File.posix()}
   def write_translation_sidecar(project, media, translation) do
     path =
       Path.join(
         Projects.project_data_dir(project),
         translation_sidecar_path(media, translation.language)
       )
-
-    :ok = File.mkdir_p(Path.dirname(path))
 
     atomic_write(
       path,
@@ -189,8 +187,7 @@ defmodule BDS.Media.Sidecars do
 
       media ->
         project = Projects.get_project!(media.project_id)
-        :ok = write_sidecar(project, media)
-        :ok
+        write_sidecar(project, media)
     end
   end
 
@@ -224,8 +221,11 @@ defmodule BDS.Media.Sidecars do
       %Translation{} = translation ->
         media = Repo.get!(Media, translation.translation_for)
         project = Projects.get_project!(media.project_id)
-        :ok = write_translation_sidecar(project, media, translation)
-        {:ok, translation}
+
+        case write_translation_sidecar(project, media, translation) do
+          :ok -> {:ok, translation}
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
 

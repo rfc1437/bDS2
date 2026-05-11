@@ -77,16 +77,15 @@ defmodule BDS.ReleasePackaging do
   defp reset_output(metadata) do
     File.rm_rf!(metadata.payload_root)
     File.rm_rf!(metadata.archive_path)
-    File.mkdir_p!(metadata.output_dir)
-    :ok
+    File.mkdir_p(metadata.output_dir)
   end
 
   defp copy_release(source, destination) do
-    File.mkdir_p!(Path.dirname(destination))
-
-    case File.cp_r(source, destination) do
-      {:ok, _files} -> :ok
-      {:error, reason, _file} -> {:error, reason}
+    with :ok <- File.mkdir_p(Path.dirname(destination)) do
+      case File.cp_r(source, destination) do
+        {:ok, _files} -> :ok
+        {:error, reason, _file} -> {:error, reason}
+      end
     end
   end
 
@@ -102,8 +101,7 @@ defmodule BDS.ReleasePackaging do
     }
 
     manifest_path = Path.join(metadata.payload_root, "manifest.json")
-    File.write!(manifest_path, Jason.encode!(manifest, pretty: true))
-    :ok
+    File.write(manifest_path, Jason.encode!(manifest, pretty: true))
   end
 
   defp create_archive(%Metadata{platform: :windows} = metadata) do
