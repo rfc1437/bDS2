@@ -10,45 +10,45 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 
 | ID | Gap | Spec | Code | Path |
 |---|---|---|---|---|
-| A1-1 | No `archived→draft` or `archived→published` transition | post.allium:121-122 | No code path to unarchive | Fix code or spec-restrict transitions |
+| A1-1 | No `archived→draft` or `archived→published` transition | post.allium:121-122 | No code path to unarchive | Fix code: implement unarchive transitions |
 | A1-2 | `DeletePost` must delete translations + translation files | post.allium:209-212 | `delete_post/1` skips translation cleanup | Fix code: delete PostTranslation rows + files |
 | A1-3 | Publish must delete old file when path changes | engine_side_effects.allium:73-74 | `publish_post` does not delete old file | Fix code: add old file deletion on path change |
 | A1-4 | `doNotTranslate: false` written to frontmatter despite "only when true" | frontmatter.allium:398 | `lib/bds/frontmatter.ex:38-39` writes false | Fix code: omit `doNotTranslate` when false |
+| A1-5 | Auto-save after 3000ms idle | editor_post.allium:183-188 | No auto-save timer | Fix code: implement auto-save on idle + unmount + tab switch |
+| A1-6 | On-demand rendering in preview server | preview.allium:53-93 | Server serves static pre-generated files | Fix code: implement on-demand template rendering for post/archive/language routes |
+| A1-7 | Template lookup must use all 4 levels (post→tag→category→default) | template_context.allium:267-277 | Only levels 1 and 4 implemented; tag/category fallback unused | Fix code: implement levels 2-3 in template_selection.ex |
+| A1-8 | `ValidateLiquid`/`ValidateScript` before publish | template.allium:110, script.allium:165 | No validation gate before publish | Fix code: add validation step before publish |
+| A1-9 | 17 preset colors + custom hex in tag picker | editor_tags.allium | Native `<input type="color">`, no preset palette | Fix code: implement preset color palette popover |
+| A1-10 | Template file written on create | engine_side_effects.allium:151-153 | Draft templates have `file_path=""` | Fix code: write template file on create |
+| A1-11 | Graceful shutdown with inflight request tracking | preview.allium:47-48 | Kills acceptor process, no inflight tracking | Fix code: track inflight requests, drain before shutdown |
+| A1-12 | Real Pagefind integration for search | generation.allium:208 | Stub only: `pagefind-ui.js` is one-liner, `PagefindUI` never defined, search-runtime.js silently bails, client-side search non-functional | Fix code: bundle real Pagefind, build proper fragment index, wire PagefindUI |
 
 ### A2. Spec Should Update (code is normative)
 
 | ID | Gap | Spec | Code | Path |
 |---|---|---|---|---|
 | A2-1 | WYSIWYG/visual editor mode (3 modes) | editor_post.allium:159-164 | Only markdown+preview; visual normalizes to markdown | Drop from spec or mark future |
-| A2-2 | Auto-save after 3000ms idle | editor_post.allium:183-188 | No auto-save timer | Drop from spec or mark future |
-| A2-3 | On-demand rendering in preview | preview.allium:53-93 | Static file serving from generated output | Update spec: preview serves pre-generated files |
-| A2-4 | Template/Script are global entities | template.allium, script.allium | Both have `project_id`, per-project uniqueness | Update spec to per-project scoping |
-| A2-5 | TagsFile uses `{tags: [...]}` wrapper | frontmatter.allium:255-273 | Code writes bare array `[...]` | Update spec |
-| A2-6 | Sidecar is "YAML-like, not gray-matter" | frontmatter.allium:174 | Code wraps with `---` delimiters | Update spec to gray-matter style |
-| A2-7 | Translation frontmatter omits status/timestamps | frontmatter.allium:107-117 | Code writes status, createdAt, updatedAt, publishedAt | Update spec to match written fields |
-| A2-8 | Search index has single `stemmed_content` | search.allium:40-54 | FTS5 per-field stemmed columns | Update spec to per-field model |
-| A2-9 | Tag archives are single-page | generation.allium:142-147 | Code paginates | Update spec |
-| A2-10 | Date archives year+month only | generation.allium:151-159 | Code also generates day-level | Update spec |
-| A2-11 | Menu is DB entity | menu.allium:20-26 | Purely file-based OPML, no DB table | Update spec to file-only model |
-| A2-12 | Panel tabs: problems, terminal | layout.allium:235-240 | `[:tasks, :output, :post_links, :git_log]` | Update spec |
-| A2-13 | Template lookup 4 levels (post→tag→category→default) | template_context.allium:267-277 | Only levels 1 and 4 implemented | Drop levels 2-3 or implement |
-| A2-14 | `ValidateLiquid`/`ValidateScript` before publish | template.allium:110, script.allium:165 | No validation gate before publish | Add to code or drop from spec |
-| A2-15 | Graceful shutdown with inflight tracking | preview.allium:47-48 | Kills acceptor, no inflight tracking | Drop from spec |
-| A2-16 | Pagefind as real library | generation.allium:208 | Simplified JSON-based mock | Update spec to mock model |
-| A2-17 | 24 Snowball stemmers all with algorithms | search.allium:26-31 | Only 15/24 have algorithms; 9 pass through unstemmed | Update spec: 15 stemmed + 9 passthrough |
-| A2-18 | Git sidebar: commit input, history, push/pull | sidebar_views.allium | Only "Working tree" item | Mark as partial/TODO in spec |
-| A2-19 | 17 preset colors in tag picker | editor_tags.allium | Native `<input type="color">`, no preset palette | Update spec |
-| A2-20 | Slug timestamp fallback after 999 | post.allium:21 | Unbounded numeric suffix | Update spec or fix code |
-| A2-21 | Thumbnail generation is async | engine_side_effects.allium:117 | Synchronous | Update spec or fix code |
+| A2-2 | Template/Script are global entities | template.allium, script.allium | Both have `project_id`, per-project uniqueness | Update spec to per-project scoping |
+| A2-3 | TagsFile uses `{tags: [...]}` wrapper | frontmatter.allium:255-273 | Code writes bare array `[...]` | Update spec |
+| A2-4 | Sidecar is "YAML-like, not gray-matter" | frontmatter.allium:174 | Code wraps with `---` delimiters | Update spec to gray-matter style |
+| A2-5 | Translation frontmatter omits status/timestamps | frontmatter.allium:107-117 | Code writes status, createdAt, updatedAt, publishedAt | Update spec to match written fields |
+| A2-6 | Search index has single `stemmed_content` | search.allium:40-54 | FTS5 per-field stemmed columns | Update spec to per-field model |
+| A2-7 | Tag archives are single-page | generation.allium:142-147 | Code paginates | Update spec |
+| A2-8 | Date archives year+month only | generation.allium:151-159 | Code also generates day-level | Update spec |
+| A2-9 | Menu is DB entity | menu.allium:20-26 | Purely file-based OPML, no DB table | Update spec to file-only model |
+| A2-10 | Panel tabs: problems, terminal | layout.allium:235-240 | `[:tasks, :output, :post_links, :git_log]` | Update spec |
+| A2-11 | Git sidebar: commit input, history, push/pull | sidebar_views.allium | Only "Working tree" item | Mark as partial/TODO in spec |
+| A2-12 | Slug timestamp fallback after 999 | post.allium:21 | Unbounded numeric suffix | Update spec or fix code |
+| A2-13 | Thumbnail generation is async | engine_side_effects.allium:117 | Synchronous | Update spec or fix code |
+| A2-14 | AiModelModality: :video vs :file/:tool | schema.allium:291 | Code has `:file`, `:tool` instead of `:video` | Update spec to :file/:tool |
+| A2-15 | JSON key convention: snake_case vs camelCase | frontmatter.allium values | Code uses camelCase for all metadata JSON | Update spec to camelCase |
+| A2-16 | Snowball stemmer language list | search.allium:26-31 | Library determines which have algorithms vs passthrough | Update spec: don't enumerate; just say "Snowball stemmers via library" |
 
-### A3. Decisions Needed
+### A3. Resolved Decisions
 
-| ID | Gap | Spec | Code | Path |
-|---|---|---|---|---|
-| A3-1 | Template file written on create | engine_side_effects.allium:151-153 | Draft templates have `file_path=""` | Decide: write file on create, or update spec |
-| A3-2 | `provider_package_ref` on AiModel | schema.allium:282 | Not in code | Decide: add field or drop from spec |
-| A3-3 | AiModelModality: :video vs :file/:tool | schema.allium:291 | Code has `:file`, `:tool` instead of `:video` | Decide: which modalities are correct |
-| A3-4 | JSON key convention: snake_case vs camelCase | frontmatter.allium values | Code uses camelCase for all metadata JSON | Decide normative convention |
+| ID | Gap | Decision |
+|---|---|---|
+| A3-1 | `provider_package_ref` on AiModel | Drop from spec — legacy field, not needed in new app |
 
 ---
 
@@ -97,11 +97,13 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 
 ## C. Internal Spec Inconsistencies
 
-| ID | Conflict | Location | Path |
+All reconciled to follow code. Specs must be self-consistent and match code.
+
+| ID | Conflict | Resolution | Path |
 |---|---|---|---|
-| C-1 | schema.allium ChatMessage has no cache tokens; ai.allium ChatMessage has `cache_read_tokens`/`cache_write_tokens` | schema.allium:235-243 vs ai.allium:147-156 | Align schema.allium with ai.allium (code matches ai.allium) |
-| C-2 | media.allium SidecarFile mentions `linkedPostIds`; frontmatter.allium MediaSidecar does NOT list it | media.allium:28 vs frontmatter.allium:171-190 | Add `linkedPostIds` to frontmatter.allium |
-| C-3 | translation.allium says status/timestamps omitted from translation files; frontmatter.allium TranslationFrontmatter defines only 5 fields; code writes 8+ fields | translation.allium:67-74, frontmatter.allium:107-117 | Reconcile: either update spec or fix code |
+| C-1 | schema.allium ChatMessage has no cache tokens; ai.allium ChatMessage has `cache_read_tokens`/`cache_write_tokens` | Code has cache tokens → align schema.allium with ai.allium | Update schema.allium |
+| C-2 | media.allium SidecarFile mentions `linkedPostIds`; frontmatter.allium MediaSidecar does NOT list it | Code writes `linkedPostIds` → add to frontmatter.allium | Update frontmatter.allium |
+| C-3 | translation.allium says status/timestamps omitted; frontmatter.allium TranslationFrontmatter defines only 5 fields; code writes 8+ fields | Code writes status/timestamps → update both specs to match code | Update translation.allium + frontmatter.allium |
 
 ---
 
@@ -184,13 +186,13 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 
 ## Priority Order for Resolution
 
-1. **A1-1 through A1-4** — code bugs (spec is correct)
+1. **A1-1 through A1-12** — code must follow spec (includes auto-save, on-demand preview, template lookup, validation gates, real Pagefind, graceful shutdown)
 2. **D1-1 through D1-18** — untested invariants/guarantees
-3. **C-1 through C-3** — internal spec inconsistencies
+3. **C-1 through C-3** — internal spec inconsistencies (reconcile to code)
 4. **B1-1 through B1-6** — major code behaviors missing from spec
-5. **A2-1 through A2-21** — spec drift (code is normative)
+5. **A2-1 through A2-16** — spec drift (code is normative, update spec)
 6. **D2-1 through D2-17** — untested rules
 7. **D3-1 through D3-11** — partial test coverage
 8. **B1-7 through B1-20** — minor code behaviors missing from spec
 9. **D4-1 through D4-7** — UI test coverage
-10. **A3-1 through A3-4** — decisions needed
+10. **A3-1** — resolved: drop provider_package_ref from spec
