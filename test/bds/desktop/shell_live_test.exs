@@ -4043,6 +4043,87 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert live_js =~ "this.syncExpandedSurfaces();"
   end
 
+  test "chat editor restores dismissed surfaces from persisted surface state when reopening a chat" do
+    assert {:ok, conversation} = AI.start_chat(%{title: "Reopen Chat", model: "gpt-4.1"})
+
+    now = Persistence.now_ms()
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :user,
+        content: "Show me two cards",
+        created_at: now
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :assistant,
+        content: "Here are two cards.",
+        tool_calls:
+          Jason.encode!([
+            %{
+              "id" => "call-card-a",
+              "name" => "render_card",
+              "arguments" => %{
+                "title" => "UniqueTitleAlpha",
+                "body" => "First card alpha"
+              }
+            },
+            %{
+              "id" => "call-card-b",
+              "name" => "render_card",
+              "arguments" => %{
+                "title" => "UniqueTitleBeta",
+                "body" => "Second card beta"
+              }
+            }
+          ]),
+        created_at: now + 1
+      })
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert length(:binary.matches(html, ~s(data-testid="chat-inline-surface"))) == 2
+
+    surface_id_a = Regex.run(~r/id="([^"]+-surface-0)"/, html) |> Enum.at(1)
+
+    dismissed_html =
+      view
+      |> element("button[phx-value-surface-id='#{surface_id_a}']")
+      |> render_click()
+
+    assert length(:binary.matches(dismissed_html, ~s(data-testid="chat-inline-surface"))) == 1
+
+    persisted = AI.get_surface_state(conversation.id)
+    assert MapSet.new(persisted["dismissed_surfaces"]) == MapSet.new([surface_id_a])
+
+    {:ok, view2, _html2} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html2 =
+      render_click(view2, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert length(:binary.matches(html2, ~s(data-testid="chat-inline-surface"))) == 1
+    assert html2 =~ "UniqueTitleBeta"
+    refute html2 =~ ~r/id="#{Regex.escape(surface_id_a)}"/
+  end
+
   test "chat editor folds tool-only assistant steps into the final assistant answer" do
     assert {:ok, conversation} = AI.start_chat(%{title: "Tool Chat", model: "gpt-4.1"})
 

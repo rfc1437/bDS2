@@ -186,4 +186,12 @@ defmodule BDS.AI do
 
   @spec cancel_chat(String.t()) :: :ok
   defdelegate cancel_chat(conversation_id), to: Chat
+
+  @spec get_surface_state(String.t()) :: map()
+  defdelegate get_surface_state(conversation_id), to: Chat
+
+  @spec put_surface_state(String.t(), map(), map(), MapSet.t()) ::
+          {:ok, map()} | {:error, term()}
+  defdelegate put_surface_state(conversation_id, surface_data, surface_tabs, dismissed_surfaces),
+    to: Chat
 end

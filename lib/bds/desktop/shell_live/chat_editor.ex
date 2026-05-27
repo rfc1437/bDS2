@@ -1,6 +1,8 @@
 defmodule BDS.Desktop.ShellLive.ChatEditor do
   @moduledoc false
 
+  require Logger
+
   use Phoenix.LiveComponent
 
   import Phoenix.HTML, only: [raw: 1]
@@ -35,6 +37,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   def update(%{action: :note_streaming_content, content: content}, socket) do
     {:ok, do_note_streaming_content(socket, content)}
+  end
+
+  def update(%{action: :persist_surface_state}, socket) do
+    {:ok, persist_surface_state(socket)}
   end
 
   def update(assigns, socket) do
@@ -97,7 +103,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         socket
       ) do
     next_data = Map.put(socket.assigns.surface_data, surface_id, fields)
-    {:noreply, assign(socket, :surface_data, next_data) |> build_data()}
+    {:noreply, assign(socket, :surface_data, next_data) |> schedule_surface_state_persist() |> build_data()}
   end
 
   def handle_event(
@@ -111,6 +117,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         :surface_tabs,
         Map.put(socket.assigns.surface_tabs, surface_id, parse_integer(index))
       )
+      |> persist_surface_state()
       |> build_data()
 
     {:noreply, socket}
@@ -120,6 +127,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
     socket =
       socket
       |> assign(:dismissed_surfaces, MapSet.put(socket.assigns.dismissed_surfaces, surface_id))
+      |> persist_surface_state()
       |> build_data()
 
     {:noreply, socket}
@@ -148,14 +156,29 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   defp ensure_state(socket) do
     conversation_id = socket.assigns.current_tab.id
 
+    persisted = AI.get_surface_state(conversation_id)
+
+    {surface_data, surface_tabs, dismissed_surfaces} =
+      case persisted do
+        state when is_map(state) and map_size(state) > 0 ->
+          {
+            state["surface_data"] || %{},
+            state["surface_tabs"] || %{},
+            MapSet.new(state["dismissed_surfaces"] || [])
+          }
+
+        _other ->
+          {%{}, %{}, MapSet.new()}
+      end
+
     defaults = %{
       conversation_id: conversation_id,
       input: "",
       model_selector_open?: false,
       request: nil,
-      surface_data: %{},
-      surface_tabs: %{},
-      dismissed_surfaces: MapSet.new(),
+      surface_data: surface_data,
+      surface_tabs: surface_tabs,
+      dismissed_surfaces: dismissed_surfaces,
       action_error: nil
     }
 
@@ -819,6 +842,41 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
   # ── Private helpers ───────────────────────────────────────────────────────
 
+  @surface_state_debounce_ms 500
+
+  defp persist_surface_state(socket) do
+    conversation_id = socket.assigns.conversation_id
+    surface_data = socket.assigns.surface_data
+    surface_tabs = socket.assigns.surface_tabs
+    dismissed_surfaces = socket.assigns.dismissed_surfaces
+
+    case AI.put_surface_state(conversation_id, surface_data, surface_tabs, dismissed_surfaces) do
+      {:ok, _state} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("Failed to persist surface state for conversation #{conversation_id}",
+          reason: inspect(reason)
+        )
+    end
+
+    socket
+  end
+
+  defp schedule_surface_state_persist(socket) do
+    if socket.assigns[:surface_state_timer] do
+      Process.cancel_timer(socket.assigns[:surface_state_timer])
+    end
+
+    timer =
+      Process.send_after(
+        self(),
+        {:persist_surface_state, socket.assigns.conversation_id},
+        @surface_state_debounce_ms
+      )
+
+    assign(socket, :surface_state_timer, timer)
+  end
 
   defp active_project_id(socket) do
     socket.assigns[:project_id]

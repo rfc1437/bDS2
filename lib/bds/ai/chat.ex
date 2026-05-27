@@ -62,6 +62,42 @@ defmodule BDS.AI.Chat do
     Repo.get(ChatConversation, conversation_id)
   end
 
+  @spec get_surface_state(String.t()) :: map()
+  def get_surface_state(conversation_id) when is_binary(conversation_id) do
+    case Repo.get(ChatConversation, conversation_id) do
+      %ChatConversation{surface_state: state} when is_map(state) -> state
+      _other -> %{}
+    end
+  end
+
+  @spec put_surface_state(String.t(), map(), map(), MapSet.t()) ::
+          {:ok, map()} | {:error, term()}
+  def put_surface_state(conversation_id, surface_data, surface_tabs, dismissed_surfaces)
+      when is_binary(conversation_id) do
+    case Repo.get(ChatConversation, conversation_id) do
+      nil ->
+        {:error, :not_found}
+
+      %ChatConversation{} = conversation ->
+        state = %{
+          "surface_data" => surface_data,
+          "surface_tabs" => surface_tabs,
+          "dismissed_surfaces" => MapSet.to_list(dismissed_surfaces)
+        }
+
+        conversation
+        |> ChatConversation.changeset(%{
+          surface_state: state,
+          updated_at: Persistence.now_ms()
+        })
+        |> Repo.update()
+        |> case do
+          {:ok, _updated} -> {:ok, state}
+          error -> error
+        end
+    end
+  end
+
   @spec delete_chat_conversation(String.t()) :: {:ok, :deleted} | {:error, :not_found | term()}
   def delete_chat_conversation(conversation_id) when is_binary(conversation_id) do
     case Repo.get(ChatConversation, conversation_id) do

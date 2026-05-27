@@ -116,6 +116,15 @@ defmodule BDS.Desktop.ShellLive.Bridges do
     {:noreply, assign(socket, :chat_editor_request_refs, refs)}
   end
 
+  def handle_info({:persist_surface_state, conversation_id}, socket, _callbacks) do
+    send_update(ChatEditor,
+      id: "chat-editor-#{conversation_id}",
+      action: :persist_surface_state
+    )
+
+    {:noreply, socket}
+  end
+
   def handle_info({:chat_editor_toggle_sidebar}, socket, callbacks) do
     {:noreply,
      callbacks.refresh_layout.(socket, Workbench.toggle_sidebar(socket.assigns.workbench))}

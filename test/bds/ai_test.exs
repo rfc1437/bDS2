@@ -1477,6 +1477,39 @@ defmodule BDS.AITest do
     assert Enum.map(messages, & &1.role) == [:user]
   end
 
+  test "get_surface_state and put_surface_state persist and restore surface UI state" do
+    assert {:ok, conversation} = BDS.AI.start_chat(%{title: "Surface State", model: "gpt-4.1"})
+
+    surface_data = %{"msg-1-surface-0" => %{"query" => "hello"}}
+    surface_tabs = %{"msg-1-surface-1" => 2}
+    dismissed = MapSet.new(["msg-1-surface-0"])
+
+    assert {:ok, _state} =
+             BDS.AI.put_surface_state(
+               conversation.id,
+               surface_data,
+               surface_tabs,
+               dismissed
+             )
+
+    loaded = BDS.AI.get_surface_state(conversation.id)
+    assert loaded["surface_data"] == surface_data
+    assert loaded["surface_tabs"] == surface_tabs
+    assert MapSet.new(loaded["dismissed_surfaces"]) == dismissed
+  end
+
+  test "get_surface_state returns empty map for conversation without surface state" do
+    assert {:ok, conversation} = BDS.AI.start_chat(%{title: "No Surface State", model: "gpt-4.1"})
+
+    loaded = BDS.AI.get_surface_state(conversation.id)
+    assert loaded == %{}
+  end
+
+  test "get_surface_state returns empty map for unknown conversation" do
+    loaded = BDS.AI.get_surface_state("nonexistent-id")
+    assert loaded == %{}
+  end
+
   defp create_project_fixture(name) do
     temp_dir = Path.join(System.tmp_dir!(), "bds-ai-#{System.unique_integer([:positive])}")
     on_exit(fn -> File.rm_rf(temp_dir) end)
