@@ -11,6 +11,21 @@ defmodule BDS.Desktop.UILocale do
   process dictionary directly. Use `with_locale/2` around any render or
   component that needs a locale binding; use `current/0` to read it.
 
+  ## Invariant
+
+  Every code path that evaluates HEEx templates containing `translated/1,2`
+  calls **must** call `UILocale.put/1` before template evaluation:
+
+    * `ShellLive.render/1` — sets locale at the top of every LiveView render.
+    * `SidebarComponents.sidebar_content/1` — sets locale before the function
+      component's HEEx (runs in the same process, may be called outside
+      the parent render cycle via `send_update`).
+    * `MenuBar.mount/1` and `MenuBar.handle_info({:set_ui_locale, _})` — set
+      locale in the separate menu-bar process which has its own render cycle.
+
+  Violating this invariant causes `current/0` to return a stale or `nil`
+  locale, producing untranslated UI text.
+
   Direct use of `Process.put(:bds_ui_locale, _)` or
   `Process.get(:bds_ui_locale)` is forbidden outside this module.
   """

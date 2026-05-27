@@ -528,10 +528,12 @@
 
 ---
 
-### CSM-035 — Process Dictionary (`Process.get/put`) Usage
-- **File:** `lib/bds/desktop/ui_locale.ex:32,49,65`
-- **What:** `UILocale.put/1` sets process dictionary (`Process.put(@key, locale)`) for UI locale. Used in `ShellLive.render` (Z. 550) and `MenuBar`.
-- **Fix:** This is isolated to the LiveView/MenuBar process so it's low-risk, but document the invariant explicitly: the process dict key `:bds_ui_locale` is set before each render call.
+### ~~CSM-035 — Process Dictionary (`Process.get/put`) Usage~~ ✅ FIXED
+- **Fixed:** 2026-05-27
+- **What was done:**
+  - **`lib/bds/desktop/ui_locale.ex`** — Added explicit **Invariant** section to `@moduledoc` documenting that every code path evaluating HEEx templates with `translated/1,2` must call `UILocale.put/1` before template evaluation. Lists all three render boundaries: `ShellLive.render/1`, `SidebarComponents.sidebar_content/1`, and `MenuBar.mount/1` + `handle_info({:set_ui_locale, _})`.
+  - Verified no raw `Process.put(:bds_ui_locale, ...)` or `Process.get(:bds_ui_locale)` exists outside `ui_locale.ex`.
+  - Added 9 tests in `test/bds/csm035_process_dict_test.exs`: source-level assertions that no raw Process.put/get/delete for `:bds_ui_locale` exists outside the module, render boundary assertions that `ShellLive.render/1`, `sidebar_content/1`, and `MenuBar.mount/1` call `UILocale.put` before template evaluation, and functional tests for `put/1`, `current/0`, and `with_locale/2` (including nil-restore behavior).
 
 ---
 
