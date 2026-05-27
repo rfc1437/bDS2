@@ -449,7 +449,7 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp translation_fill_enabled?(metadata) do
-    ([Map.get(metadata, :main_language)] ++ Map.get(metadata, :blog_languages, []))
+    ([metadata.main_language] ++ metadata.blog_languages)
     |> Enum.map(fn language ->
       language
       |> to_string()

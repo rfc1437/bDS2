@@ -88,7 +88,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.StyleEditor do
   def current_theme(assigns) do
     case Metadata.get_project_metadata(assigns.projects.active_project_id) do
       {:ok, metadata} ->
-        case Map.get(metadata, :pico_theme) do
+        case metadata.pico_theme do
           nil -> "default"
           "" -> "default"
           theme -> theme

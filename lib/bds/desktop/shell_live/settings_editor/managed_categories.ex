@@ -22,8 +22,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
 
   @spec category_rows(term()) :: term()
   def category_rows(metadata) do
-    categories = Map.get(metadata, :categories, [])
-    settings = Map.get(metadata, :category_settings, %{})
+    categories = metadata.categories
+    settings = metadata.category_settings
 
     Enum.map(categories, fn category ->
       category_settings = Map.get(settings, category, %{})
@@ -167,7 +167,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
     end
   end
 
-  defp category_names(metadata), do: Map.get(metadata, :categories, [])
+  defp category_names(metadata), do: metadata.categories
 
   defp ensure_default_categories(project_id) do
     Enum.reduce_while(Map.keys(@default_category_settings), :ok, fn category, _acc ->

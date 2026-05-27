@@ -8,7 +8,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.PublishingSettings do
 
   @spec publishing_form(term()) :: term()
   def publishing_form(metadata) do
-    prefs = Map.get(metadata, :publishing_preferences, %{})
+    prefs = metadata.publishing_preferences
 
     %{
       "ssh_host" => Map.get(prefs, "ssh_host", ""),

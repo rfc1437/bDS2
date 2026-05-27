@@ -605,6 +605,6 @@ defmodule BDS.ImportExecution do
 
   defp project_default_author(project_id) do
     {:ok, metadata} = Metadata.get_project_metadata(project_id)
-    Map.get(metadata, :default_author)
+    metadata.default_author
   end
 end

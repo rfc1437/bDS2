@@ -222,7 +222,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
     {:ok, metadata} = Metadata.get_project_metadata(project_id)
 
     %{
-      categories: Enum.uniq(Map.get(metadata, :categories, []) || []),
+      categories: Enum.uniq(metadata.categories || []),
       tags: project_id |> Tags.list_tags() |> Enum.map(& &1.name) |> Enum.uniq()
     }
   end

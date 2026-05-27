@@ -252,7 +252,7 @@ defmodule BDS.Posts.AutoTranslation do
   end
 
   defp configured_languages(metadata) do
-    ([Map.get(metadata, :main_language)] ++ Map.get(metadata, :blog_languages, []))
+    ([metadata.main_language] ++ metadata.blog_languages)
     |> Enum.map(&normalize_language/1)
     |> Enum.reject(&(&1 in [nil, ""]))
     |> Enum.uniq()

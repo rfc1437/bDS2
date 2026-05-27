@@ -21,7 +21,7 @@ defmodule BDS.Generation.Outputs do
 
     Enum.reject(route_posts, fn post ->
       is_binary(Map.get(post, :translation_source_slug)) and
-        MapSet.member?(subtree_languages, to_string(Map.get(post, :language)))
+        MapSet.member?(subtree_languages, to_string(post.language))
     end)
   end
 
@@ -432,11 +432,11 @@ defmodule BDS.Generation.Outputs do
                title: post.title,
                content: body,
                slug: post.slug,
-               language: Map.get(post, :language),
+               language: post.language,
                excerpt: post.excerpt,
                _post_record: post
              },
-             fn -> render_post_page(post.title, body, post.slug, Map.get(post, :language)) end
+             fn -> render_post_page(post.title, body, post.slug, post.language) end
            )}
         end)
       end)
@@ -560,11 +560,11 @@ defmodule BDS.Generation.Outputs do
                title: post.title,
                content: body,
                slug: post.slug,
-               language: Map.get(post, :language),
+               language: post.language,
                excerpt: post.excerpt,
                _post_record: post
              },
-             fn -> render_post_page(post.title, body, post.slug, Map.get(post, :language)) end
+             fn -> render_post_page(post.title, body, post.slug, post.language) end
            )}
         end)
       end)

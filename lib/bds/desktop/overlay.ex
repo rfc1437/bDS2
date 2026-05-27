@@ -48,29 +48,32 @@ defmodule BDS.Desktop.Overlay do
   end
 
   def open(:media, :confirm_delete, context) do
-    delete_details = Map.get(context, :delete_details, %{})
+    %{
+      title: title,
+      entity_name: entity_name,
+      entity_type: entity_type,
+      reference_list: reference_list
+    } = context.delete_details
 
     %{
       kind: :confirm_delete,
-      title: Map.get(delete_details, :title, "Delete"),
-      entity_name: Map.get(delete_details, :entity_name, ""),
-      entity_type: Map.get(delete_details, :entity_type, "media"),
-      reference_count: length(Map.get(delete_details, :reference_list, [])),
-      reference_list: Map.get(delete_details, :reference_list, [])
+      title: title,
+      entity_name: entity_name,
+      entity_type: entity_type,
+      reference_count: length(reference_list),
+      reference_list: reference_list
     }
   end
 
   def open(:tags, :confirm_delete, context), do: open(:media, :confirm_delete, context)
 
   def open(:tags, :confirm_merge, context) do
-    merge = Map.get(context, :merge_details, %{})
-    target = Map.get(merge, :target, "")
-    count = Map.get(merge, :count, 0)
+    %{title: title, message: message} = context.merge_details
 
     %{
       kind: :confirm_dialog,
-      title: Map.get(merge, :title, "Merge #{count} tags into #{target}?"),
-      message: Map.get(merge, :message, "Cannot be undone.")
+      title: title,
+      message: message
     }
   end
 
@@ -115,8 +118,8 @@ defmodule BDS.Desktop.Overlay do
       |> Map.get(:all_media, [])
       |> Enum.filter(fn media ->
         normalized == "" or
-          search_matches?(Map.get(media, :title, ""), normalized) or
-          search_matches?(Map.get(media, :original_name, ""), normalized)
+          search_matches?(media.title, normalized) or
+          search_matches?(media.original_name, normalized)
       end)
       |> Enum.map(&to_insert_media_result/1)
 
@@ -203,18 +206,22 @@ defmodule BDS.Desktop.Overlay do
   def insert_media_result(_overlay, _media_id), do: nil
 
   defp language_picker(context, source_language) do
+    existing_translations = Map.get(context, :existing_translations, %{})
+    language_names = Map.get(context, :language_names, %{})
+    language_flags = Map.get(context, :language_flags, %{})
+
     targets =
       context
       |> Map.get(:blog_languages, [])
       |> Enum.uniq()
       |> Enum.reject(&(&1 == source_language))
       |> Enum.map(fn code ->
-        existing_status = Map.get(Map.get(context, :existing_translations, %{}), code)
+        existing_status = Map.get(existing_translations, code)
 
         %{
           code: code,
-          name: Map.get(Map.get(context, :language_names, %{}), code, String.upcase(code)),
-          flag_emoji: Map.get(Map.get(context, :language_flags, %{}), code, code),
+          name: Map.get(language_names, code, String.upcase(code)),
+          flag_emoji: Map.get(language_flags, code, code),
           has_existing_translation: not is_nil(existing_status),
           existing_status: existing_status
         }
@@ -255,14 +262,15 @@ defmodule BDS.Desktop.Overlay do
   def set_ai_suggestions_error(overlay, _error_message), do: overlay
 
   defp normalize_ai_fields(fields) do
-    Enum.map(fields, fn field ->
+    Enum.map(fields, fn %{key: key, label: label, current_value: current,
+                          suggested_value: suggested, locked: locked} = field ->
       %{
-        key: to_string(Map.get(field, :key, "")),
-        label: Map.get(field, :label, ""),
-        current_value: Map.get(field, :current_value, ""),
-        suggested_value: Map.get(field, :suggested_value, ""),
-        accepted: not Map.get(field, :locked, false),
-        locked: Map.get(field, :locked, false),
+        key: to_string(key),
+        label: label,
+        current_value: current,
+        suggested_value: suggested,
+        accepted: not locked,
+        locked: locked,
         loading: Map.get(field, :loading, false)
       }
     end)
@@ -276,7 +284,7 @@ defmodule BDS.Desktop.Overlay do
   end
 
   defp gallery_images(context) do
-    images = Enum.filter(Map.get(context, :media, []), &Map.get(&1, :is_image, false))
+    images = Enum.filter(Map.get(context, :media, []), & &1.is_image)
     post_media_ids = Map.get(context, :post_media_ids, [])
 
     case Enum.filter(images, &(&1.id in post_media_ids)) do
@@ -289,29 +297,29 @@ defmodule BDS.Desktop.Overlay do
     %{
       post_id: post.id,
       title: post.title,
-      status: to_string(Map.get(post, :status, "draft")),
-      canonical_url: Map.get(post, :canonical_url, "/posts/#{post.id}"),
-      similarity_score: Map.get(post, :similarity_score)
+      status: post.status,
+      canonical_url: post.canonical_url,
+      similarity_score: nil
     }
   end
 
   defp to_insert_media_result(media) do
     %{
       media_id: media.id,
-      title: Map.get(media, :title, ""),
-      original_name: Map.get(media, :original_name, media.id),
-      is_image: Map.get(media, :is_image, false),
-      thumbnail_url: Map.get(media, :thumbnail_url)
+      title: media.title,
+      original_name: media.original_name,
+      is_image: media.is_image,
+      thumbnail_url: media.thumbnail_url
     }
   end
 
   defp to_gallery_image(media) do
     %{
       media_id: media.id,
-      thumbnail_url: Map.get(media, :thumbnail_url),
-      image_url: Map.get(media, :image_url, Map.get(media, :thumbnail_url)),
-      alt_text: Map.get(media, :alt_text),
-      title: Map.get(media, :title, Map.get(media, :original_name, media.id))
+      thumbnail_url: media.thumbnail_url,
+      image_url: media.image_url,
+      alt_text: media.alt_text,
+      title: media.title
     }
   end
 

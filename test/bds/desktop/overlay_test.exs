@@ -206,11 +206,17 @@ defmodule BDS.Desktop.OverlayTest do
         }
       ],
       delete_details: %{
+        title: "Delete Media",
         entity_name: "Street Scene",
         entity_type: "media",
         reference_list: ["Photo Walk", "Trip Notes"]
       },
-      merge_details: %{target: "travel", count: 3}
+      merge_details: %{
+        target: "travel",
+        count: 3,
+        title: "Merge 3 tags into travel?",
+        message: "Cannot be undone."
+      }
     }
   end
 end

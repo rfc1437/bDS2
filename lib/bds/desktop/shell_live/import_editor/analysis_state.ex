@@ -266,7 +266,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
   @spec default_author(term()) :: term()
   def default_author(project_id) do
     {:ok, metadata} = Metadata.get_project_metadata(project_id)
-    Map.get(metadata, :default_author)
+    metadata.default_author
   end
 
   @spec suggested_definition_name(term()) :: term()

@@ -118,7 +118,7 @@ defmodule BDS.Generation.Data do
     main = String.downcase(to_string(main_language || ""))
 
     Enum.map(posts, fn post ->
-      post_language = String.downcase(to_string(Map.get(post, :language) || ""))
+      post_language = String.downcase(to_string(post.language || ""))
       effective_language = if post_language == "", do: main, else: post_language
 
       cond do
@@ -373,18 +373,18 @@ defmodule BDS.Generation.Data do
       excerpt: translation.excerpt,
       content: nil,
       status: :published,
-      author: Map.get(post, :author),
+      author: post.author,
       created_at: post.created_at,
       updated_at: translation.updated_at,
       published_at: translation.published_at || post.published_at,
       file_path: translation.file_path,
-      tags: Map.get(post, :tags, []),
-      categories: Map.get(post, :categories, []),
-      template_slug: Map.get(post, :template_slug),
+      tags: post.tags,
+      categories: post.categories,
+      template_slug: post.template_slug,
       language: translation.language,
-      do_not_translate: Map.get(post, :do_not_translate, false),
+      do_not_translate: post.do_not_translate,
       translation_source_slug: post.slug,
-      translation_canonical_language: Map.get(post, :language),
+      translation_canonical_language: post.language,
       translation_file_path: translation.file_path
     }
   end

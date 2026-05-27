@@ -101,7 +101,7 @@ defmodule BDS.Preview do
     with :ok <- ensure_running(state.current, project_id),
          {:ok, payload} <- load_draft_preview_payload(project_id, post_id, query_params) do
       body =
-        case Rendering.render_post_page(project_id, Map.get(payload, :template_slug), payload) do
+        case Rendering.render_post_page(project_id, payload.template_slug, payload) do
           {:ok, rendered} -> rendered
           {:error, _reason} -> render_draft(payload)
         end
@@ -178,7 +178,7 @@ defmodule BDS.Preview do
   defp resolve_draft_request(project_id, post_id, query_params) do
     with {:ok, payload} <- load_draft_preview_payload(project_id, post_id, query_params) do
       body =
-        case Rendering.render_post_page(project_id, Map.get(payload, :template_slug), payload) do
+        case Rendering.render_post_page(project_id, payload.template_slug, payload) do
           {:ok, rendered} -> rendered
           {:error, _reason} -> render_draft(payload)
         end

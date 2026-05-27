@@ -468,10 +468,35 @@
 
 ---
 
-### CSM-032 — `Map.get` with Default Instead of Pattern Matching
-- **Files:** Widespread
-- **What:** `Map.get(map, key, default)` when the key is expected to exist.
-- **Fix:** Use pattern matching (`%{key: value} = map`) or `Map.fetch!/2` if the key is required.
+### ~~CSM-032 — `Map.get` with Default Instead of Pattern Matching~~ ✅ FIXED
+- **Fixed:** 2026-05-27
+- **What was done:**
+  - **Metadata struct access** — Replaced `Map.get(metadata, :key)` / `Map.get(metadata, :key, default)` with dot access (`metadata.key`) across 10 files that consume the well-defined metadata map from `Metadata.load_state()`:
+    - `lib/bds/posts/translation_validation.ex` — `:main_language`, `:blog_languages`
+    - `lib/bds/posts/auto_translation.ex` — `:main_language`, `:blog_languages`
+    - `lib/bds/desktop/shell_commands.ex` — `:main_language`, `:blog_languages`
+    - `lib/bds/desktop/shell_live/settings_editor/project_settings.ex` — all 10 metadata fields
+    - `lib/bds/desktop/shell_live/settings_editor/style_editor.ex` — `:pico_theme`
+    - `lib/bds/desktop/shell_live/settings_editor/managed_categories.ex` — `:categories`, `:category_settings`
+    - `lib/bds/desktop/shell_live/settings_editor/publishing_settings.ex` — `:publishing_preferences`
+    - `lib/bds/desktop/shell_live/import_editor/taxonomy_editing.ex` — `:categories`
+    - `lib/bds/desktop/shell_live/import_editor/analysis_state.ex` — `:default_author`
+    - `lib/bds/import_execution.ex` — `:default_author`
+  - **Overlay context maps** — Replaced `Map.get(delete_details, :key, default)` and `Map.get(merge, :key, default)` with pattern matching in `lib/bds/desktop/overlay.ex`:
+    - `open(:media, :confirm_delete, ...)` — pattern matches `%{title:, entity_name:, entity_type:, reference_list:}` from `context.delete_details`
+    - `open(:tags, :confirm_merge, ...)` — pattern matches `%{title:, message:}` from `context.merge_details`
+    - `normalize_ai_fields/1` — pattern matches `%{key:, label:, current_value:, suggested_value:, locked:}` from each field
+    - `language_picker/2` — extracts `existing_translations`, `language_names`, `language_flags` into local bindings before the loop, eliminating nested `Map.get(Map.get(...))` calls
+  - **Overlay media/post maps** — Replaced `Map.get(media, :field)` with dot access in `to_insert_media_result`, `to_gallery_image`, `gallery_images`, search filtering, and `to_insert_link_result` (media/post maps are built with known keys by `overlay_components.ex`)
+  - **Generation pipeline** — Replaced `Map.get(post, :field)` with `post.field` for Post struct fields across:
+    - `lib/bds/generation/data.ex` — `:author`, `:tags`, `:categories`, `:template_slug`, `:do_not_translate`, `:language` in `build_published_translation_variant` and `resolve_posts_for_language`
+    - `lib/bds/generation/outputs.ex` — `:language` (all occurrences)
+    - `lib/bds/generation/validation.ex` — `:file_path`
+    - `lib/bds/generation/sitemap.ex` — `:do_not_translate`
+    - `lib/bds/preview.ex` — `:template_slug`
+  - Kept `Map.get` where appropriate: dynamic field access (`Map.get(post, field)` with variable keys), truly optional keys (`:translation_source_slug` on mixed struct/map lists), external data lookups (string-keyed JSON, form params), and hash-map lookups with defaults.
+  - Updated `test/bds/desktop/overlay_test.exs` to provide complete `delete_details` and `merge_details` maps matching the real contract from `overlay_components.ex`.
+  - Added 18 tests in `test/bds/csm032_map_get_pattern_match_test.exs`: source-level assertions that metadata consumers use dot access, overlay uses pattern matching for known structures, and generation pipeline uses dot access for Post struct fields.
 
 ---
 

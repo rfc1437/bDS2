@@ -75,7 +75,7 @@ defmodule BDS.Generation.Sitemap do
             page_path = Paths.relative_path_to_url_path(Paths.page_output_path(post.slug, nil))
 
             languages =
-              if Paths.truthy_flag?(Map.get(post, :do_not_translate)),
+              if Paths.truthy_flag?(post.do_not_translate),
                 do: [plan.language],
                 else: all_languages
 

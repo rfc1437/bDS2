@@ -16,17 +16,17 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings do
   @spec project_form(term()) :: term()
   def project_form(metadata) do
     %{
-      "name" => Map.get(metadata, :name, ""),
-      "description" => Map.get(metadata, :description, ""),
-      "public_url" => Map.get(metadata, :public_url, ""),
-      "main_language" => Map.get(metadata, :main_language) || "en",
-      "default_author" => Map.get(metadata, :default_author, ""),
-      "max_posts_per_page" => Integer.to_string(Map.get(metadata, :max_posts_per_page, 50)),
+      "name" => metadata.name || "",
+      "description" => metadata.description || "",
+      "public_url" => metadata.public_url || "",
+      "main_language" => metadata.main_language || "en",
+      "default_author" => metadata.default_author || "",
+      "max_posts_per_page" => Integer.to_string(metadata.max_posts_per_page),
       "blogmark_category" =>
-        Map.get(metadata, :blogmark_category) ||
-          List.first(Map.get(metadata, :categories, [])) || "article",
-      "blog_languages" => Map.get(metadata, :blog_languages, []),
-      "semantic_similarity_enabled" => Map.get(metadata, :semantic_similarity_enabled, false)
+        metadata.blogmark_category ||
+          List.first(metadata.categories) || "article",
+      "blog_languages" => metadata.blog_languages,
+      "semantic_similarity_enabled" => metadata.semantic_similarity_enabled
     }
   end
 

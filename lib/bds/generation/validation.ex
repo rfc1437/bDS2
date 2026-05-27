@@ -34,7 +34,7 @@ defmodule BDS.Generation.Validation do
         post_file_path:
           source_full_path(
             project_data_dir,
-            Map.get(post, :translation_file_path) || Map.get(post, :file_path)
+            Map.get(post, :translation_file_path) || post.file_path
           ),
         generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
       }
@@ -53,7 +53,7 @@ defmodule BDS.Generation.Validation do
 
       %{
         post_url_path: relative_path_to_url_path(relative_path),
-        post_file_path: source_full_path(project_data_dir, Map.get(post, :file_path)),
+        post_file_path: source_full_path(project_data_dir, post.file_path),
         generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
       }
     end)

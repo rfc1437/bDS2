@@ -312,7 +312,7 @@ defmodule BDS.Posts.TranslationValidation do
 
   defp legacy_missing_entries(source_posts, translation_rows, metadata) do
     configured_languages =
-      ([Map.get(metadata, :main_language)] ++ Map.get(metadata, :blog_languages, []))
+      ([metadata.main_language] ++ metadata.blog_languages)
       |> Enum.map(&do_normalize_language/1)
       |> Enum.reject(&(&1 in [nil, ""]))
       |> Enum.uniq()
@@ -444,7 +444,7 @@ defmodule BDS.Posts.TranslationValidation do
     language = do_normalize_language(source_post.language)
 
     if language == "" do
-      do_normalize_language(Map.get(metadata, :main_language))
+      do_normalize_language(metadata.main_language)
     else
       language
     end
