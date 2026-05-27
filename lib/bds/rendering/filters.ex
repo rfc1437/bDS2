@@ -148,25 +148,29 @@ defmodule BDS.Rendering.Filters do
   end
 
   defp render_macro_source(template_path, template_source, assigns, context) do
-    case Liquex.parse(template_source) do
-      {:ok, template_ast} ->
-        isolated_context = Liquex.Context.new_isolated_subscope(context, assigns)
-
-        try do
-          {result, _context} = Liquex.render!(template_ast, isolated_context)
-          IO.iodata_to_binary(result)
-        rescue
-          e in Liquex.Error ->
-            require Logger
-            Logger.warning("Macro template render failed (#{template_path}): #{e.message}")
-            ""
-        end
-
+    with {:ok, template_ast} <- Liquex.parse(template_source),
+         {:ok, rendered} <- safe_liquex_render(template_ast, context, assigns) do
+      rendered
+    else
       {:error, reason, line} ->
         require Logger
         Logger.warning("Macro template parse failed (#{template_path}): #{reason} at line #{line}")
         ""
+
+      {:error, message} ->
+        require Logger
+        Logger.warning("Macro template render failed (#{template_path}): #{message}")
+        ""
     end
+  end
+
+  defp safe_liquex_render(template_ast, context, assigns) do
+    isolated_context = Liquex.Context.new_isolated_subscope(context, assigns)
+
+    {result, _context} = Liquex.render!(template_ast, isolated_context)
+    {:ok, IO.iodata_to_binary(result)}
+  rescue
+    e in Liquex.Error -> {:error, e.message}
   end
 
   defp render_markdown_html(markdown) do

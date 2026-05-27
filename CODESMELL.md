@@ -457,9 +457,14 @@
 
 ---
 
-### CSM-031 — `try/rescue` Instead of `with` and Error Tuples
-- **Files:** `lib/bds/rendering/filters.ex`, `lib/bds/rendering/template_selection.ex`, `lib/bds/desktop/shell_data.ex`
-- **Fix:** Replace `try/rescue` around expected failures with non-bang functions and `with` chains.
+### ~~CSM-031 — `try/rescue` Instead of `with` and Error Tuples~~ ✅ FIXED
+- **Fixed:** 2026-05-27
+- **What was done:**
+  - **`lib/bds/rendering/filters.ex`** — Extracted `safe_liquex_render/3` private helper that isolates the unavoidable `Liquex.render!` rescue into a single function returning `{:ok, binary} | {:error, String.t()}`. Replaced inline `try/rescue` in `render_macro_source/4` with a `with` chain using the helper.
+  - **`lib/bds/rendering/template_selection.ex`** — Same pattern: extracted `safe_liquex_render/3` helper, replaced inline `try/rescue` in `render_template/3` with a `with` chain.
+  - **`lib/bds/rendering/template_selection.ex`** — `load_bundled_template_source/3`: Replaced raising `Liquex.FileSystem.read_template_file` with `FileSystem.try_read` (returns `{:ok, source} | {:error, :enoent}`), eliminating the function-level `rescue` block entirely. Uses a `with` chain for control flow.
+  - **`lib/bds/desktop/shell_data.ex`** — Already fixed by CSM-010; no `try/rescue` blocks remain.
+  - Added 7 tests in `test/bds/csm031_try_rescue_test.exs`: source-level assertions that no inline `try/rescue` around `Liquex.render!` exists in either file, both files define `safe_liquex_render` helpers, `load_bundled_template_source` has no rescue block and uses `FileSystem.try_read`, and `shell_data.ex` has no try/rescue.
 
 ---
 

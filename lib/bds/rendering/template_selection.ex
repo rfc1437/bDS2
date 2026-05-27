@@ -93,45 +93,45 @@ defmodule BDS.Rendering.TemplateSelection do
   @spec render_template(String.t(), String.t(), map()) ::
           {:ok, String.t()} | {:error, String.t()}
   def render_template(project_id, source, assigns) do
-    with {:ok, template_ast} <- Liquex.parse(source) do
-      project = Projects.get_project!(project_id)
-
-      context =
-        Liquex.Context.new(assigns,
-          static_environment: assigns,
-          filter_module: Filters,
-          file_system: FileSystem.new(StarterTemplates.template_roots(project))
-        )
-
-      try do
-        {result, _context} = Liquex.render!(template_ast, context)
-        {:ok, IO.iodata_to_binary(result)}
-      rescue
-        e in Liquex.Error -> {:error, e.message}
-      end
+    with {:ok, template_ast} <- Liquex.parse(source),
+         {:ok, _rendered} = ok <- safe_liquex_render(template_ast, project_id, assigns) do
+      ok
     else
-      {:error, reason, line} -> {:error, "#{reason} at line #{line}"}
+      {:error, reason, line} when is_integer(line) -> {:error, "#{reason} at line #{line}"}
+      {:error, _message} = error -> error
     end
+  end
+
+  defp safe_liquex_render(template_ast, project_id, assigns) do
+    project = Projects.get_project!(project_id)
+
+    context =
+      Liquex.Context.new(assigns,
+        static_environment: assigns,
+        filter_module: Filters,
+        file_system: FileSystem.new(StarterTemplates.template_roots(project))
+      )
+
+    {result, _context} = Liquex.render!(template_ast, context)
+    {:ok, IO.iodata_to_binary(result)}
+  rescue
+    e in Liquex.Error -> {:error, e.message}
   end
 
   defp load_bundled_template_source(project, kind, slug) do
     desired_slug = bundled_template_slug(kind, slug)
 
-    if is_binary(desired_slug) do
-      file_system = project |> StarterTemplates.template_roots() |> FileSystem.new()
-      source = Liquex.FileSystem.read_template_file(file_system, desired_slug)
-
+    with true <- is_binary(desired_slug),
+         file_system = project |> StarterTemplates.template_roots() |> FileSystem.new(),
+         {:ok, source} <- FileSystem.try_read(file_system, desired_slug) do
       case Frontmatter.parse_document(source) do
         {:ok, %{body: body}} -> {:ok, body}
         {:error, :invalid_frontmatter} -> {:ok, source}
       end
     else
-      {:error, :template_not_found}
+      false -> {:error, :template_not_found}
+      {:error, :enoent} -> {:error, :template_not_found}
     end
-  rescue
-    error in [Liquex.Error] ->
-      _ = error
-      {:error, :template_not_found}
   end
 
   defp maybe_load_bundled_template_source(project, kind, slug, template, reason, error)
