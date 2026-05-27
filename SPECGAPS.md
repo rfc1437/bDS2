@@ -43,12 +43,7 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 | A2-14 | AiModelModality: :video vs :file/:tool | schema.allium:291 | Code has `:file`, `:tool` instead of `:video` | Update spec to :file/:tool |
 | A2-15 | JSON key convention: snake_case vs camelCase | frontmatter.allium values | Code uses camelCase for all metadata JSON | Update spec to camelCase |
 | A2-16 | Snowball stemmer language list | search.allium:26-31 | Library determines which have algorithms vs passthrough | Update spec: don't enumerate; just say "Snowball stemmers via library" |
-
-### A3. Resolved Decisions
-
-| ID | Gap | Decision |
-|---|---|---|
-| A3-1 | `provider_package_ref` on AiModel | Drop from spec — legacy field, not needed in new app |
+| A2-17 | `provider_package_ref` on AiModel | schema.allium:282 | Not in code; legacy field not needed | Drop from spec |
 
 ---
 
@@ -190,9 +185,8 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 2. **D1-1 through D1-18** — untested invariants/guarantees
 3. **C-1 through C-3** — internal spec inconsistencies (reconcile to code)
 4. **B1-1 through B1-6** — major code behaviors missing from spec
-5. **A2-1 through A2-16** — spec drift (code is normative, update spec)
+5. **A2-1 through A2-17** — spec drift (code is normative, update spec)
 6. **D2-1 through D2-17** — untested rules
 7. **D3-1 through D3-11** — partial test coverage
 8. **B1-7 through B1-20** — minor code behaviors missing from spec
 9. **D4-1 through D4-7** — UI test coverage
-10. **A3-1** — resolved: drop provider_package_ref from spec
