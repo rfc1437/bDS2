@@ -15,6 +15,7 @@ defmodule BDS.Embeddings do
 
   @duplicate_threshold 0.92
   @exact_match_score 0.999999
+  @key_batch_size 199
 
   def model_id, do: configured_backend().model_info().model_id
   def dimensions, do: configured_backend().model_info().dimensions
@@ -73,7 +74,24 @@ defmodule BDS.Embeddings do
             order_by: [asc: post.created_at, asc: post.slug]
         )
 
-      Enum.each(posts, &sync_post_if_enabled(&1, refresh_index: false))
+      existing_keys = preload_keys_by_post_id(project_id, Enum.map(posts, & &1.id))
+      base_label = max_label_value()
+
+      {rows, _next_label} =
+        Enum.reduce(posts, {[], base_label + 1}, fn post, {acc, next_label} ->
+          existing_key = Map.get(existing_keys, post.id)
+
+          case compute_key_data(post, existing_key, next_label) do
+            :skip ->
+              {acc, next_label}
+
+            {:upsert, row} ->
+              bump = if existing_key, do: 0, else: 1
+              {[row | acc], next_label + bump}
+          end
+        end)
+
+      batch_upsert_keys(rows)
       :ok = rebuild_snapshot(project_id)
       {:ok, Enum.map(posts, & &1.id)}
     else
@@ -104,12 +122,27 @@ defmodule BDS.Embeddings do
           where: key.project_id == ^project_id and key.post_id not in ^post_ids
       )
 
-      posts
-      |> Enum.with_index(1)
-      |> Enum.each(fn {post, index} ->
-        sync_post_if_enabled(post, refresh_index: false)
-        :ok = report_rebuild_progress(on_progress, index, total_posts, "embedding entries")
-      end)
+      existing_keys = preload_keys_by_post_id(project_id)
+      base_label = max_label_value()
+
+      {rows, _next_label} =
+        posts
+        |> Enum.with_index(1)
+        |> Enum.reduce({[], base_label + 1}, fn {post, index}, {acc, next_label} ->
+          :ok = report_rebuild_progress(on_progress, index, total_posts, "embedding entries")
+          existing_key = Map.get(existing_keys, post.id)
+
+          case compute_key_data(post, existing_key, next_label) do
+            :skip ->
+              {acc, next_label}
+
+            {:upsert, row} ->
+              bump = if existing_key, do: 0, else: 1
+              {[row | acc], next_label + bump}
+          end
+        end)
+
+      batch_upsert_keys(rows)
 
       :ok = report_rebuild_phase(on_progress, 0.99, "Persisting embedding snapshot")
       :ok = rebuild_snapshot(project_id)
@@ -196,6 +229,53 @@ defmodule BDS.Embeddings do
     end
   end
 
+  defp preload_keys_by_post_id(project_id) do
+    Repo.all(from key in Key, where: key.project_id == ^project_id)
+    |> Map.new(&{&1.post_id, &1})
+  end
+
+  defp preload_keys_by_post_id(project_id, post_ids) do
+    Repo.all(
+      from key in Key,
+        where: key.project_id == ^project_id and key.post_id in ^post_ids
+    )
+    |> Map.new(&{&1.post_id, &1})
+  end
+
+  defp max_label_value do
+    Repo.one(from key in Key, select: max(key.label)) || 0
+  end
+
+  defp compute_key_data(%Post{} = post, existing_key, next_label) do
+    body = resolve_post_body(post)
+    raw_text = compose_embedding_source(post.title, body)
+    content_hash = hash_text(raw_text)
+
+    if existing_key && existing_key.content_hash == content_hash do
+      :skip
+    else
+      {:ok, vector} = embed_text(raw_text, post.language)
+      label = if existing_key, do: existing_key.label, else: next_label
+      {:upsert, [label, post.id, post.project_id, content_hash, Jason.encode!(vector)]}
+    end
+  end
+
+  defp batch_upsert_keys([]), do: :ok
+
+  defp batch_upsert_keys(rows) do
+    rows
+    |> Enum.chunk_every(@key_batch_size)
+    |> Enum.each(fn chunk ->
+      placeholders = Enum.map_join(chunk, ", ", fn _ -> "(?, ?, ?, ?, ?)" end)
+      params = List.flatten(chunk)
+
+      Repo.query!(
+        "INSERT INTO embedding_keys (label, post_id, project_id, content_hash, vector) VALUES #{placeholders} ON CONFLICT(label) DO UPDATE SET content_hash = excluded.content_hash, vector = excluded.vector",
+        params
+      )
+    end)
+  end
+
   def remove_post(post_id) when is_binary(post_id) do
     project_id =
       case Repo.get_by(Key, post_id: post_id) do
@@ -227,23 +307,24 @@ defmodule BDS.Embeddings do
             order_by: [asc: post.created_at, asc: post.slug]
         )
 
-      Enum.each(posts, fn post ->
-        body = resolve_post_body(post)
-        content_hash = hash_text(compose_embedding_source(post.title, body))
+      existing_keys = preload_keys_by_post_id(project_id)
+      base_label = max_label_value()
 
-        case Repo.get_by(Key, post_id: post.id, project_id: project_id) do
-          %Key{content_hash: ^content_hash} ->
-            :ok
+      {rows, _next_label} =
+        Enum.reduce(posts, {[], base_label + 1}, fn post, {acc, next_label} ->
+          existing_key = Map.get(existing_keys, post.id)
 
-          _other ->
-            :ok =
-              sync_post_if_enabled(
-                %{post | content: if(post.content in [nil, ""], do: body, else: post.content)},
-                refresh_index: false
-              )
-        end
-      end)
+          case compute_key_data(post, existing_key, next_label) do
+            :skip ->
+              {acc, next_label}
 
+            {:upsert, row} ->
+              bump = if existing_key, do: 0, else: 1
+              {[row | acc], next_label + bump}
+          end
+        end)
+
+      batch_upsert_keys(rows)
       :ok = rebuild_snapshot(project_id)
 
       indexed =

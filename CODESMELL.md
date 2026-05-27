@@ -500,10 +500,20 @@
 
 ---
 
-### CSM-033 — `Enum.each` with Side Effects That Should Be Batch Inserts
-- **Files:** `lib/bds/search.ex:174-177`, `lib/bds/embeddings.ex`
-- **What:** `Enum.each` used for inserting records. The side-effect pattern is fine, but `Enum.map` + `Repo.insert_all` would be much faster for bulk inserts.
-- **Fix:** Use `Repo.insert_all` for batch inserts instead of `Enum.each` + `Repo.insert`.
+### ~~CSM-033 — `Enum.each` with Side Effects That Should Be Batch Inserts~~ ✅ FIXED
+- **Fixed:** 2026-05-27
+- **What was done:**
+  - **`lib/bds/search.ex`** — Already addressed by CSM-006; `batch_insert_post_index` and `batch_insert_media_index` use multi-row SQL INSERT with chunking.
+  - **`lib/bds/embeddings.ex`** — Replaced `Enum.each` + per-post `sync_post_if_enabled` (which did N individual `Repo.get_by` reads + N individual `Repo.insert_or_update` writes) in three bulk functions:
+    - `rebuild_project/2` — preloads all keys via `preload_keys_by_post_id/1`, computes rows with `compute_key_data/3`, batch-upserts with `batch_upsert_keys/1`.
+    - `repair_posts/2` — same pattern with `preload_keys_by_post_id/2` scoped to target post IDs.
+    - `index_unindexed/1` — same pattern, eliminating per-post `Repo.get_by` lookups.
+  - Added `preload_keys_by_post_id/1` and `/2` — single-query key preload into a map by post_id.
+  - Added `max_label_value/0` — reads max label once instead of per-post `next_label()` queries.
+  - Added `compute_key_data/3` — resolves body, hashes, embeds (if needed), returns `:skip` or `{:upsert, row}`.
+  - Added `batch_upsert_keys/1` — multi-row `INSERT INTO embedding_keys ... ON CONFLICT(label) DO UPDATE` with 199-row chunking (SQLite 999-param limit ÷ 5 columns).
+  - `sync_post_if_enabled/2` retained for single-post `sync_post/1` path (CRUD operations).
+  - Added 11 tests in `test/bds/csm033_batch_inserts_test.exs`: source-level assertions (no Enum.each+sync_post_if_enabled, batch_upsert_keys present, preload present, ON CONFLICT upsert, compute_key_data used), search.ex batch verification, and functional tests (index 5 posts, rebuild updates stale keys, repair targets subset, skip on matching hash).
 
 ---
 
