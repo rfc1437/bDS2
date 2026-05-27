@@ -46,6 +46,7 @@ defmodule BDS.Publishing do
     {:reply, Repo.get(PublishJob, job_id), state}
   end
 
+  @impl true
   def handle_call({:update_job, job_id, attrs}, _from, state) do
     with %PublishJob{} = job <- Repo.get(PublishJob, job_id) do
       attrs = Map.put(attrs, :updated_at, Persistence.now_ms())
@@ -55,6 +56,7 @@ defmodule BDS.Publishing do
     {:reply, :ok, state}
   end
 
+  @impl true
   def handle_call({:should_upload_scp_file, upload_key, local_mtime}, _from, state) do
     should_upload? =
       case state.scp_uploads[upload_key] do
@@ -65,10 +67,12 @@ defmodule BDS.Publishing do
     {:reply, should_upload?, state}
   end
 
+  @impl true
   def handle_call({:mark_uploaded_scp_file, upload_key, local_mtime}, _from, state) do
     {:reply, :ok, put_in(state, [:scp_uploads, upload_key], local_mtime)}
   end
 
+  @impl true
   def handle_call({:upload_site, project_id, credentials, targets, opts}, _from, state) do
     job_id = "publish-" <> Integer.to_string(System.unique_integer([:positive, :monotonic]))
     uploader = build_uploader(Keyword.put_new(opts, :project_id, project_id))

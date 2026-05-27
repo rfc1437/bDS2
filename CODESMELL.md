@@ -537,10 +537,12 @@
 
 ---
 
-### CSM-036 — Missing `@impl true` on GenServer Callbacks
-- **File:** `lib/bds/publishing.ex:46,61,71,75`
-- **What:** Only `init/1` (Z. 36) and the first `handle_call` (Z. 41) have `@impl true`. The remaining `handle_call` clauses at Z. 46, 61, 71, 75 lack it.
-- **Fix:** Add `@impl true` before every `handle_call`, `handle_cast`, `handle_info`, and `terminate`.
+### ~~CSM-036 — Missing `@impl true` on GenServer Callbacks~~ ✅ FIXED
+- **Fixed:** 2026-05-27
+- **What was done:**
+  - Added `@impl true` before all four `handle_call` clauses that were missing it in `lib/bds/publishing.ex`: `{:update_job, ...}`, `{:should_upload_scp_file, ...}`, `{:mark_uploaded_scp_file, ...}`, and `{:upload_site, ...}`.
+  - No `handle_cast`, `handle_info`, or `terminate` callbacks exist in this module; only `handle_call` needed fixing.
+  - Added 2 tests in `test/bds/csm036_impl_true_test.exs`: source-level assertion that every `handle_call` clause is preceded by `@impl true`, and a guard test for any future `handle_cast`/`handle_info`/`terminate` callbacks.
 
 ---
 
