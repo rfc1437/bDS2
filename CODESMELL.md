@@ -517,9 +517,14 @@
 
 ---
 
-### CSM-034 — `File.read!` / `File.write!` Without Error Handling
-- **Files:** `lib/bds/preview_assets.ex:32`, `lib/bds/release_packaging.ex:105`, `lib/bds/templates.ex:488-489`
-- **Fix:** Use `File.read/1`, `File.write/2`, and handle `{:error, reason}`.
+### ~~CSM-034 — `File.read!` / `File.write!` Without Error Handling~~ ✅ FIXED
+- **Fixed:** 2026-05-27
+- **What was done:**
+  - **`lib/bds/preview_assets.ex`** — `generated_outputs/0`: Replaced `File.read!` with `File.read` inside `Enum.flat_map`, silently skipping files that become unreadable between `Path.wildcard` and read (TOCTOU race).
+  - **`lib/bds/templates.ex`** — `upsert_template_from_file/3`: Replaced `File.read!` and pattern-matched `Frontmatter.parse_document` with a `with` chain returning `{:ok, template} | {:error, reason}`. Replaced `Repo.insert_or_update!` with `Repo.insert_or_update` to propagate changeset errors.
+  - **`lib/bds/templates.ex`** — Updated all three callers: `rebuild_templates_from_files` logs a warning and skips bad files, `sync_template_from_file` and `import_orphan_template_file` map errors to `{:error, :not_found}`.
+  - **`lib/bds/release_packaging.ex`** — Already fixed by CSM-030 (`File.write!` → `File.write`).
+  - Added 8 tests in `test/bds/csm034_file_read_bang_test.exs`: source-level assertions for no bang file ops in all three files, functional tests for rebuild skipping bad templates, sync returning error on deleted file, import returning error on missing file, and preview_assets returning valid output tuples.
 
 ---
 

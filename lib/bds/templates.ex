@@ -4,6 +4,8 @@ defmodule BDS.Templates do
   including slug derivation, status transitions, and filesystem synchronization.
   """
 
+  require Logger
+
   import Ecto.Query
   import BDS.MapUtils, only: [attr: 2, maybe_put: 3]
 
@@ -184,10 +186,18 @@ defmodule BDS.Templates do
     templates =
       template_paths
       |> Enum.with_index(1)
-      |> Enum.map(fn {path, index} ->
-        template = upsert_template_from_file(project_id, project, path)
+      |> Enum.flat_map(fn {path, index} ->
+        result = upsert_template_from_file(project_id, project, path)
         :ok = report_rebuild_progress(on_progress, index, total_files, "template files")
-        template
+
+        case result do
+          {:ok, template} ->
+            [template]
+
+          {:error, reason} ->
+            Logger.warning("Skipping template #{path}: #{inspect(reason)}")
+            []
+        end
       end)
 
     remove_stale_published_templates(project_id, project, template_paths)
@@ -241,10 +251,9 @@ defmodule BDS.Templates do
         project = Projects.get_project!(template.project_id)
         full_path = Path.join(Projects.project_data_dir(project), template.file_path)
 
-        if File.exists?(full_path) do
-          {:ok, upsert_template_from_file(template.project_id, project, full_path)}
-        else
-          {:error, :not_found}
+        case upsert_template_from_file(template.project_id, project, full_path) do
+          {:ok, _template} = ok -> ok
+          {:error, _reason} -> {:error, :not_found}
         end
     end
   end
@@ -278,10 +287,9 @@ defmodule BDS.Templates do
     project = Projects.get_project!(project_id)
     full_path = Path.join(Projects.project_data_dir(project), relative_path)
 
-    if File.exists?(full_path) do
-      {:ok, upsert_template_from_file(project_id, project, full_path)}
-    else
-      {:error, :not_found}
+    case upsert_template_from_file(project_id, project, full_path) do
+      {:ok, _template} = ok -> ok
+      {:error, _reason} -> {:error, :not_found}
     end
   end
 
@@ -493,31 +501,33 @@ defmodule BDS.Templates do
   end
 
   defp upsert_template_from_file(project_id, project, path) do
-    contents = File.read!(path)
-    {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
     relative_path = Path.relative_to(path, Projects.project_data_dir(project))
-    now = Persistence.now_ms()
 
-    attrs = %{
-      id: DocumentFields.get(fields, "id") || Ecto.UUID.generate(),
-      project_id: project_id,
-      slug: DocumentFields.fetch!(fields, "slug"),
-      title: DocumentFields.get(fields, "title") || "",
-      kind: parse_template_kind(DocumentFields.fetch!(fields, "kind")),
-      enabled: Map.get(fields, "enabled", true),
-      version: Map.get(fields, "version", 1),
-      file_path: relative_path,
-      status: :published,
-      content: nil,
-      created_at: DocumentFields.get(fields, "createdAt", now),
-      updated_at: DocumentFields.get(fields, "updatedAt", now)
-    }
+    with {:ok, contents} <- File.read(path),
+         {:ok, %{fields: fields}} <- Frontmatter.parse_document(contents) do
+      now = Persistence.now_ms()
 
-    template = Repo.get_by(Template, project_id: project_id, slug: attrs.slug) || %Template{}
+      attrs = %{
+        id: DocumentFields.get(fields, "id") || Ecto.UUID.generate(),
+        project_id: project_id,
+        slug: DocumentFields.fetch!(fields, "slug"),
+        title: DocumentFields.get(fields, "title") || "",
+        kind: parse_template_kind(DocumentFields.fetch!(fields, "kind")),
+        enabled: Map.get(fields, "enabled", true),
+        version: Map.get(fields, "version", 1),
+        file_path: relative_path,
+        status: :published,
+        content: nil,
+        created_at: DocumentFields.get(fields, "createdAt", now),
+        updated_at: DocumentFields.get(fields, "updatedAt", now)
+      }
 
-    template
-    |> Template.changeset(attrs)
-    |> Repo.insert_or_update!()
+      template = Repo.get_by(Template, project_id: project_id, slug: attrs.slug) || %Template{}
+
+      template
+      |> Template.changeset(attrs)
+      |> Repo.insert_or_update()
+    end
   end
 
   defp remove_stale_published_templates(project_id, project, template_paths) do

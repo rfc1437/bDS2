@@ -28,8 +28,11 @@ defmodule BDS.PreviewAssets do
     end)
     |> Enum.filter(&File.regular?/1)
     |> Enum.sort()
-    |> Enum.map(fn path ->
-      {Path.relative_to(path, @preview_root), File.read!(path)}
+    |> Enum.flat_map(fn path ->
+      case File.read(path) do
+        {:ok, contents} -> [{Path.relative_to(path, @preview_root), contents}]
+        {:error, _reason} -> []
+      end
     end)
   end
 
