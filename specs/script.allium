@@ -20,6 +20,7 @@ enum ScriptStatus {
 }
 
 entity Script {
+    project_id: String
     slug: String
     title: String
     kind: macro | utility | transform
@@ -63,8 +64,8 @@ surface ScriptManagementSurface {
     facing _: ScriptOperator
 
     provides:
-        CreateScriptRequested(title, kind, content, entrypoint)
-        CreateAndPublishScriptRequested(title, kind, content, entrypoint)
+        CreateScriptRequested(project, title, kind, content, entrypoint)
+        CreateAndPublishScriptRequested(project, title, kind, content, entrypoint)
         UpdateScriptRequested(script, changes)
         PublishScriptRequested(script)
         DeleteScriptRequested(script)
@@ -113,9 +114,10 @@ surface ScriptRuntimeSurface {
 }
 
 invariant UniqueScriptSlug {
+    -- Slug uniqueness is scoped per project, not globally.
     for a in Scripts:
         for b in Scripts:
-            a != b implies a.slug != b.slug
+            a != b and a.project_id = b.project_id implies a.slug != b.slug
 }
 
 invariant ScriptFileLayout {
@@ -125,11 +127,12 @@ invariant ScriptFileLayout {
 -- Script files use standard --- YAML frontmatter
 
 rule CreateScript {
-    when: CreateScriptRequested(title, kind, content, entrypoint)
+    when: CreateScriptRequested(project, title, kind, content, entrypoint)
     let slug = slugify(title)
     -- Creates a draft script: content stored in DB, no file written yet
     ensures:
         let new_script = Script.created(
+            project_id: project.id,
             slug: slug,
             title: title,
             kind: kind,
@@ -160,11 +163,12 @@ rule ReopenPublishedScript {
 rule CreateAndPublishScript {
     -- Alternative creation path: create + immediately publish (file written)
     -- Some implementations may expose this as a single user action
-    when: CreateAndPublishScriptRequested(title, kind, content, entrypoint)
+    when: CreateAndPublishScriptRequested(project, title, kind, content, entrypoint)
     let slug = slugify(title)
     requires: ValidateScript(content) = valid
     ensures:
         let new_script = Script.created(
+            project_id: project.id,
             slug: slug,
             title: title,
             kind: kind,
@@ -234,7 +238,7 @@ rule ExecuteTransform {
     -- Execution uses the same managed job host API contract as other batch
     -- scripts and may report progress while mass-processing remote or local
     -- content.
-    let transforms = Scripts where kind = transform and enabled = true
+    let transforms = Scripts where project_id = data.project_id and kind = transform and enabled = true
     for t in ordered_by(transforms, s => s.updated_at, s => s.slug, s => s.id):
         requires: t.entrypoint != ""
         ensures: TransformApplied(t, data)

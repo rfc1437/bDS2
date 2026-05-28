@@ -279,7 +279,6 @@ entity AiModel {
     max_output_tokens: Integer
     interleaved: String?    -- interleaved capability descriptor
     status: String?         -- active | deprecated | preview
-    provider_package_ref: String? -- provider-specific legacy package reference
     updated_at: Timestamp
 }
 
@@ -288,7 +287,7 @@ entity AiModelModality {
     provider: AiProvider
     model_id: String
     direction: String       -- "input" | "output"
-    modality: String        -- "text" | "image" | "audio" | "video"
+    modality: String        -- "text" | "image" | "audio" | "file" | "tool"
 }
 
 entity AiCatalogMeta {
@@ -552,7 +551,6 @@ surface AiModelRecordSurface {
         model.max_output_tokens
         model.interleaved when model.interleaved != null
         model.status when model.status != null
-        model.provider_package_ref when model.provider_package_ref != null
         model.updated_at
 }
 

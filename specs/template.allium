@@ -10,6 +10,7 @@ enum TemplateStatus {
 }
 
 entity Template {
+    project_id: String
     slug: String
     title: String
     kind: post | list | not_found | partial
@@ -23,8 +24,8 @@ entity Template {
 
     -- Derived
     content_location: if status = published: file_path else: content
-    referencing_posts: Posts where template_slug = this.slug
-    referencing_tags: Tags where post_template_slug = this.slug
+    referencing_posts: Posts where template_slug = this.slug and project_id = this.project_id
+    referencing_tags: Tags where post_template_slug = this.slug and project_id = this.project_id
 
     transitions status {
         draft -> published
@@ -36,8 +37,8 @@ surface TemplateManagementSurface {
     facing _: TemplateOperator
 
     provides:
-        CreateTemplateRequested(title, kind, content)
-        CreateAndPublishTemplateRequested(title, kind, content)
+        CreateTemplateRequested(project, title, kind, content)
+        CreateAndPublishTemplateRequested(project, title, kind, content)
         UpdateTemplateRequested(template, changes)
         PublishTemplateRequested(template)
         DeleteTemplateRequested(template)
@@ -45,9 +46,10 @@ surface TemplateManagementSurface {
 }
 
 invariant UniqueTemplateSlug {
+    -- Slug uniqueness is scoped per project, not globally.
     for a in Templates:
         for b in Templates:
-            a != b implies a.slug != b.slug
+            a != b and a.project_id = b.project_id implies a.slug != b.slug
 }
 
 invariant TemplateFrontmatter {
@@ -85,11 +87,12 @@ invariant RebuildTemplatesIndexesOnlyProjectTemplates {
 }
 
 rule CreateTemplate {
-    when: CreateTemplateRequested(title, kind, content)
+    when: CreateTemplateRequested(project, title, kind, content)
     let slug = slugify(title)
     -- Creates a draft template: content stored in DB, no file written yet
     ensures:
         let new_template = Template.created(
+            project_id: project.id,
             slug: slug,
             title: title,
             kind: kind,
@@ -105,11 +108,12 @@ rule CreateTemplate {
 rule CreateAndPublishTemplate {
     -- Alternative creation path: create + immediately publish (file written)
     -- Some implementations may expose this as a single user action
-    when: CreateAndPublishTemplateRequested(title, kind, content)
+    when: CreateAndPublishTemplateRequested(project, title, kind, content)
     let slug = slugify(title)
     requires: ValidateLiquid(content) = valid
     ensures:
         let new_template = Template.created(
+            project_id: project.id,
             slug: slug,
             title: title,
             kind: kind,

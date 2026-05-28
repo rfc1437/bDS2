@@ -33,7 +33,7 @@ value SettingsProjectSection {
 }
 
 value SettingsEditorSection {
-    default_mode: String                -- select: wysiwyg | markdown | preview
+    default_mode: String                -- select: markdown | preview
     diff_view_style: String             -- select: inline | side-by-side
     wrap_long_lines: Boolean            -- checkbox
     hide_unchanged_regions: Boolean     -- checkbox
@@ -138,7 +138,7 @@ surface SettingsViewSurface {
         -- Bookmarklet uses project's publicUrl to construct POST endpoint.
 
     @guarantee EditorSection
-        -- Section 2: Default Editor Mode (select: WYSIWYG/Markdown/Preview),
+        -- Section 2: Default Editor Mode (select: Markdown/Preview),
         --   Diff View Style (select: Inline/Side-by-side),
         --   Wrap Long Lines (checkbox), Hide Unchanged Regions (checkbox).
 

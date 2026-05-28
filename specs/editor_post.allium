@@ -19,7 +19,7 @@ value PostEditorView {
     metadata: PostEditorMetadata
     metadata_expanded: Boolean          -- starts expanded when title is empty
     excerpt_expanded: Boolean
-    editor_mode: String                 -- visual | markdown | preview
+    editor_mode: String                 -- markdown | preview
     footer: PostEditorFooter
 }
 
@@ -152,15 +152,15 @@ surface PostEditorSurface {
         -- Collapsible section with textarea (4 rows).
 
     @guarantee EditorBodyToolbar
-        -- Toolbar: "Content" label, mode toggle (Visual/Markdown/Preview),
+        -- Toolbar: "Content" label, mode toggle (Markdown/Preview),
         --   action buttons (markdown mode only): Gallery (with media count),
         --   Insert Post Link, Insert Media.
 
     @guarantee EditorModes
-        -- Visual: rich-text WYSIWYG editor.
         -- Markdown: code editor with markdown-with-macros language,
         --   highlighting [[macro ...]] syntax. Word wrap on, minimap off, 14px font.
         -- Preview: iframe showing rendered preview.
+        -- Note: visual/WYSIWYG mode not implemented; "visual" normalizes to markdown.
 
     @guarantee DragDropImages
         -- Drop image file onto editor area triggers import chain.
@@ -193,8 +193,8 @@ invariant PostDirtyTracking {
 }
 
 invariant PostEditorModePersistence {
-    -- Editor mode (visual/markdown/preview) persists per session.
-    -- Default mode comes from editor settings.
+    -- Editor mode (markdown/preview) persists per session.
+    -- Default mode comes from editor settings (markdown).
 }
 
 -- ─── Post editor actions ────────────────────────────────────

@@ -22,28 +22,29 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 | A1-10 | Template file written on create | engine_side_effects.allium:151-153 | Draft templates have `file_path=""` | Fix code: write template file on create |
 | A1-11 | Graceful shutdown with inflight request tracking | preview.allium:47-48 | Kills acceptor process, no inflight tracking | Fix code: track inflight requests, drain before shutdown |
 | A1-12 | Real Pagefind integration for search | generation.allium:208 | Stub only: `pagefind-ui.js` is one-liner, `PagefindUI` never defined, search-runtime.js silently bails, client-side search non-functional | Fix code: bundle real Pagefind, build proper fragment index, wire PagefindUI |
+| A1-13 | Git sidebar shows only "Working tree" placeholder | sidebar_views.allium:651-770 | `sidebar.ex:782-798` returns single entity_list item; `BDS.Git` has full status/diff/commit/history/fetch/pull/push/prune_lfs but sidebar doesn't use it | Fix code: wire sidebar `git_view/0` to `BDS.Git` — render branch, ahead/behind, status file list, commit input, history entries, action buttons per spec |
 
 ### A2. Spec Should Update (code is normative)
 
 | ID | Gap | Spec | Code | Path |
 |---|---|---|---|---|
-| A2-1 | WYSIWYG/visual editor mode (3 modes) | editor_post.allium:159-164 | Only markdown+preview; visual normalizes to markdown | Drop from spec or mark future |
-| A2-2 | Template/Script are global entities | template.allium, script.allium | Both have `project_id`, per-project uniqueness | Update spec to per-project scoping |
-| A2-3 | TagsFile uses `{tags: [...]}` wrapper | frontmatter.allium:255-273 | Code writes bare array `[...]` | Update spec |
-| A2-4 | Sidecar is "YAML-like, not gray-matter" | frontmatter.allium:174 | Code wraps with `---` delimiters | Update spec to gray-matter style |
-| A2-5 | Translation frontmatter omits status/timestamps | frontmatter.allium:107-117 | Code writes status, createdAt, updatedAt, publishedAt | Update spec to match written fields |
-| A2-6 | Search index has single `stemmed_content` | search.allium:40-54 | FTS5 per-field stemmed columns | Update spec to per-field model |
-| A2-7 | Tag archives are single-page | generation.allium:142-147 | Code paginates | Update spec |
-| A2-8 | Date archives year+month only | generation.allium:151-159 | Code also generates day-level | Update spec |
-| A2-9 | Menu is DB entity | menu.allium:20-26 | Purely file-based OPML, no DB table | Update spec to file-only model |
-| A2-10 | Panel tabs: problems, terminal | layout.allium:235-240 | `[:tasks, :output, :post_links, :git_log]` | Update spec |
-| A2-11 | Git sidebar: commit input, history, push/pull | sidebar_views.allium | Only "Working tree" item | Mark as partial/TODO in spec |
-| A2-12 | Slug timestamp fallback after 999 | post.allium:21 | Unbounded numeric suffix | Update spec or fix code |
-| A2-13 | Thumbnail generation is async | engine_side_effects.allium:117 | Synchronous | Update spec or fix code |
-| A2-14 | AiModelModality: :video vs :file/:tool | schema.allium:291 | Code has `:file`, `:tool` instead of `:video` | Update spec to :file/:tool |
-| A2-15 | JSON key convention: snake_case vs camelCase | frontmatter.allium values | Code uses camelCase for all metadata JSON | Update spec to camelCase |
-| A2-16 | Snowball stemmer language list | search.allium:26-31 | Library determines which have algorithms vs passthrough | Update spec: don't enumerate; just say "Snowball stemmers via library" |
-| A2-17 | `provider_package_ref` on AiModel | schema.allium:282 | Not in code; legacy field not needed | Drop from spec |
+| A2-1 | ~~WYSIWYG/visual editor mode (3 modes)~~ | editor_post.allium:159-164 | Only markdown+preview; visual normalizes to markdown | **Resolved:** spec updated to 2 modes (markdown/preview), visual/WYSIWYG dropped |
+| A2-2 | ~~Template/Script are global entities~~ | template.allium, script.allium | Both have `project_id`, per-project uniqueness | **Resolved:** spec updated — added `project_id` to entities, scoped uniqueness invariants and create rules per project |
+| A2-3 | ~~TagsFile uses `{tags: [...]}` wrapper~~ | frontmatter.allium:255-273 | Code writes bare array `[...]` | **Resolved:** spec updated — removed wrapper object, TagEntry is now the top-level value, bare array in invariant, camelCase keys |
+| A2-4 | ~~Sidecar is "YAML-like, not gray-matter"~~ | frontmatter.allium:174 | Code wraps with `---` delimiters | **Resolved:** spec updated — format comment now says gray-matter style with --- delimiters |
+| A2-5 | ~~Translation frontmatter omits status/timestamps~~ | frontmatter.allium:107-117 | Code writes status, createdAt, updatedAt, publishedAt | **Resolved:** spec updated — TranslationFrontmatter now includes status, created_at, updated_at, published_at; TranslationFilesInheritCanonicalMetadata renamed to TranslationFrontmatterRoundtrip; translation.allium invariant updated to TranslationFilesCarryFullMetadata |
+| A2-6 | ~~Search index has single `stemmed_content`~~ | search.allium:40-54 | FTS5 per-field stemmed columns | **Resolved:** spec updated — PostSearchIndex has title/excerpt/content/tags/categories; MediaSearchIndex has title/alt/caption/original_name/tags; SearchMedia now accepts filters; index rules use delete-and-reinsert with per-field stemming |
+| A2-7 | ~~Tag archives are single-page~~ | generation.allium:142-147 | Code paginates | **Resolved:** spec updated — GenerateTagPages now paginated like categories, using max_posts_per_page |
+| A2-8 | ~~Date archives year+month only~~ | generation.allium:151-159 | Code also generates day-level | **Resolved:** spec updated — GenerateDateArchivePages now includes day-level archives, all three levels paginated |
+| A2-9 | ~~Menu is DB entity~~ | menu.allium:20-26 | Purely file-based OPML, no DB table | **Resolved:** spec updated — `entity Menu` changed to `value Menu`, file-only model with OPML persistence, added LoadMenu/SyncMenuFromFilesystem rules |
+| A2-10 | ~~Panel tabs: problems, terminal~~ | layout.allium:235-240 | `[:tasks, :output, :post_links, :git_log]` | **Resolved:** spec already lists tasks/output/post_links/git_log with availability and fallback rules matching code |
+| A2-11 | ~~Git sidebar: commit input, history, push/pull~~ | sidebar_views.allium | Only "Working tree" item | **Moved to A1-13:** backend code exists in BDS.Git, sidebar must wire it up |
+| A2-12 | ~~Slug timestamp fallback after 999~~ | post.allium:21 | Unbounded numeric suffix | **Resolved:** spec updated — uniqueness comment now says unbounded numeric suffix, no 999 cap or timestamp fallback |
+| A2-13 | ~~Thumbnail generation is async~~ | engine_side_effects.allium:117 | Synchronous | **Resolved:** spec updated — import thumbnail generation now says synchronous (awaited, logged on error), matching code; summary table changed from `async` to `sync` |
+| A2-14 | ~~AiModelModality: :video vs :file/:tool~~ | schema.allium:291 | Code has `:file`, `:tool` instead of `:video` | **Resolved:** spec updated — modality enum now lists "text" \| "image" \| "audio" \| "file" \| "tool", matching code |
+| A2-15 | ~~JSON key convention: snake_case vs camelCase~~ | frontmatter.allium values | Code uses camelCase for all metadata JSON | **Resolved:** all value types in frontmatter.allium updated to camelCase field names; added CamelCaseKeys invariant; surfaces updated; also added linkedPostIds to MediaSidecar (C-2) and projectId to TemplateFrontmatter/ScriptFrontmatter (B1-9) |
+| A2-16 | ~~Snowball stemmer language list~~ | search.allium:26-31 | Library determines which have algorithms vs passthrough | **Resolved:** spec updated — StemmerLanguage comment now says "Snowball stemmers via library (Stemex); languages with algorithm get real stemming, others pass through" |
+| A2-17 | ~~`provider_package_ref` on AiModel~~ | schema.allium:282 | Not in code; legacy field not needed | **Resolved:** dropped from AiModel entity and AiModelRecordSurface in schema.allium; DB column retained (migration artifact) |
 
 ---
 
@@ -60,8 +61,8 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 | B1-5 | `published_*` snapshot fields on Post for diffing | `lib/bds/posts/post.ex:61-65` | Add to post.allium entity |
 | B1-6 | Full rendering subsystem (Liquex, Filters, Labels, LinksAndLanguages, PostRendering) | `lib/bds/rendering/` | Distill into spec |
 | B1-7 | 404.html generation | `lib/bds/generation/outputs.ex:344-345` | Add to generation.allium |
-| B1-8 | `linkedPostIds` in media sidecar | `lib/bds/media/sidecars.ex:42` | Add to frontmatter.allium MediaSidecar |
-| B1-9 | `projectId` in template/script frontmatter | `templates.ex:337`, `scripts.ex:268` | Add to frontmatter.allium |
+| B1-8 | ~~`linkedPostIds` in media sidecar~~ | `lib/bds/media/sidecars.ex:42` | **Resolved:** added to MediaSidecar value in frontmatter.allium (with A2-15) |
+| B1-9 | ~~`projectId` in template/script frontmatter~~ | `templates.ex:337`, `scripts.ex:268` | **Resolved:** added projectId to TemplateFrontmatter and ScriptFrontmatter in frontmatter.allium (with A2-15) |
 | B1-10 | Media translation editing modal | `media_editor.html.heex:275-303` | Add to editor_media.allium |
 | B1-11 | Menu editor drag-drop, indent/unindent/move | `lib/bds/desktop/menu_editor/tree_ops.ex` | Add to editor_misc.allium |
 | B1-12 | `:language_picker` overlay with flag emojis | `shell_overlay.html.heex:116-139` | Add to modals.allium |
@@ -97,8 +98,8 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 | ID | Conflict | Resolution | Path |
 |---|---|---|---|
 | C-1 | schema.allium ChatMessage has no cache tokens; ai.allium ChatMessage has `cache_read_tokens`/`cache_write_tokens` | Code has cache tokens → align schema.allium with ai.allium | Update schema.allium |
-| C-2 | media.allium SidecarFile mentions `linkedPostIds`; frontmatter.allium MediaSidecar does NOT list it | Code writes `linkedPostIds` → add to frontmatter.allium | Update frontmatter.allium |
-| C-3 | translation.allium says status/timestamps omitted; frontmatter.allium TranslationFrontmatter defines only 5 fields; code writes 8+ fields | Code writes status/timestamps → update both specs to match code | Update translation.allium + frontmatter.allium |
+| C-2 | ~~media.allium SidecarFile mentions `linkedPostIds`; frontmatter.allium MediaSidecar does NOT list it~~ | Code writes `linkedPostIds` → add to frontmatter.allium | **Resolved:** linkedPostIds added to MediaSidecar in frontmatter.allium (with A2-15) |
+| C-3 | ~~translation.allium says status/timestamps omitted; frontmatter.allium TranslationFrontmatter defines only 5 fields; code writes 8+ fields~~ | Code writes status/timestamps → update both specs to match code | **Resolved:** both specs updated (see A2-5) |
 
 ---
 

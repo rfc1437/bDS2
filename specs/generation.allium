@@ -143,19 +143,39 @@ rule GenerateTagPages {
     when: GenerateSiteRequested(generation)
     requires: tag in generation.sections
     for t in Tags where post_count > 0:
-        ensures: FileGenerated(format("tag/{slug}/index.html", slug: slugify(t.name)))
+        let slug = slugify(t.name)
+        let page_count = ceil(posts_with_tag(t).count / generation.max_posts_per_page)
+        ensures: FileGenerated(format("tag/{slug}/index.html", slug: slug))
+        for page in page_range(2, page_count):
+            ensures: FileGenerated(format("tag/{slug}/page/{page}/index.html",
+                slug: slug, page: page))
 }
 
--- Date section: year and month archives
+-- Date section: year, month, and day archives
 
 rule GenerateDateArchivePages {
     when: GenerateSiteRequested(generation)
     requires: date in generation.sections
     for year in distinct_years(Posts):
+        let yp = ceil(posts_in_year(year).count / generation.max_posts_per_page)
         ensures: FileGenerated(format("{year}/index.html", year: year))
+        for page in page_range(2, yp):
+            ensures: FileGenerated(format("{year}/page/{page}/index.html",
+                year: year, page: page))
         for month in distinct_months(Posts, year):
+            let mp = ceil(posts_in_month(year, month).count / generation.max_posts_per_page)
             ensures: FileGenerated(format("{year}/{month}/index.html",
                 year: year, month: month))
+            for page in page_range(2, mp):
+                ensures: FileGenerated(format("{year}/{month}/page/{page}/index.html",
+                    year: year, month: month, page: page))
+            for day in distinct_days(Posts, year, month):
+                let dp = ceil(posts_in_day(year, month, day).count / generation.max_posts_per_page)
+                ensures: FileGenerated(format("{year}/{month}/{day}/index.html",
+                    year: year, month: month, day: day))
+                for page in page_range(2, dp):
+                    ensures: FileGenerated(format("{year}/{month}/{day}/page/{page}/index.html",
+                        year: year, month: month, day: day, page: page))
 }
 
 -- Template rendering context
