@@ -86,10 +86,11 @@
 .chat-message {
   display: flex;
   max-width: 100%;
+  margin-bottom: 16px;
 }
 
 .chat-message.user {
-  justify-content: flex-end;
+  flex-direction: row-reverse;
 }
 
 .chat-message-content {
@@ -102,10 +103,11 @@
 }
 
 .chat-panel .chat-message.user .chat-message-content {
-  background: transparent;
-  color: var(--vscode-list-activeSelectionForeground);
-  border: 0;
-  padding: 6px 12px;
+  background: var(--vscode-button-background, var(--accent-color, #007acc));
+  color: var(--vscode-button-foreground, var(--vscode-list-activeSelectionForeground, #ffffff));
+  border: 1px solid var(--vscode-button-background, var(--accent-color, #007acc));
+  border-radius: 6px;
+  padding: 12px 14px;
   line-height: 1.35;
 }
 
@@ -457,18 +459,18 @@
 }
 
 .chat-panel .chat-input-container {
-  --chat-input-line-height: 20px;
-  --chat-input-min-height: 20px;
+  --chat-input-line-height: 22px;
+  --chat-input-min-height: 24px;
   border-top: 1px solid var(--vscode-panel-border);
-  padding: 8px 16px;
+  padding: 12px 16px;
   background: var(--vscode-sideBar-background);
 }
 
 .chat-panel .chat-input-wrapper {
-  min-height: 30px;
+  min-height: 40px;
   border: 1px solid var(--vscode-input-border);
-  border-radius: 6px;
-  padding: 4px 6px;
+  border-radius: 8px;
+  padding: 6px 8px;
   background: var(--vscode-input-background);
 }
 
@@ -487,9 +489,14 @@
   max-height: 160px;
   resize: vertical;
   border: 0;
+  outline: none;
   background: transparent;
   color: var(--vscode-input-foreground);
   overflow-y: hidden;
+}
+
+.chat-panel .chat-input:focus {
+  outline: none;
 }
 
 .chat-panel .chat-input::placeholder {

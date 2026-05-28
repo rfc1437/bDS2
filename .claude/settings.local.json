@@ -9,7 +9,13 @@
       "Bash(git push *)",
       "Bash(git -C /Users/gb/Projects/bDS2 status)",
       "Bash(git status *)",
-      "Bash(mix assets.deploy)"
+      "Bash(mix assets.deploy)",
+      "Bash(mix phx.server)",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__javascript_tool"
     ]
   }
 }
