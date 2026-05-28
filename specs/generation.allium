@@ -63,6 +63,23 @@ surface GenerationStatusSurface {
         generation.generated_files.count
 }
 
+invariant GenerationPublishedOnly {
+    -- Generation renders the *published* state of the blog, never draft content.
+    --
+    -- Post universe: posts that have a published .md file on disk.
+    --   This includes status=published posts and status=draft posts that were
+    --   previously published (they still have a file_path with last-published content).
+    --   Posts that have never been published (no file_path) are excluded entirely.
+    --
+    -- Content source: always the .md file on disk (the last-published snapshot).
+    --   The DB content field (which holds draft edits) is never read during generation.
+    --   Snapshots set content=nil to ensure file-based resolution.
+    --
+    -- Contrast with preview (see preview.allium PreviewDraftOverlay):
+    --   Preview includes all drafts and prefers DB content over file content,
+    --   giving the author a live view of unpublished edits.
+}
+
 invariant IncrementalByContentHash {
     -- Files are only written when content_hash changes
     -- generatedFileHashes table tracks (projectId, relativePath, contentHash)
