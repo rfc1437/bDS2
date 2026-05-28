@@ -75,7 +75,7 @@ defmodule BDS.Posts.FileSync do
         {"status", :published},
         {"author", post.author},
         {"language", post.language},
-        {"doNotTranslate", post.do_not_translate},
+        {"doNotTranslate", post.do_not_translate || nil},
         {"templateSlug", post.template_slug},
         {"createdAt", post.created_at},
         {"updatedAt", post.updated_at},

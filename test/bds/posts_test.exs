@@ -188,6 +188,26 @@ defmodule BDS.PostsTest do
     refute File.exists?(full_path <> ".tmp")
   end
 
+  test "publish_post omits doNotTranslate from frontmatter when false", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Normal Post",
+               content: "body"
+             })
+
+    assert post.do_not_translate == false
+    assert {:ok, published} = BDS.Posts.publish_post(post.id)
+
+    full_path = Path.join(temp_dir, published.file_path)
+    file_contents = File.read!(full_path)
+
+    refute file_contents =~ "doNotTranslate"
+  end
+
   test "publish_post deletes old file when file path changes", %{
     project: project,
     temp_dir: temp_dir
