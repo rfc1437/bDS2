@@ -9,6 +9,7 @@ defmodule BDS.Preview do
   alias BDS.Projects
   alias BDS.Repo
   alias BDS.Rendering
+  alias BDS.Rendering.TemplateSelection
 
   @host "127.0.0.1"
   @port 4123
@@ -219,6 +220,7 @@ defmodule BDS.Preview do
 
   defp draft_preview_payload(post, query_params) do
     requested_language = query_params |> Map.get("lang") |> normalize_requested_language()
+    effective_slug = post.template_slug || TemplateSelection.resolve_post_template_slug(post.project_id, post.tags, post.categories)
 
     case draft_preview_translation(post.id, requested_language, post.language) do
       %Translation{} = translation ->
@@ -230,7 +232,7 @@ defmodule BDS.Preview do
           slug: post.slug,
           language: translation.language,
           excerpt: translation.excerpt,
-          template_slug: post.template_slug
+          template_slug: effective_slug
         }
 
       nil ->
@@ -242,7 +244,7 @@ defmodule BDS.Preview do
           slug: post.slug,
           language: post.language,
           excerpt: post.excerpt,
-          template_slug: post.template_slug
+          template_slug: effective_slug
         }
     end
   end

@@ -10,6 +10,7 @@ defmodule BDS.Preview.Router do
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
   alias BDS.Rendering
+  alias BDS.Rendering.TemplateSelection
   alias BDS.Repo
 
   @type route ::
@@ -219,7 +220,9 @@ defmodule BDS.Preview.Router do
       _post_record: effective_record
     }
 
-    case Rendering.render_post_page(project_id, post.template_slug, assigns) do
+    effective_slug = post.template_slug || TemplateSelection.resolve_post_template_slug(project_id, post.tags, post.categories)
+
+    case Rendering.render_post_page(project_id, effective_slug, assigns) do
       {:ok, rendered} -> {:ok, rendered}
       {:error, _reason} -> {:error, :not_found}
     end

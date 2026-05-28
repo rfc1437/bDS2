@@ -4,12 +4,51 @@ defmodule BDS.Rendering.TemplateSelection do
   import Ecto.Query
 
   alias BDS.Frontmatter
+  alias BDS.Metadata
   alias BDS.Projects
   alias BDS.Rendering.FileSystem
   alias BDS.Rendering.Filters
   alias BDS.Repo
   alias BDS.StarterTemplates
+  alias BDS.Tags.Tag
   alias BDS.Templates.Template
+
+  @spec resolve_post_template_slug(String.t(), [String.t()], [String.t()]) ::
+          String.t() | nil
+  def resolve_post_template_slug(project_id, tag_names, category_names) do
+    resolve_from_tags(project_id, tag_names) ||
+      resolve_from_categories(project_id, category_names)
+  end
+
+  defp resolve_from_tags(_project_id, []), do: nil
+
+  defp resolve_from_tags(project_id, tag_names) do
+    Repo.all(
+      from tag in Tag,
+        where:
+          tag.project_id == ^project_id and
+            tag.name in ^tag_names and
+            not is_nil(tag.post_template_slug) and
+            tag.post_template_slug != "",
+        select: tag.post_template_slug,
+        limit: 1
+    )
+    |> List.first()
+  end
+
+  defp resolve_from_categories(_project_id, []), do: nil
+
+  defp resolve_from_categories(project_id, category_names) do
+    {:ok, state} = Metadata.get_project_metadata(project_id)
+    settings = state.category_settings || %{}
+
+    Enum.find_value(category_names, fn cat_name ->
+      case Map.get(settings, cat_name) do
+        %{"post_template_slug" => slug} when is_binary(slug) and slug != "" -> slug
+        _ -> nil
+      end
+    end)
+  end
 
   @spec load_template_source(String.t(), atom(), String.t() | nil) ::
           {:ok, String.t()} | {:error, term()}

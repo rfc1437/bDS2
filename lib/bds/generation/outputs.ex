@@ -5,6 +5,8 @@ defmodule BDS.Generation.Outputs do
   import BDS.Generation.Renderers
   import BDS.Generation.Sitemap, only: [render_feed: 3, render_atom: 3, render_calendar: 1]
 
+  alias BDS.Rendering.TemplateSelection
+
   @spec additional_languages(map()) :: [String.t()]
   def additional_languages(plan) do
     Enum.reject(plan.blog_languages, &(&1 == plan.language))
@@ -391,10 +393,12 @@ defmodule BDS.Generation.Outputs do
         canonical_variant = Map.get(translations_by_post_language, {post.id, main_language}, post)
         body = load_body(project_id, canonical_variant.file_path, canonical_variant.content)
 
+        effective_slug = effective_template_slug(project_id, post)
+
         {page_output_path(post.slug, nil),
          render_post_output(
            project_id,
-           post.template_slug,
+           effective_slug,
            %{
              id: canonical_variant.id,
              title: canonical_variant.title,
@@ -423,10 +427,12 @@ defmodule BDS.Generation.Outputs do
         |> Enum.map(fn post ->
           body = load_body(project_id, post.file_path, post.content)
 
+          effective_slug = effective_template_slug(project_id, post)
+
           {page_output_path(post.slug, language),
            render_post_output(
              project_id,
-             post.template_slug,
+             effective_slug,
              %{
                id: post.id,
                title: post.title,
@@ -521,10 +527,12 @@ defmodule BDS.Generation.Outputs do
         canonical_variant = Map.get(translations_by_post_language, {post.id, main_language}, post)
         body = load_body(project_id, canonical_variant.file_path, canonical_variant.content)
 
+        effective_slug = effective_template_slug(project_id, post)
+
         {post_output_path(post),
          render_post_output(
            project_id,
-           post.template_slug,
+           effective_slug,
            %{
              id: canonical_variant.id,
              title: canonical_variant.title,
@@ -551,10 +559,12 @@ defmodule BDS.Generation.Outputs do
         Enum.map(posts, fn post ->
           body = load_body(project_id, post.file_path, post.content)
 
+          effective_slug = effective_template_slug(project_id, post)
+
           {post_output_path(post, language),
            render_post_output(
              project_id,
-             post.template_slug,
+             effective_slug,
              %{
                id: post.id,
                title: post.title,
@@ -570,5 +580,19 @@ defmodule BDS.Generation.Outputs do
       end)
 
     post_outputs ++ translation_outputs
+  end
+
+  defp effective_template_slug(project_id, post) do
+    slug = Map.get(post, :template_slug)
+
+    if is_binary(slug) and slug != "" do
+      slug
+    else
+      TemplateSelection.resolve_post_template_slug(
+        project_id,
+        Map.get(post, :tags) || [],
+        Map.get(post, :categories) || []
+      )
+    end
   end
 end
