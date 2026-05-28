@@ -9,4 +9,4 @@
 /priv/data/*.db
 /priv/data/*.db-shm
 /priv/data/*.db-wal
-*.ez
+*.eztmp/
