@@ -20,16 +20,16 @@ defmodule BDS.TranslationCompletenessTest do
     expected = %{
       "de/default.po" => 0,
       "de/render.po" => 0,
-      "de/ui.po" => 153,
+      "de/ui.po" => 0,
       "fr/default.po" => 0,
       "fr/render.po" => 0,
-      "fr/ui.po" => 153,
+      "fr/ui.po" => 0,
       "it/default.po" => 0,
       "it/render.po" => 0,
-      "it/ui.po" => 153,
+      "it/ui.po" => 0,
       "es/default.po" => 0,
       "es/render.po" => 0,
-      "es/ui.po" => 153
+      "es/ui.po" => 0
     }
 
     actual =

@@ -79,7 +79,7 @@ msgstr ""
 
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:42
 #: lib/bds/desktop/shell_live/overlay_manager.ex:72
-#: lib/bds/desktop/shell_live/post_editor.ex:700
+#: lib/bds/desktop/shell_live/post_editor.ex:776
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:43
 #, elixir-autogen, elixir-format
 msgid "AI Suggestions"
@@ -142,12 +142,12 @@ msgstr ""
 msgid "Add Submenu"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:223
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:259
 #, elixir-autogen, elixir-format
 msgid "Add category"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:138
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:174
 #, elixir-autogen, elixir-format
 msgid "Add tag"
 msgstr ""
@@ -246,7 +246,7 @@ msgid "Assistant"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:166
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:166
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:202
 #, elixir-autogen, elixir-format
 msgid "Author"
 msgstr ""
@@ -263,8 +263,8 @@ msgstr ""
 #: lib/bds/desktop/shell_live/media_editor.ex:349
 #: lib/bds/desktop/shell_live/media_editor.ex:538
 #: lib/bds/desktop/shell_live/overlay_manager.ex:73
-#: lib/bds/desktop/shell_live/post_editor.ex:567
-#: lib/bds/desktop/shell_live/post_editor.ex:616
+#: lib/bds/desktop/shell_live/post_editor.ex:643
+#: lib/bds/desktop/shell_live/post_editor.ex:692
 #, elixir-autogen, elixir-format
 msgid "Automatic AI actions stay gated by airplane mode."
 msgstr ""
@@ -283,7 +283,7 @@ msgid "Available languages"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/panel_renderer.ex:124
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:264
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:300
 #, elixir-autogen, elixir-format
 msgid "Backlinks"
 msgstr ""
@@ -367,7 +367,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/index.html.heex:336
 #: lib/bds/desktop/shell_live/misc_editor.ex:750
 #: lib/bds/desktop/shell_live/misc_editor.ex:751
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:207
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:243
 #: lib/bds/desktop/shell_live/settings_editor/managed_categories.ex:59
 #: lib/bds/desktop/shell_live/settings_editor/managed_categories.ex:75
 #: lib/bds/desktop/shell_live/settings_editor/managed_categories.ex:107
@@ -499,7 +499,7 @@ msgstr ""
 msgid "Confirm"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:326
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:362
 #: lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex:34
 #: lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex:32
 #: lib/bds/ui/sidebar.ex:761
@@ -548,17 +548,17 @@ msgstr ""
 msgid "Create / Edit"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:239
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:275
 #, elixir-autogen, elixir-format
 msgid "Create category"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:157
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:193
 #, elixir-autogen, elixir-format
 msgid "Create tag"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:417
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:453
 #: lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex:48
 #: lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex:46
 #, elixir-autogen, elixir-format
@@ -609,7 +609,7 @@ msgstr ""
 msgid "Date Distribution"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:252
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:288
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:174
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:182
 #, elixir-autogen, elixir-format
@@ -634,7 +634,7 @@ msgstr ""
 #: lib/bds/desktop/menu_bar.ex:162
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:98
 #: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:166
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:80
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:116
 #: lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex:16
 #: lib/bds/desktop/shell_live/sidebar_components.ex:515
 #: lib/bds/desktop/shell_live/sidebar_components.ex:518
@@ -696,7 +696,7 @@ msgstr ""
 msgid "Desktop Runtime"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:187
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:223
 #, elixir-autogen, elixir-format
 msgid "Detect"
 msgstr ""
@@ -706,9 +706,9 @@ msgstr ""
 #: lib/bds/desktop/shell_live/media_editor.ex:199
 #: lib/bds/desktop/shell_live/media_editor.ex:205
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:59
-#: lib/bds/desktop/shell_live/post_editor.ex:566
-#: lib/bds/desktop/shell_live/post_editor.ex:595
-#: lib/bds/desktop/shell_live/post_editor.ex:601
+#: lib/bds/desktop/shell_live/post_editor.ex:642
+#: lib/bds/desktop/shell_live/post_editor.ex:671
+#: lib/bds/desktop/shell_live/post_editor.ex:677
 #, elixir-autogen, elixir-format
 msgid "Detect Language"
 msgstr ""
@@ -774,7 +774,7 @@ msgstr ""
 msgid "Display Text"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:196
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:232
 #, elixir-autogen, elixir-format
 msgid "Do Not Translate"
 msgstr ""
@@ -896,8 +896,8 @@ msgstr ""
 msgid "Exact Match"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:313
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:318
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:349
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:354
 #, elixir-autogen, elixir-format
 msgid "Excerpt"
 msgstr ""
@@ -981,7 +981,7 @@ msgid "Force Reload"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:194
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:383
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:419
 #, elixir-autogen, elixir-format
 msgid "Gallery"
 msgstr ""
@@ -1033,7 +1033,7 @@ msgstr ""
 #: lib/bds/desktop/shell_data.ex:116
 #: lib/bds/desktop/shell_live/index.html.heex:666
 #: lib/bds/desktop/shell_live/media_editor.ex:703
-#: lib/bds/desktop/shell_live/post_editor.ex:818
+#: lib/bds/desktop/shell_live/post_editor.ex:894
 #, elixir-autogen, elixir-format
 msgid "Idle"
 msgstr ""
@@ -1175,12 +1175,12 @@ msgstr ""
 msgid "Insert"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:354
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:390
 #, elixir-autogen, elixir-format
 msgid "Insert Link"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:363
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:399
 #, elixir-autogen, elixir-format
 msgid "Insert Media"
 msgstr ""
@@ -1198,13 +1198,13 @@ msgstr ""
 
 #: lib/bds/desktop/shell_live/import_editor.ex:874
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:171
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:171
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:207
 #, elixir-autogen, elixir-format
 msgid "Language"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/media_editor.ex:206
-#: lib/bds/desktop/shell_live/post_editor.ex:602
+#: lib/bds/desktop/shell_live/post_editor.ex:678
 #, elixir-autogen, elixir-format
 msgid "Language detection failed."
 msgstr ""
@@ -1220,7 +1220,7 @@ msgstr ""
 msgid "Link to Post"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:293
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:329
 #, elixir-autogen, elixir-format
 msgid "Linked Media"
 msgstr ""
@@ -1231,7 +1231,7 @@ msgid "Linked Posts"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/panel_renderer.ex:142
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:276
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:312
 #, elixir-autogen, elixir-format
 msgid "Links To"
 msgstr ""
@@ -1288,7 +1288,7 @@ msgstr ""
 msgid "Mapped"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor.ex:821
+#: lib/bds/desktop/shell_live/post_editor.ex:897
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:120
 #, elixir-autogen, elixir-format
 msgid "Markdown"
@@ -1339,7 +1339,7 @@ msgstr ""
 msgid "Merge Tags"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:90
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:126
 #, elixir-autogen, elixir-format
 msgid "Metadata"
 msgstr ""
@@ -1451,8 +1451,8 @@ msgstr ""
 
 #: lib/bds/desktop/shell_live/misc_editor.ex:468
 #: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:72
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:272
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:284
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:308
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:320
 #: lib/bds/desktop/shell_live/sidebar_components.ex:320
 #: lib/bds/desktop/shell_live/sidebar_components.ex:380
 #: lib/bds/desktop/shell_live/sidebar_components.ex:454
@@ -1463,7 +1463,7 @@ msgstr ""
 msgid "No items"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:306
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:342
 #, elixir-autogen, elixir-format
 msgid "No linked media"
 msgstr ""
@@ -1700,7 +1700,7 @@ msgstr ""
 msgid "OpenAI-compatible endpoints, model routing, airplane mode, and system prompt"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:301
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:337
 #, elixir-autogen, elixir-format
 msgid "Order"
 msgstr ""
@@ -1786,12 +1786,16 @@ msgid "Persist the detected language for this media item"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/misc_editor.ex:742
-#: lib/bds/desktop/shell_live/post_editor.ex:464
-#: lib/bds/desktop/shell_live/post_editor.ex:468
-#: lib/bds/desktop/shell_live/post_editor.ex:503
-#: lib/bds/desktop/shell_live/post_editor.ex:507
-#: lib/bds/desktop/shell_live/post_editor.ex:542
-#: lib/bds/desktop/shell_live/post_editor.ex:557
+#: lib/bds/desktop/shell_live/post_editor.ex:474
+#: lib/bds/desktop/shell_live/post_editor.ex:478
+#: lib/bds/desktop/shell_live/post_editor.ex:513
+#: lib/bds/desktop/shell_live/post_editor.ex:517
+#: lib/bds/desktop/shell_live/post_editor.ex:552
+#: lib/bds/desktop/shell_live/post_editor.ex:567
+#: lib/bds/desktop/shell_live/post_editor.ex:596
+#: lib/bds/desktop/shell_live/post_editor.ex:599
+#: lib/bds/desktop/shell_live/post_editor.ex:629
+#: lib/bds/desktop/shell_live/post_editor.ex:632
 #: lib/bds/desktop/shell_live/sidebar_components.ex:515
 #: lib/bds/desktop/shell_live/sidebar_delete.ex:174
 #: lib/bds/ui/registry.ex:99
@@ -1801,7 +1805,7 @@ msgstr ""
 
 #: lib/bds/desktop/shell_data.ex:247
 #: lib/bds/desktop/shell_live/panel_renderer.ex:118
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:261
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:297
 #, elixir-autogen, elixir-format
 msgid "Post Links"
 msgstr ""
@@ -1821,12 +1825,12 @@ msgstr ""
 msgid "Post is marked as do-not-translate but has translations"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor.ex:503
+#: lib/bds/desktop/shell_live/post_editor.ex:513
 #, elixir-autogen, elixir-format
 msgid "Post published"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor.ex:464
+#: lib/bds/desktop/shell_live/post_editor.ex:474
 #, elixir-autogen, elixir-format
 msgid "Post saved"
 msgstr ""
@@ -1850,7 +1854,7 @@ msgstr ""
 msgid "Preferences"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor.ex:822
+#: lib/bds/desktop/shell_live/post_editor.ex:898
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:121
 #, elixir-autogen, elixir-format
 msgid "Preview"
@@ -1866,7 +1870,7 @@ msgstr ""
 msgid "Preview Post"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:394
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:430
 #, elixir-autogen, elixir-format
 msgid "Preview unavailable"
 msgstr ""
@@ -1906,7 +1910,7 @@ msgstr ""
 msgid "Public URL"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:70
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:106
 #: lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex:11
 #: lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex:11
 #, elixir-autogen, elixir-format
@@ -1919,8 +1923,8 @@ msgid "Publish Selected"
 msgstr ""
 
 #: lib/bds/desktop/shell_data.ex:181
-#: lib/bds/desktop/shell_live/post_editor.ex:816
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:420
+#: lib/bds/desktop/shell_live/post_editor.ex:892
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:456
 #: lib/bds/ui/sidebar.ex:320
 #, elixir-autogen, elixir-format
 msgid "Published"
@@ -2055,12 +2059,12 @@ msgstr ""
 msgid "Remove"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:214
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:250
 #, elixir-autogen, elixir-format
 msgid "Remove category"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:129
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:165
 #, elixir-autogen, elixir-format
 msgid "Remove tag"
 msgstr ""
@@ -2117,7 +2121,7 @@ msgstr ""
 msgid "Result"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor.ex:817
+#: lib/bds/desktop/shell_live/post_editor.ex:893
 #, elixir-autogen, elixir-format
 msgid "Reverted"
 msgstr ""
@@ -2169,7 +2173,7 @@ msgid "Save Translation"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/media_editor.ex:702
-#: lib/bds/desktop/shell_live/post_editor.ex:815
+#: lib/bds/desktop/shell_live/post_editor.ex:891
 #, elixir-autogen, elixir-format
 msgid "Saved"
 msgstr ""
@@ -2369,7 +2373,7 @@ msgstr ""
 
 #: lib/bds/desktop/shell_live/import_editor.ex:1126
 #: lib/bds/desktop/shell_live/import_editor.ex:1183
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:202
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:238
 #: lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex:24
 #: lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex:23
 #, elixir-autogen, elixir-format
@@ -2463,7 +2467,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/index.html.heex:297
 #: lib/bds/desktop/shell_live/index.html.heex:325
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:161
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:122
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:158
 #: lib/bds/desktop/shell_live/tags_editor.ex:94
 #: lib/bds/desktop/shell_live/tags_editor.ex:136
 #: lib/bds/desktop/shell_live/tags_editor.ex:189
@@ -2492,7 +2496,7 @@ msgid "Technology"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/misc_editor.ex:747
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:250
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:286
 #: lib/bds/desktop/shell_live/sidebar_components.ex:524
 #: lib/bds/desktop/shell_live/sidebar_delete.ex:179
 #: lib/bds/ui/registry.ex:134
@@ -2571,7 +2575,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/import_editor.ex:1182
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:146
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:285
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:117
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:153
 #: lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex:23
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:155
 #: lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex:22
@@ -2644,9 +2648,9 @@ msgstr ""
 #: lib/bds/desktop/shell_live/media_editor.ex:558
 #: lib/bds/desktop/shell_live/media_editor.ex:563
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:76
-#: lib/bds/desktop/shell_live/post_editor.ex:615
-#: lib/bds/desktop/shell_live/post_editor.ex:644
-#: lib/bds/desktop/shell_live/post_editor.ex:649
+#: lib/bds/desktop/shell_live/post_editor.ex:691
+#: lib/bds/desktop/shell_live/post_editor.ex:720
+#: lib/bds/desktop/shell_live/post_editor.ex:725
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:60
 #, elixir-autogen, elixir-format
 msgid "Translate"
@@ -2672,7 +2676,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:183
 #: lib/bds/desktop/shell_live/misc_editor.ex:743
 #: lib/bds/desktop/shell_live/misc_editor.ex:745
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:93
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:129
 #: lib/bds/ui/registry.ex:131
 #, elixir-autogen, elixir-format
 msgid "Translations"
@@ -2723,7 +2727,7 @@ msgstr ""
 
 #: lib/bds/desktop/shell_live/media_editor.ex:701
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:10
-#: lib/bds/desktop/shell_live/post_editor.ex:814
+#: lib/bds/desktop/shell_live/post_editor.ex:890
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:7
 #, elixir-autogen, elixir-format
 msgid "Unsaved"
@@ -2743,7 +2747,7 @@ msgstr ""
 msgid "Untitled Import"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:418
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:454
 #: lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex:48
 #: lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex:46
 #, elixir-autogen, elixir-format
@@ -3206,7 +3210,7 @@ msgstr "Image Import Concurrency"
 #: lib/bds/desktop/shell_live.ex:649
 #: lib/bds/desktop/shell_live.ex:658
 #: lib/bds/desktop/shell_live.ex:665
-#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:371
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:407
 #, elixir-autogen, elixir-format
 msgid "Add Gallery Images"
 msgstr "Add Gallery Images"
@@ -3215,3 +3219,33 @@ msgstr "Add Gallery Images"
 #, elixir-autogen, elixir-format
 msgid "Failed to process %{path}: %{reason}"
 msgstr "Failed to process %{path}: %{reason}"
+
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:78
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Archive"
+msgstr ""
+
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:79
+#, elixir-autogen, elixir-format
+msgid "Move this post to the archive"
+msgstr ""
+
+#: lib/bds/desktop/shell_live/post_editor.ex:596
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Post archived"
+msgstr ""
+
+#: lib/bds/desktop/shell_live/post_editor.ex:629
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Post unarchived"
+msgstr ""
+
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:95
+#, elixir-autogen, elixir-format
+msgid "Restore this post to draft"
+msgstr ""
+
+#: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:94
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Unarchive"
+msgstr ""

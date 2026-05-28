@@ -61,6 +61,42 @@
                 <small><%= dgettext("ui", "Select a target language for this post") %></small>
               </span>
             </button>
+
+            <%= if @post_editor.can_archive? or @post_editor.can_unarchive? do %>
+              <div class="quick-actions-divider"></div>
+
+              <%= if @post_editor.can_archive? do %>
+                <button
+                  class="quick-action-item ui-dropdown-item flex items-start gap-3 text-left"
+                  data-testid="post-archive-button"
+                  type="button"
+                  phx-click="archive_post_editor"
+                  phx-target={@myself}
+                >
+                  <span class="quick-action-icon">📦</span>
+                  <span class="quick-action-text flex min-w-0 flex-1 flex-col">
+                    <strong><%= dgettext("ui", "Archive") %></strong>
+                    <small><%= dgettext("ui", "Move this post to the archive") %></small>
+                  </span>
+                </button>
+              <% end %>
+
+              <%= if @post_editor.can_unarchive? do %>
+                <button
+                  class="quick-action-item ui-dropdown-item flex items-start gap-3 text-left"
+                  data-testid="post-unarchive-button"
+                  type="button"
+                  phx-click="unarchive_post_editor"
+                  phx-target={@myself}
+                >
+                  <span class="quick-action-icon">📤</span>
+                  <span class="quick-action-text flex min-w-0 flex-1 flex-col">
+                    <strong><%= dgettext("ui", "Unarchive") %></strong>
+                    <small><%= dgettext("ui", "Restore this post to draft") %></small>
+                  </span>
+                </button>
+              <% end %>
+            <% end %>
           </div>
         <% end %>
       </div>

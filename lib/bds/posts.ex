@@ -352,6 +352,36 @@ defmodule BDS.Posts do
     end
   end
 
+  @spec unarchive_post(String.t()) ::
+          {:ok, Post.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def unarchive_post(post_id) do
+    case Repo.get(Post, post_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Post{status: :archived} = post ->
+        content = restore_content_for_unarchive(post)
+
+        post
+        |> Post.changeset(%{status: :draft, content: content, updated_at: Persistence.now_ms()})
+        |> Repo.update()
+        |> case do
+          {:ok, updated_post} ->
+            :ok = Search.sync_post(updated_post)
+            {:ok, updated_post}
+
+          error ->
+            error
+        end
+
+      %Post{} = post ->
+        {:error,
+         post
+         |> Post.changeset(%{})
+         |> Ecto.Changeset.add_error(:status, "cannot unarchive non-archived post")}
+    end
+  end
+
   @spec get_post!(String.t()) :: Post.t()
   @spec get_post(String.t()) :: Post.t() | nil
   def get_post(post_id), do: Repo.get(Post, post_id)
@@ -580,6 +610,17 @@ defmodule BDS.Posts do
       end
     )
   end
+
+  defp restore_content_for_unarchive(%Post{content: content}) when is_binary(content), do: content
+
+  defp restore_content_for_unarchive(%Post{file_path: file_path} = post)
+       when file_path not in [nil, ""] do
+    project = Projects.get_project!(post.project_id)
+    full_path = Path.join(Projects.project_data_dir(project), file_path)
+    read_markdown_body(full_path)
+  end
+
+  defp restore_content_for_unarchive(_post), do: ""
 
   defp normalize_title(nil), do: ""
   defp normalize_title(title), do: title

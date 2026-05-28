@@ -204,6 +204,14 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     {:noreply, do_delete(socket)}
   end
 
+  def handle_event("archive_post_editor", _params, socket) do
+    {:noreply, do_archive(socket)}
+  end
+
+  def handle_event("unarchive_post_editor", _params, socket) do
+    {:noreply, do_unarchive(socket)}
+  end
+
   def handle_event("set_post_editor_mode", %{"mode" => mode}, socket) do
     normalized_mode = normalize_mode(mode)
 
@@ -370,6 +378,8 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
             editing_canonical_language?(translations, active_language, canonical_language),
           can_publish?: post.status == :draft,
           can_delete?: post.status == :published,
+          can_archive?: post.status in [:draft, :published],
+          can_unarchive?: post.status == :archived,
           has_published_version?: has_published_version?(post),
           discard_label: discard_label(post),
           discard_title: discard_title(post),
@@ -556,6 +566,72 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       {:error, reason} ->
         notify_output(socket, dgettext("ui", "Post"), inspect(reason), "error")
         |> build_data()
+    end
+  end
+
+  defp do_archive(socket) do
+    case socket.assigns.post do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        case Posts.archive_post(post.id) do
+          {:ok, archived_post} ->
+            socket =
+              socket
+              |> assign(:post, archived_post)
+              |> assign(:drafts, %{})
+              |> assign(:dirty?, false)
+              |> assign(:quick_actions_open?, false)
+              |> build_data()
+
+            Notify.tab_meta(
+              :post,
+              post.id,
+              archived_post.title || archived_post.slug || archived_post.id,
+              "archived"
+            )
+
+            Notify.dirty(:post, post.id, false)
+            notify_output(socket, dgettext("ui", "Post"), dgettext("ui", "Post archived"))
+
+          {:error, reason} ->
+            notify_output(socket, dgettext("ui", "Post"), inspect(reason), "error")
+            |> build_data()
+        end
+    end
+  end
+
+  defp do_unarchive(socket) do
+    case socket.assigns.post do
+      nil ->
+        socket
+
+      %Post{} = post ->
+        case Posts.unarchive_post(post.id) do
+          {:ok, unarchived_post} ->
+            socket =
+              socket
+              |> assign(:post, unarchived_post)
+              |> assign(:drafts, %{})
+              |> assign(:dirty?, false)
+              |> assign(:quick_actions_open?, false)
+              |> build_data()
+
+            Notify.tab_meta(
+              :post,
+              post.id,
+              unarchived_post.title || unarchived_post.slug || unarchived_post.id,
+              "draft"
+            )
+
+            Notify.dirty(:post, post.id, false)
+            notify_output(socket, dgettext("ui", "Post"), dgettext("ui", "Post unarchived"))
+
+          {:error, reason} ->
+            notify_output(socket, dgettext("ui", "Post"), inspect(reason), "error")
+            |> build_data()
+        end
     end
   end
 

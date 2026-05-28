@@ -296,6 +296,65 @@ defmodule BDS.PostsTest do
     assert contents =~ "\n---\nBody\n"
   end
 
+  test "unarchive_post transitions archived draft back to draft", %{project: project} do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Archive Then Unarchive",
+               content: "Draft body"
+             })
+
+    assert {:ok, archived} = BDS.Posts.archive_post(post.id)
+    assert archived.status == :archived
+
+    assert {:ok, unarchived} = BDS.Posts.unarchive_post(archived.id)
+    assert unarchived.status == :draft
+    assert unarchived.content == "Draft body"
+  end
+
+  test "unarchive_post restores content from disk for previously published posts" do
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-unarchive-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Unarchive Pub", data_path: temp_dir})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Publish Then Archive",
+               content: "Published body"
+             })
+
+    assert {:ok, published} = BDS.Posts.publish_post(post.id)
+    assert published.content == nil
+    assert {:ok, archived} = BDS.Posts.archive_post(published.id)
+    assert archived.status == :archived
+    assert archived.content == nil
+
+    assert {:ok, unarchived} = BDS.Posts.unarchive_post(archived.id)
+    assert unarchived.status == :draft
+    assert unarchived.content == "Published body"
+  end
+
+  test "unarchive_post rejects non-archived posts", %{project: project} do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Still Draft",
+               content: "Body"
+             })
+
+    assert {:error, %Ecto.Changeset{}} = BDS.Posts.unarchive_post(post.id)
+  end
+
+  test "unarchive_post returns not_found for nonexistent post" do
+    assert {:error, :not_found} = BDS.Posts.unarchive_post(Ecto.UUID.generate())
+  end
+
   test "rebuild_posts_from_files recreates published posts from disk" do
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-post-rebuild-#{System.unique_integer([:positive])}")

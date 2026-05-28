@@ -10,7 +10,7 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 
 | ID | Gap | Spec | Code | Path |
 |---|---|---|---|---|
-| A1-1 | No `archived→draft` or `archived→published` transition | post.allium:121-122 | No code path to unarchive | Fix code: implement unarchive transitions |
+| A1-1 | ~~No `archived→draft` or `archived→published` transition~~ | post.allium:121-122 | `unarchive_post/1` implemented, `publish_post` already handled archived→published | **Resolved:** `unarchive_post/1` in posts.ex restores content from disk, UI wired via quick actions, 4 tests added |
 | A1-2 | `DeletePost` must delete translations + translation files | post.allium:209-212 | `delete_post/1` skips translation cleanup | Fix code: delete PostTranslation rows + files |
 | A1-3 | Publish must delete old file when path changes | engine_side_effects.allium:73-74 | `publish_post` does not delete old file | Fix code: add old file deletion on path change |
 | A1-4 | `doNotTranslate: false` written to frontmatter despite "only when true" | frontmatter.allium:398 | `lib/bds/frontmatter.ex:38-39` writes false | Fix code: omit `doNotTranslate` when false |
