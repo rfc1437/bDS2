@@ -3711,6 +3711,264 @@ button svg, button svg * {
   border-radius: 4px;
   background: var(--vscode-textCodeBlock-background);
 }
+.chat-inline-surface {
+  margin: 10px 0;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  background: var(--vscode-sideBar-background);
+  overflow: hidden;
+}
+.chat-inline-surface-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+.chat-inline-surface-header::-webkit-details-marker {
+  display: none;
+}
+.chat-inline-surface-header::marker {
+  content: "";
+}
+.chat-inline-surface-icon {
+  flex: 0 0 auto;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+}
+.chat-inline-surface-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--vscode-editor-foreground);
+}
+.chat-inline-surface-dismiss {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.chat-inline-surface:hover .chat-inline-surface-dismiss {
+  opacity: 1;
+}
+.chat-inline-surface-dismiss:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+.chat-inline-surface-body {
+  padding: 0 12px 12px;
+}
+.chat-inline-surface-body h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+.chat-surface-chart-type {
+  margin: 0 0 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-descriptionForeground);
+  display: none;
+}
+.chat-surface-chart-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chat-surface-chart-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-surface-chart-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+}
+.chat-surface-chart-meta span:first-child {
+  color: var(--vscode-editor-foreground);
+}
+.chat-surface-chart-meta span:last-child {
+  color: var(--vscode-descriptionForeground);
+  font-variant-numeric: tabular-nums;
+}
+.chat-surface-chart-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.chat-surface-chart-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent-color);
+  min-width: 0;
+  transition: width 0.3s ease;
+}
+.chat-surface-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chat-surface-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+.chat-surface-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.chat-surface-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.chat-surface-action-button {
+  padding: 4px 12px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-editor-foreground);
+  font-size: 12px;
+  cursor: pointer;
+}
+.chat-surface-action-button:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+.chat-surface-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-surface-metric-label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+.chat-surface-metric-value {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--vscode-editor-foreground);
+}
+.chat-surface-list {
+  margin: 0;
+  padding: 0 0 0 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.chat-surface-mindmap {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.chat-surface-mindmap li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+.chat-surface-mindmap li:last-child {
+  border-bottom: none;
+}
+.chat-surface-mindmap strong {
+  display: block;
+  color: var(--vscode-editor-foreground);
+}
+.chat-surface-mindmap-children {
+  display: block;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  padding-left: 12px;
+}
+.chat-surface-tabs {
+  display: flex;
+  flex-direction: column;
+}
+.chat-surface-tab-list {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+.chat-surface-tab-button {
+  padding: 6px 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  cursor: pointer;
+}
+.chat-surface-tab-button.active {
+  color: var(--vscode-editor-foreground);
+  border-bottom-color: var(--accent-color);
+}
+.chat-surface-tab-button:hover:not(.active) {
+  color: var(--vscode-editor-foreground);
+}
+.chat-surface-tab-panel {
+  padding: 10px 0 0;
+}
+.chat-surface-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chat-surface-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+.chat-surface-form-field input, .chat-surface-form-field textarea, .chat-surface-form-field select {
+  padding: 5px 8px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+}
+.chat-surface-form-field textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+.chat-surface-form-checkbox {
+  display: flex;
+  align-items: center;
+}
+.chat-surface-text {
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.chat-tool-surface-table-wrap {
+  overflow-x: auto;
+}
 .chat-panel .chat-input-container {
   --chat-input-line-height: 20px;
   --chat-input-min-height: 20px;
@@ -3812,6 +4070,8 @@ button svg, button svg * {
   pointer-events: auto;
 }
 .ai-suggestions-modal, .insert-modal, .language-picker-modal, .confirm-delete-modal, .confirm-dialog, .gallery-overlay-content {
+  position: relative;
+  z-index: 1;
   background: #1e1e1e;
   border: 1px solid #3c3c3c;
   border-radius: 8px;

@@ -8,7 +8,8 @@
       "Bash(git add *)",
       "Bash(git push *)",
       "Bash(git -C /Users/gb/Projects/bDS2 status)",
-      "Bash(git status *)"
+      "Bash(git status *)",
+      "Bash(mix assets.deploy)"
     ]
   }
 }

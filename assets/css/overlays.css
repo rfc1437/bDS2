@@ -36,6 +36,8 @@
 .confirm-delete-modal,
 .confirm-dialog,
 .gallery-overlay-content {
+  position: relative;
+  z-index: 1;
   background: #1e1e1e;
   border: 1px solid #3c3c3c;
   border-radius: 8px;
