@@ -62,6 +62,18 @@ defmodule BDS.Desktop.ShellLive.Notify do
     :ok
   end
 
+  @spec schedule_auto_save(atom(), term()) :: :ok
+  def schedule_auto_save(type, id) do
+    send(self(), {:schedule_auto_save, type, id})
+    :ok
+  end
+
+  @spec cancel_auto_save(atom(), term()) :: :ok
+  def cancel_auto_save(type, id) do
+    send(self(), {:cancel_auto_save, type, id})
+    :ok
+  end
+
   @spec parent(term()) :: :ok
   def parent(message) do
     send(self(), message)

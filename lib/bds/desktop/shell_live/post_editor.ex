@@ -185,6 +185,10 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       Notify.dirty(:post, post_id, dirty?)
     end
 
+    if dirty? do
+      Notify.schedule_auto_save(:post, post_id)
+    end
+
     {:noreply, socket}
   end
 
@@ -471,6 +475,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               Atom.to_string(record_status(record)))
 
             Notify.dirty(:post, post.id, false)
+            Notify.cancel_auto_save(:post, post.id)
             notify_output(socket, dgettext("ui", "Post"), dgettext("ui", "Post saved"))
             socket
 

@@ -1337,6 +1337,142 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert saved_post.excerpt == "Saved excerpt"
   end
 
+  test "post editor auto-saves after idle timer fires", %{project: project} do
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Auto-save Draft",
+        content: "Original body",
+        excerpt: "Original excerpt"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => post.id,
+        "title" => post.title,
+        "subtitle" => "draft"
+      })
+
+    _html =
+      view
+      |> form("[data-testid='post-editor-form']", %{
+        post_editor: %{
+          title: "Auto-saved Title",
+          content: "Auto-saved body",
+          excerpt: "Auto-saved excerpt",
+          tags: "",
+          categories: "",
+          author: "",
+          language: "en",
+          do_not_translate: "false"
+        }
+      })
+      |> render_change()
+
+    send_and_await(view, {:auto_save_fire, :post, post.id})
+    _html = render(view)
+
+    saved_post = Posts.get_post!(post.id)
+    assert saved_post.title == "Auto-saved Title"
+    assert saved_post.content == "Auto-saved body"
+    assert saved_post.excerpt == "Auto-saved excerpt"
+  end
+
+  test "post editor auto-save timer fires and persists after delay", %{project: project} do
+    Application.put_env(:bds, :auto_save_delay, 100)
+    on_exit(fn -> Application.delete_env(:bds, :auto_save_delay) end)
+
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Timer Draft",
+        content: "Body",
+        excerpt: ""
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => post.id,
+        "title" => post.title,
+        "subtitle" => "draft"
+      })
+
+    _html =
+      view
+      |> form("[data-testid='post-editor-form']", %{
+        post_editor: %{
+          title: "Timer Changed Title",
+          content: "Body",
+          excerpt: "",
+          tags: "",
+          categories: "",
+          author: "",
+          language: "en",
+          do_not_translate: "false"
+        }
+      })
+      |> render_change()
+
+    Process.sleep(200)
+    _html = render(view)
+
+    saved_post = Posts.get_post!(post.id)
+    assert saved_post.title == "Timer Changed Title"
+  end
+
+  test "post editor auto-saves dirty content on tab switch", %{project: project} do
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Tab-switch Draft",
+        content: "Original body",
+        excerpt: ""
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => post.id,
+        "title" => post.title,
+        "subtitle" => "draft"
+      })
+
+    _html =
+      view
+      |> form("[data-testid='post-editor-form']", %{
+        post_editor: %{
+          title: "Unsaved Tab Title",
+          content: "Unsaved body",
+          excerpt: "",
+          tags: "",
+          categories: "",
+          author: "",
+          language: "en",
+          do_not_translate: "false"
+        }
+      })
+      |> render_change()
+
+    _html =
+      render_click(view, "select_tab", %{
+        "type" => "dashboard",
+        "id" => "dashboard"
+      })
+
+    _html = render(view)
+    saved_post = Posts.get_post!(post.id)
+    assert saved_post.title == "Unsaved Tab Title"
+    assert saved_post.content == "Unsaved body"
+  end
+
   test "menu editor adds a submenu, nests an entry, and saves the opml", %{
     project: project,
     temp_dir: temp_dir

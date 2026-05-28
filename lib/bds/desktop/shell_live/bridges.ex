@@ -47,6 +47,40 @@ defmodule BDS.Desktop.ShellLive.Bridges do
     {:noreply, assign(socket, :workbench, workbench)}
   end
 
+  @default_auto_save_delay 3000
+
+  def handle_info({:schedule_auto_save, type, id}, socket, _callbacks) do
+    timers = socket.assigns[:auto_save_timers] || %{}
+    key = {type, id}
+
+    case Map.get(timers, key) do
+      nil -> :ok
+      old_ref -> Process.cancel_timer(old_ref)
+    end
+
+    delay = Application.get_env(:bds, :auto_save_delay, @default_auto_save_delay)
+    ref = Process.send_after(self(), {:auto_save_fire, type, id}, delay)
+    {:noreply, assign(socket, :auto_save_timers, Map.put(timers, key, ref))}
+  end
+
+  def handle_info({:cancel_auto_save, type, id}, socket, _callbacks) do
+    timers = socket.assigns[:auto_save_timers] || %{}
+    key = {type, id}
+
+    case Map.get(timers, key) do
+      nil -> :ok
+      old_ref -> Process.cancel_timer(old_ref)
+    end
+
+    {:noreply, assign(socket, :auto_save_timers, Map.delete(timers, key))}
+  end
+
+  def handle_info({:auto_save_fire, :post, post_id}, socket, _callbacks) do
+    timers = socket.assigns[:auto_save_timers] || %{}
+    send_update(PostEditor, id: "post-editor-#{post_id}", action: :save)
+    {:noreply, assign(socket, :auto_save_timers, Map.delete(timers, {:post, post_id}))}
+  end
+
   def handle_info({:editor_command, action, params}, socket, callbacks) do
     {:noreply, callbacks.apply_shell_command.(socket, action, params)}
   end

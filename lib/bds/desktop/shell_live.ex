@@ -176,6 +176,7 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:output_entries, [])
      |> assign(:panel_post_links, %{backlinks: [], outlinks: []})
      |> assign(:panel_git_entries, [])
+     |> assign(:auto_save_timers, %{})
      |> reload_shell(workbench)
      |> apply_url_params(params)
      |> tap(&sync_menu_bar_locale/1)}
@@ -252,6 +253,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("select_tab", %{"type" => type, "id" => id}, socket) do
+    socket = auto_save_current_post(socket)
+
     workbench =
       Workbench.open_tab(
         socket.assigns.workbench,
@@ -270,6 +273,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("close_tab", %{"type" => type, "id" => id}, socket) do
+    socket = auto_save_current_post(socket)
+
     type_atom = BoundedAtoms.editor_route(type, :post)
     workbench = Workbench.close_tab(socket.assigns.workbench, type_atom, id)
     tab_meta = Map.delete(socket.assigns.tab_meta, {type_atom, id})
@@ -1142,6 +1147,18 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp shell_command?(action), do: not is_nil(shell_command_atom(action))
+
+  defp auto_save_current_post(
+         %{assigns: %{current_tab: %{type: :post, id: post_id}, workbench: workbench}} = socket
+       ) do
+    if Workbench.dirty?(workbench, :post, post_id) do
+      send_update(PostEditor, id: "post-editor-#{post_id}", action: :save)
+    end
+
+    socket
+  end
+
+  defp auto_save_current_post(socket), do: socket
 
   defp save_current_tab(%{assigns: %{current_tab: %{type: :post, id: post_id}}} = socket) do
     send_update(PostEditor, id: "post-editor-#{post_id}", action: :save)
