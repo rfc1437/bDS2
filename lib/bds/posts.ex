@@ -309,8 +309,11 @@ defmodule BDS.Posts do
               select: pm.media_id
           )
 
+        {:ok, translations} = Translations.list_post_translations(post.id)
+
         case Repo.delete(post) do
           {:ok, deleted_post} ->
+            Enum.each(translations, &FileSync.delete_translation_file/1)
             delete_post_file(deleted_post)
             Embeddings.remove_post(deleted_post.id)
             PostLinks.delete_post_links(deleted_post.id)

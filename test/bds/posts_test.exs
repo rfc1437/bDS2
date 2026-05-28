@@ -228,6 +228,43 @@ defmodule BDS.PostsTest do
     assert {:error, :not_found} = BDS.Posts.delete_post(post.id)
   end
 
+  test "delete_post deletes translation records and their files from disk" do
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-del-trans-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "DelTrans", data_path: temp_dir})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Parent Post",
+               content: "Body"
+             })
+
+    assert {:ok, translation} =
+             BDS.Posts.upsert_post_translation(post.id, "de", %{
+               title: "Elternbeitrag",
+               content: "Inhalt"
+             })
+
+    assert {:ok, _published} = BDS.Posts.publish_post(post.id)
+
+    published_translation = BDS.Posts.get_post_translation!(translation.id)
+    translation_path = Path.join(temp_dir, published_translation.file_path)
+    assert File.exists?(translation_path)
+
+    assert {:ok, :deleted} = BDS.Posts.delete_post(post.id)
+
+    assert BDS.Repo.get(BDS.Posts.Post, post.id) == nil
+    assert {:ok, []} = BDS.Posts.list_post_translations(post.id)
+
+    refute File.exists?(translation_path)
+  end
+
   test "delete_post returns not_found for nonexistent post" do
     assert {:error, :not_found} = BDS.Posts.delete_post(Ecto.UUID.generate())
   end
