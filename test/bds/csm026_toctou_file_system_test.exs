@@ -3,8 +3,14 @@ defmodule BDS.TOCTOU.FileSystemTest do
 
   alias BDS.Rendering.FileSystem, as: TemplateFileSystem
 
+  setup do
+    tmp_dir = Path.join(System.tmp_dir!(), "bds-toctou-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(tmp_dir)
+    on_exit(fn -> File.rm_rf(tmp_dir) end)
+    %{tmp_dir: tmp_dir}
+  end
+
   describe "try_read/2 eliminates TOCTOU race" do
-    @tag :tmp_dir
     test "reads file atomically without separate existence check", %{tmp_dir: tmp_dir} do
       File.write!(Path.join(tmp_dir, "header.liquid"), "HEADER CONTENT")
       fs = TemplateFileSystem.new(tmp_dir)
@@ -12,14 +18,12 @@ defmodule BDS.TOCTOU.FileSystemTest do
       assert {:ok, "HEADER CONTENT"} = TemplateFileSystem.try_read(fs, "header")
     end
 
-    @tag :tmp_dir
     test "returns {:error, :enoent} for missing templates", %{tmp_dir: tmp_dir} do
       fs = TemplateFileSystem.new(tmp_dir)
 
       assert {:error, :enoent} = TemplateFileSystem.try_read(fs, "nonexistent")
     end
 
-    @tag :tmp_dir
     test "falls through to next root path when first is missing", %{tmp_dir: tmp_dir} do
       root_a = Path.join(tmp_dir, "a")
       root_b = Path.join(tmp_dir, "b")
@@ -32,7 +36,6 @@ defmodule BDS.TOCTOU.FileSystemTest do
       assert {:ok, "FROM B"} = TemplateFileSystem.try_read(fs, "partial")
     end
 
-    @tag :tmp_dir
     test "first root path wins when both have the template", %{tmp_dir: tmp_dir} do
       root_a = Path.join(tmp_dir, "a")
       root_b = Path.join(tmp_dir, "b")
@@ -46,7 +49,6 @@ defmodule BDS.TOCTOU.FileSystemTest do
       assert {:ok, "FROM A"} = TemplateFileSystem.try_read(fs, "shared")
     end
 
-    @tag :tmp_dir
     test "file deleted between candidate_paths and try_read does not crash", %{tmp_dir: tmp_dir} do
       path = Path.join(tmp_dir, "ephemeral.liquid")
       File.write!(path, "TEMPORARY")
@@ -60,7 +62,6 @@ defmodule BDS.TOCTOU.FileSystemTest do
   end
 
   describe "read_template_file/2 protocol uses atomic read" do
-    @tag :tmp_dir
     test "reads existing template", %{tmp_dir: tmp_dir} do
       File.write!(Path.join(tmp_dir, "footer.liquid"), "FOOTER")
       fs = TemplateFileSystem.new(tmp_dir)
@@ -68,7 +69,6 @@ defmodule BDS.TOCTOU.FileSystemTest do
       assert "FOOTER" = Liquex.FileSystem.read_template_file(fs, "footer")
     end
 
-    @tag :tmp_dir
     test "raises on missing template", %{tmp_dir: tmp_dir} do
       fs = TemplateFileSystem.new(tmp_dir)
 
