@@ -406,35 +406,35 @@ defmodule BDS.Preview.Router do
       |> MapSet.new()
 
     project_id
-    |> load_all_published_posts()
+    |> load_previewable_posts()
     |> Enum.reject(fn post ->
       Enum.any?(post.categories || [], &MapSet.member?(excluded, &1))
     end)
   end
 
-  defp load_all_published_posts(project_id) do
+  defp load_previewable_posts(project_id) do
     Repo.all(
       from p in Post,
-        where: p.project_id == ^project_id and p.status == :published,
+        where: p.project_id == ^project_id and p.status in [:published, :draft],
         order_by: [desc: p.created_at, desc: p.published_at, asc: p.slug]
     )
   end
 
   defp load_published_posts_by_category(project_id, category) do
     project_id
-    |> load_all_published_posts()
+    |> load_previewable_posts()
     |> Enum.filter(fn post -> category in (post.categories || []) end)
   end
 
   defp load_published_posts_by_tag(project_id, tag) do
     project_id
-    |> load_all_published_posts()
+    |> load_previewable_posts()
     |> Enum.filter(fn post -> tag in (post.tags || []) end)
   end
 
   defp load_published_posts_by_year(project_id, year) do
     project_id
-    |> load_all_published_posts()
+    |> load_previewable_posts()
     |> Enum.filter(fn post ->
       {post_year, _, _} = Paths.local_date_parts!(post.created_at)
       post_year == year
@@ -443,7 +443,7 @@ defmodule BDS.Preview.Router do
 
   defp load_published_posts_by_month(project_id, year, month) do
     project_id
-    |> load_all_published_posts()
+    |> load_previewable_posts()
     |> Enum.filter(fn post ->
       {post_year, post_month, _} = Paths.local_date_parts!(post.created_at)
       post_year == year and post_month == month
@@ -452,7 +452,7 @@ defmodule BDS.Preview.Router do
 
   defp load_published_posts_by_day(project_id, year, month, day) do
     project_id
-    |> load_all_published_posts()
+    |> load_previewable_posts()
     |> Enum.filter(fn post ->
       {post_year, post_month, post_day} = Paths.local_date_parts!(post.created_at)
       post_year == year and post_month == month and post_day == day
@@ -462,7 +462,9 @@ defmodule BDS.Preview.Router do
   defp find_post_by_slug_and_date(project_id, slug, year, month, day) do
     case Repo.one(
            from p in Post,
-             where: p.project_id == ^project_id and p.slug == ^slug and p.status == :published
+             where:
+               p.project_id == ^project_id and p.slug == ^slug and
+                 p.status in [:published, :draft]
          ) do
       nil ->
         nil
@@ -481,7 +483,9 @@ defmodule BDS.Preview.Router do
   defp find_page_by_slug(project_id, slug) do
     case Repo.one(
            from p in Post,
-             where: p.project_id == ^project_id and p.slug == ^slug and p.status == :published
+             where:
+               p.project_id == ^project_id and p.slug == ^slug and
+                 p.status in [:published, :draft]
          ) do
       %Post{categories: categories} = post ->
         if "page" in (categories || []), do: post, else: nil

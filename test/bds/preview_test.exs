@@ -605,6 +605,107 @@ defmodule BDS.PreviewTest do
     assert :ok = BDS.Preview.stop_preview(project.id)
   end
 
+  test "on-demand rendering: draft post (never published) is visible and uses DB content", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Pure Draft",
+               content: "Draft-only content",
+               language: "en"
+             })
+
+    assert post.status == :draft
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    datetime = DateTime.from_unix!(post.created_at, :millisecond)
+    y = Integer.to_string(datetime.year)
+    m = String.pad_leading(Integer.to_string(datetime.month), 2, "0")
+    d = String.pad_leading(Integer.to_string(datetime.day), 2, "0")
+
+    assert {:ok, %{body: html, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/#{y}/#{m}/#{d}/#{post.slug}")
+
+    assert html =~ "Pure Draft"
+    assert html =~ "Draft-only content"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "on-demand rendering: published-then-edited post shows draft DB content over file", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Published Then Edited",
+               content: "Original content",
+               language: "en"
+             })
+
+    assert {:ok, published} = Posts.publish_post(post.id)
+
+    {:ok, edited} =
+      Posts.update_post(published.id, %{
+        title: "Edited Title",
+        content: "Edited draft content"
+      })
+
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    datetime = DateTime.from_unix!(edited.created_at, :millisecond)
+    y = Integer.to_string(datetime.year)
+    m = String.pad_leading(Integer.to_string(datetime.month), 2, "0")
+    d = String.pad_leading(Integer.to_string(datetime.day), 2, "0")
+
+    assert {:ok, %{body: html, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/#{y}/#{m}/#{d}/#{edited.slug}")
+
+    assert html =~ "Edited Title"
+    assert html =~ "Edited draft content"
+    refute html =~ "Original content"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "on-demand rendering: draft posts appear in home listing", %{project: project} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, _draft} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Draft In List",
+               content: "Draft list body",
+               language: "en"
+             })
+
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: html, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/")
+
+    assert html =~ "Draft In List"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
   test "preview query params can override the rendered theme for generated and draft pages", %{
     project: project
   } do
