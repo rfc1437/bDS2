@@ -3,6 +3,7 @@
 /deps/
 /dist/
 /doc/
+/tmp/
 /.elixir_ls/
 /erl_crash.dump
 /node_modules/
