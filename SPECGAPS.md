@@ -15,7 +15,7 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 | A1-3 | ~~Publish must delete old file when path changes~~ | engine_side_effects.allium:73-74 | `publish_post` now deletes old file when `file_path` changes | **Resolved:** old file deletion added to `publish_post/1` in posts.ex, test added |
 | A1-4 | ~~`doNotTranslate: false` written to frontmatter despite "only when true"~~ | frontmatter.allium:398 | `file_sync.ex:78` now converts false→nil so serializer omits the key | **Resolved:** doNotTranslate omitted from frontmatter when false, test added |
 | A1-5 | ~~Auto-save after 3000ms idle~~ | editor_post.allium:183-188 | PostEditor schedules auto-save via parent timer on dirty change | **Resolved:** 3000ms idle auto-save timer in Bridges, tab-switch save in ShellLive, cancel on manual save, 3 tests added |
-| A1-6 | On-demand rendering in preview server | preview.allium:53-93 | Server serves static pre-generated files | Fix code: implement on-demand template rendering for post/archive/language routes |
+| A1-6 | ~~On-demand rendering in preview server~~ | preview.allium:53-93 | `Preview.Router` matches post/archive/home/language routes and renders on-demand via `Rendering` | **Resolved:** `Preview.Router` implements on-demand template rendering for post, archive, home, date, tag, category, page, and language-prefixed routes; static file fallback retained for non-HTML assets (pagefind, feeds); 6 tests added |
 | A1-7 | Template lookup must use all 4 levels (post→tag→category→default) | template_context.allium:267-277 | Only levels 1 and 4 implemented; tag/category fallback unused | Fix code: implement levels 2-3 in template_selection.ex |
 | A1-8 | `ValidateLiquid`/`ValidateScript` before publish | template.allium:110, script.allium:165 | No validation gate before publish | Fix code: add validation step before publish |
 | A1-9 | 17 preset colors + custom hex in tag picker | editor_tags.allium | Native `<input type="color">`, no preset palette | Fix code: implement preset color palette popover |
@@ -23,6 +23,7 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 | A1-11 | Graceful shutdown with inflight request tracking | preview.allium:47-48 | Kills acceptor process, no inflight tracking | Fix code: track inflight requests, drain before shutdown |
 | A1-12 | Real Pagefind integration for search | generation.allium:208 | Stub only: `pagefind-ui.js` is one-liner, `PagefindUI` never defined, search-runtime.js silently bails, client-side search non-functional | Fix code: bundle real Pagefind, build proper fragment index, wire PagefindUI |
 | A1-13 | Git sidebar shows only "Working tree" placeholder | sidebar_views.allium:651-770 | `sidebar.ex:782-798` returns single entity_list item; `BDS.Git` has full status/diff/commit/history/fetch/pull/push/prune_lfs but sidebar doesn't use it | Fix code: wire sidebar `git_view/0` to `BDS.Git` — render branch, ahead/behind, status file list, commit input, history entries, action buttons per spec |
+| A1-14 | Embedding uses TF-IDF hash projection instead of real neural model | embedding.allium:44-53, invariants ModelCaching/VectorCacheInDb | `backends/in_app.ex` hashes terms into sparse vectors via `:erlang.phash2`; no ONNX model, no `"query: "` prefix, no mean pooling, vectors stored as JSON text not Float32Array BLOB, snapshot-based neighbor lookup instead of USearch HNSW index | Fix code: (1) add Bumblebee + ONNX runtime deps to run `Xenova/multilingual-e5-small`, (2) implement lazy model download + cache in app data dir, (3) `"query: "` prefix + mean pooling + L2 norm in backend, (4) store vectors as binary BLOB (1536 bytes), (5) replace JSON snapshot with USearch HNSW index (cosine, M=16, ef=128/64, 5s debounce), (6) cross-language semantic similarity must work |
 
 ### A2. Spec Should Update (code is normative)
 
@@ -182,7 +183,7 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 
 ## Priority Order for Resolution
 
-1. **A1-1 through A1-12** — code must follow spec (includes auto-save, on-demand preview, template lookup, validation gates, real Pagefind, graceful shutdown)
+1. **A1-1 through A1-14** — code must follow spec (includes auto-save, on-demand preview, template lookup, validation gates, real Pagefind, graceful shutdown, real embedding model)
 2. **D1-1 through D1-18** — untested invariants/guarantees
 3. **C-1 through C-3** — internal spec inconsistencies (reconcile to code)
 4. **B1-1 through B1-6** — major code behaviors missing from spec

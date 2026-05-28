@@ -66,14 +66,20 @@ defmodule BDS.PreviewTest do
     assert server.port == 4123
     assert server.is_running == true
 
-    assert {:ok, %{body: "<html>home</html>", content_type: "text/html"}} =
+    assert {:ok, %{body: home_html, content_type: "text/html"}} =
              BDS.Preview.request(project.id, "/")
 
-    assert {:ok, %{body: "<html>startseite</html>", content_type: "text/html"}} =
+    assert home_html =~ "<html"
+
+    assert {:ok, %{body: de_html, content_type: "text/html"}} =
              BDS.Preview.request(project.id, "/de/")
 
-    assert {:ok, %{body: "<html>tag archive</html>", content_type: "text/html"}} =
+    assert de_html =~ "<html"
+
+    assert {:ok, %{body: tag_html, content_type: "text/html"}} =
              BDS.Preview.request(project.id, "/tag/elixir")
+
+    assert tag_html =~ "<html"
 
     assert {:ok, %{body: "console.log('pagefind')", content_type: "application/javascript"}} =
              BDS.Preview.request(project.id, "/pagefind/pagefind-ui.js")
@@ -381,9 +387,6 @@ defmodule BDS.PreviewTest do
                blog_languages: ["en"]
              })
 
-    assert {:ok, _} =
-             Generation.write_generated_file(project.id, "index.html", "<html>http home</html>")
-
     assert {:ok, post} =
              Posts.create_post(%{
                project_id: project.id,
@@ -399,7 +402,7 @@ defmodule BDS.PreviewTest do
                body_format: :binary
              )
 
-    assert body == "<html>http home</html>"
+    assert body =~ "<html"
 
     assert Enum.any?(headers, fn {name, value} ->
              String.downcase(to_string(name)) == "content-type" and
@@ -417,6 +420,187 @@ defmodule BDS.PreviewTest do
              )
 
     assert draft_body =~ "Draft over HTTP"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "on-demand rendering: published post route renders via template without generated files", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "On-Demand Post",
+               content: "**Rendered** on demand",
+               language: "en"
+             })
+
+    assert {:ok, published} = Posts.publish_post(post.id)
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    datetime = DateTime.from_unix!(published.created_at, :millisecond)
+    y = Integer.to_string(datetime.year)
+    m = String.pad_leading(Integer.to_string(datetime.month), 2, "0")
+    d = String.pad_leading(Integer.to_string(datetime.day), 2, "0")
+
+    assert {:ok, %{body: html, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/#{y}/#{m}/#{d}/#{published.slug}")
+
+    assert html =~ "On-Demand Post"
+    assert html =~ "<strong>Rendered</strong> on demand"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "on-demand rendering: home page renders published posts as list without generated files", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"],
+               max_posts_per_page: 10
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Home Listed Post",
+               content: "Listed body",
+               language: "en"
+             })
+
+    assert {:ok, _published} = Posts.publish_post(post.id)
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: html, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/")
+
+    assert html =~ "Home Listed Post"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "on-demand rendering: category archive renders filtered posts", %{project: project} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Article Post",
+               content: "Article body",
+               language: "en",
+               categories: ["article"]
+             })
+
+    assert {:ok, _published} = Posts.publish_post(post.id)
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: html, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/category/article")
+
+    assert html =~ "Article Post"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "on-demand rendering: tag archive renders filtered posts", %{project: project} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Tagged Post",
+               content: "Tagged body",
+               language: "en",
+               tags: ["elixir"]
+             })
+
+    assert {:ok, _published} = Posts.publish_post(post.id)
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: html, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/tag/elixir")
+
+    assert html =~ "Tagged Post"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "on-demand rendering: language-prefixed route renders with translation overlay", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en", "de"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "English Post",
+               content: "English body",
+               language: "en"
+             })
+
+    assert {:ok, _published} = Posts.publish_post(post.id)
+
+    assert {:ok, _translation} =
+             Posts.upsert_post_translation(post.id, "de", %{
+               title: "Deutscher Beitrag",
+               content: "Deutscher Inhalt"
+             })
+
+    assert {:ok, _pub_translation} = Posts.publish_post_translation(post.id, "de")
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: html, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/de/")
+
+    assert html =~ "Deutscher Beitrag"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "on-demand rendering: year archive renders date-filtered posts", %{project: project} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Dated Post",
+               content: "Dated body",
+               language: "en"
+             })
+
+    assert {:ok, published} = Posts.publish_post(post.id)
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    datetime = DateTime.from_unix!(published.created_at, :millisecond)
+
+    assert {:ok, %{body: html, content_type: "text/html"}} =
+             BDS.Preview.request(project.id, "/#{datetime.year}")
+
+    assert html =~ "Dated Post"
 
     assert :ok = BDS.Preview.stop_preview(project.id)
   end

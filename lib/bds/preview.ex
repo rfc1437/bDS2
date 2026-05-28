@@ -154,24 +154,39 @@ defmodule BDS.Preview do
 
       :error ->
         with {:ok, relative_path, kind} <- route_request(request_path) do
-          full_path =
-            case kind do
-              :media -> safe_join(server.data_dir, Path.join(["media", relative_path]))
-              :generated -> safe_join(Path.join(server.data_dir, "html"), relative_path)
-            end
+          case kind do
+            :media ->
+              serve_file(safe_join(server.data_dir, Path.join(["media", relative_path])),
+                server: server, query_params: query_params)
 
-          case full_path do
-            {:error, :not_found} ->
-              {:error, :not_found}
+            :generated ->
+              case BDS.Preview.Router.render_route(server.project_id, request_path) do
+                {:ok, response} ->
+                  {:ok, apply_response_overrides(response, query_params)}
 
-            resolved_path ->
-              case read_response(resolved_path) do
-                {:error, :not_found} -> render_not_found_response(server.project_id, query_params)
-                {:ok, response} -> {:ok, apply_response_overrides(response, query_params)}
-                other -> other
+                :not_matched ->
+                  serve_file(safe_join(Path.join(server.data_dir, "html"), relative_path),
+                    server: server, query_params: query_params)
               end
           end
         end
+    end
+  end
+
+  defp serve_file({:error, :not_found}, opts) do
+    render_not_found_response(opts[:server].project_id, opts[:query_params])
+  end
+
+  defp serve_file(resolved_path, opts) do
+    case read_response(resolved_path) do
+      {:error, :not_found} ->
+        render_not_found_response(opts[:server].project_id, opts[:query_params])
+
+      {:ok, response} ->
+        {:ok, apply_response_overrides(response, opts[:query_params])}
+
+      other ->
+        other
     end
   end
 
