@@ -12,7 +12,7 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 |---|---|---|---|---|
 | A1-1 | ~~No `archived→draft` or `archived→published` transition~~ | post.allium:121-122 | `unarchive_post/1` implemented, `publish_post` already handled archived→published | **Resolved:** `unarchive_post/1` in posts.ex restores content from disk, UI wired via quick actions, 4 tests added |
 | A1-2 | ~~`DeletePost` must delete translations + translation files~~ | post.allium:209-212 | `delete_post/1` now fetches translations before cascade-delete and removes their files from disk | **Resolved:** translation file cleanup added to `delete_post/1` in posts.ex, test added |
-| A1-3 | Publish must delete old file when path changes | engine_side_effects.allium:73-74 | `publish_post` does not delete old file | Fix code: add old file deletion on path change |
+| A1-3 | ~~Publish must delete old file when path changes~~ | engine_side_effects.allium:73-74 | `publish_post` now deletes old file when `file_path` changes | **Resolved:** old file deletion added to `publish_post/1` in posts.ex, test added |
 | A1-4 | `doNotTranslate: false` written to frontmatter despite "only when true" | frontmatter.allium:398 | `lib/bds/frontmatter.ex:38-39` writes false | Fix code: omit `doNotTranslate` when false |
 | A1-5 | Auto-save after 3000ms idle | editor_post.allium:183-188 | No auto-save timer | Fix code: implement auto-save on idle + unmount + tab switch |
 | A1-6 | On-demand rendering in preview server | preview.allium:53-93 | Server serves static pre-generated files | Fix code: implement on-demand template rendering for post/archive/language routes |

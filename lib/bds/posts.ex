@@ -171,6 +171,10 @@ defmodule BDS.Posts do
             serialize_post_file(%{post | updated_at: updated_at, content: body}, published_at)
           )
 
+        if post.file_path != "" and post.file_path != relative_path do
+          delete_post_file(post)
+        end
+
         post
         |> Post.changeset(%{
           status: :published,

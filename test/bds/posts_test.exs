@@ -188,6 +188,39 @@ defmodule BDS.PostsTest do
     refute File.exists?(full_path <> ".tmp")
   end
 
+  test "publish_post deletes old file when file path changes", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Moving Post",
+               content: "Body"
+             })
+
+    assert {:ok, published} = BDS.Posts.publish_post(post.id)
+    new_path = Path.join(temp_dir, published.file_path)
+    assert File.exists?(new_path)
+
+    old_relative = "posts/1999/01/moving-post.md"
+    old_full = Path.join(temp_dir, old_relative)
+    File.mkdir_p!(Path.dirname(old_full))
+    File.write!(old_full, "stale content")
+
+    import Ecto.Query
+    BDS.Repo.update_all(
+      from(p in BDS.Posts.Post, where: p.id == ^published.id),
+      set: [file_path: old_relative, content: "edited body"]
+    )
+
+    assert {:ok, republished} = BDS.Posts.publish_post(published.id)
+    assert republished.file_path == published.file_path
+
+    assert File.exists?(Path.join(temp_dir, republished.file_path))
+    refute File.exists?(old_full)
+  end
+
   test "delete_post removes the database row and published markdown file when present" do
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-post-delete-#{System.unique_integer([:positive])}")
