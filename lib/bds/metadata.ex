@@ -13,6 +13,9 @@ defmodule BDS.Metadata do
   @default_categories ["article", "aside", "page", "picture"]
   @min_posts_per_page 1
   @max_posts_per_page 500
+  @default_image_import_concurrency 4
+  @min_image_import_concurrency 1
+  @max_image_import_concurrency 8
   @supported_pico_themes MapSet.new([
                            "default",
                            "amber",
@@ -70,6 +73,7 @@ defmodule BDS.Metadata do
         :main_language,
         :default_author,
         :max_posts_per_page,
+        :image_import_concurrency,
         :blogmark_category,
         :pico_theme,
         :semantic_similarity_enabled,
@@ -238,6 +242,8 @@ defmodule BDS.Metadata do
       default_author: Map.get(project_metadata, "default_author"),
       max_posts_per_page:
         Map.get(project_metadata, "max_posts_per_page", @default_max_posts_per_page),
+      image_import_concurrency:
+        Map.get(project_metadata, "image_import_concurrency", @default_image_import_concurrency),
       blogmark_category: Map.get(project_metadata, "blogmark_category"),
       pico_theme: Map.get(project_metadata, "pico_theme"),
       semantic_similarity_enabled:
@@ -274,6 +280,8 @@ defmodule BDS.Metadata do
       default_author: Map.get(project_metadata, "default_author"),
       max_posts_per_page:
         Map.get(project_metadata, "max_posts_per_page", @default_max_posts_per_page),
+      image_import_concurrency:
+        Map.get(project_metadata, "image_import_concurrency", @default_image_import_concurrency),
       blogmark_category: Map.get(project_metadata, "blogmark_category"),
       pico_theme: Map.get(project_metadata, "pico_theme"),
       semantic_similarity_enabled:
@@ -293,6 +301,7 @@ defmodule BDS.Metadata do
       main_language: nil,
       default_author: nil,
       max_posts_per_page: @default_max_posts_per_page,
+      image_import_concurrency: @default_image_import_concurrency,
       blogmark_category: nil,
       pico_theme: nil,
       semantic_similarity_enabled: false,
@@ -308,6 +317,8 @@ defmodule BDS.Metadata do
       main_language: normalize_optional_language(attr(attrs, :main_language)),
       default_author: attr(attrs, :default_author),
       max_posts_per_page: normalize_posts_per_page(attr(attrs, :max_posts_per_page)),
+      image_import_concurrency:
+        normalize_image_import_concurrency(attr(attrs, :image_import_concurrency)),
       blogmark_category: attr(attrs, :blogmark_category),
       pico_theme: normalize_pico_theme(attr(attrs, :pico_theme)),
       semantic_similarity_enabled: attr(attrs, :semantic_similarity_enabled) || false,
@@ -342,6 +353,7 @@ defmodule BDS.Metadata do
       "main_language" => project_metadata.main_language,
       "default_author" => project_metadata.default_author,
       "max_posts_per_page" => project_metadata.max_posts_per_page,
+      "image_import_concurrency" => project_metadata.image_import_concurrency,
       "blogmark_category" => project_metadata.blogmark_category,
       "pico_theme" => project_metadata.pico_theme,
       "semantic_similarity_enabled" => project_metadata.semantic_similarity_enabled,
@@ -429,6 +441,8 @@ defmodule BDS.Metadata do
       "main_language" => Map.get(payload, "mainLanguage"),
       "default_author" => Map.get(payload, "defaultAuthor"),
       "max_posts_per_page" => Map.get(payload, "maxPostsPerPage", @default_max_posts_per_page),
+      "image_import_concurrency" =>
+        Map.get(payload, "imageImportConcurrency", @default_image_import_concurrency),
       "blogmark_category" => Map.get(payload, "blogmarkCategory"),
       "pico_theme" => Map.get(payload, "picoTheme"),
       "semantic_similarity_enabled" => Map.get(payload, "semanticSimilarityEnabled", false),
@@ -505,6 +519,8 @@ defmodule BDS.Metadata do
       "defaultAuthor" => Map.get(project_metadata, "default_author"),
       "maxPostsPerPage" =>
         Map.get(project_metadata, "max_posts_per_page", @default_max_posts_per_page),
+      "imageImportConcurrency" =>
+        Map.get(project_metadata, "image_import_concurrency", @default_image_import_concurrency),
       "blogmarkCategory" => Map.get(project_metadata, "blogmark_category"),
       "picoTheme" => Map.get(project_metadata, "pico_theme"),
       "semanticSimilarityEnabled" =>
@@ -575,6 +591,23 @@ defmodule BDS.Metadata do
   end
 
   defp normalize_posts_per_page(_value), do: @default_max_posts_per_page
+
+  defp normalize_image_import_concurrency(nil), do: @default_image_import_concurrency
+
+  defp normalize_image_import_concurrency(value) when is_integer(value) do
+    value
+    |> max(@min_image_import_concurrency)
+    |> min(@max_image_import_concurrency)
+  end
+
+  defp normalize_image_import_concurrency(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {integer, ""} -> normalize_image_import_concurrency(integer)
+      _ -> @default_image_import_concurrency
+    end
+  end
+
+  defp normalize_image_import_concurrency(_value), do: @default_image_import_concurrency
 
   defp normalize_optional_language(nil), do: nil
   defp normalize_optional_language(""), do: nil

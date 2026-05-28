@@ -5,13 +5,14 @@ defmodule BDS.Desktop.ShellLive do
 
   import Phoenix.HTML
 
-  alias BDS.{AI, BoundedAtoms}
+  alias BDS.{AI, BoundedAtoms, Metadata}
   alias BDS.CliSync.Watcher
-  alias BDS.Desktop.{ExternalLinks, FolderPicker, ShellData, UILocale}
+  alias BDS.Desktop.{ExternalLinks, FilePicker, FolderPicker, ShellData, UILocale}
 
   alias BDS.Desktop.ShellLive.{
     Bridges,
     ChatEditor,
+    GalleryImport,
     ImportEditor,
     MediaEditor,
     MenuEditor,
@@ -399,6 +400,41 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("overlay_lightbox_next", params, socket),
     do: OverlayManager.handle_event("overlay_lightbox_next", params, socket, overlay_callbacks())
 
+  def handle_event("add_gallery_images", %{"post-id" => post_id}, socket) do
+    if socket.assigns.offline_mode do
+      {:noreply,
+       append_output_entry(
+         socket,
+         dgettext("ui", "Add Gallery Images"),
+         dgettext("ui", "Automatic AI actions stay gated by airplane mode."),
+         nil,
+         "info"
+       )}
+    else
+      project_id = socket.assigns.projects.active_project_id
+      {:ok, metadata} = Metadata.get_project_metadata(project_id)
+      concurrency_limit = metadata.image_import_concurrency
+      language = metadata.main_language || "en"
+      parent = self()
+
+      Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
+        case FilePicker.choose_files(dgettext("ui", "Add Gallery Images"),
+               image_only: true, multiple: true) do
+          {:ok, paths} when is_list(paths) and paths != [] ->
+            GalleryImport.start(paths, project_id, post_id, language, concurrency_limit, parent)
+
+          :cancel ->
+            send(parent, {:add_images_cancelled})
+
+          {:error, reason} ->
+            send(parent, {:add_images_error, reason})
+        end
+      end)
+
+      {:noreply, assign(socket, :gallery_import_post_id, post_id)}
+    end
+  end
+
   def handle_event("toggle_project_menu", _params, socket) do
     {:noreply, assign(socket, :project_menu_open, not socket.assigns.project_menu_open)}
   end
@@ -578,6 +614,68 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_info({:ai_suggestions_error, type, id, reason}, socket) do
     OverlayManager.handle_info({:ai_suggestions_error, type, id, reason}, socket)
+  end
+
+  def handle_info({:add_image_processed, title}, socket) do
+    {:noreply,
+     append_output_entry(socket, dgettext("ui", "Add Gallery Images"), dgettext("ui", "Added %{title}", title: title), nil, "info")}
+  end
+
+  def handle_info({:add_images_complete, count}, socket) do
+    post_id = socket.assigns[:gallery_import_post_id]
+
+    socket =
+      if is_binary(post_id) do
+        send_update(PostEditor,
+          id: "post-editor-#{post_id}",
+          action: :insert_content,
+          content: "\n[[gallery]]\n"
+        )
+
+        send_update(PostEditor,
+          id: "post-editor-#{post_id}",
+          action: :refresh
+        )
+
+        socket
+        |> assign(:gallery_import_post_id, nil)
+      else
+        socket
+      end
+
+    {:noreply,
+     socket
+     |> append_output_entry(
+       dgettext("ui", "Add Gallery Images"),
+       dgettext("ui", "Added %{count} images to post", count: count),
+       nil,
+       "info"
+     )}
+  end
+
+  def handle_info({:add_images_error, reason}, socket) do
+    {:noreply,
+     append_output_entry(socket, dgettext("ui", "Add Gallery Images"), inspect(reason), nil, "error")}
+  end
+
+  def handle_info({:add_image_error, path, reason}, socket) do
+    {:noreply,
+     append_output_entry(
+       socket,
+       dgettext("ui", "Add Gallery Images"),
+       dgettext("ui", "Failed to process %{path}: %{reason}", path: Path.basename(path), reason: inspect(reason)),
+       nil,
+       "error"
+     )}
+  end
+
+  def handle_info({:add_images_cancelled}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_info({:test_ping, caller, ref}, socket) do
+    send(caller, {:test_pong, ref})
+    {:noreply, socket}
   end
 
   def handle_info(message, socket) do

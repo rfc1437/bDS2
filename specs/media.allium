@@ -203,3 +203,27 @@ invariant SidecarRoundtrip {
         parse_sidecar(m.sidecar_path).caption = m.caption
         parse_sidecar(m.sidecar_path).tags = m.tags
 }
+
+rule BatchImportProcessLinkImages {
+    when: BatchImportImagesRequested(project, post, file_paths, language)
+    requires: not OfflineMode
+    for source_path in file_paths where is_image(source_path):
+        let media = ImportMedia(source_path, project)
+        let analysis = AnalyzeImage(media, language)
+        ensures: MediaUpdated(media, analysis)
+        ensures: PostMediaLinked(media, post)
+    @guidance
+        -- Triggered from post editor quick action "Add Gallery Images".
+        -- AI results auto-applied without user confirmation.
+        -- After metadata is set, media is auto-translated to all configured blog languages.
+        -- Non-image files skipped entirely.
+        -- Concurrency limit from project metadata image_import_concurrency (default 4, min 1, max 8).
+        -- Toast per completed image + final summary toast.
+        -- On completion: [[gallery]] macro inserted into post content and post editor refreshed.
+}
+
+config {
+    batch_image_import_concurrency_default: Integer = 4
+    batch_image_import_concurrency_min: Integer = 1
+    batch_image_import_concurrency_max: Integer = 8
+}

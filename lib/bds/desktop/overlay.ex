@@ -35,7 +35,8 @@ defmodule BDS.Desktop.Overlay do
       title: Map.get(context, :insert_media_title, "Insert Media"),
       search_query: "",
       results: Enum.map(media, &to_insert_media_result/1),
-      all_media: media
+      all_media: media,
+      post_id: current_id(context)
     }
   end
 

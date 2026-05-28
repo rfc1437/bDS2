@@ -3998,7 +3998,7 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element("[data-testid='chat-send-button']")
       |> render_click()
 
-    send(view.pid, {
+    send_and_await(view, {
       :chat_tool_call,
       conversation.id,
       %{
@@ -4245,14 +4245,14 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(class="chat-input chat-surface-input ui-textarea")
 
     css = desktop_css_source()
-    assert css =~ "--chat-input-line-height: 20px;"
-    assert css =~ "--chat-input-min-height: 20px;"
+    assert css =~ "--chat-input-line-height: 22px;"
+    assert css =~ "--chat-input-min-height: 24px;"
     assert css =~ ".chat-panel .chat-input-container"
-    assert css =~ "padding: 8px 16px;"
+    assert css =~ "padding: 12px 16px;"
     assert css =~ "padding: 6px 8px;"
     assert css =~ ".chat-panel .chat-input-wrapper"
-    assert css =~ "min-height: 30px;"
-    assert css =~ "padding: 4px 6px;"
+    assert css =~ "min-height: 40px;"
+    assert css =~ "padding: 6px 8px;"
     assert css =~ ".chat-panel .chat-input"
     assert css =~ "box-sizing: border-box;"
     assert css =~ "margin: 0;"
@@ -4565,7 +4565,7 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert assistant_index < user_index
     assert html =~ ~r/<textarea[^>]*class="chat-input chat-surface-input ui-textarea"[^>]*disabled/
 
-    send(view.pid, {
+    send_and_await(view, {
       :chat_tool_call,
       conversation.id,
       %{
@@ -4629,10 +4629,12 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> element(".chat-input-wrapper")
       |> render_change(%{"message" => "Newest question"})
 
-    _html =
+    html =
       view
       |> element("[data-testid='chat-send-button']")
       |> render_click()
+
+    assert html =~ ~s(data-testid="chat-streaming-thinking")
 
     assert Enum.count(AI.list_chat_messages(conversation.id), fn message ->
              message.role == :user and message.content == "Newest question"
@@ -4660,7 +4662,9 @@ defmodule BDS.Desktop.ShellLiveTest do
       })
     )
 
-    send(view.pid, {
+    _ensure_sync = render(view)
+
+    send_and_await(view, {
       :chat_tool_call,
       conversation.id,
       %{
@@ -4929,6 +4933,20 @@ defmodule BDS.Desktop.ShellLiveTest do
     run_git!(project_dir, ["config", "user.email", "tests@example.com"])
     run_git!(project_dir, ["add", "-A"])
     run_git!(project_dir, ["commit", "-m", message])
+  end
+
+  # Sends a message to the LiveView and blocks until it has been processed.
+  # Uses a test ping/pong to guarantee the message was handled before returning.
+  defp send_and_await(view, message) do
+    ref = make_ref()
+    send(view.pid, message)
+    send(view.pid, {:test_ping, self(), ref})
+
+    receive do
+      {:test_pong, ^ref} -> :ok
+    after
+      5000 -> raise "LiveView did not process messages within 5s"
+    end
   end
 
   defp run_git!(dir, args) do

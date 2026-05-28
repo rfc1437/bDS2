@@ -3,7 +3,14 @@ defmodule BDS.Rendering.Filters do
 
   use Liquex.Filter
 
+  import Ecto.Query
+
   alias BDS.Slug
+  alias BDS.{Repo}
+  alias BDS.Media.Media, as: MediaRecord
+  alias BDS.Posts.{Post, PostMedia}
+  alias BDS.Tags.Tag
+  require Logger
 
   @spec i18n(term(), String.t(), Liquex.Context.t()) :: String.t()
   def i18n(value, language, _context) do
@@ -28,7 +35,7 @@ defmodule BDS.Rendering.Filters do
         ) :: String.t()
   def markdown(
         value,
-        _post_id,
+        post_id,
         _post_data_json_by_id,
         canonical_post_paths,
         canonical_media_paths,
@@ -36,15 +43,15 @@ defmodule BDS.Rendering.Filters do
         _language_prefix,
         context
       ) do
-    render_markdown(value, canonical_post_paths, canonical_media_paths, language, context)
+    render_markdown(value, canonical_post_paths, canonical_media_paths, language, context, post_id)
   end
 
-  @spec render_markdown(term(), map() | nil, map() | nil, String.t(), Liquex.Context.t()) ::
+  @spec render_markdown(term(), map() | nil, map() | nil, String.t(), Liquex.Context.t(), term()) ::
           String.t()
-  def render_markdown(value, canonical_post_paths, canonical_media_paths, language, context) do
+  def render_markdown(value, canonical_post_paths, canonical_media_paths, language, context, post_id \\ nil) do
     value
     |> to_string()
-    |> replace_built_in_macros(language, context)
+    |> replace_built_in_macros(language, context, post_id)
     |> render_markdown_html()
     |> rewrite_rendered_html_urls(canonical_post_paths || %{}, canonical_media_paths || %{})
   end
@@ -56,7 +63,7 @@ defmodule BDS.Rendering.Filters do
     |> Slug.slugify()
   end
 
-  defp replace_built_in_macros(content, language, context) do
+  defp replace_built_in_macros(content, language, context, post_id) do
     Regex.replace(~r/\[\[(\w+)(?:\s+([^\]]+))?\]\]/, content, fn full_match,
                                                                  macro_name,
                                                                  raw_params ->
@@ -87,6 +94,15 @@ defmodule BDS.Rendering.Filters do
             },
             context
           )
+
+        "gallery" ->
+          render_gallery_macro(context, params, post_id)
+
+        "photo_archive" ->
+          render_photo_archive_macro(context, params)
+
+        "tag_cloud" ->
+          render_tag_cloud_macro(context, params)
 
         _other ->
           full_match
@@ -127,23 +143,14 @@ defmodule BDS.Rendering.Filters do
   end
 
   defp render_macro_template(template_path, assigns, context) do
-    case Map.get(assigns, "id") do
-      "" ->
+    case BDS.Rendering.FileSystem.try_read(context.file_system, template_path) do
+      {:ok, template_source} ->
+        render_macro_source(template_path, template_source, assigns, context)
+
+      {:error, :enoent} ->
+        require Logger
+        Logger.warning("Macro template not found: #{template_path}")
         ""
-
-      nil ->
-        ""
-
-      _id ->
-        case BDS.Rendering.FileSystem.try_read(context.file_system, template_path) do
-          {:ok, template_source} ->
-            render_macro_source(template_path, template_source, assigns, context)
-
-          {:error, :enoent} ->
-            require Logger
-            Logger.warning("Macro template not found: #{template_path}")
-            ""
-        end
     end
   end
 
@@ -285,4 +292,307 @@ defmodule BDS.Rendering.Filters do
 
   defp ensure_leading_slash("/" <> _rest = path), do: path
   defp ensure_leading_slash(path), do: "/" <> path
+
+  # ── Built-in macro renderers ───────────────────────────────────────────────
+
+  defp render_gallery_macro(context, params, post_id) when is_binary(post_id) do
+    columns = normalize_columns(Map.get(params, "columns", "3"), 3, 1, 6)
+    caption = Map.get(params, "caption")
+
+    items =
+      post_id
+      |> linked_media_images()
+      |> Enum.map(fn media ->
+        %{
+          "media_path" => "/#{media.file_path}",
+          "title" => media.title || media.original_name,
+          "alt" => media.alt || media.title || media.original_name,
+          "group_name" => post_id
+        }
+      end)
+
+    render_macro_template(
+      "macros/gallery",
+      %{
+        "columns" => columns,
+        "post_id" => post_id,
+        "items" => items,
+        "caption" => caption,
+        "empty_label" =>
+          BDS.Gettext.lgettext(
+            Access.get(context, "language") || "en",
+            "render",
+            "No images"
+          )
+      },
+      context
+    )
+  end
+
+  defp render_gallery_macro(context, params, _post_id) do
+    render_macro_template(
+      "macros/gallery",
+      %{
+        "columns" => normalize_columns(Map.get(params, "columns", "3"), 3, 1, 6),
+        "post_id" => "",
+        "items" => [],
+        "caption" => Map.get(params, "caption"),
+        "empty_label" =>
+          BDS.Gettext.lgettext(
+            Access.get(context, "language") || "en",
+            "render",
+            "No images"
+          )
+      },
+      context
+    )
+  end
+
+  defp render_photo_archive_macro(context, params) do
+    language = Access.get(context, "language") || "en"
+    project_id = project_id_from_context(context)
+
+    months =
+      if project_id do
+        media_month_archive(project_id, Map.get(params, "year"), Map.get(params, "month"))
+      else
+        []
+      end
+
+    render_macro_template(
+      "macros/photo-archive",
+      %{
+        "root_classes" => "macro-photo-archive",
+        "data_attrs" => [],
+        "months" => months,
+        "empty_label" =>
+          BDS.Gettext.lgettext(language, "render", "No photos found")
+      },
+      context
+    )
+  end
+
+  defp render_tag_cloud_macro(context, params) do
+    language = Access.get(context, "language") || "en"
+    project_id = project_id_from_context(context)
+
+    {words_json, width, height} =
+      if project_id do
+        build_tag_cloud_data(project_id)
+      else
+        {nil, 800, 400}
+      end
+
+    render_macro_template(
+      "macros/tag-cloud",
+      %{
+        "orientation" => Map.get(params, "orientation", "horizontal"),
+        "words_json" => words_json,
+        "width" => Map.get(params, "width", width),
+        "height" => Map.get(params, "height", height),
+        "aria_label" => "Tag cloud",
+        "empty_label" =>
+          BDS.Gettext.lgettext(language, "render", "No tags")
+      },
+      context
+    )
+  end
+
+  # ── Data queries for macros ────────────────────────────────────────────────
+
+  defp linked_media_images(post_id) do
+    Repo.all(
+      from pm in PostMedia,
+        join: m in MediaRecord,
+        on: pm.media_id == m.id,
+        where: pm.post_id == ^post_id,
+        where: like(m.mime_type, "image/%"),
+        order_by: [asc: pm.sort_order, asc: pm.media_id],
+        select: m
+    )
+  end
+
+  defp media_month_archive(project_id, year, month) do
+    query =
+      from m in MediaRecord,
+        where: m.project_id == ^project_id,
+        where: like(m.mime_type, "image/%"),
+        order_by: [desc: m.created_at],
+        select: m
+
+    query =
+      if year do
+        year_int = parse_integer(year)
+
+        if month do
+          month_int = parse_integer(month)
+          start_ts = month_start_ms(year_int, month_int)
+          end_ts = month_end_ms(year_int, month_int)
+
+          from m in query,
+            where: m.created_at >= ^start_ts and m.created_at <= ^end_ts
+        else
+          start_ts = month_start_ms(year_int, 1)
+          end_ts = month_end_ms(year_int, 12)
+
+          from m in query,
+            where: m.created_at >= ^start_ts and m.created_at <= ^end_ts
+        end
+      else
+        from m in query, limit: 200
+      end
+
+    media_records =
+      query
+      |> Repo.all()
+      |> group_by_media_month()
+
+    if year == nil do
+      Enum.take(media_records, 10)
+    else
+      media_records
+    end
+  end
+
+  defp group_by_media_month(media_records) do
+    month_names = %{
+      1 => "January", 2 => "February", 3 => "March", 4 => "April",
+      5 => "May", 6 => "June", 7 => "July", 8 => "August",
+      9 => "September", 10 => "October", 11 => "November", 12 => "December"
+    }
+
+    media_records
+    |> Enum.group_by(fn m ->
+      date = DateTime.from_unix!(div(m.created_at, 1000))
+      {date.year, date.month}
+    end)
+    |> Enum.sort_by(fn {{y, m}, _} -> {y, m} end, :desc)
+    |> Enum.map(fn {{year, month}, items} ->
+      %{
+        "label" => "#{Map.get(month_names, month)} #{year}",
+        "items" =>
+          Enum.map(items, fn m ->
+            %{
+              "media_path" => "/#{m.file_path}",
+              "title" => m.title || m.original_name,
+              "alt" => m.alt || m.title || m.original_name,
+              "group_name" => "#{year}-#{month}"
+            }
+          end)
+      }
+    end)
+  end
+
+  defp build_tag_cloud_data(project_id) do
+    tag_colors =
+      Repo.all(
+        from tag in Tag,
+          where: tag.project_id == ^project_id,
+          where: not is_nil(tag.color) and tag.color != "",
+          select: {tag.name, tag.color}
+      )
+      |> Map.new()
+
+    %{rows: rows} =
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        """
+        SELECT trim(je.value) AS tag, COUNT(*) AS cnt
+        FROM posts, json_each(posts.tags) je
+        WHERE posts.project_id = ?1
+          AND trim(je.value) != ''
+        GROUP BY tag
+        ORDER BY cnt DESC, lower(tag) ASC
+        """,
+        [project_id]
+      )
+
+    tag_entries =
+      Enum.map(rows, fn [tag, count] ->
+        %{tag: tag, count: count, color: Map.get(tag_colors, tag)}
+      end)
+
+    if tag_entries == [] do
+      {nil, 0, 0}
+    else
+      max_count = Enum.map(tag_entries, & &1.count) |> Enum.max()
+      min_count = Enum.map(tag_entries, & &1.count) |> Enum.min()
+      range = max(max_count - min_count, 1)
+
+      words =
+        Enum.map(tag_entries, fn %{tag: tag, count: count, color: color} ->
+          size = 12.0 + (count - min_count) / range * 28.0
+          %{"text" => tag, "size" => size, "color" => color || "var(--accent-color)"}
+        end)
+
+      {Jason.encode!(words), 800, 400}
+    end
+  end
+
+  # ── Helpers ────────────────────────────────────────────────────────────────
+
+  defp project_id_from_context(context) do
+    post = Access.get(context, "post") || %{}
+    post["project_id"] || Access.get(post, :project_id) || project_id_from_post(context)
+  end
+
+  defp project_id_from_post(context) do
+    post_id =
+      Access.get(Access.get(context, "post") || %{}, "id") ||
+        Access.get(Access.get(context, "post") || %{}, :id)
+
+    if is_binary(post_id) do
+      case Repo.one(from p in Post, where: p.id == ^post_id, select: p.project_id) do
+        nil -> nil
+        project_id -> project_id
+      end
+    end
+  end
+
+  defp normalize_columns(value, default, min, max) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, ""} -> n |> max(min) |> min(max)
+      _ -> default
+    end
+  end
+  defp normalize_columns(value, _default, min, max) when is_integer(value),
+    do: value |> max(min) |> min(max)
+  defp normalize_columns(_value, default, _min, _max), do: default
+
+  defp parse_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
+  defp parse_integer(value) when is_integer(value), do: value
+  defp parse_integer(_value), do: nil
+
+  defp month_start_ms(year, month) do
+    case DateTime.from_iso8601("#{year}-#{pad(month)}-01T00:00:00Z") do
+      {:ok, dt, _} -> DateTime.to_unix(dt, :millisecond)
+      _ -> 0
+    end
+  end
+
+  defp month_end_ms(year, month) do
+    last_day =
+      if month == 12 do
+        31
+      else
+        case DateTime.from_iso8601("#{year}-#{pad(month + 1)}-01T00:00:00Z") do
+          {:ok, dt, _} ->
+            dt |> DateTime.add(-1, :second) |> DateTime.to_date() |> Map.get(:day)
+          _ ->
+            31
+        end
+      end
+
+    case DateTime.from_iso8601("#{year}-#{pad(month)}-#{pad(last_day)}T23:59:59.999Z") do
+      {:ok, dt, _} -> DateTime.to_unix(dt, :millisecond)
+      _ -> 0
+    end
+  end
+
+  defp pad(n) when is_integer(n), do: n |> Integer.to_string() |> String.pad_leading(2, "0")
 end

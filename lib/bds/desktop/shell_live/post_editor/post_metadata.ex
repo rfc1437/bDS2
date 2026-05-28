@@ -168,11 +168,19 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
 
   @spec gallery_count(term()) :: term()
   def gallery_count(form) do
-    form
-    |> Map.get("content", "")
-    |> to_string()
-    |> then(&Regex.scan(~r/!\[[^\]]*\]\([^\)]+\)/, &1))
-    |> length()
+    content = form |> Map.get("content", "") |> to_string()
+
+    image_count =
+      content
+      |> then(&Regex.scan(~r/!\[[^\]]*\]\([^\)]+\)/, &1))
+      |> length()
+
+    gallery_macro_count =
+      content
+      |> then(&Regex.scan(~r/\[\[gallery\]\]/i, &1))
+      |> length()
+
+    max(image_count, gallery_macro_count)
   end
 
   @spec preview_url(term(), term(), term(), term()) :: term()

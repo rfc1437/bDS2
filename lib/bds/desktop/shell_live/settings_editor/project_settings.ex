@@ -22,6 +22,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings do
       "main_language" => metadata.main_language || "en",
       "default_author" => metadata.default_author || "",
       "max_posts_per_page" => Integer.to_string(metadata.max_posts_per_page),
+      "image_import_concurrency" => Integer.to_string(metadata.image_import_concurrency),
       "blogmark_category" =>
         metadata.blogmark_category ||
           List.first(metadata.categories) || "article",
@@ -71,6 +72,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings do
       main_language: blank_to_nil(Map.get(draft, "main_language")),
       default_author: blank_to_nil(Map.get(draft, "default_author")),
       max_posts_per_page: parse_integer(Map.get(draft, "max_posts_per_page"), 50),
+      image_import_concurrency: parse_integer(Map.get(draft, "image_import_concurrency"), 4),
       blogmark_category: blank_to_nil(Map.get(draft, "blogmark_category")),
       blog_languages: Map.get(draft, "blog_languages", []),
       semantic_similarity_enabled: truthy?(Map.get(draft, "semantic_similarity_enabled"))
@@ -85,6 +87,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings do
       "main_language" => Map.get(params, "main_language", "en"),
       "default_author" => Map.get(params, "default_author", ""),
       "max_posts_per_page" => Map.get(params, "max_posts_per_page", "50"),
+      "image_import_concurrency" => Map.get(params, "image_import_concurrency", "4"),
       "blogmark_category" => Map.get(params, "blogmark_category", "article"),
       "blog_languages" => List.wrap(Map.get(params, "blog_languages", [])),
       "semantic_similarity_enabled" => truthy?(Map.get(params, "semantic_similarity_enabled"))

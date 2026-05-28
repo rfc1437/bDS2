@@ -138,6 +138,7 @@ defmodule BDS.Repo.SchemaMigrationTest do
         "title",
         "model",
         "copilot_session_id",
+        "surface_state",
         "created_at",
         "updated_at"
       ],

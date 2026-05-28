@@ -83,6 +83,10 @@
               <div class="setting-control"><input class="ui-input" type="number" min="1" max="500" name="settings_project[max_posts_per_page]" value={@settings_editor.project["max_posts_per_page"]} /></div>
             </div>
             <div class="setting-row">
+              <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Image Import Concurrency") %></label></div>
+              <div class="setting-control"><input class="ui-input" type="number" min="1" max="8" name="settings_project[image_import_concurrency]" value={@settings_editor.project["image_import_concurrency"]} /></div>
+            </div>
+            <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Blogmark Category") %></label></div>
               <div class="setting-control">
                 <select class="ui-input" name="settings_project[blogmark_category]">

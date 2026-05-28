@@ -1,156 +1,156 @@
-#: lib/bds/rendering/labels.ex:17
-#: lib/bds/ui/sidebar.ex:241
-#: lib/bds/ui/sidebar.ex:316
+#: lib/bds/rendering/labels.ex:18
+#: lib/bds/ui/sidebar.ex:284
+#: lib/bds/ui/sidebar.ex:578
 #, elixir-autogen, elixir-format
 msgid "Archive"
 msgstr "Archivo"
 
-#: lib/bds/rendering/labels.ex:52
+#: lib/bds/rendering/labels.ex:54
 #, elixir-autogen, elixir-format
 msgid "April"
 msgstr "abril"
 
-#: lib/bds/rendering/labels.ex:24
+#: lib/bds/rendering/labels.ex:25
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Archive calendar"
 msgstr "Archivo"
 
-#: lib/bds/rendering/labels.ex:68
+#: lib/bds/rendering/labels.ex:70
 #, elixir-autogen, elixir-format
 msgid "August"
 msgstr "agosto"
 
-#: lib/bds/rendering/labels.ex:15
+#: lib/bds/rendering/labels.ex:16
 #, elixir-autogen, elixir-format
 msgid "Backlinks"
 msgstr "Retroenlaces"
 
-#: lib/bds/rendering/labels.ex:23
+#: lib/bds/rendering/labels.ex:24
 #, elixir-autogen, elixir-format
 msgid "Calendar data could not be loaded."
 msgstr "No se pudieron cargar los datos del calendario."
 
-#: lib/bds/rendering/labels.ex:25
+#: lib/bds/rendering/labels.ex:26
 #, elixir-autogen, elixir-format
 msgid "Close calendar"
 msgstr "Cerrar calendario"
 
-#: lib/bds/rendering/labels.ex:84
+#: lib/bds/rendering/labels.ex:86
 #, elixir-autogen, elixir-format
 msgid "December"
 msgstr "diciembre"
 
-#: lib/bds/rendering/labels.ex:44
+#: lib/bds/rendering/labels.ex:46
 #, elixir-autogen, elixir-format
 msgid "February"
 msgstr "febrero"
 
-#: lib/bds/rendering/labels.ex:40
+#: lib/bds/rendering/labels.ex:42
 #, elixir-autogen, elixir-format
 msgid "January"
 msgstr "enero"
 
-#: lib/bds/rendering/labels.ex:64
+#: lib/bds/rendering/labels.ex:66
 #, elixir-autogen, elixir-format
 msgid "July"
 msgstr "julio"
 
-#: lib/bds/rendering/labels.ex:60
+#: lib/bds/rendering/labels.ex:62
 #, elixir-autogen, elixir-format
 msgid "June"
 msgstr "junio"
 
-#: lib/bds/rendering/labels.ex:26
+#: lib/bds/rendering/labels.ex:27
 #, elixir-autogen, elixir-format
 msgid "Language"
 msgstr "Idioma"
 
-#: lib/bds/rendering/labels.ex:16
+#: lib/bds/rendering/labels.ex:17
 #, elixir-autogen, elixir-format
 msgid "Linked from"
 msgstr "Enlazado desde"
 
-#: lib/bds/rendering/labels.ex:22
+#: lib/bds/rendering/labels.ex:23
 #, elixir-autogen, elixir-format
 msgid "Loading calendar…"
 msgstr "Cargando calendario…"
 
-#: lib/bds/rendering/labels.ex:48
+#: lib/bds/rendering/labels.ex:50
 #, elixir-autogen, elixir-format
 msgid "March"
 msgstr "marzo"
 
-#: lib/bds/rendering/labels.ex:56
+#: lib/bds/rendering/labels.ex:58
 #, elixir-autogen, elixir-format
 msgid "May"
 msgstr "mayo"
 
-#: lib/bds/rendering/labels.ex:80
+#: lib/bds/rendering/labels.ex:82
 #, elixir-autogen, elixir-format
 msgid "November"
 msgstr "noviembre"
 
-#: lib/bds/rendering/labels.ex:76
+#: lib/bds/rendering/labels.ex:78
 #, elixir-autogen, elixir-format
 msgid "October"
 msgstr "octubre"
 
-#: lib/bds/rendering/labels.ex:21
+#: lib/bds/rendering/labels.ex:22
 #, elixir-autogen, elixir-format
 msgid "Open calendar"
 msgstr "Abrir calendario"
 
-#: lib/bds/rendering/labels.ex:18
+#: lib/bds/rendering/labels.ex:19
 #, elixir-autogen, elixir-format
 msgid "Pagination"
 msgstr "Paginación"
 
-#: lib/bds/rendering/labels.ex:28
+#: lib/bds/rendering/labels.ex:29
 #, elixir-autogen, elixir-format
 msgid "Search..."
 msgstr "Buscar..."
 
-#: lib/bds/rendering/labels.ex:72
+#: lib/bds/rendering/labels.ex:74
 #, elixir-autogen, elixir-format
 msgid "September"
 msgstr "septiembre"
 
-#: lib/bds/rendering/labels.ex:27
+#: lib/bds/rendering/labels.ex:28
 #, elixir-autogen, elixir-format
 msgid "Site search"
 msgstr "Buscar en el sitio"
 
-#: lib/bds/rendering/labels.ex:14
+#: lib/bds/rendering/labels.ex:15
 #, elixir-autogen, elixir-format
 msgid "Taxonomy"
 msgstr "Taxonomía"
 
-#: lib/bds/rendering/labels.ex:19
+#: lib/bds/rendering/labels.ex:20
 #, elixir-autogen, elixir-format
 msgid "newer"
 msgstr "más reciente"
 
-#: lib/bds/rendering/labels.ex:20
+#: lib/bds/rendering/labels.ex:21
 #, elixir-autogen, elixir-format
 msgid "older"
 msgstr "más antiguo"
 
-#: lib/bds/rendering/labels.ex:30
+#: lib/bds/rendering/labels.ex:31
 #, elixir-autogen, elixir-format
 msgid "Back to preview home"
 msgstr "Volver al inicio de vista previa"
 
-#: lib/bds/rendering/labels.ex:29
+#: lib/bds/rendering/labels.ex:30
 #, elixir-autogen, elixir-format
 msgid "The requested preview page could not be found."
 msgstr "No se pudo encontrar la página de vista previa solicitada."
 
-#: lib/bds/rendering/labels.ex:32
+#: lib/bds/rendering/labels.ex:33
 #, elixir-autogen, elixir-format
 msgid "Vimeo video"
 msgstr "Vídeo de Vimeo"
 
-#: lib/bds/rendering/labels.ex:31
+#: lib/bds/rendering/labels.ex:32
 #, elixir-autogen, elixir-format
 msgid "YouTube video"
 msgstr "Vídeo de YouTube"

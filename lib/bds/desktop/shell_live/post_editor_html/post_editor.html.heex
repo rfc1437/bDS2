@@ -362,6 +362,14 @@
             >
               <%= dgettext("ui", "Insert Media") %>
             </button>
+            <button
+              class="add-gallery-images-button"
+              type="button"
+              phx-click="add_gallery_images"
+              phx-value-post-id={@post_editor.id}
+            >
+              <%= dgettext("ui", "Add Gallery Images") %>
+            </button>
           <% end %>
 
           <%= if @post_editor.gallery_count > 0 do %>

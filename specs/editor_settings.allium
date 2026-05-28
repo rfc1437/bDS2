@@ -29,6 +29,7 @@ value SettingsProjectSection {
     blog_languages: List<String>        -- checkboxes (main language disabled)
     default_author: String              -- text input
     max_posts_per_page: Integer         -- number input (1-500, default 50)
+    image_import_concurrency: Integer   -- number input (1-8, default 4)
     blogmark_category: String           -- select from categories
 }
 
@@ -92,6 +93,9 @@ invariant SettingsMCPAgents {
 config {
     settings_max_posts_per_page: Integer = 500
     settings_default_posts_per_page: Integer = 50
+    settings_image_import_concurrency_default: Integer = 4
+    settings_image_import_concurrency_min: Integer = 1
+    settings_image_import_concurrency_max: Integer = 8
     settings_system_prompt_rows: Integer = 12
 }
 
@@ -131,6 +135,7 @@ surface SettingsViewSurface {
         -- Section 1: Project Name, Description (textarea 3 rows), Data Path (text + Browse + Reset),
         --   Public URL, Main Language (select), Blog Languages (checkbox grid, main disabled),
         --   Default Author, Max Posts Per Page (number 1-500),
+        --   Image Import Concurrency (number 1-8, default 4),
         --   Blogmark Category (select), Blogmark Bookmarklet (copy button), Save button.
 
     @guarantee BookmarkletCopy

@@ -10,7 +10,9 @@ defmodule BDS.Rendering.PostRendering do
   alias BDS.Rendering.TemplateSelection
   alias BDS.MapUtils
   alias BDS.Posts.Post
+  alias BDS.Posts.PostMedia
   alias BDS.Posts.Translation
+  alias BDS.Media.Media, as: MediaRecord
   alias BDS.Repo
 
   @spec post_assigns(String.t(), map()) :: map()
@@ -39,7 +41,8 @@ defmodule BDS.Rendering.PostRendering do
         canonical_post_paths,
         canonical_media_paths,
         language,
-        template_context
+        template_context,
+        post_id
       )
 
     incoming_links =
@@ -208,6 +211,7 @@ defmodule BDS.Rendering.PostRendering do
       title: MapUtils.attr(assigns, :title),
       content: MapUtils.attr(assigns, :content),
       raw_content: MapUtils.attr(assigns, :raw_content),
+      project_id: MapUtils.attr(assigns, :project_id) || Map.get(post_record || %{}, :project_id),
       excerpt:
         Map.get(
           assigns,
@@ -234,7 +238,7 @@ defmodule BDS.Rendering.PostRendering do
           MapUtils.attr(assigns, :template_slug)
         ),
       do_not_translate: Map.get(post_record || %{}, :do_not_translate, false),
-      linked_media: [],
+      linked_media: linked_media_images(assigns),
       outgoing_links: outgoing_links,
       incoming_links: incoming_links
     }
@@ -245,21 +249,42 @@ defmodule BDS.Rendering.PostRendering do
           map(),
           map(),
           String.t(),
-          Liquex.Context.t()
+          Liquex.Context.t(),
+          term()
         ) :: String.t()
   def render_post_content(
         content,
         canonical_post_paths,
         canonical_media_paths,
         language,
-        template_context
+        template_context,
+        post_id \\ nil
       ) do
     Filters.render_markdown(
       content,
       canonical_post_paths,
       canonical_media_paths,
       language,
-      template_context
+      template_context,
+      post_id
     )
+  end
+
+  defp linked_media_images(assigns) do
+    post_id = MapUtils.attr(assigns, :id)
+
+    if is_binary(post_id) do
+      Repo.all(
+        from pm in PostMedia,
+          join: m in MediaRecord,
+          on: pm.media_id == m.id,
+          where: pm.post_id == ^post_id,
+          where: like(m.mime_type, "image/%"),
+          order_by: [asc: pm.sort_order, asc: pm.media_id],
+          select: m
+      )
+    else
+      []
+    end
   end
 end

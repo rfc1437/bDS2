@@ -113,6 +113,7 @@ This document provides context and best practices for GitHub Copilot when workin
 - For supported locales, translations MUST come from that locale file only; do not copy English terms into supported locale files as fallback
 - English fallback is allowed only when the requested locale is unsupported by available locale files
 - The project `mainLanguage` selector must expose exactly all supported render languages and no unsupported extras
+- When adding new `msgid` entries, you MUST provide translations for ALL supported locales (de, fr, it, es) — empty `msgstr` values are not acceptable
 
 > **No hardcoded user-facing text. No exceptions.**
 
