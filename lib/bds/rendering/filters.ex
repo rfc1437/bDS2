@@ -155,7 +155,7 @@ defmodule BDS.Rendering.Filters do
   end
 
   defp render_macro_source(template_path, template_source, assigns, context) do
-    with {:ok, template_ast} <- Liquex.parse(template_source),
+    with {:ok, template_ast} <- Liquex.parse(template_source, BDS.Rendering.LiquidParser),
          {:ok, rendered} <- safe_liquex_render(template_ast, context, assigns) do
       rendered
     else

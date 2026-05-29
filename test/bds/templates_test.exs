@@ -315,6 +315,31 @@ defmodule BDS.TemplatesTest do
     assert published.status == :published
   end
 
+  # LiquidTagSubset invariant (template.allium): only {% if %}, {% for %},
+  # {% assign %}, {% render %} (plus {{ }} output) are supported. Any tag
+  # outside that subset must be rejected at publish time.
+  for tag <- ["unless", "case", "capture", "tablerow", "cycle", "increment"] do
+    @tag_name tag
+    test "publish_template rejects unsupported Liquid tag #{tag}", %{
+      project: project
+    } do
+      tag = @tag_name
+
+      assert {:ok, template} =
+               BDS.Templates.create_template(%{
+                 project_id: project.id,
+                 title: "Tag #{tag}",
+                 kind: :post,
+                 content: "{% #{tag} foo %}bar{% end#{tag} %}"
+               })
+
+      assert {:error, {:invalid_liquid, _reason}} = BDS.Templates.publish_template(template.id)
+
+      reloaded = Repo.get!(BDS.Templates.Template, template.id)
+      assert reloaded.status == :draft
+    end
+  end
+
   test "rebuild_templates_from_files recreates published templates from disk", %{
     project: project,
     temp_dir: temp_dir

@@ -132,7 +132,7 @@ defmodule BDS.Rendering.TemplateSelection do
   @spec render_template(String.t(), String.t(), map()) ::
           {:ok, String.t()} | {:error, String.t()}
   def render_template(project_id, source, assigns) do
-    with {:ok, template_ast} <- Liquex.parse(source),
+    with {:ok, template_ast} <- Liquex.parse(source, BDS.Rendering.LiquidParser),
          {:ok, _rendered} = ok <- safe_liquex_render(template_ast, project_id, assigns) do
       ok
     else
