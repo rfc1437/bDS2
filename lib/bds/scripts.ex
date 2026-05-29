@@ -57,28 +57,35 @@ defmodule BDS.Scripts do
         {:error, :not_found}
 
       script ->
-        file_path = script_file_path(script.slug)
-        full_path = full_file_path(script.project_id, file_path)
-        updated_at = Persistence.now_ms()
         content = script.content || ""
 
-        :ok =
-          Persistence.atomic_write(
-            full_path,
-            serialize_script_file(
-              %{script | status: :published, file_path: file_path, updated_at: updated_at},
-              content
-            )
-          )
+        case validate_script(content) do
+          :ok ->
+            file_path = script_file_path(script.slug)
+            full_path = full_file_path(script.project_id, file_path)
+            updated_at = Persistence.now_ms()
 
-        script
-        |> Script.changeset(%{
-          status: :published,
-          file_path: file_path,
-          content: nil,
-          updated_at: updated_at
-        })
-        |> Repo.update()
+            :ok =
+              Persistence.atomic_write(
+                full_path,
+                serialize_script_file(
+                  %{script | status: :published, file_path: file_path, updated_at: updated_at},
+                  content
+                )
+              )
+
+            script
+            |> Script.changeset(%{
+              status: :published,
+              file_path: file_path,
+              content: nil,
+              updated_at: updated_at
+            })
+            |> Repo.update()
+
+          {:error, reason} ->
+            {:error, {:invalid_script, reason}}
+        end
     end
   end
 
@@ -252,6 +259,13 @@ defmodule BDS.Scripts do
       end
 
     not Repo.exists?(scoped_query)
+  end
+
+  defp validate_script(source) do
+    case BDS.Scripting.validate(source) do
+      :ok -> :ok
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   defp script_file_path(slug), do: Path.join(["scripts", "#{slug}.lua"])

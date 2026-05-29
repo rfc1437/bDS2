@@ -126,6 +126,35 @@ defmodule BDS.ScriptsTest do
     refute File.exists?(Path.join(temp_dir, published.file_path))
   end
 
+  test "publish_script rejects invalid Lua syntax", %{project: project} do
+    assert {:ok, script} =
+             BDS.Scripts.create_script(%{
+               project_id: project.id,
+               title: "Bad Script",
+               kind: :utility,
+               content: "function main( missing end"
+             })
+
+    assert {:error, {:invalid_script, _reason}} = BDS.Scripts.publish_script(script.id)
+
+    reloaded = Repo.get!(Script, script.id)
+    assert reloaded.status == :draft
+    assert reloaded.content == "function main( missing end"
+  end
+
+  test "publish_script allows valid Lua syntax", %{project: project} do
+    assert {:ok, script} =
+             BDS.Scripts.create_script(%{
+               project_id: project.id,
+               title: "Good Script",
+               kind: :utility,
+               content: "function main() return 42 end"
+             })
+
+    assert {:ok, published} = BDS.Scripts.publish_script(script.id)
+    assert published.status == :published
+  end
+
   test "rebuild_scripts_from_files recreates published scripts from disk", %{
     project: project,
     temp_dir: temp_dir

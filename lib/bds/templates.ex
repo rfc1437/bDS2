@@ -62,28 +62,35 @@ defmodule BDS.Templates do
         {:error, :not_found}
 
       template ->
-        file_path = template_file_path(template.slug)
-        full_path = full_file_path(template.project_id, file_path)
-        updated_at = Persistence.now_ms()
         content = template.content || ""
 
-        :ok =
-          Persistence.atomic_write(
-            full_path,
-            serialize_template_file(
-              %{template | status: :published, file_path: file_path, updated_at: updated_at},
-              content
-            )
-          )
+        case validate_liquid(content) do
+          :ok ->
+            file_path = template_file_path(template.slug)
+            full_path = full_file_path(template.project_id, file_path)
+            updated_at = Persistence.now_ms()
 
-        template
-        |> Template.changeset(%{
-          status: :published,
-          file_path: file_path,
-          content: nil,
-          updated_at: updated_at
-        })
-        |> Repo.update()
+            :ok =
+              Persistence.atomic_write(
+                full_path,
+                serialize_template_file(
+                  %{template | status: :published, file_path: file_path, updated_at: updated_at},
+                  content
+                )
+              )
+
+            template
+            |> Template.changeset(%{
+              status: :published,
+              file_path: file_path,
+              content: nil,
+              updated_at: updated_at
+            })
+            |> Repo.update()
+
+          {:error, reason} ->
+            {:error, {:invalid_liquid, reason}}
+        end
     end
   end
 
@@ -325,6 +332,13 @@ defmodule BDS.Templates do
       end
 
     not Repo.exists?(scoped_query)
+  end
+
+  defp validate_liquid(source) do
+    case Liquex.parse(source) do
+      {:ok, _ast} -> :ok
+      {:error, reason, line} -> {:error, "#{reason} at line #{line}"}
+    end
   end
 
   defp template_file_path(slug), do: Path.join(["templates", "#{slug}.liquid"])

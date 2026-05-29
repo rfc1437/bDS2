@@ -31,7 +31,7 @@ defmodule BDS.CSM013BangRenderingTest do
       assert {:error, _reason} = result
     end
 
-    test "render_post_page returns {:error, _} for broken template source", %{project: project} do
+    test "publish_template rejects broken template source", %{project: project} do
       {:ok, template} =
         BDS.Templates.create_template(%{
           project_id: project.id,
@@ -40,30 +40,7 @@ defmodule BDS.CSM013BangRenderingTest do
           content: "{% if true %}unclosed if"
         })
 
-      {:ok, published_template} = BDS.Templates.publish_template(template.id)
-
-      {:ok, post} =
-        BDS.Posts.create_post(%{
-          project_id: project.id,
-          title: "Test Post",
-          content: "Body",
-          language: "en",
-          template_slug: published_template.slug
-        })
-
-      {:ok, published_post} = BDS.Posts.publish_post(post.id)
-
-      result =
-        Rendering.render_post_page(project.id, published_template.slug, %{
-          id: published_post.id,
-          title: published_post.title,
-          content: published_post.content || "",
-          slug: published_post.slug,
-          language: "en",
-          template_slug: published_post.template_slug
-        })
-
-      assert {:error, _reason} = result
+      assert {:error, {:invalid_liquid, _reason}} = BDS.Templates.publish_template(template.id)
     end
   end
 

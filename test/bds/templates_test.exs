@@ -264,6 +264,35 @@ defmodule BDS.TemplatesTest do
     assert reloaded_tag.post_template_slug == "feature-view"
   end
 
+  test "publish_template rejects invalid Liquid syntax", %{project: project} do
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Bad Template",
+               kind: :post,
+               content: "{% for item in items %}unclosed"
+             })
+
+    assert {:error, {:invalid_liquid, _reason}} = BDS.Templates.publish_template(template.id)
+
+    reloaded = Repo.get!(BDS.Templates.Template, template.id)
+    assert reloaded.status == :draft
+    assert reloaded.content == "{% for item in items %}unclosed"
+  end
+
+  test "publish_template allows valid Liquid syntax", %{project: project} do
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Good Template",
+               kind: :post,
+               content: "{% for item in items %}{{ item }}{% endfor %}"
+             })
+
+    assert {:ok, published} = BDS.Templates.publish_template(template.id)
+    assert published.status == :published
+  end
+
   test "rebuild_templates_from_files recreates published templates from disk", %{
     project: project,
     temp_dir: temp_dir
