@@ -229,6 +229,13 @@ defmodule BDS.TagsTest do
            ] = Jason.decode!(File.read!(tags_path))
   end
 
+  test "colour_presets contains exactly 17 unique valid hex colours" do
+    presets = BDS.Desktop.ShellLive.TagsEditor.colour_presets()
+    assert length(presets) == 17
+    assert length(Enum.uniq(presets)) == 17
+    assert Enum.all?(presets, &Regex.match?(~r/^#[0-9a-fA-F]{6}$/, &1))
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->

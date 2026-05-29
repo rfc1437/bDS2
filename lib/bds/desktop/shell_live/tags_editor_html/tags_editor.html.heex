@@ -38,7 +38,13 @@
           <form class="tag-create-form" phx-change="change_new_tag_editor" phx-target={@myself}>
             <div class="tag-form-row flex flex-wrap items-center gap-3">
               <input class="ui-input" type="text" name="new_tag[name]" value={@tags_editor.new_tag["name"]} placeholder={dgettext("ui", "Tag name")} />
-              <input type="color" name="new_tag[color]" value={if(@tags_editor.new_tag["color"] in [nil, ""], do: "#3b82f6", else: @tags_editor.new_tag["color"])} />
+              <input type="hidden" name="new_tag[color]" value={@tags_editor.new_tag["color"] || ""} />
+              <.colour_picker
+                color={@tags_editor.new_tag["color"]}
+                presets={@tags_editor.colour_presets}
+                pick_event="pick_new_tag_color"
+                target={@myself}
+              />
               <button class="primary ui-button ui-button-primary" type="button" phx-click="create_tag_editor" phx-target={@myself}><%= dgettext("ui", "Create") %></button>
             </div>
           </form>
@@ -47,7 +53,13 @@
             <form class="tag-edit-form" phx-change="change_edit_tag_editor" phx-target={@myself}>
               <div class="tag-form-row flex flex-wrap items-center gap-3">
                 <input class="ui-input" type="text" name="edit_tag[name]" value={@tags_editor.edit_draft["name"]} />
-                <input type="color" name="edit_tag[color]" value={if(@tags_editor.edit_draft["color"] in [nil, ""], do: "#3b82f6", else: @tags_editor.edit_draft["color"])} />
+                <input type="hidden" name="edit_tag[color]" value={@tags_editor.edit_draft["color"] || ""} />
+                <.colour_picker
+                  color={@tags_editor.edit_draft["color"]}
+                  presets={@tags_editor.colour_presets}
+                  pick_event="pick_edit_tag_color"
+                  target={@myself}
+                />
                 <select class="ui-input" name="edit_tag[post_template_slug]">
                   <option value=""><%= dgettext("ui", "No Template") %></option>
                   <%= for template <- @tags_editor.templates do %>

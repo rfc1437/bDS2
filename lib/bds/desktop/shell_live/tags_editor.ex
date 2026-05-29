@@ -16,6 +16,16 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
 
   @tags_sections ~w(cloud manage merge)
 
+  @colour_presets ~w(
+    #ef4444 #f97316 #f59e0b #eab308 #84cc16
+    #22c55e #10b981 #14b8a6 #06b6d4 #0ea5e9
+    #3b82f6 #6366f1 #8b5cf6 #a855f7 #d946ef
+    #ec4899 #64748b
+  )
+
+  @spec colour_presets() :: [String.t()]
+  def colour_presets, do: @colour_presets
+
   @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   @impl true
   def update(%{action: :save} = assigns, socket) do
@@ -102,6 +112,26 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
         "name" => Map.get(params, "name", ""),
         "color" => Map.get(params, "color", ""),
         "post_template_slug" => Map.get(params, "post_template_slug", "")
+      })
+
+    {:noreply, assign(socket, :tags_editor, tags_editor)}
+  end
+
+  def handle_event("pick_new_tag_color", %{"color" => color}, socket) do
+    tags_editor =
+      Map.put(socket.assigns.tags_editor, :new_tag, %{
+        socket.assigns.tags_editor.new_tag
+        | "color" => color
+      })
+
+    {:noreply, assign(socket, :tags_editor, tags_editor)}
+  end
+
+  def handle_event("pick_edit_tag_color", %{"color" => color}, socket) do
+    tags_editor =
+      Map.put(socket.assigns.tags_editor, :edit_draft, %{
+        socket.assigns.tags_editor.edit_draft
+        | "color" => color
       })
 
     {:noreply, assign(socket, :tags_editor, tags_editor)}
@@ -241,6 +271,55 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
     end
   end
 
+  attr :color, :string, default: nil
+  attr :presets, :list, required: true
+  attr :pick_event, :string, required: true
+  attr :target, :any, required: true
+
+  defp colour_picker(assigns) do
+    ~H"""
+    <div
+      class="colour-picker-wrap"
+      id={"cp-#{@pick_event}"}
+      phx-hook="ColourPicker"
+      data-pick-event={@pick_event}
+      data-target={if @target, do: @target.cid}
+    >
+      <button
+        type="button"
+        class="colour-picker-trigger"
+        style={"background-color: #{if @color in [nil, ""], do: "#3b82f6", else: @color}"}
+        phx-click={Phoenix.LiveView.JS.toggle(to: "#cp-#{@pick_event} .colour-picker-popover")}
+      />
+      <div class="colour-picker-popover hidden">
+        <div class="colour-picker-grid">
+          <%= for preset <- @presets do %>
+            <button
+              type="button"
+              class={"colour-picker-swatch#{if normalize_hex(@color) == normalize_hex(preset), do: " selected", else: ""}"}
+              style={"background-color: #{preset}"}
+              phx-click={Phoenix.LiveView.JS.push(@pick_event, value: %{color: preset}, target: if(@target, do: @target.cid)) |> Phoenix.LiveView.JS.add_class("hidden", to: "#cp-#{@pick_event} .colour-picker-popover")}
+            />
+          <% end %>
+        </div>
+        <div class="colour-picker-custom">
+          <label>#</label>
+          <input
+            type="text"
+            maxlength="7"
+            placeholder="RRGGBB"
+            value={if @color in [nil, ""], do: "", else: @color}
+          />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  defp normalize_hex(nil), do: nil
+  defp normalize_hex(""), do: nil
+  defp normalize_hex(hex), do: String.downcase(hex)
+
   defp load_data(socket) do
     project_id = socket.assigns.project_id
 
@@ -280,7 +359,8 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
       merge_target:
         Map.get(socket.assigns, :tags_editor, %{})
         |> Map.get(:merge_target, List.first(selected) || ""),
-      selected_section: selected_section
+      selected_section: selected_section,
+      colour_presets: @colour_presets
     }
 
     assign(socket, :tags_editor, data)

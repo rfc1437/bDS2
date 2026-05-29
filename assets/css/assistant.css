@@ -555,3 +555,88 @@
     padding: 8px 12px;
   }
 }
+
+/* Colour picker popover */
+.colour-picker-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.colour-picker-trigger {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--vscode-input-border);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.colour-picker-trigger:hover {
+  opacity: 0.85;
+}
+
+.colour-picker-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  padding: 8px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  border-radius: 6px;
+  background: var(--vscode-dropdown-background, var(--vscode-sideBar-background));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  width: 196px;
+}
+
+.colour-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.colour-picker-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.1s;
+}
+
+.colour-picker-swatch:hover {
+  border-color: var(--vscode-focusBorder);
+}
+
+.colour-picker-swatch.selected {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.colour-picker-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.colour-picker-custom label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+
+.colour-picker-custom input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 3px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-family: monospace;
+}

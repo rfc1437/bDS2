@@ -241,7 +241,8 @@ defmodule BDS.Desktop.ShellLiveTest do
         edit_draft: %{"name" => "news", "color" => "#3b82f6", "post_template_slug" => ""},
         selected: ["news", "updates"],
         merge_target: "news",
-        templates: [%{slug: "post-template", title: "Post Template"}]
+        templates: [%{slug: "post-template", title: "Post Template"}],
+        colour_presets: BDS.Desktop.ShellLive.TagsEditor.colour_presets()
       }
     }
   end
