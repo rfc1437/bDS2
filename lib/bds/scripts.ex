@@ -225,6 +225,26 @@ defmodule BDS.Scripts do
     end
   end
 
+  @doc """
+  Returns the executable source for a script, reading the published file body
+  when the in-memory content is not loaded.
+  """
+  @spec resolved_content(Script.t()) :: String.t()
+  def resolved_content(%Script{} = script), do: effective_script_content(script)
+
+  @doc """
+  Lists enabled `transform` scripts for a project in the deterministic order
+  the transform pipeline applies them: updated_at, then slug, then id.
+  """
+  @spec list_transform_scripts(String.t()) :: [Script.t()]
+  def list_transform_scripts(project_id) when is_binary(project_id) do
+    Script
+    |> where([s], s.project_id == ^project_id and s.kind == :transform and s.enabled == true)
+    |> order_by([s], asc: s.updated_at, asc: s.slug, asc: s.id)
+    |> Repo.all()
+    |> Enum.map(&hydrate_script_content/1)
+  end
+
   defp default_entrypoint(:macro), do: "render"
   defp default_entrypoint(_kind), do: "main"
 

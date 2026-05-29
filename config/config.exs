@@ -58,7 +58,10 @@ config :bds, :scripting,
   timeout: 300_000,
   max_reductions: 5_000_000,
   job_timeout: :infinity,
-  job_max_reductions: :none
+  job_max_reductions: :none,
+  transform_max_toasts_per_script: 5,
+  transform_max_toasts_total: 20,
+  transform_max_toast_length: 300
 
 config :bds, :embeddings,
   backend: BDS.Embeddings.Backends.Neural,
