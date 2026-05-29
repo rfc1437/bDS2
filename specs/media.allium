@@ -186,7 +186,7 @@ rule UpsertMediaTranslation {
 rule RebuildMediaFromFiles {
     when: RebuildMediaFromFilesRequested(project)
     -- Scans media directory for .meta sidecars, reimports to DB
-    for sidecar in scan_directory(project.effective_data_dir + "/media", "*.meta"):
+    for sidecar in scan_directory(project.public_dir + "/media", "*.meta"):
         let parsed = parse_sidecar(sidecar)
         ensures: Media.created(parsed)
             -- or updated if already exists

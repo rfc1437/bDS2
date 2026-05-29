@@ -10,4 +10,7 @@
 /priv/data/*.db
 /priv/data/*.db-shm
 /priv/data/*.db-wal
+# Embeddings index artifacts are per-project runtime caches, never committed.
+*.usearch
+*.usearch.meta.json
 *.eztmp/

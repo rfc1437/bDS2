@@ -268,7 +268,7 @@ rule ExecuteTransform {
 
 rule RebuildScriptsFromFiles {
     when: RebuildScriptsFromFilesRequested(project)
-    for file in scan_directory(project.effective_data_dir + "/scripts", "*." + config.script_extension):
+    for file in scan_directory(project.public_dir + "/scripts", "*." + config.script_extension):
         let parsed = parse_script_file(file)
         ensures: Script.created(parsed)
 }

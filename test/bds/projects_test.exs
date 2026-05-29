@@ -117,6 +117,32 @@ defmodule BDS.ProjectsTest do
     assert Enum.count(BDS.Projects.list_projects(), & &1.is_active) == 1
   end
 
+  test "project_cache_dir never falls back into the project data directory" do
+    # Private app-internal artifacts (the embeddings index) must live under the
+    # OS private app directory (macOS: ~/Library/Application Support/bds), never
+    # inside priv/data/projects/<id> — leaving them in the project tree pollutes
+    # the repository.
+    saved = Application.get_env(:bds, :project_cache_root)
+    Application.delete_env(:bds, :project_cache_root)
+    on_exit(fn -> Application.put_env(:bds, :project_cache_root, saved) end)
+
+    project_id = "fallback-#{System.unique_integer([:positive])}"
+    cache_dir = BDS.Projects.project_cache_dir(project_id)
+
+    data_dir = Path.expand("../../priv/data/projects/#{project_id}", __DIR__)
+    refute cache_dir == data_dir
+    refute String.starts_with?(cache_dir, Path.expand("../../priv/data", __DIR__))
+
+    private_app_dir =
+      case :filename.basedir(:user_config, "bds") do
+        path when is_list(path) -> List.to_string(path)
+        path -> path
+      end
+      |> Path.expand()
+
+    assert String.starts_with?(cache_dir, private_app_dir)
+  end
+
   test "ensure_default_project creates the default project once and keeps it active" do
     Repo.delete_all(Project)
 

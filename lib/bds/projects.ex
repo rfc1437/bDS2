@@ -268,18 +268,23 @@ defmodule BDS.Projects do
     not Repo.exists?(from project in Project, where: project.slug == ^slug)
   end
 
-  defp repo_data_dir do
-    Application.fetch_env!(:bds, BDS.Repo)
-    |> Keyword.fetch!(:database)
-    |> Path.expand()
-    |> Path.dirname()
-  end
-
   defp project_cache_root do
     case Application.get_env(:bds, :project_cache_root) do
       root when is_binary(root) -> Path.expand(root)
-      _other -> repo_data_dir()
+      # Private app-internal artifacts (e.g. the embeddings index) live under the
+      # OS private app directory — on macOS ~/Library/Application Support/bds —
+      # never inside the repo or a project's public folder. Colocating them with
+      # project_data_dir would pollute (and historically committed to) the repo.
+      _other -> private_app_dir()
     end
+  end
+
+  defp private_app_dir do
+    case :filename.basedir(:user_config, "bds") do
+      path when is_list(path) -> List.to_string(path)
+      path -> path
+    end
+    |> Path.expand()
   end
 
   defp attr(attrs, key) do

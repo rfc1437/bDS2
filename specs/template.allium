@@ -81,7 +81,7 @@ invariant UserTemplateDirectoryOverridesBundledDefaults {
 }
 
 invariant RebuildTemplatesIndexesOnlyProjectTemplates {
-    -- Rebuild-from-files scans only project.effective_data_dir/templates.
+    -- Rebuild-from-files scans only project.public_dir/templates.
     -- Bundled defaults are render-time fallbacks and are not indexed into Templates
     -- unless the user has created matching project files.
 }
@@ -171,7 +171,7 @@ rule CascadeSlugUpdate {
 
 rule RebuildTemplatesFromFiles {
     when: RebuildTemplatesFromFilesRequested(project)
-    for file in scan_directory(project.effective_data_dir + "/templates", "*.liquid"):
+    for file in scan_directory(project.public_dir + "/templates", "*.liquid"):
         let parsed = parse_template_file(file)
         ensures: Template.created(parsed)
             -- or updated if slug already exists

@@ -61,7 +61,7 @@ rule RunMetadataDiff {
                 )
 
     -- Detect orphan files (on disk but not in DB)
-    for file in scan_directory(project.effective_data_dir + "/posts", "*.md"):
+    for file in scan_directory(project.public_dir + "/posts", "*.md"):
         let matching = Posts where file_path = file
         if matching.count = 0:
             ensures: OrphanReport.created(file_path: file)
