@@ -1,6 +1,8 @@
 defmodule BDS.TemplateLookupPriorityTest do
   use ExUnit.Case, async: false
 
+  import Ecto.Query
+
   alias BDS.Rendering.TemplateSelection
 
   setup do
@@ -135,6 +137,44 @@ defmodule BDS.TemplateLookupPriorityTest do
         )
 
       assert result == nil
+    end
+  end
+
+  describe "BundledDefaultTemplatesExistOutsideProjectData" do
+    test "single-post bundled template resolves with no Template rows", %{project: project} do
+      assert [] = BDS.Repo.all(from t in BDS.Templates.Template, where: t.project_id == ^project.id)
+
+      {:ok, source} = TemplateSelection.load_template_source(project.id, :post, nil)
+
+      assert source =~ ~s(data-template="single-post")
+    end
+
+    test "post-list bundled template resolves with no Template rows", %{project: project} do
+      assert [] = BDS.Repo.all(from t in BDS.Templates.Template, where: t.project_id == ^project.id)
+
+      {:ok, source} = TemplateSelection.load_template_source(project.id, :list, nil)
+
+      assert source =~ ~s({% if archive_context %})
+    end
+
+    test "not-found bundled template resolves with no Template rows", %{project: project} do
+      assert [] = BDS.Repo.all(from t in BDS.Templates.Template, where: t.project_id == ^project.id)
+
+      {:ok, source} = TemplateSelection.load_template_source(project.id, :not_found, nil)
+
+      assert source =~ ~s(data-template="not-found")
+      assert source =~ "404"
+    end
+
+    test "bundled defaults resolve even when project has no templates directory", %{
+      project: project
+    } do
+      template_dir = Path.join(BDS.Projects.project_data_dir(project), "templates")
+      refute File.exists?(template_dir)
+
+      {:ok, source} = TemplateSelection.load_template_source(project.id, :post, nil)
+
+      assert source =~ ~s(data-template="single-post")
     end
   end
 
