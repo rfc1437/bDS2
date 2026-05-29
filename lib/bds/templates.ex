@@ -350,7 +350,7 @@ defmodule BDS.Templates do
   end
 
   defp validate_liquid(source) do
-    case Liquex.parse(source, BDS.Rendering.LiquidParser) do
+    case BDS.Rendering.LiquidParser.validate(source) do
       {:ok, _ast} -> :ok
       {:error, reason, line} -> {:error, "#{reason} at line #{line}"}
     end

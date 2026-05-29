@@ -71,7 +71,7 @@ defmodule BDS.MCP.Tools do
 
   @spec validate_template(String.t()) :: {:ok, %{valid: boolean(), errors: [String.t()]}}
   def validate_template(source) when is_binary(source) do
-    case Liquex.parse(source, BDS.Rendering.LiquidParser) do
+    case BDS.Rendering.LiquidParser.validate(source) do
       {:ok, _ast} ->
         {:ok, %{valid: true, errors: []}}
 

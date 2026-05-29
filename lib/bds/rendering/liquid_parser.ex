@@ -17,9 +17,61 @@ defmodule BDS.Rendering.LiquidParser do
 
   Pass this module as the second argument to `Liquex.parse/2` (and
   `Liquex.parse!/2`) so validation and rendering share the same surface.
+
+  `validate/1` additionally enforces the `LiquidFilterSubset` invariant: only
+  the four standard filters (`escape`, `url_encode`, `default`, `append`) and
+  three custom filters (`i18n`, `markdown`, `slugify`) are permitted. Any other
+  filter (`upcase`, `date`, `truncate`, `split`, `join`, …) is rejected even
+  though Liquex would otherwise apply it as a built-in standard filter.
   """
 
   import NimbleParsec
+
+  # LiquidFilterSubset invariant (specs/template.allium).
+  @allowed_filters ~w(escape url_encode default append i18n markdown slugify)
+
+  @doc "The filter names permitted by the `LiquidFilterSubset` invariant."
+  @spec allowed_filters() :: [String.t()]
+  def allowed_filters, do: @allowed_filters
+
+  @doc """
+  Parses `source` with the restricted tag grammar and enforces the
+  `LiquidFilterSubset` invariant.
+
+  Returns `{:ok, ast}` on success, or `{:error, reason, line}` on a parse error
+  or an unsupported filter (mirroring the `Liquex.parse/2` error shape so
+  callers can treat both failures uniformly).
+  """
+  @spec validate(binary()) :: {:ok, term()} | {:error, term(), non_neg_integer()}
+  def validate(source) when is_binary(source) do
+    case Liquex.parse(source, __MODULE__) do
+      {:ok, ast} ->
+        case unsupported_filters(ast) do
+          [] -> {:ok, ast}
+          [name | _] -> {:error, "unsupported filter: #{name}", 0}
+        end
+
+      {:error, _reason, _line} = error ->
+        error
+    end
+  end
+
+  @spec unsupported_filters(term()) :: [String.t()]
+  defp unsupported_filters(ast) do
+    ast
+    |> collect_filters()
+    |> Enum.uniq()
+    |> Enum.reject(&(&1 in @allowed_filters))
+  end
+
+  @spec collect_filters(term()) :: [String.t()]
+  defp collect_filters({:filter, [name | rest]}) when is_binary(name) do
+    [name | collect_filters(rest)]
+  end
+
+  defp collect_filters(term) when is_tuple(term), do: collect_filters(Tuple.to_list(term))
+  defp collect_filters(term) when is_list(term), do: Enum.flat_map(term, &collect_filters/1)
+  defp collect_filters(_term), do: []
 
   @tags [
     Liquex.Tag.AssignTag,

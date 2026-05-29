@@ -340,6 +340,55 @@ defmodule BDS.TemplatesTest do
     end
   end
 
+  # LiquidFilterSubset invariant (template.allium): only escape, url_encode,
+  # default, append (standard) and i18n, markdown, slugify (custom) are allowed.
+  # Any other filter must be rejected at publish time, even though Liquex would
+  # otherwise apply it as a built-in standard filter.
+  for filter <- ["upcase", "downcase", "date", "truncate", "split", "reverse"] do
+    @filter_name filter
+    test "publish_template rejects unsupported Liquid filter #{filter}", %{
+      project: project
+    } do
+      filter = @filter_name
+
+      assert {:ok, template} =
+               BDS.Templates.create_template(%{
+                 project_id: project.id,
+                 title: "Filter #{filter}",
+                 kind: :post,
+                 content: "{{ title | #{filter} }}"
+               })
+
+      assert {:error, {:invalid_liquid, reason}} =
+               BDS.Templates.publish_template(template.id)
+
+      assert reason =~ "unsupported filter: #{filter}"
+
+      reloaded = Repo.get!(BDS.Templates.Template, template.id)
+      assert reloaded.status == :draft
+    end
+  end
+
+  for filter <- ["escape", "url_encode", "slugify"] do
+    @filter_name filter
+    test "publish_template allows supported Liquid filter #{filter}", %{
+      project: project
+    } do
+      filter = @filter_name
+
+      assert {:ok, template} =
+               BDS.Templates.create_template(%{
+                 project_id: project.id,
+                 title: "Filter #{filter}",
+                 kind: :post,
+                 content: "{{ title | #{filter} }}"
+               })
+
+      assert {:ok, published} = BDS.Templates.publish_template(template.id)
+      assert published.status == :published
+    end
+  end
+
   test "rebuild_templates_from_files recreates published templates from disk", %{
     project: project,
     temp_dir: temp_dir

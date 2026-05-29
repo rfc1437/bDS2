@@ -199,11 +199,16 @@ invariant LiquidFilterSubset {
     --   | default: fallback_value
     --   | append: suffix_string
     --
-    -- Custom filters (2):
+    -- Custom filters (3):
     --   | i18n: language          — translates a key string for given language
     --   | markdown: post_id, post_data_json_by_id, canonical_post_path_by_slug,
     --              canonical_media_path_by_source_path, language, language_prefix
     --     — renders Markdown to HTML with link rewriting (6 arguments)
+    --   | slugify                 — slugifies a string (used for tag/category URLs)
+    --
+    -- Enforced at publish/validation time (LiquidParser.validate); any other
+    -- filter is rejected even though Liquex would otherwise apply it as a
+    -- built-in standard filter.
     --
     -- NOT used: date, strip_html, truncate, split, join, size (as filter),
     --   upcase, downcase, replace, remove, sort, map, where, first, last,
