@@ -645,6 +645,13 @@ defmodule BDS.Scripting.ApiTest do
     assert result["startup_project_name"] == "Scripting API"
   end
 
+  test "blogmark bookmarklet uses the bds2:// scheme to avoid clashing with the old app" do
+    bookmarklet = BDS.Scripting.Capabilities.AppShell.blogmark_bookmarklet()
+
+    assert String.contains?(bookmarklet, "bds2://new-post?")
+    refute String.contains?(bookmarklet, "'bds://new-post")
+  end
+
   defp write_binary_fixture(base_dir, name, contents) do
     path = Path.join(base_dir, name)
     File.write!(path, contents)

@@ -262,7 +262,8 @@ rule ExecuteTransform {
         -- config.transform_max_toast_length characters.
 
     @guidance
-        -- bds://new-post deep links from browser bookmarks
+        -- bds2://new-post deep links from browser bookmarks
+        -- (bds2:// scheme avoids clashing with the legacy app's bds:// scheme)
         -- Ordering is deterministic: updated_at, then slug, then id
 }
 

@@ -3,7 +3,7 @@ defmodule BDS.Scripts.Transforms do
   Runs the blogmark transform pipeline (spec: script.allium `ExecuteTransform`).
 
   Enabled `transform` scripts for a project are applied sequentially to a post
-  candidate produced by a `bds://new-post` blogmark deep link. Each transform
+  candidate produced by a `bds2://new-post` blogmark deep link. Each transform
   receives the current candidate plus a context describing the blogmark source
   and origin URL, and returns the modified candidate.
 

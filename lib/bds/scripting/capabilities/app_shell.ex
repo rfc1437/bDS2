@@ -46,7 +46,7 @@ defmodule BDS.Scripting.Capabilities.AppShell do
   end
 
   def blogmark_bookmarklet do
-    "javascript:(()=>{const t=encodeURIComponent(document.title||'');const u=encodeURIComponent(location.href||'');location.href='bds://new-post?title='+t+'&url='+u;})();"
+    "javascript:(()=>{const t=encodeURIComponent(document.title||'');const u=encodeURIComponent(location.href||'');location.href='bds2://new-post?title='+t+'&url='+u;})();"
   end
 
   def title_bar_metrics(opts) do
