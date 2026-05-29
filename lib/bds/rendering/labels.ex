@@ -27,6 +27,7 @@ defmodule BDS.Rendering.Labels do
         language_switcher_label: dgettext("render", "Language"),
         site_search_label: dgettext("render", "Site search"),
         search_placeholder: dgettext("render", "Search..."),
+        search_no_results: dgettext("render", "No results found"),
         not_found_message: dgettext("render", "The requested preview page could not be found."),
         not_found_back_label: dgettext("render", "Back to preview home"),
         youtube_video: dgettext("render", "YouTube video"),

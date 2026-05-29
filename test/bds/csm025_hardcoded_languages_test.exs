@@ -7,7 +7,7 @@ defmodule BDS.CSM025HardcodedLanguagesTest do
     %{language: main, blog_languages: languages}
   end
 
-  defp html(path), do: {path, "<p>hello</p>"}
+  defp html(path), do: {path, "<article data-pagefind-body><p>hello</p></article>"}
 
   describe "build_outputs/2 derives language prefixes from plan" do
     test "no hardcoded language prefixes in source" do

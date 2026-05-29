@@ -1,0 +1,65 @@
+/* Styling for the self-contained PagefindUI search widget. */
+.pagefind-ui {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.pagefind-ui__form {
+  margin: 0 0 0.75rem 0;
+}
+
+.pagefind-ui__search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--pico-form-element-border-color, #ccc);
+  border-radius: 0.375rem;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.pagefind-ui__results {
+  display: block;
+}
+
+.pagefind-ui__message {
+  margin: 0.5rem 0;
+  opacity: 0.7;
+}
+
+.pagefind-ui__result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pagefind-ui__result {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--pico-muted-border-color, #eee);
+}
+
+.pagefind-ui__result:last-child {
+  border-bottom: none;
+}
+
+.pagefind-ui__result-link {
+  display: block;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pagefind-ui__result-link:hover {
+  text-decoration: underline;
+}
+
+.pagefind-ui__result-excerpt {
+  margin: 0.25rem 0 0 0;
+  opacity: 0.8;
+  line-height: 1.4;
+}
+
+.pagefind-ui__result-excerpt mark {
+  background: var(--pico-mark-background-color, #ffe08a);
+  color: inherit;
+  padding: 0 0.1em;
+  border-radius: 0.15em;
+}

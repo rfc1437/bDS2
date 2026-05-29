@@ -252,7 +252,7 @@ defmodule BDS.GenerationTest do
                title: "Post View",
                kind: :post,
                content:
-                 "<article class=\"post-template\"><h1>{{ post.title }}</h1><div class=\"body\">{{ post.content }}</div></article>"
+                 "<article class=\"post-template\" data-pagefind-body><h1>{{ post.title }}</h1><div class=\"body\">{{ post.content }}</div></article>"
              })
 
     assert {:ok, published_post_template} = BDS.Templates.publish_template(post_template.id)
