@@ -10,6 +10,9 @@
 /priv/data/*.db
 /priv/data/*.db-shm
 /priv/data/*.db-wal
+# Project public content (posts, media, templates, generated html) lives in the
+# per-user default content folder, never the repo. See PublicContentLivesInProjectFolder.
+/priv/data/projects/
 # Embeddings index artifacts are per-project runtime caches, never committed.
 *.usearch
 *.usearch.meta.json

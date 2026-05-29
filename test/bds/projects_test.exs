@@ -157,6 +157,48 @@ defmodule BDS.ProjectsTest do
     assert Repo.aggregate(Project, :count, :id) == 1
   end
 
+  test "the default project's public content folder lives outside the repo and private dir" do
+    Repo.delete_all(Project)
+
+    assert {:ok, default_project} = BDS.Projects.ensure_default_project()
+
+    data_dir = BDS.Projects.project_data_dir(default_project)
+
+    # Public content must live under the per-user default content location,
+    # never in the application repo (priv/data) nor the private app dir.
+    refute String.starts_with?(data_dir, Path.expand("../../priv/data", __DIR__))
+    refute String.starts_with?(data_dir, BDS.Projects.private_dir())
+    assert String.starts_with?(data_dir, Application.fetch_env!(:bds, :default_content_root))
+  end
+
+  test "project_data_dir never falls back into the application repo" do
+    # A project without an explicit data_path resolves to the per-user default
+    # content location, not priv/data/projects/<id> inside the repo.
+    project = %Project{id: "no-path-#{System.unique_integer([:positive])}", data_path: nil}
+
+    data_dir = BDS.Projects.project_data_dir(project)
+
+    refute String.starts_with?(data_dir, Path.expand("../../priv/data", __DIR__))
+    assert String.starts_with?(data_dir, Application.fetch_env!(:bds, :default_content_root))
+  end
+
+  test "project locations are recorded in a machine-local registry under private_dir", %{
+    temp_root: temp_root
+  } do
+    external_dir = Path.join(temp_root, "registry-blog")
+    File.mkdir_p!(external_dir)
+
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Registry Blog", data_path: external_dir})
+
+    registry = BDS.Projects.project_registry()
+    assert registry[project.id] == external_dir
+    assert String.starts_with?(BDS.Projects.registry_path(), BDS.Projects.private_dir())
+
+    assert {:ok, _deleted} = BDS.Projects.delete_project(project.id)
+    refute Map.has_key?(BDS.Projects.project_registry(), project.id)
+  end
+
   test "delete_project rejects the default and active projects", %{temp_root: temp_root} do
     Repo.delete_all(Project)
 

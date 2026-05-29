@@ -69,6 +69,12 @@ defmodule BDS.Projects do
         now = Persistence.now_ms()
         is_active = not Repo.exists?(from project in Project, where: project.is_active == true)
 
+        # The default project's public content folder is created at the per-user
+        # default content location on first launch — never in the repo or the
+        # private app dir (PublicContentLivesInProjectFolder).
+        data_path = default_project_dir(@default_project_id)
+        File.mkdir_p!(data_path)
+
         Repo.transaction(fn ->
           project =
             %Project{}
@@ -77,7 +83,7 @@ defmodule BDS.Projects do
               name: @default_project_name,
               slug: unique_slug(Slug.slugify(@default_project_name)),
               description: nil,
-              data_path: nil,
+              data_path: data_path,
               created_at: now,
               updated_at: now,
               is_active: is_active
@@ -87,16 +93,50 @@ defmodule BDS.Projects do
           project
         end)
         |> case do
-          {:ok, project} -> rebuild_project_templates(project)
-          {:error, reason} -> {:error, reason}
+          {:ok, project} ->
+            record_project_location(project.id, data_path)
+            rebuild_project_templates(project)
+
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
 
   @spec project_data_dir(Project.t()) :: String.t()
-  def project_data_dir(%Project{} = project) do
-    project.data_path || Path.expand("../../priv/data/projects/#{project.id}", __DIR__)
+  def project_data_dir(%Project{data_path: data_path}) when is_binary(data_path) and data_path != "",
+    do: data_path
+
+  # A project without an explicit data_path resolves to its folder under the
+  # per-user default content location — never priv/data inside the repo
+  # (PublicContentLivesInProjectFolder).
+  def project_data_dir(%Project{id: id}), do: default_project_dir(id)
+
+  @doc """
+  Per-user base directory that holds the public, portable content of projects
+  created without an explicit folder (the default project on first launch).
+
+  Configurable via `:default_content_root`; otherwise the user's home dir under
+  `bds/`. Never the application repo nor `private_dir/0`
+  (PublicContentLivesInProjectFolder).
+  """
+  @spec default_content_root() :: String.t()
+  def default_content_root do
+    case Application.get_env(:bds, :default_content_root) do
+      root when is_binary(root) -> Path.expand(root)
+      _other -> Path.join(System.user_home!(), "bds")
+    end
   end
+
+  defp default_project_dir(project_id), do: Path.join(default_content_root(), project_id)
+
+  @doc """
+  The OS per-user app-data directory holding machine-specific, regenerable
+  artifacts only (database, embeddings index, model cache, project registry,
+  UI state) — never project content (PrivateArtifactsLiveInOsAppDir).
+  """
+  @spec private_dir() :: String.t()
+  def private_dir, do: private_app_dir()
 
   @spec project_cache_dir(Project.t() | String.t()) :: String.t()
   def project_cache_dir(%Project{} = project), do: project_cache_dir(project.id)
@@ -130,6 +170,8 @@ defmodule BDS.Projects do
     end)
     |> case do
       {:ok, project} ->
+        record_project_location(project.id, project_data_dir(project))
+
         with {:ok, project} <- rebuild_project_templates(project) do
           sync_filesystem_metadata(project)
         end
@@ -192,10 +234,15 @@ defmodule BDS.Projects do
         {:error, :cannot_delete_active_project}
 
       %Project{} = project ->
-        internal_dir = if is_nil(project.data_path), do: project_data_dir(project), else: nil
+        data_dir = project_data_dir(project)
+
+        # App-managed folders (those under the per-user default content location)
+        # are removed; user-chosen external folders are preserved.
+        managed_dir =
+          if String.starts_with?(data_dir, default_content_root()), do: data_dir, else: nil
 
         cleanup_dirs =
-          [internal_dir, project_cache_dir(project)] |> Enum.filter(&is_binary/1) |> Enum.uniq()
+          [managed_dir, project_cache_dir(project)] |> Enum.filter(&is_binary/1) |> Enum.uniq()
 
         Repo.transaction(fn ->
           case Repo.delete(project) do
@@ -206,6 +253,7 @@ defmodule BDS.Projects do
         |> case do
           {:ok, deleted_project} ->
             BDS.Embeddings.Index.forget(deleted_project.id)
+            forget_project_location(deleted_project.id)
 
             Enum.each(cleanup_dirs, fn dir ->
               _ = File.rm_rf(dir)
@@ -285,6 +333,41 @@ defmodule BDS.Projects do
       path -> path
     end
     |> Path.expand()
+  end
+
+  @doc """
+  Path to the machine-local project registry: a `id => data_path` pointer file
+  under `private_dir/0` that remembers where each project's folder currently
+  lives. The folder location is never embedded in `meta/project.json`, so a
+  project folder can be moved or renamed and only the registry is updated
+  (DataPathNotPersistedInProjectJson).
+  """
+  @spec registry_path() :: String.t()
+  def registry_path, do: Path.join(private_dir(), "project_registry.json")
+
+  @doc "Reads the machine-local project registry as an `id => data_path` map."
+  @spec project_registry() :: %{optional(String.t()) => String.t()}
+  def project_registry do
+    with {:ok, contents} <- File.read(registry_path()),
+         {:ok, map} when is_map(map) <- Jason.decode(contents) do
+      map
+    else
+      _ -> %{}
+    end
+  end
+
+  defp record_project_location(project_id, data_path) when is_binary(data_path) do
+    project_registry() |> Map.put(project_id, data_path) |> write_registry()
+  end
+
+  defp forget_project_location(project_id) do
+    project_registry() |> Map.delete(project_id) |> write_registry()
+  end
+
+  defp write_registry(registry) do
+    path = registry_path()
+    File.mkdir_p!(Path.dirname(path))
+    File.write(path, Jason.encode!(registry))
   end
 
   defp attr(attrs, key) do
