@@ -16,7 +16,12 @@
       "mcp__Claude_in_Chrome__computer",
       "mcp__Claude_in_Chrome__browser_batch",
       "mcp__Claude_in_Chrome__javascript_tool",
-      "Bash(allium check *)"
+      "Bash(allium check *)",
+      "Bash(mix deps.get)",
+      "Bash(allium --help)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
