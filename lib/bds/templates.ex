@@ -28,23 +28,38 @@ defmodule BDS.Templates do
     now = Persistence.now_ms()
     project_id = attr(attrs, :project_id)
     title = attr(attrs, :title) || ""
+    slug = unique_slug(project_id, Slug.slugify(title), "template")
+    file_path = template_file_path(slug)
 
-    %Template{}
-    |> Template.changeset(%{
-      id: Ecto.UUID.generate(),
-      project_id: project_id,
-      slug: unique_slug(project_id, Slug.slugify(title), "template"),
-      title: title,
-      kind: attr(attrs, :kind),
-      enabled: true,
-      version: 1,
-      file_path: "",
-      status: :draft,
-      content: attr(attrs, :content),
-      created_at: now,
-      updated_at: now
-    })
-    |> Repo.insert()
+    changeset =
+      %Template{}
+      |> Template.changeset(%{
+        id: Ecto.UUID.generate(),
+        project_id: project_id,
+        slug: slug,
+        title: title,
+        kind: attr(attrs, :kind),
+        enabled: true,
+        version: 1,
+        file_path: file_path,
+        status: :draft,
+        content: attr(attrs, :content),
+        created_at: now,
+        updated_at: now
+      })
+
+    with {:ok, template} <- Repo.insert(changeset) do
+      full_path = full_file_path(template.project_id, file_path)
+      File.mkdir_p!(Path.dirname(full_path))
+
+      :ok =
+        Persistence.atomic_write(
+          full_path,
+          serialize_template_file(template, template.content || "")
+        )
+
+      {:ok, template}
+    end
   end
 
   @spec get_template(String.t()) :: Template.t() | nil
@@ -348,7 +363,6 @@ defmodule BDS.Templates do
     Path.join(Projects.project_data_dir(project), relative_path)
   end
 
-  defp next_template_file_path(%Template{file_path: ""}, _next_slug), do: ""
   defp next_template_file_path(%Template{}, next_slug), do: template_file_path(next_slug)
 
   defp serialize_template_file(template, content) do

@@ -29,7 +29,7 @@ defmodule BDS.TemplatesTest do
     assert template.status == :draft
     assert template.enabled == true
     assert template.version == 1
-    assert template.file_path == ""
+    assert template.file_path == "templates/article-view.liquid"
     assert template.content == "<article>{{ content }}</article>"
 
     assert {:ok, duplicate} =
@@ -41,6 +41,28 @@ defmodule BDS.TemplatesTest do
              })
 
     assert duplicate.slug == "article-view-2"
+  end
+
+  test "create_template writes template file to disk", %{project: project, temp_dir: temp_dir} do
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "My Layout",
+               kind: :post,
+               content: "<main>{{ content }}</main>"
+             })
+
+    assert template.file_path == "templates/my-layout.liquid"
+
+    full_path = Path.join(temp_dir, template.file_path)
+    assert File.exists?(full_path)
+
+    contents = File.read!(full_path)
+    assert contents =~ "---\nid: #{template.id}\n"
+    assert contents =~ "slug: my-layout\n"
+    assert contents =~ "title: My Layout\n"
+    assert contents =~ "kind: post\n"
+    assert contents =~ "\n---\n<main>{{ content }}</main>\n"
   end
 
   test "publish_template writes a liquid file with frontmatter and clears draft content", %{
