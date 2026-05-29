@@ -37,7 +37,8 @@ defmodule BDS.Application do
       {Task.Supervisor, name: BDS.TCP.TaskSupervisor},
       BDS.Scripting.JobStore,
       {Task.Supervisor, name: BDS.Scripting.TaskSupervisor},
-      BDS.Scripting.JobSupervisor
+      BDS.Scripting.JobSupervisor,
+      BDS.Embeddings.Index
     ] ++ embedding_children() ++ desktop_children(current_env())
 
     opts = [strategy: :one_for_one, name: BDS.Supervisor]

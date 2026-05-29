@@ -236,6 +236,9 @@ defmodule BDS.MetadataTest do
 
     assert metadata.semantic_similarity_enabled == true
     assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: post.id) != nil
+
+    # Index persistence is debounced (5s); force it to assert the file.
+    :ok = BDS.Embeddings.Index.flush(project.id)
     assert File.exists?(BDS.Embeddings.index_path(project.id))
   end
 

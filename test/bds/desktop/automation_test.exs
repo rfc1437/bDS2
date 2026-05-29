@@ -44,32 +44,32 @@ defmodule BDS.Desktop.AutomationTest do
 
     assert :ok = Automation.click(session, "[data-testid='toggle-sidebar']")
 
-    snapshot = Automation.snapshot(session)
+    snapshot = await(session, &(&1.sidebar_visible == false))
     assert snapshot.sidebar_visible == false
 
     assert :ok = Automation.press(session, "Meta+B")
 
-    snapshot = Automation.snapshot(session)
+    snapshot = await(session, &(&1.sidebar_visible == true))
     assert snapshot.sidebar_visible == true
 
     assert :ok = Automation.press(session, "Meta+J")
 
-    snapshot = Automation.snapshot(session)
+    snapshot = await(session, &(&1.panel_visible == true))
     assert snapshot.panel_visible == true
 
     assert :ok = Automation.press(session, "Meta+J")
 
-    snapshot = Automation.snapshot(session)
+    snapshot = await(session, &(&1.panel_visible == false))
     assert snapshot.panel_visible == false
 
     assert :ok = Automation.press(session, "Meta+,")
 
-    snapshot = Automation.snapshot(session)
+    snapshot = await(session, &(&1.editor_title == "Settings"))
     assert snapshot.editor_title == "Settings"
 
     assert :ok = Automation.click(session, "[data-testid='toggle-assistant']")
 
-    snapshot = Automation.snapshot(session)
+    snapshot = await(session, &(&1.assistant_visible == true))
     assert snapshot.assistant_visible == true
     assert snapshot.panel_visible == false
 
@@ -92,7 +92,7 @@ defmodule BDS.Desktop.AutomationTest do
 
     assert :ok = Automation.drag(session, "[data-resize='sidebar']", 90)
 
-    snapshot = Automation.snapshot(session)
+    snapshot = await(session, &(&1.sidebar_width >= 360 and &1.sidebar_width <= 380))
     assert snapshot.sidebar_width >= 360
     assert snapshot.sidebar_width <= 380
 
@@ -100,7 +100,7 @@ defmodule BDS.Desktop.AutomationTest do
 
     assert :ok = Automation.reload(session)
 
-    snapshot = Automation.snapshot(session)
+    snapshot = await(session, &(&1.sidebar_visible == true and &1.sidebar_width >= resized_width - 2))
     assert snapshot.sidebar_visible == true
     assert snapshot.sidebar_width >= resized_width - 2
     assert snapshot.sidebar_width <= resized_width + 2
@@ -140,12 +140,12 @@ defmodule BDS.Desktop.AutomationTest do
 
     assert :ok = Automation.native_menu_action(session, "toggle_sidebar")
 
-    snapshot = Automation.snapshot(session)
+    snapshot = await(session, &(&1.sidebar_visible == false))
     assert snapshot.sidebar_visible == false
 
     assert :ok = Automation.native_menu_action(session, "edit_preferences")
 
-    snapshot = Automation.snapshot(session)
+    snapshot = await(session, &(&1.editor_title == "Settings"))
     assert snapshot.editor_title == "Settings"
   end
 
@@ -172,6 +172,24 @@ defmodule BDS.Desktop.AutomationTest do
     |> case do
       "" -> 0
       value -> String.to_integer(value)
+    end
+  end
+
+  # Polls snapshots until the predicate holds (or times out), returning the
+  # last snapshot. UI transitions after a keypress/click/menu action are
+  # asynchronous, so a single immediate snapshot can race under CPU load.
+  defp await(session, fun, timeout \\ 5_000)
+
+  defp await(session, _fun, timeout) when timeout <= 0, do: Automation.snapshot(session)
+
+  defp await(session, fun, timeout) do
+    snapshot = Automation.snapshot(session)
+
+    if fun.(snapshot) do
+      snapshot
+    else
+      Process.sleep(50)
+      await(session, fun, timeout - 50)
     end
   end
 

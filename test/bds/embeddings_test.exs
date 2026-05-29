@@ -319,24 +319,28 @@ defmodule BDS.EmbeddingsTest do
 
     assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
 
+    # Persistence is debounced (5s); force it to disk to assert the files.
+    :ok = BDS.Embeddings.Index.flush(project.id)
+
     index_path = BDS.Embeddings.index_path(project.id)
     assert File.exists?(index_path)
+    assert File.exists?(index_path <> ".meta.json")
     refute String.starts_with?(index_path, BDS.Projects.project_data_dir(project))
 
     cache_root = Application.fetch_env!(:bds, :project_cache_root) |> Path.expand()
 
     assert index_path == Path.join([cache_root, "projects", project.id, "embeddings.usearch"])
 
-    snapshot = index_path |> File.read!() |> Jason.decode!()
-    assert snapshot["project_id"] == project.id
-    assert snapshot["model_id"] == "fake/multilingual-e5-small"
-    assert snapshot["dimensions"] == 384
-    assert snapshot["entries"][alpha.id]["label"] != nil
-    assert snapshot["entries"][alpha.id]["content_hash"] != nil
+    # The sidecar carries the dimension and the label→post_id mapping.
+    meta = (index_path <> ".meta.json") |> File.read!() |> Jason.decode!()
+    assert meta["dim"] == 384
+    post_ids = Enum.map(meta["labels"], fn [_label, post_id] -> post_id end)
+    assert alpha.id in post_ids
+    assert beta.id in post_ids
 
-    assert Enum.any?(snapshot["entries"][alpha.id]["neighbors"], fn neighbor ->
-             neighbor["post_id"] == beta.id
-           end)
+    # The HNSW index answers nearest-neighbour queries.
+    assert {:ok, [neighbor]} = BDS.Embeddings.find_similar(alpha.id, 1)
+    assert neighbor.post_id == beta.id
   end
 
   test "embedding index uses the app-internal persisted file name", %{project: project} do
@@ -443,43 +447,76 @@ defmodule BDS.EmbeddingsTest do
 
     refreshed_key = BDS.Repo.get_by!(BDS.Embeddings.Key, project_id: project.id, post_id: post.id)
     assert refreshed_key.content_hash == stale_key.content_hash
+
+    :ok = BDS.Embeddings.Index.flush(project.id)
     assert File.exists?(BDS.Embeddings.index_path(project.id))
   end
 
-  test "sync_post refreshes snapshot drift when the embedding hash is already current", %{
+  test "similarity queries keep working when sync_post finds the embedding already current", %{
     project: project
   } do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
 
-    assert {:ok, post} =
+    assert {:ok, alpha} =
              BDS.Posts.create_post(%{
                project_id: project.id,
-               title: "Snapshot Repair",
+               title: "Alpha",
                content: "space rocket orbit mission galaxy",
                language: "en"
              })
 
-    assert {:ok, post} = BDS.Posts.publish_post(post.id)
+    assert {:ok, beta} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Beta",
+               content: "rocket launch orbit mission station",
+               language: "en"
+             })
+
+    assert {:ok, alpha} = BDS.Posts.publish_post(alpha.id)
+    assert {:ok, _beta} = BDS.Posts.publish_post(beta.id)
     assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
 
-    key = BDS.Repo.get_by!(BDS.Embeddings.Key, project_id: project.id, post_id: post.id)
-    index_path = BDS.Embeddings.index_path(project.id)
+    # Re-syncing with an unchanged content hash is a no-op for the index...
+    assert :ok = BDS.Embeddings.sync_post(alpha.id)
 
-    snapshot = index_path |> File.read!() |> Jason.decode!()
+    # ...and nearest-neighbour queries still resolve through the HNSW index.
+    assert {:ok, [neighbor]} = BDS.Embeddings.find_similar(alpha.id, 1)
+    assert neighbor.post_id == beta.id
+  end
 
-    drifted_snapshot =
-      put_in(snapshot, ["entries", post.id, "content_hash"], "stale-snapshot-hash")
+  test "find_similar rebuilds the HNSW index on demand when none is loaded", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
 
-    File.write!(index_path, Jason.encode!(drifted_snapshot))
+    assert {:ok, alpha} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Alpha",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
 
-    refute Enum.any?(BDS.Embeddings.diff_reports(project.id), &(&1.entity_id == post.id))
+    assert {:ok, beta} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Beta",
+               content: "rocket launch orbit mission station",
+               language: "en"
+             })
 
-    assert :ok = BDS.Embeddings.sync_post(post.id)
+    assert {:ok, _alpha} = BDS.Posts.publish_post(alpha.id)
+    assert {:ok, _beta} = BDS.Posts.publish_post(beta.id)
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
 
-    repaired_snapshot = index_path |> File.read!() |> Jason.decode!()
-    assert get_in(repaired_snapshot, ["entries", post.id, "content_hash"]) == key.content_hash
+    # Drop the in-memory index and remove the persisted files, then query: it
+    # must self-heal by rebuilding from the DB vectors.
+    :ok = BDS.Embeddings.Index.forget(project.id)
+    File.rm_rf!(BDS.Projects.project_cache_dir(project.id))
 
-    refute Enum.any?(BDS.Embeddings.diff_reports(project.id), &(&1.entity_id == post.id))
+    assert {:ok, similar} = BDS.Embeddings.find_similar(alpha.id, 1)
+    assert [%{post_id: post_id}] = similar
+    assert post_id == beta.id
   end
 end

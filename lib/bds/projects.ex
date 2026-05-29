@@ -148,6 +148,9 @@ defmodule BDS.Projects do
       project ->
         now = Persistence.now_ms()
 
+        previous_active_id =
+          Repo.one(from p in Project, where: p.is_active == true, select: p.id)
+
         Repo.transaction(fn ->
           Repo.update_all(
             from(p in Project, where: p.is_active == true),
@@ -159,8 +162,16 @@ defmodule BDS.Projects do
           |> Repo.update!()
         end)
         |> case do
-          {:ok, active_project} -> {:ok, active_project}
-          {:error, reason} -> {:error, reason}
+          {:ok, active_project} ->
+            # Force-save the outgoing project's embedding index (DebouncedPersistence).
+            if is_binary(previous_active_id) and previous_active_id != active_project.id do
+              BDS.Embeddings.Index.flush(previous_active_id)
+            end
+
+            {:ok, active_project}
+
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
@@ -194,6 +205,8 @@ defmodule BDS.Projects do
         end)
         |> case do
           {:ok, deleted_project} ->
+            BDS.Embeddings.Index.forget(deleted_project.id)
+
             Enum.each(cleanup_dirs, fn dir ->
               _ = File.rm_rf(dir)
             end)

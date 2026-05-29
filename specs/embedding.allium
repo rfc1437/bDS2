@@ -63,7 +63,7 @@ value EmbeddingVector {
 -- ─── Entities ───────────────────────────────────────────────
 
 entity EmbeddingKey {
-    label: Integer                      -- HNSW label for USearch
+    label: Integer                      -- HNSW node label / id
     post: post/Post
     content_hash: String                -- SHA-256 of "{title}\n\n{content}"
     vector: EmbeddingVector
@@ -75,9 +75,11 @@ entity DismissedDuplicatePair {
     -- IDs stored in canonical order (sorted) for dedup
 }
 
--- ─── USearch HNSW Index ─────────────────────────────────────
+-- ─── HNSW Index ─────────────────────────────────────────────
 
 config {
+    -- HNSW approximate-nearest-neighbour index (hnswlib). USearch has no Elixir
+    -- binding; hnswlib provides the same HNSW algorithm and parameters.
     model_id: String = "Xenova/multilingual-e5-small"
     embedding_dimensions: Integer = 384
     hnsw_metric: String = "cosine"
@@ -86,7 +88,8 @@ config {
     hnsw_expansion_search: Integer = 64 -- efSearch
     debounce_persist: Duration = 5.seconds
     -- Index file: {userData}/projects/{projectId}/embeddings.usearch
-    -- Key mapping is persisted alongside the embedding records
+    -- Key mapping (label → post_id) persisted in a sidecar (.meta.json) next
+    -- to the index file, plus the source-of-truth rows in embedding_keys
     batch_size: Integer = 16            -- texts per batched inference run
     sequence_length: Integer = 256      -- max tokens per input (truncated)
 }
@@ -112,7 +115,7 @@ rule EmbedPost {
     let existing = EmbeddingKey{post: post}
     if not exists existing or existing.content_hash != hash:
         -- Compute embedding vector via local model
-        -- Upsert into USearch index + embedding_keys DB table
+        -- Upsert into HNSW index + embedding_keys DB table
         -- Debounced index save (5s)
         ensures: EmbeddingKeyUpdated(post)
 }
@@ -151,9 +154,9 @@ rule IndexUnindexed {
 rule FindSimilar {
     when: FindSimilarRequested(post, limit)
     requires: semantic_similarity_enabled
-    -- HNSW approximate nearest neighbor search via USearch
+    -- HNSW approximate nearest neighbor search (hnswlib)
     -- Searches index for (limit + 1) neighbors, excludes self
-    -- Converts USearch cosine distance to similarity: max(0, 1 - distance)
+    -- Converts HNSW cosine distance to similarity: max(0, 1 - distance)
     -- Returns ranked list sorted by descending similarity
     ensures: SimilarPostsResult(post, ranked_matches)
 }
@@ -162,7 +165,7 @@ rule ComputeSimilarities {
     when: ComputeSimilaritiesRequested(source_post, target_post_ids)
     requires: semantic_similarity_enabled
     -- Exact pairwise cosine similarity between source vector and each target vector
-    -- Uses in-memory vector cache, NOT USearch search
+    -- Uses in-memory vector cache, NOT the HNSW index
     -- Returns map of post_id -> similarity score
     -- Used by InsertPostLinkModal to rank FTS search results
     ensures: SimilarityScoresResult(source_post, scores)
@@ -207,7 +210,7 @@ invariant ContentHashSkipsUnchanged {
 }
 
 invariant DebouncedPersistence {
-    -- USearch index persistence is debounced at 5 seconds
+    -- HNSW index persistence is debounced at 5 seconds
     -- Prevents excessive disk I/O during bulk operations
     -- Index also force-saved on project switch and app shutdown
 }
@@ -234,8 +237,9 @@ invariant NativeAcceleratedExecution {
     -- inference pass and inputs are truncated to a bounded sequence_length, so
     -- (re)indexing many posts is not serialised one document at a time.
     -- Current implementation: Bumblebee + EXLA, which is native CPU on Apple
-    -- Silicon (XLA has no Metal backend). Apple GPU acceleration via EMLX/MLX
-    -- is tracked as a follow-up (SPECGAPS A1-14c).
+    -- Silicon (XLA has no Metal backend); neighbour search is HNSW (hnswlib).
+    -- Apple GPU acceleration via EMLX/MLX is tracked as a follow-up
+    -- (SPECGAPS A1-14c).
 }
 
 invariant ModelCaching {
@@ -245,7 +249,7 @@ invariant ModelCaching {
 }
 
 invariant ProjectIsolation {
-    -- Each project has its own USearch index file and embedding_keys rows
+    -- Each project has its own HNSW index file and embedding_keys rows
     -- On project switch: save current index, load new project's index
     -- Model pipeline shared across projects (not reloaded)
 }

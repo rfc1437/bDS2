@@ -37,6 +37,7 @@ defmodule BDS.MixProject do
       {:nx, "~> 0.10"},
       {:exla, "~> 0.10"},
       {:bumblebee, "~> 0.6.3"},
+      {:hnswlib, "~> 0.1.7"},
       {:stemex, "~> 0.2.1"},
       {:gettext, "~> 0.24"},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
@@ -63,7 +64,7 @@ defmodule BDS.MixProject do
     env = Mix.env()
 
     [
-      plt_add_apps: [:mix, :inets, :ssl, :nx, :exla, :bumblebee],
+      plt_add_apps: [:mix, :inets, :ssl, :nx, :exla, :bumblebee, :hnswlib],
       paths: ["_build/#{env}/lib/bds/ebin"]
     ]
   end

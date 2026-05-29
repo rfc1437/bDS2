@@ -395,6 +395,8 @@ defmodule BDS.MaintenanceTest do
     assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
 
     index_path = BDS.Embeddings.index_path(project.id)
+    # Index persistence is debounced (5s); force it to assert the file.
+    :ok = BDS.Embeddings.Index.flush(project.id)
     assert File.exists?(index_path)
 
     Repo.delete_all(from key in BDS.Embeddings.Key, where: key.project_id == ^project.id)
@@ -416,6 +418,8 @@ defmodule BDS.MaintenanceTest do
 
     assert post.id in rebuilt_post_ids
     assert Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: post.id) != nil
+
+    :ok = BDS.Embeddings.Index.flush(project.id)
     assert File.exists?(index_path)
   end
 
