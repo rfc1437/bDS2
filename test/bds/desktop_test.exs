@@ -256,6 +256,53 @@ defmodule BDS.DesktopTest do
     assert_receive :window_quit_requested
   end
 
+  test "the app owns final termination instead of delegating to Desktop.Window/System.halt" do
+    # Desktop.Window.quit/0 routes through System.halt/1, which runs the wx C++
+    # static destructors on exit and crashes on macOS. The app-owned shutdown
+    # must terminate the OS process directly with SIGKILL instead.
+    assert BDS.Desktop.Shutdown.quit_module() == BDS.Desktop.Shutdown
+  end
+
+  test "hard quit terminates the BEAM OS process with SIGKILL rather than libc exit" do
+    previous_kill = Application.get_env(:bds, :desktop_os_kill_fun)
+    test_pid = self()
+
+    Application.put_env(:bds, :desktop_os_kill_fun, fn os_pid ->
+      send(test_pid, {:os_killed, to_string(os_pid)})
+      :ok
+    end)
+
+    on_exit(fn -> restore_env(:desktop_os_kill_fun, previous_kill) end)
+
+    assert :ok = BDS.Desktop.Shutdown.quit()
+    assert_receive {:os_killed, beam_pid}
+    assert beam_pid == to_string(:os.getpid())
+  end
+
+  test "hard quit kills heart before itself so the app is not relaunched" do
+    previous_kill = Application.get_env(:bds, :desktop_os_kill_fun)
+    test_pid = self()
+
+    {:ok, fake_heart} =
+      Agent.start(fn -> :ok end, name: :heart)
+
+    Application.put_env(:bds, :desktop_os_kill_fun, fn os_pid ->
+      send(test_pid, {:os_killed, to_string(os_pid)})
+      :ok
+    end)
+
+    on_exit(fn ->
+      restore_env(:desktop_os_kill_fun, previous_kill)
+      if Process.alive?(fake_heart), do: Agent.stop(fake_heart)
+    end)
+
+    assert :ok = BDS.Desktop.Shutdown.quit()
+    # heart has no linked port here, so only the BEAM itself is killed, and the
+    # call must not crash while inspecting the heart process.
+    assert_receive {:os_killed, beam_pid}
+    assert beam_pid == to_string(:os.getpid())
+  end
+
   test "desktop root html is a LiveView shell and references the generated asset entrypoints" do
     conn = conn(:get, "/?k=#{Desktop.Auth.login_key()}")
     conn = BDS.Desktop.Endpoint.call(conn, BDS.Desktop.Endpoint.init([]))
