@@ -524,6 +524,59 @@ defmodule BDS.MediaTest do
     assert contents =~ "caption: \"Bildunterschrift\"\n---"
   end
 
+  test "UniqueMediaTranslation: a media has at most one translation per language", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    source_path = Path.join(temp_dir, "sample.txt")
+    File.write!(source_path, "hello media")
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    assert {:ok, first} =
+             BDS.Media.upsert_media_translation(media.id, "de", %{title: "Titel"})
+
+    # Re-upserting the same language updates the existing row instead of adding a second.
+    assert {:ok, second} =
+             BDS.Media.upsert_media_translation(media.id, "de", %{title: "Geändert"})
+
+    assert second.id == first.id
+
+    assert [persisted] =
+             BDS.Media.Translation
+             |> where([t], t.translation_for == ^media.id and t.language == "de")
+             |> Repo.all()
+
+    assert persisted.title == "Geändert"
+
+    # A direct insert of a distinct row with the same (media, language) is rejected by the
+    # unique constraint backing the invariant.
+    now = BDS.Persistence.now_ms()
+
+    duplicate =
+      BDS.Media.Translation.changeset(%BDS.Media.Translation{}, %{
+        id: Ecto.UUID.generate(),
+        project_id: media.project_id,
+        translation_for: media.id,
+        language: "de",
+        title: "Duplicate",
+        created_at: now,
+        updated_at: now
+      })
+
+    assert {:error, changeset} = Repo.insert(duplicate)
+    assert %{language: ["has already been taken"]} = errors_on(changeset)
+  end
+
+  defp errors_on(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
+      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
+        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+      end)
+    end)
+  end
+
   defp tiny_jpeg_binary do
     Image.new!(3, 2, color: [255, 0, 0])
     |> Image.write!(:memory, suffix: ".jpg", quality: 85)
