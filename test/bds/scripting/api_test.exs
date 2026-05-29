@@ -109,6 +109,33 @@ defmodule BDS.Scripting.ApiTest do
     assert {:error, _reason} = BDS.Scripting.execute_macro(project.id, bad_source, [])
   end
 
+  test "macro execution is bounded by its timeout budget (MacroTimeout)", %{project: project} do
+    # An entrypoint that never returns must not run forever: the macro timeout
+    # budget terminates it and degrades to an error. max_reductions: :none forces
+    # the luerl sandbox onto its wall-clock path so we exercise the time budget
+    # itself rather than the reduction limit.
+    looping_source = "function render() while true do end end"
+    budget_ms = 150
+
+    {elapsed_us, result} =
+      :timer.tc(fn ->
+        BDS.Scripting.execute_macro(project.id, looping_source, [],
+          timeout: budget_ms,
+          max_reductions: :none
+        )
+      end)
+
+    assert {:error, :timeout} = result
+
+    elapsed_ms = div(elapsed_us, 1000)
+
+    # The macro must be killed close to its budget, never allowed to run for the
+    # default multi-minute script timeout. Generous upper bound to stay stable
+    # on loaded CI while still proving the budget is enforced.
+    assert elapsed_ms < 2_000,
+           "macro ran for #{elapsed_ms}ms, expected termination near the #{budget_ms}ms budget"
+  end
+
   test "project scripting exposes project, post, script, template, metadata, and task namespaces",
        %{
          project: project
