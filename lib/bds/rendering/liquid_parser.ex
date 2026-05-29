@@ -23,12 +23,21 @@ defmodule BDS.Rendering.LiquidParser do
   three custom filters (`i18n`, `markdown`, `slugify`) are permitted. Any other
   filter (`upcase`, `date`, `truncate`, `split`, `join`, …) is rejected even
   though Liquex would otherwise apply it as a built-in standard filter.
+
+  `validate/1` also enforces the `LiquidOperatorSubset` invariant: only the
+  `==` and `>` comparison operators are permitted (alongside the `and`/`or`
+  logical operators and bare-variable truthiness). Any other comparison
+  operator (`!=`, `<`, `>=`, `<=`, `contains`) is rejected even though Liquex
+  would otherwise evaluate it.
   """
 
   import NimbleParsec
 
   # LiquidFilterSubset invariant (specs/template.allium).
   @allowed_filters ~w(escape url_encode default append i18n markdown slugify)
+
+  # LiquidOperatorSubset invariant (specs/template.allium).
+  @allowed_operators [:==, :>]
 
   @doc "The filter names permitted by the `LiquidFilterSubset` invariant."
   @spec allowed_filters() :: [String.t()]
@@ -46,9 +55,12 @@ defmodule BDS.Rendering.LiquidParser do
   def validate(source) when is_binary(source) do
     case Liquex.parse(source, __MODULE__) do
       {:ok, ast} ->
-        case unsupported_filters(ast) do
-          [] -> {:ok, ast}
-          [name | _] -> {:error, "unsupported filter: #{name}", 0}
+        with [] <- unsupported_filters(ast),
+             [] <- unsupported_operators(ast) do
+          {:ok, ast}
+        else
+          [{:filter, name} | _] -> {:error, "unsupported filter: #{name}", 0}
+          [{:operator, op} | _] -> {:error, "unsupported operator: #{op}", 0}
         end
 
       {:error, _reason, _line} = error ->
@@ -56,12 +68,22 @@ defmodule BDS.Rendering.LiquidParser do
     end
   end
 
-  @spec unsupported_filters(term()) :: [String.t()]
+  @spec unsupported_filters(term()) :: [{:filter, String.t()}]
   defp unsupported_filters(ast) do
     ast
     |> collect_filters()
     |> Enum.uniq()
     |> Enum.reject(&(&1 in @allowed_filters))
+    |> Enum.map(&{:filter, &1})
+  end
+
+  @spec unsupported_operators(term()) :: [{:operator, String.t()}]
+  defp unsupported_operators(ast) do
+    ast
+    |> collect_operators()
+    |> Enum.uniq()
+    |> Enum.reject(&(&1 in @allowed_operators))
+    |> Enum.map(&{:operator, operator_to_string(&1)})
   end
 
   @spec collect_filters(term()) :: [String.t()]
@@ -72,6 +94,16 @@ defmodule BDS.Rendering.LiquidParser do
   defp collect_filters(term) when is_tuple(term), do: collect_filters(Tuple.to_list(term))
   defp collect_filters(term) when is_list(term), do: Enum.flat_map(term, &collect_filters/1)
   defp collect_filters(_term), do: []
+
+  @spec collect_operators(term()) :: [atom()]
+  defp collect_operators({:op, op}) when is_atom(op), do: [op]
+  defp collect_operators(term) when is_tuple(term), do: collect_operators(Tuple.to_list(term))
+  defp collect_operators(term) when is_list(term), do: Enum.flat_map(term, &collect_operators/1)
+  defp collect_operators(_term), do: []
+
+  @spec operator_to_string(atom()) :: String.t()
+  defp operator_to_string(:contains), do: "contains"
+  defp operator_to_string(op), do: Atom.to_string(op)
 
   @tags [
     Liquex.Tag.AssignTag,

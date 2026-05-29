@@ -223,6 +223,10 @@ invariant LiquidOperatorSubset {
     -- Special values: blank (nil/empty comparison)
     -- Property access: dot notation (object.property), .size on arrays,
     --   bracket notation for map lookups (map[key])
+    --
+    -- Enforced at publish/validation time (LiquidParser.validate); any other
+    -- comparison operator (!=, <, >=, <=, contains) is rejected even though
+    -- Liquex would otherwise evaluate it.
 }
 
 invariant LiquidRenderContext {

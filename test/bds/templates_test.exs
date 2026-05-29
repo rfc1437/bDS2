@@ -389,6 +389,59 @@ defmodule BDS.TemplatesTest do
     end
   end
 
+  # LiquidOperatorSubset invariant (template.allium): only == and > comparison
+  # operators (plus the and/or logical operators and bare-variable truthiness)
+  # are allowed. Any other comparison operator must be rejected at publish time,
+  # even though Liquex would otherwise evaluate it.
+  for op <- ["!=", "<", ">=", "<=", "contains"] do
+    @op_name op
+    test "publish_template rejects unsupported Liquid operator #{op}", %{
+      project: project
+    } do
+      op = @op_name
+
+      assert {:ok, template} =
+               BDS.Templates.create_template(%{
+                 project_id: project.id,
+                 title: "Operator #{op}",
+                 kind: :post,
+                 content: "{% if title #{op} other %}yes{% endif %}"
+               })
+
+      assert {:error, {:invalid_liquid, reason}} =
+               BDS.Templates.publish_template(template.id)
+
+      assert reason =~ "unsupported operator: #{op}"
+
+      reloaded = Repo.get!(BDS.Templates.Template, template.id)
+      assert reloaded.status == :draft
+    end
+  end
+
+  for content <- [
+        "{% if title == other %}yes{% endif %}",
+        "{% if total > 0 %}yes{% endif %}",
+        "{% if published %}yes{% endif %}",
+        "{% if a == b and c > d %}yes{% endif %}",
+        "{% if a == b or c == d %}yes{% endif %}"
+      ] do
+    @op_content content
+    test "publish_template allows supported operators in #{content}", %{project: project} do
+      content = @op_content
+
+      assert {:ok, template} =
+               BDS.Templates.create_template(%{
+                 project_id: project.id,
+                 title: "Allowed #{content}",
+                 kind: :post,
+                 content: content
+               })
+
+      assert {:ok, published} = BDS.Templates.publish_template(template.id)
+      assert published.status == :published
+    end
+  end
+
   test "rebuild_templates_from_files recreates published templates from disk", %{
     project: project,
     temp_dir: temp_dir
