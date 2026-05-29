@@ -286,15 +286,16 @@ defmodule BDS.AITest do
   end
 
   test "model_capabilities does not create atoms from unknown capability keys" do
-    before = :erlang.system_info(:atom_count)
+    fictive_key = "csm001_fictive_#{:erlang.unique_integer()}"
+    another_key = "another_unknown_#{:erlang.unique_integer()}"
 
     malicious_caps =
       Jason.encode!(%{
         "supports_attachment" => true,
         "supports_tool_calls" => false,
         "disables_reasoning" => false,
-        "csm001_fictive_#{:erlang.unique_integer()}" => true,
-        "another_unknown_#{:erlang.unique_integer()}" => 42
+        fictive_key => true,
+        another_key => 42
       })
 
     :ok = BDS.AI.SettingsStore.put_setting("ai.model_capabilities.csm-test-model", malicious_caps)
@@ -303,8 +304,9 @@ defmodule BDS.AITest do
     assert result.supports_attachment == true
     assert result.supports_tool_calls == false
 
-    after_count = :erlang.system_info(:atom_count)
-    assert after_count == before
+    # Unknown keys must remain as strings, not converted to atoms
+    assert_raise ArgumentError, fn -> String.to_existing_atom(fictive_key) end
+    assert_raise ArgumentError, fn -> String.to_existing_atom(another_key) end
   end
 
   test "put_endpoint, get_endpoint, and delete_endpoint manage encrypted endpoint settings" do
