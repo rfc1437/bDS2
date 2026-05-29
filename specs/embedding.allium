@@ -48,7 +48,8 @@ value EmbeddingModel {
     -- Lazy-loaded: pipeline created on first embedding request, not at startup
     -- Text preprocessing: prefix all input with "query: " (e5 convention)
     -- Pooling: mean pooling + L2 normalization
-    -- Loaded on-device via Bumblebee+EXLA; the canonical e5 weights come from
+    -- Loaded on-device via Bumblebee (EMLX/Apple GPU or EXLA-CPU, see
+    -- NativeAcceleratedExecution); the canonical e5 weights come from
     -- the "intfloat/multilingual-e5-small" repository, surfaced under the
     -- "Xenova/multilingual-e5-small" model_id identifier.
     model_id: String                    -- "Xenova/multilingual-e5-small"
@@ -236,10 +237,12 @@ invariant NativeAcceleratedExecution {
     -- Inference MUST be batched: batch_size inputs are run per compiled
     -- inference pass and inputs are truncated to a bounded sequence_length, so
     -- (re)indexing many posts is not serialised one document at a time.
-    -- Current implementation: Bumblebee + EXLA, which is native CPU on Apple
-    -- Silicon (XLA has no Metal backend); neighbour search is HNSW (hnswlib).
-    -- Apple GPU acceleration via EMLX/MLX is tracked as a follow-up
-    -- (SPECGAPS A1-14c).
+    -- Current implementation: Bumblebee with a runtime-selected defn compiler.
+    -- On Apple Silicon the model runs on the Apple GPU via EMLX (MLX/Metal,
+    -- params placed on the EMLX.Backend GPU device); everywhere else, and as a
+    -- fallback when EMLX is unavailable, it runs on optimised native CPU via
+    -- EXLA. Selection is `accelerator: :auto | :emlx | :exla` (default :auto).
+    -- Neighbour search is HNSW (hnswlib).
 }
 
 invariant ModelCaching {

@@ -68,7 +68,10 @@ config :bds, :embeddings,
   # Inference is batched: batch_size texts per compiled run, truncated to
   # sequence_length tokens. Tuning these trades throughput against memory.
   batch_size: 16,
-  sequence_length: 256
+  sequence_length: 256,
+  # Hardware acceleration: :auto prefers the Apple GPU (EMLX/Metal) on Apple
+  # Silicon and falls back to EXLA-CPU elsewhere. Force with :emlx or :exla.
+  accelerator: :auto
 
 # Cache downloaded model files under the app data directory so they persist
 # across sessions (ModelCaching invariant). Overridden at runtime in prod.

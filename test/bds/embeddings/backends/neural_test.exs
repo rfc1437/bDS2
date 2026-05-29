@@ -36,4 +36,36 @@ defmodule BDS.Embeddings.Backends.NeuralTest do
 
     assert BDS.Embeddings.Backend in behaviours
   end
+
+  describe "accelerator selection (NativeAcceleratedExecution)" do
+    test "auto prefers Apple GPU (EMLX) when available on Apple Silicon" do
+      assert Neural.select_accelerator(:auto, true, true) == :emlx
+    end
+
+    test "auto falls back to EXLA-CPU off Apple Silicon" do
+      assert Neural.select_accelerator(:auto, true, false) == :exla
+    end
+
+    test "auto falls back to EXLA-CPU when EMLX is unavailable" do
+      assert Neural.select_accelerator(:auto, false, true) == :exla
+    end
+
+    test "explicit :exla is honoured even on Apple Silicon with EMLX present" do
+      assert Neural.select_accelerator(:exla, true, true) == :exla
+    end
+
+    test "explicit :emlx is honoured when available" do
+      assert Neural.select_accelerator(:emlx, true, true) == :emlx
+      assert Neural.select_accelerator(:emlx, true, false) == :emlx
+    end
+
+    test "explicit :emlx degrades to EXLA when EMLX is unavailable" do
+      assert Neural.select_accelerator(:emlx, false, true) == :exla
+    end
+
+    test "defn options map each accelerator to its native compiler" do
+      assert Neural.defn_options(:emlx) == [compiler: EMLX]
+      assert Neural.defn_options(:exla) == [compiler: EXLA]
+    end
+  end
 end

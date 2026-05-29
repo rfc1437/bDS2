@@ -23,8 +23,17 @@ defmodule BDS.Embeddings.Backends.Neural do
       compiled for a fixed `batch_size`/`sequence_length` (configurable);
       shorter sequences mean less wasted transformer compute.
 
-  EXLA on Apple Silicon runs on the CPU — XLA has no Metal/GPU backend. See
-  SPECGAPS A1-14c for the planned EMLX (Apple GPU via MLX) acceleration path.
+  Hardware acceleration follows the `NativeAcceleratedExecution` invariant.
+  The serving's defn compiler is chosen at build time:
+
+    * On Apple Silicon (arm64 macOS) with EMLX available, inference runs on the
+      Apple GPU via MLX/Metal (`compiler: EMLX`, params placed on the
+      `EMLX.Backend` GPU device).
+    * Everywhere else — and as a fallback when EMLX is unavailable or explicitly
+      disabled — it runs on optimised native CPU via XLA (`compiler: EXLA`).
+
+  The accelerator can be pinned with `config :bds, :embeddings, accelerator:`
+  to `:auto` (default), `:emlx`, or `:exla`.
   """
 
   @behaviour BDS.Embeddings.Backend
@@ -39,6 +48,7 @@ defmodule BDS.Embeddings.Backends.Neural do
   @default_dimensions 384
   @default_batch_size 16
   @default_sequence_length 256
+  @default_accelerator :auto
 
   def child_spec(opts) do
     %{id: __MODULE__, start: {__MODULE__, :start_link, [opts]}}
@@ -124,6 +134,8 @@ defmodule BDS.Embeddings.Backends.Neural do
 
   defp build_serving do
     repo = {:hf, Keyword.get(config(), :model_repo, @default_model_repo)}
+    accelerator = current_accelerator()
+    maybe_set_default_backend(accelerator)
 
     with {:ok, model_info} <- Bumblebee.load_model(repo),
          {:ok, tokenizer} <- Bumblebee.load_tokenizer(repo) do
@@ -133,11 +145,56 @@ defmodule BDS.Embeddings.Backends.Neural do
           output_attribute: :hidden_state,
           embedding_processor: :l2_norm,
           compile: [batch_size: batch_size(), sequence_length: sequence_length()],
-          defn_options: [compiler: EXLA]
+          defn_options: defn_options(accelerator)
         )
 
       {:ok, serving}
     end
+  end
+
+  # Place model params/tensors on the Apple GPU (Metal) when accelerating with
+  # EMLX so the compiled inference pass actually runs on-device. EXLA manages
+  # its own device placement, so nothing to do there.
+  defp maybe_set_default_backend(:emlx), do: Nx.global_default_backend({EMLX.Backend, device: :gpu})
+  defp maybe_set_default_backend(:exla), do: :ok
+
+  @doc false
+  @spec defn_options(:emlx | :exla) :: keyword()
+  def defn_options(:emlx), do: [compiler: EMLX]
+  def defn_options(:exla), do: [compiler: EXLA]
+
+  @doc false
+  @spec current_accelerator() :: :emlx | :exla
+  def current_accelerator do
+    select_accelerator(configured_accelerator(), emlx_available?(), apple_silicon?())
+  end
+
+  @doc """
+  Pure accelerator-selection policy for `NativeAcceleratedExecution`.
+
+  Prefer the Apple GPU (EMLX) under `:auto` only when it is both available and
+  running on Apple Silicon; honour an explicit `:emlx`/`:exla` request, but
+  degrade a forced `:emlx` to EXLA when EMLX is not loaded so a misconfigured
+  host still gets working CPU inference instead of crashing.
+  """
+  @spec select_accelerator(:auto | :emlx | :exla, boolean(), boolean()) :: :emlx | :exla
+  def select_accelerator(:exla, _emlx_available?, _apple_silicon?), do: :exla
+  def select_accelerator(:emlx, true, _apple_silicon?), do: :emlx
+  def select_accelerator(:emlx, false, _apple_silicon?), do: :exla
+  def select_accelerator(:auto, true, true), do: :emlx
+  def select_accelerator(:auto, _emlx_available?, _apple_silicon?), do: :exla
+
+  defp configured_accelerator do
+    config() |> Keyword.get(:accelerator, @default_accelerator)
+  end
+
+  defp emlx_available? do
+    Code.ensure_loaded?(EMLX) and Code.ensure_loaded?(EMLX.Backend)
+  end
+
+  defp apple_silicon? do
+    :os.type() == {:unix, :darwin} and
+      to_string(:erlang.system_info(:system_architecture)) =~ ~r/aarch64|arm/
   end
 
   defp batch_size do

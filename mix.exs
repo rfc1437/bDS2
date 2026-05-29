@@ -36,6 +36,10 @@ defmodule BDS.MixProject do
       {:image, "~> 0.67"},
       {:nx, "~> 0.10"},
       {:exla, "~> 0.10"},
+      # Apple Silicon GPU (Metal) acceleration for embedding inference. Ships
+      # precompiled MLX binaries; the Neural backend prefers it on arm64 macOS
+      # and falls back to EXLA-CPU elsewhere (SPECGAPS A1-14c).
+      {:emlx, "~> 0.2.0"},
       {:bumblebee, "~> 0.6.3"},
       {:hnswlib, "~> 0.1.7"},
       {:stemex, "~> 0.2.1"},
@@ -64,7 +68,7 @@ defmodule BDS.MixProject do
     env = Mix.env()
 
     [
-      plt_add_apps: [:mix, :inets, :ssl, :nx, :exla, :bumblebee, :hnswlib],
+      plt_add_apps: [:mix, :inets, :ssl, :nx, :exla, :emlx, :bumblebee, :hnswlib],
       paths: ["_build/#{env}/lib/bds/ebin"]
     ]
   end
