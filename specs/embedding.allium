@@ -87,6 +87,8 @@ config {
     debounce_persist: Duration = 5.seconds
     -- Index file: {userData}/projects/{projectId}/embeddings.usearch
     -- Key mapping is persisted alongside the embedding records
+    batch_size: Integer = 16            -- texts per batched inference run
+    sequence_length: Integer = 256      -- max tokens per input (truncated)
 }
 
 -- ─── Gating ─────────────────────────────────────────────────
@@ -222,6 +224,18 @@ invariant RealNeuralModel {
     -- Cross-language semantic similarity is a primary requirement:
     -- posts in different languages about the same topic must produce similar vectors.
     -- This is only achievable with the trained multilingual transformer model.
+}
+
+invariant NativeAcceleratedExecution {
+    -- Model execution MUST use the platform's native hardware acceleration
+    -- where available (GPU/Metal/Neural Engine on Apple Silicon, CUDA on
+    -- NVIDIA, etc.), and otherwise fall back to optimised native CPU execution.
+    -- Inference MUST be batched: batch_size inputs are run per compiled
+    -- inference pass and inputs are truncated to a bounded sequence_length, so
+    -- (re)indexing many posts is not serialised one document at a time.
+    -- Current implementation: Bumblebee + EXLA, which is native CPU on Apple
+    -- Silicon (XLA has no Metal backend). Apple GPU acceleration via EMLX/MLX
+    -- is tracked as a follow-up (SPECGAPS A1-14c).
 }
 
 invariant ModelCaching {

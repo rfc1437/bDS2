@@ -37,6 +37,17 @@ defmodule BDS.Embeddings.Backends.InApp do
     {:ok, vector}
   end
 
+  @impl true
+  def embed_many(texts, opts) when is_list(texts) and is_list(opts) do
+    vectors =
+      Enum.map(texts, fn text ->
+        {:ok, vector} = embed(text, opts)
+        vector
+      end)
+
+    {:ok, vectors}
+  end
+
   defp tokenize(text) do
     Regex.scan(~r/[[:alnum:]]+/u, String.downcase(text))
     |> List.flatten()

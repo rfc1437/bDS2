@@ -64,7 +64,11 @@ config :bds, :embeddings,
   backend: BDS.Embeddings.Backends.Neural,
   model_id: "Xenova/multilingual-e5-small",
   model_repo: "intfloat/multilingual-e5-small",
-  dimensions: 384
+  dimensions: 384,
+  # Inference is batched: batch_size texts per compiled run, truncated to
+  # sequence_length tokens. Tuning these trades throughput against memory.
+  batch_size: 16,
+  sequence_length: 256
 
 # Cache downloaded model files under the app data directory so they persist
 # across sessions (ModelCaching invariant). Overridden at runtime in prod.

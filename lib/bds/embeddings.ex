@@ -75,21 +75,7 @@ defmodule BDS.Embeddings do
         )
 
       existing_keys = preload_keys_by_post_id(project_id, Enum.map(posts, & &1.id))
-      base_label = max_label_value()
-
-      {rows, _next_label} =
-        Enum.reduce(posts, {[], base_label + 1}, fn post, {acc, next_label} ->
-          existing_key = Map.get(existing_keys, post.id)
-
-          case compute_key_data(post, existing_key, next_label) do
-            :skip ->
-              {acc, next_label}
-
-            {:upsert, row} ->
-              bump = if existing_key, do: 0, else: 1
-              {[row | acc], next_label + bump}
-          end
-        end)
+      rows = build_key_rows(posts, existing_keys, max_label_value(), nil)
 
       batch_upsert_keys(rows)
       :ok = rebuild_snapshot(project_id)
@@ -113,9 +99,6 @@ defmodule BDS.Embeddings do
         )
 
       post_ids = Enum.map(posts, & &1.id)
-      total_posts = length(posts)
-
-      :ok = report_rebuild_started(on_progress, total_posts, "embedding entries")
 
       Repo.delete_all(
         from key in Key,
@@ -123,24 +106,7 @@ defmodule BDS.Embeddings do
       )
 
       existing_keys = preload_keys_by_post_id(project_id)
-      base_label = max_label_value()
-
-      {rows, _next_label} =
-        posts
-        |> Enum.with_index(1)
-        |> Enum.reduce({[], base_label + 1}, fn {post, index}, {acc, next_label} ->
-          :ok = report_rebuild_progress(on_progress, index, total_posts, "embedding entries")
-          existing_key = Map.get(existing_keys, post.id)
-
-          case compute_key_data(post, existing_key, next_label) do
-            :skip ->
-              {acc, next_label}
-
-            {:upsert, row} ->
-              bump = if existing_key, do: 0, else: 1
-              {[row | acc], next_label + bump}
-          end
-        end)
+      rows = build_key_rows(posts, existing_keys, max_label_value(), on_progress)
 
       batch_upsert_keys(rows)
 
@@ -246,18 +212,83 @@ defmodule BDS.Embeddings do
     Repo.one(from key in Key, select: max(key.label)) || 0
   end
 
-  defp compute_key_data(%Post{} = post, existing_key, next_label) do
-    body = resolve_post_body(post)
-    raw_text = compose_embedding_source(post.title, body)
-    content_hash = hash_text(raw_text)
+  # Builds the upsert rows for a batch of posts. Posts whose content_hash is
+  # unchanged are skipped (ContentHashSkipsUnchanged); the rest are embedded in
+  # batches (see embed_pending/2) so model inference is not serialised one post
+  # at a time. Labels keep their existing value or take the next free integer.
+  defp build_key_rows(posts, existing_keys, base_label, on_progress) do
+    prepared =
+      Enum.map(posts, fn post ->
+        raw_text = compose_embedding_source(post.title, resolve_post_body(post))
+        existing = Map.get(existing_keys, post.id)
+        content_hash = hash_text(raw_text)
 
-    if existing_key && existing_key.content_hash == content_hash do
-      :skip
-    else
-      {:ok, vector} = embed_text(raw_text, post.language)
-      label = if existing_key, do: existing_key.label, else: next_label
-      {:upsert, [label, post.id, post.project_id, content_hash, encode_vector(vector)]}
-    end
+        %{
+          post: post,
+          existing: existing,
+          raw_text: raw_text,
+          content_hash: content_hash,
+          needs_embed?: is_nil(existing) or existing.content_hash != content_hash
+        }
+      end)
+
+    pending = Enum.filter(prepared, & &1.needs_embed?)
+    :ok = report_rebuild_started(on_progress, length(pending), "embedding entries")
+    vectors_by_post_id = embed_pending(pending, on_progress)
+
+    {rows, _next_label} =
+      Enum.reduce(prepared, {[], base_label + 1}, fn entry, {acc, next_label} ->
+        if entry.needs_embed? do
+          vector = Map.fetch!(vectors_by_post_id, entry.post.id)
+          label = if entry.existing, do: entry.existing.label, else: next_label
+          bump = if entry.existing, do: 0, else: 1
+
+          row = [
+            label,
+            entry.post.id,
+            entry.post.project_id,
+            entry.content_hash,
+            encode_vector(vector)
+          ]
+
+          {[row | acc], next_label + bump}
+        else
+          {acc, next_label}
+        end
+      end)
+
+    rows
+  end
+
+  defp embed_pending([], _on_progress), do: %{}
+
+  defp embed_pending(pending, on_progress) do
+    total = length(pending)
+    batch = batch_size()
+
+    pending
+    # Group by language so the lexical stub stems consistently; the neural
+    # backend is multilingual and ignores the language hint.
+    |> Enum.group_by(& &1.post.language)
+    |> Enum.reduce({%{}, 0}, fn {language, group}, acc ->
+      group
+      |> Enum.chunk_every(batch)
+      |> Enum.reduce(acc, fn chunk, {vectors, done} ->
+        {:ok, chunk_vectors} = embed_many(Enum.map(chunk, & &1.raw_text), language)
+
+        vectors =
+          chunk
+          |> Enum.zip(chunk_vectors)
+          |> Enum.reduce(vectors, fn {entry, vector}, acc ->
+            Map.put(acc, entry.post.id, vector)
+          end)
+
+        done = done + length(chunk)
+        :ok = report_rebuild_progress(on_progress, done, total, "embedding entries")
+        {vectors, done}
+      end)
+    end)
+    |> elem(0)
   end
 
   defp batch_upsert_keys([]), do: :ok
@@ -308,21 +339,7 @@ defmodule BDS.Embeddings do
         )
 
       existing_keys = preload_keys_by_post_id(project_id)
-      base_label = max_label_value()
-
-      {rows, _next_label} =
-        Enum.reduce(posts, {[], base_label + 1}, fn post, {acc, next_label} ->
-          existing_key = Map.get(existing_keys, post.id)
-
-          case compute_key_data(post, existing_key, next_label) do
-            :skip ->
-              {acc, next_label}
-
-            {:upsert, row} ->
-              bump = if existing_key, do: 0, else: 1
-              {[row | acc], next_label + bump}
-          end
-        end)
+      rows = build_key_rows(posts, existing_keys, max_label_value(), nil)
 
       batch_upsert_keys(rows)
       :ok = rebuild_snapshot(project_id)
@@ -658,6 +675,32 @@ defmodule BDS.Embeddings do
     # Per-backend preprocessing (e5 "query: " prefix, pooling, normalisation)
     # is the backend's responsibility — see BDS.Embeddings.Backends.Neural.
     configured_backend().embed(raw_text, language: language)
+  end
+
+  # Embeds a batch of texts in one shot. Backends that implement the optional
+  # embed_many/2 callback (e.g. the neural backend, which feeds them through the
+  # model as a single batched inference run) handle the whole list; others fall
+  # back to sequential single embeds.
+  defp embed_many(texts, language) do
+    backend = configured_backend()
+
+    if function_exported?(backend, :embed_many, 2) do
+      backend.embed_many(texts, language: language)
+    else
+      vectors =
+        Enum.map(texts, fn text ->
+          {:ok, vector} = backend.embed(text, language: language)
+          vector
+        end)
+
+      {:ok, vectors}
+    end
+  end
+
+  defp batch_size do
+    Application.get_env(:bds, :embeddings, [])
+    |> Keyword.get(:batch_size, 16)
+    |> max(1)
   end
 
   defp rebuild_snapshot(project_id) do

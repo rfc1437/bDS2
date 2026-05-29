@@ -34,9 +34,13 @@ defmodule BDS.CSM033BatchInsertsTest do
              "expected ON CONFLICT upsert clause"
     end
 
-    test "compute_key_data is used instead of individual Repo.insert_or_update", %{source: source} do
-      assert source =~ "compute_key_data(post, existing_key, next_label)",
-             "expected compute_key_data helper for row computation"
+    test "build_key_rows computes rows for batched upsert instead of individual Repo.insert_or_update",
+         %{source: source} do
+      assert source =~ "build_key_rows(posts, existing_keys",
+             "expected build_key_rows helper for batched row computation"
+
+      assert source =~ "embed_many(",
+             "expected batched embedding via embed_many"
     end
   end
 

@@ -15,6 +15,28 @@ defmodule BDS.EmbeddingsTest do
     end
   end
 
+  defmodule BatchRecordingBackend do
+    @behaviour BDS.Embeddings.Backend
+
+    @recorder :embeddings_batch_recorder
+
+    @impl true
+    def model_info do
+      %{model_id: "batch/multilingual-e5-small", dimensions: 384}
+    end
+
+    @impl true
+    def embed(text, opts) do
+      BDS.Embeddings.Backends.InApp.embed(text, opts)
+    end
+
+    @impl true
+    def embed_many(texts, opts) do
+      Agent.update(@recorder, fn sizes -> [length(texts) | sizes] end)
+      BDS.Embeddings.Backends.InApp.embed_many(texts, opts)
+    end
+  end
+
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
@@ -349,6 +371,46 @@ defmodule BDS.EmbeddingsTest do
     # The packed vector still drives similarity queries.
     assert {:ok, scores} = BDS.Embeddings.compute_similarities(post.id, [post.id])
     assert is_map(scores)
+  end
+
+  test "rebuilding embeds posts in batches instead of one at a time", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    for index <- 1..5 do
+      assert {:ok, post} =
+               BDS.Posts.create_post(%{
+                 project_id: project.id,
+                 title: "Batch #{index}",
+                 content: "space rocket orbit mission galaxy #{index}",
+                 language: "en"
+               })
+
+      assert {:ok, _post} = BDS.Posts.publish_post(post.id)
+    end
+
+    # Simulate the post-migration state where the vector cache is empty, so the
+    # rebuild has to (re)embed every post.
+    BDS.Repo.delete_all(BDS.Embeddings.Key)
+
+    {:ok, _recorder} = Agent.start_link(fn -> [] end, name: :embeddings_batch_recorder)
+
+    Application.put_env(:bds, :embeddings,
+      backend: BatchRecordingBackend,
+      model_id: "batch/multilingual-e5-small",
+      dimensions: 384,
+      batch_size: 3
+    )
+
+    assert {:ok, rebuilt} = BDS.Embeddings.reindex_all(project.id)
+    assert length(rebuilt) == 5
+
+    batch_sizes = Agent.get(:embeddings_batch_recorder, & &1)
+
+    # 5 pending posts at batch_size 3 → one batch of 3 and one of 2, never
+    # one-at-a-time.
+    assert Enum.sort(batch_sizes, :desc) == [3, 2]
+    assert Enum.max(batch_sizes) > 1
   end
 
   test "reindex_all rebuilds stored embeddings for the whole project", %{project: project} do

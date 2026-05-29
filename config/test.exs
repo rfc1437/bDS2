@@ -15,4 +15,6 @@ config :bds, :embeddings,
   backend: BDS.Embeddings.Backends.InApp,
   model_id: "Xenova/multilingual-e5-small",
   model_repo: "intfloat/multilingual-e5-small",
-  dimensions: 384
+  dimensions: 384,
+  batch_size: 16,
+  sequence_length: 256
