@@ -114,10 +114,19 @@ defmodule BDS.Git do
   def history(project_id, branch, opts \\ [])
       when is_binary(project_id) and is_binary(branch) and is_list(opts) do
     with {:ok, project_dir} <- project_dir(project_id),
-         {:ok, local_log} <- run_git(project_dir, ["log", "--format=%H%x09%s", branch], opts),
-         {:ok, remote_log} <-
-           run_git(project_dir, ["log", "--format=%H", "origin/#{branch}"], opts) do
-      local_commits = parse_local_history(local_log)
+         {:ok, local_log} <-
+           run_git(
+             project_dir,
+             ["log", "--date=short", "--format=%H%x09%an%x09%ad%x09%s", branch],
+             opts
+           ) do
+      remote_log =
+        case run_git(project_dir, ["log", "--format=%H", "origin/#{branch}"], opts) do
+          {:ok, output} -> output
+          {:error, {:git_failed, _message}} -> ""
+        end
+
+      local_commits = parse_history_log(local_log)
       remote_hashes = MapSet.new(parse_remote_history(remote_log))
       local_hashes = MapSet.new(Enum.map(local_commits, & &1.hash))
 
@@ -126,7 +135,7 @@ defmodule BDS.Git do
         |> MapSet.difference(local_hashes)
         |> MapSet.to_list()
         |> Enum.map(fn hash ->
-          %{hash: hash, subject: nil, sync_status: %{kind: :remote_only}}
+          %{hash: hash, subject: nil, author: nil, date: nil, sync_status: %{kind: :remote_only}}
         end)
 
       commits =
@@ -201,6 +210,22 @@ defmodule BDS.Git do
     with {:ok, project_dir} <- project_dir(project_id),
          {:ok, output} <- run_git(project_dir, ["lfs", "prune", "--recent"], opts) do
       {:ok, %{retained_recent: retain_recent, output: output}}
+    end
+  end
+
+  def set_remote(project_id, remote_url, opts \\ [])
+      when is_binary(project_id) and is_binary(remote_url) and is_list(opts) do
+    with {:ok, project_dir} <- project_dir(project_id) do
+      case run_git(project_dir, ["remote", "add", "origin", remote_url], opts) do
+        {:ok, _output} ->
+          {:ok, %{remote_url: remote_url}}
+
+        {:error, {:git_failed, _message}} ->
+          with {:ok, _output} <-
+                 run_git(project_dir, ["remote", "set-url", "origin", remote_url], opts) do
+            {:ok, %{remote_url: remote_url}}
+          end
+      end
     end
   end
 
@@ -376,6 +401,23 @@ defmodule BDS.Git do
       case String.split(line, "\t", parts: 2) do
         [hash, subject] -> %{hash: hash, subject: subject}
         [hash] -> %{hash: hash, subject: nil}
+      end
+    end)
+  end
+
+  defp parse_history_log(output) do
+    output
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      case String.split(line, "\t", parts: 4) do
+        [hash, author, date, subject] ->
+          %{hash: hash, author: author, date: date, subject: subject}
+
+        [hash, author, date] ->
+          %{hash: hash, author: author, date: date, subject: nil}
+
+        [hash | _rest] ->
+          %{hash: hash, author: nil, date: nil, subject: nil}
       end
     end)
   end

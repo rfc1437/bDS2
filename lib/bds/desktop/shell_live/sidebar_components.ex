@@ -257,6 +257,7 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
       "media_grid" -> render_media_sidebar(assigns)
       "entity_list" -> render_entity_sidebar(assigns)
       "nav_list" -> render_nav_sidebar(assigns)
+      "git" -> render_git_sidebar(assigns)
       _other -> render_default_sidebar(assigns)
     end
   end
@@ -480,6 +481,141 @@ defmodule BDS.Desktop.ShellLive.SidebarComponents do
         </button>
       <% end %>
     </div>
+    """
+  end
+
+  defp render_git_sidebar(assigns) do
+    assigns = assign(assigns, :git_state, Map.get(assigns.sidebar_data, :git_state, "not_a_repo"))
+
+    ~H"""
+    <div class="git-sidebar">
+      <%= if @git_state == "active" do %>
+        <%= render_git_active(assigns) %>
+      <% else %>
+        <%= render_git_not_a_repo(assigns) %>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp render_git_not_a_repo(assigns) do
+    ~H"""
+    <section class="git-section git-not-a-repo">
+      <p class="git-empty-hint"><%= dgettext("ui", "This project is not a Git repository yet.") %></p>
+      <form class="git-init-form flex flex-col gap-2" data-testid="git-init-form" phx-submit="git_initialize">
+        <input
+          type="text"
+          name="git[remote_url]"
+          placeholder={dgettext("ui", "Remote URL (optional)")}
+          value={Map.get(@sidebar_data, :remote_url) || ""}
+        />
+        <button class="git-action-button" data-testid="git-initialize" type="submit">
+          <%= dgettext("ui", "Initialize Git") %>
+        </button>
+      </form>
+    </section>
+    """
+  end
+
+  defp render_git_active(assigns) do
+    ~H"""
+    <header class="git-header">
+      <div class="git-branch-row flex items-center gap-2">
+        <span class="git-branch-icon">⎇</span>
+        <span class="git-branch" data-testid="git-branch"><%= @sidebar_data.branch %></span>
+        <%= if @sidebar_data.upstream do %>
+          <span class="git-upstream" data-testid="git-upstream"><%= @sidebar_data.upstream %></span>
+        <% end %>
+      </div>
+      <div class="git-tracking flex items-center gap-3">
+        <span class="git-ahead" data-testid="git-ahead" title={dgettext("ui", "Ahead")}>↑ <%= @sidebar_data.ahead %></span>
+        <span class="git-behind" data-testid="git-behind" title={dgettext("ui", "Behind")}>↓ <%= @sidebar_data.behind %></span>
+      </div>
+      <div class="git-sync-legend flex items-center gap-3">
+        <span class="git-legend-item"><span class="git-sync-dot git-sync-synced"></span><%= dgettext("ui", "Synced") %></span>
+        <span class="git-legend-item"><span class="git-sync-dot git-sync-local_only"></span><%= dgettext("ui", "Local only") %></span>
+        <span class="git-legend-item"><span class="git-sync-dot git-sync-remote_only"></span><%= dgettext("ui", "Remote only") %></span>
+      </div>
+    </header>
+
+    <div class="git-actions flex items-center gap-2">
+      <button class="git-action-button" data-testid="git-action-fetch" type="button" phx-click="git_fetch" title={dgettext("ui", "Fetch")}><%= dgettext("ui", "Fetch") %></button>
+      <button class="git-action-button" data-testid="git-action-pull" type="button" phx-click="git_pull" title={dgettext("ui", "Pull")}><%= dgettext("ui", "Pull") %></button>
+      <button class="git-action-button" data-testid="git-action-push" type="button" phx-click="git_push" title={dgettext("ui", "Push")}><%= dgettext("ui", "Push") %></button>
+      <button class="git-action-button" data-testid="git-action-prune-lfs" type="button" phx-click="git_prune_lfs" title={dgettext("ui", "Prune LFS")}><%= dgettext("ui", "Prune LFS") %></button>
+    </div>
+
+    <section class="git-section git-changes">
+      <div class="git-section-title">
+        <span><%= dgettext("ui", "Changes") %></span>
+        <span class="git-section-count"><%= length(@sidebar_data.status_files) %></span>
+      </div>
+
+      <form class="git-commit-form flex flex-col gap-2" data-testid="git-commit-form" phx-submit="git_commit">
+        <input type="text" name="git[message]" placeholder={dgettext("ui", "Commit message")} />
+        <button class="git-action-button" data-testid="git-commit" type="submit"><%= dgettext("ui", "Commit") %></button>
+      </form>
+
+      <%= if Enum.any?(@sidebar_data.status_files) do %>
+        <div class="git-status-list flex flex-col">
+          <%= for file <- @sidebar_data.status_files do %>
+            <button
+              class="git-status-file flex items-center justify-between gap-2"
+              data-testid="git-status-file"
+              data-route="git_diff"
+              type="button"
+              title={"#{file.label}: #{file.path}"}
+              phx-click="open_sidebar_item"
+              phx-value-route="git_diff"
+              phx-value-id={"git-diff:" <> file.path}
+              phx-value-title={file.path}
+              phx-value-subtitle={file.label}
+            >
+              <span class="git-status-path"><%= file.path %></span>
+              <span class={"git-status-badge git-status-#{file.status}"}><%= file.code %></span>
+            </button>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="git-empty-hint"><%= dgettext("ui", "No changes") %></p>
+      <% end %>
+    </section>
+
+    <section class="git-section git-history">
+      <div class="git-section-title">
+        <span><%= dgettext("ui", "History") %></span>
+      </div>
+      <%= if Enum.any?(@sidebar_data.history_entries) do %>
+        <div class="git-history-list flex flex-col">
+          <%= for entry <- @sidebar_data.history_entries do %>
+            <button
+              class="git-history-entry flex flex-col"
+              data-testid="git-history-entry"
+              data-route="git_diff"
+              type="button"
+              phx-click="open_sidebar_item"
+              phx-value-route="git_diff"
+              phx-value-id={"git-diff:commit:" <> entry.short_hash}
+              phx-value-title={entry.short_hash}
+              phx-value-subtitle={entry.subject || ""}
+            >
+              <span class="git-history-subject"><%= entry.subject %></span>
+              <span class="git-history-meta flex items-center gap-2">
+                <span class={"git-sync-dot git-sync-#{entry.sync_status}"}></span>
+                <span class="git-history-hash"><%= entry.short_hash %></span>
+                <%= if entry.author do %><span class="git-history-author"><%= entry.author %></span><% end %>
+                <%= if entry.date do %><span class="git-history-date"><%= entry.date %></span><% end %>
+              </span>
+            </button>
+          <% end %>
+        </div>
+        <%= if @sidebar_data.has_more_history do %>
+          <p class="git-history-more"><%= dgettext("ui", "Older history available") %></p>
+        <% end %>
+      <% else %>
+        <p class="git-empty-hint"><%= dgettext("ui", "No commits yet") %></p>
+      <% end %>
+    </section>
     """
   end
 

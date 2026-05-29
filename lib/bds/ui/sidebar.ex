@@ -35,7 +35,7 @@ defmodule BDS.UI.Sidebar do
           "import",
           list_import_definitions(project_id)
         ),
-      "git" => git_view(),
+      "git" => git_view(project_id),
       "settings" => settings_nav_view()
     }
   end
@@ -94,7 +94,7 @@ defmodule BDS.UI.Sidebar do
         )
 
       "git" ->
-        git_view()
+        git_view(project_id)
 
       "settings" ->
         settings_nav_view()
@@ -139,13 +139,17 @@ defmodule BDS.UI.Sidebar do
           "import",
           []
         ),
-      "git" => git_view(),
+      "git" => git_view(nil),
       "settings" => settings_nav_view()
     }
   end
 
-  defp empty_view("posts"), do: build_posts_view([], %{}, false, empty_filter_params(), %{}, [], [], [])
-  defp empty_view("pages"), do: build_posts_view([], %{}, true, empty_filter_params(), %{}, [], [], [])
+  defp empty_view("posts"),
+    do: build_posts_view([], %{}, false, empty_filter_params(), %{}, [], [], [])
+
+  defp empty_view("pages"),
+    do: build_posts_view([], %{}, true, empty_filter_params(), %{}, [], [], [])
+
   defp empty_view("media"), do: build_media_view([], empty_filter_params(), %{}, [], [], 0)
 
   defp empty_view("scripts"),
@@ -186,7 +190,7 @@ defmodule BDS.UI.Sidebar do
         []
       )
 
-  defp empty_view("git"), do: git_view()
+  defp empty_view("git"), do: git_view(nil)
   defp empty_view("settings"), do: settings_nav_view()
 
   defp empty_view(_other),
@@ -563,7 +567,14 @@ defmodule BDS.UI.Sidebar do
     build_media_view(limited_media, filters, tag_colors, year_months, avail_tags, total_count)
   end
 
-  defp build_media_view(limited_media, filters, tag_colors, year_month_counts, available_tags, total_count) do
+  defp build_media_view(
+         limited_media,
+         filters,
+         tag_colors,
+         year_month_counts,
+         available_tags,
+         total_count
+       ) do
     loaded_count = length(limited_media)
 
     %{
@@ -779,23 +790,114 @@ defmodule BDS.UI.Sidebar do
     }
   end
 
-  defp git_view do
-    %{
+  @git_history_page_size 20
+
+  defp git_view(project_id) do
+    base = %{
       title: dgettext("ui", "Git"),
       subtitle: dgettext("ui", "Working tree and history"),
-      layout: "entity_list",
-      empty_message: dgettext("ui", "No items"),
-      items: [
-        %{
-          id: "git-working-tree",
-          title: dgettext("ui", "Working tree"),
-          meta: dgettext("ui", "Working tree and history"),
-          route: "git_diff",
-          updated_at: nil
-        }
-      ]
+      layout: "git",
+      empty_message: dgettext("ui", "No items")
+    }
+
+    if git_repo?(project_id) do
+      Map.merge(base, active_git_view(project_id))
+    else
+      Map.merge(base, %{git_state: "not_a_repo", remote_url: nil})
+    end
+  end
+
+  defp git_repo?(nil), do: false
+
+  defp git_repo?(project_id) when is_binary(project_id) do
+    case BDS.Projects.get_project(project_id) do
+      nil -> false
+      project -> File.dir?(Path.join(BDS.Projects.project_data_dir(project), ".git"))
+    end
+  end
+
+  defp active_git_view(project_id) do
+    repo =
+      case BDS.Git.repository(project_id) do
+        {:ok, repo} -> repo
+        _other -> %{current_branch: nil, remote_url: nil}
+      end
+
+    branch = repo[:current_branch]
+
+    remote =
+      case BDS.Git.remote_state(project_id) do
+        {:ok, state} -> state
+        _other -> %{upstream_branch: nil, ahead: 0, behind: 0}
+      end
+
+    status_files =
+      case BDS.Git.status(project_id) do
+        {:ok, %{files: files}} -> Enum.map(files, &git_status_file/1)
+        _other -> []
+      end
+
+    commits =
+      if is_binary(branch) do
+        case BDS.Git.history(project_id, branch) do
+          {:ok, %{commits: commits}} -> commits
+          _other -> []
+        end
+      else
+        []
+      end
+
+    %{
+      git_state: "active",
+      branch: branch,
+      upstream: remote[:upstream_branch],
+      ahead: remote[:ahead] || 0,
+      behind: remote[:behind] || 0,
+      status_files: status_files,
+      history_entries:
+        commits |> Enum.take(@git_history_page_size) |> Enum.map(&git_history_entry/1),
+      has_more_history: length(commits) > @git_history_page_size,
+      remote_url: repo[:remote_url]
     }
   end
+
+  defp git_status_file(%{status: status} = file) do
+    %{
+      path: Map.get(file, :path, ""),
+      status: to_string(status),
+      code: git_status_code(status),
+      label: git_status_label(status)
+    }
+  end
+
+  defp git_status_code(:added), do: "A"
+  defp git_status_code(:deleted), do: "D"
+  defp git_status_code(:modified), do: "M"
+  defp git_status_code(:renamed), do: "R"
+  defp git_status_code(:untracked), do: "U"
+  defp git_status_code(_other), do: "M"
+
+  defp git_status_label(:added), do: dgettext("ui", "added")
+  defp git_status_label(:deleted), do: dgettext("ui", "deleted")
+  defp git_status_label(:modified), do: dgettext("ui", "modified")
+  defp git_status_label(:renamed), do: dgettext("ui", "renamed")
+  defp git_status_label(:untracked), do: dgettext("ui", "untracked")
+  defp git_status_label(_other), do: dgettext("ui", "modified")
+
+  defp git_history_entry(commit) do
+    %{
+      short_hash: commit |> Map.get(:hash, "") |> String.slice(0, 7),
+      subject: Map.get(commit, :subject),
+      author: Map.get(commit, :author),
+      date: Map.get(commit, :date),
+      sync_status: git_sync_status(get_in(commit, [:sync_status, :kind]))
+    }
+  end
+
+  defp git_sync_status(:both), do: "synced"
+  defp git_sync_status(:local_only), do: "local_only"
+  defp git_sync_status(:remote_only), do: "remote_only"
+  defp git_sync_status(_other), do: "synced"
 
   defp entity_list_view(title, subtitle, route, items) do
     %{

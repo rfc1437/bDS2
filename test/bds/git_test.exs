@@ -61,8 +61,8 @@ defmodule BDS.GitTest do
         "git", ["rev-parse", "--abbrev-ref", "HEAD"], _opts ->
           {"main\n", 0}
 
-        "git", ["log", "--format=%H%x09%s", "main"], _opts ->
-          {"a1\tLocal commit\nb2\tShared commit\n", 0}
+        "git", ["log", "--date=short", "--format=%H%x09%an%x09%ad%x09%s", "main"], _opts ->
+          {"a1\tAda\t2026-01-01\tLocal commit\nb2\tBabbage\t2026-01-02\tShared commit\n", 0}
 
         "git", ["log", "--format=%H", "origin/main"], _opts ->
           {"b2\nc3\n", 0}
@@ -83,7 +83,11 @@ defmodule BDS.GitTest do
     assert diff.unstaged_diff == "unstaged diff"
 
     assert {:ok, history} = Git.history(project.id, "main", runner: runner)
-    assert Enum.find(history.commits, &(&1.hash == "a1")).sync_status.kind == :local_only
+    a1 = Enum.find(history.commits, &(&1.hash == "a1"))
+    assert a1.sync_status.kind == :local_only
+    assert a1.author == "Ada"
+    assert a1.date == "2026-01-01"
+    assert a1.subject == "Local commit"
     assert Enum.find(history.commits, &(&1.hash == "b2")).sync_status.kind == :both
     assert Enum.find(history.commits, &(&1.hash == "c3")).sync_status.kind == :remote_only
 

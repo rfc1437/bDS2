@@ -84,6 +84,8 @@ defmodule BDS.Desktop.ShellLive do
     "load_more_sidebar"
   ]
 
+  @git_action_events ["git_fetch", "git_pull", "git_push", "git_prune_lfs"]
+
   @layout_menu_actions MapSet.new([
                          :toggle_sidebar,
                          :toggle_panel,
@@ -192,7 +194,8 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("toggle_assistant_sidebar", _params, socket) do
-    {:noreply, refresh_layout(socket, Workbench.toggle_assistant_sidebar(socket.assigns.workbench))}
+    {:noreply,
+     refresh_layout(socket, Workbench.toggle_assistant_sidebar(socket.assigns.workbench))}
   end
 
   def handle_event("select_view", %{"view" => view_id}, socket) do
@@ -235,6 +238,20 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event(event, params, socket) when event in @sidebar_filter_events do
     SidebarEvents.handle(socket, event, params, &refresh_sidebar/2)
+  end
+
+  def handle_event(event, _params, socket) when event in @git_action_events do
+    {:noreply, run_git_action(socket, event)}
+  end
+
+  def handle_event("git_commit", params, socket) do
+    message = params |> get_in(["git", "message"]) |> to_string() |> String.trim()
+    {:noreply, commit_git(socket, message)}
+  end
+
+  def handle_event("git_initialize", params, socket) do
+    remote_url = params |> get_in(["git", "remote_url"]) |> normalize_git_remote_url()
+    {:noreply, initialize_git(socket, remote_url)}
   end
 
   def handle_event("create_sidebar_item", %{"kind" => kind}, socket) do
@@ -424,7 +441,9 @@ defmodule BDS.Desktop.ShellLive do
 
       Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
         case FilePicker.choose_files(dgettext("ui", "Add Gallery Images"),
-               image_only: true, multiple: true) do
+               image_only: true,
+               multiple: true
+             ) do
           {:ok, paths} when is_list(paths) and paths != [] ->
             GalleryImport.start(paths, project_id, post_id, language, concurrency_limit, parent)
 
@@ -623,7 +642,13 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_info({:add_image_processed, title}, socket) do
     {:noreply,
-     append_output_entry(socket, dgettext("ui", "Add Gallery Images"), dgettext("ui", "Added %{title}", title: title), nil, "info")}
+     append_output_entry(
+       socket,
+       dgettext("ui", "Add Gallery Images"),
+       dgettext("ui", "Added %{title}", title: title),
+       nil,
+       "info"
+     )}
   end
 
   def handle_info({:add_images_complete, count}, socket) do
@@ -660,7 +685,13 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_info({:add_images_error, reason}, socket) do
     {:noreply,
-     append_output_entry(socket, dgettext("ui", "Add Gallery Images"), inspect(reason), nil, "error")}
+     append_output_entry(
+       socket,
+       dgettext("ui", "Add Gallery Images"),
+       inspect(reason),
+       nil,
+       "error"
+     )}
   end
 
   def handle_info({:add_image_error, path, reason}, socket) do
@@ -668,7 +699,10 @@ defmodule BDS.Desktop.ShellLive do
      append_output_entry(
        socket,
        dgettext("ui", "Add Gallery Images"),
-       dgettext("ui", "Failed to process %{path}: %{reason}", path: Path.basename(path), reason: inspect(reason)),
+       dgettext("ui", "Failed to process %{path}: %{reason}",
+         path: Path.basename(path),
+         reason: inspect(reason)
+       ),
        nil,
        "error"
      )}
@@ -696,13 +730,17 @@ defmodule BDS.Desktop.ShellLive do
   defp refresh_layout(socket, workbench) do
     git_badge_count = socket.assigns[:git_badge_count] || 0
     activity_buttons = Workbench.activity_buttons(workbench, git_badge_count)
-    task_status = socket.assigns[:task_status] || %{running_task_message: nil, running_task_overflow: nil}
+
+    task_status =
+      socket.assigns[:task_status] || %{running_task_message: nil, running_task_overflow: nil}
+
     dashboard = socket.assigns[:dashboard] || BDS.UI.Dashboard.empty_snapshot()
     page_language = socket.assigns[:page_language] || ShellData.ui_language()
     offline_mode = Map.get(socket.assigns, :offline_mode, true)
     sidebar_data = socket.assigns[:sidebar_data] || %{}
     current_tab = current_tab(workbench)
     prev_tab = socket.assigns[:current_tab]
+
     prev_panel_tab =
       case socket.assigns[:workbench] do
         %Workbench{panel: %{active_tab: tab}} -> tab
@@ -1015,6 +1053,122 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:tab_meta, tab_meta)
     |> refresh_layout(workbench)
     |> push_url_state()
+  end
+
+  defp run_git_action(socket, event) do
+    project_id = current_project_id(socket)
+
+    {label, result} =
+      case event do
+        "git_fetch" -> {dgettext("ui", "Fetch"), git_call(project_id, &BDS.Git.fetch/1)}
+        "git_pull" -> {dgettext("ui", "Pull"), git_call(project_id, &BDS.Git.pull/1)}
+        "git_push" -> {dgettext("ui", "Push"), git_call(project_id, &BDS.Git.push/1)}
+        "git_prune_lfs" -> {dgettext("ui", "Prune LFS"), prune_lfs(project_id)}
+      end
+
+    socket
+    |> append_git_result(label, result)
+    |> refresh_sidebar(socket.assigns.workbench)
+  end
+
+  defp commit_git(socket, "") do
+    socket
+    |> append_output_entry(
+      dgettext("ui", "Commit"),
+      dgettext("ui", "Commit message is required"),
+      nil,
+      "error"
+    )
+    |> refresh_sidebar(socket.assigns.workbench)
+  end
+
+  defp commit_git(socket, message) do
+    case git_call(current_project_id(socket), &BDS.Git.commit_all(&1, message)) do
+      {:ok, _result} ->
+        workbench = close_git_diff_tabs(socket.assigns.workbench)
+        tab_meta = TabHelpers.sync_tab_meta(workbench, socket.assigns[:tab_meta] || %{})
+
+        socket
+        |> assign(:tab_meta, tab_meta)
+        |> append_output_entry(dgettext("ui", "Commit"), message)
+        |> refresh_sidebar(workbench)
+        |> push_url_state()
+
+      {:error, reason} ->
+        socket
+        |> append_output_entry(dgettext("ui", "Commit"), format_git_error(reason), nil, "error")
+        |> refresh_sidebar(socket.assigns.workbench)
+    end
+  end
+
+  defp initialize_git(socket, remote_url) do
+    project_id = current_project_id(socket)
+
+    case git_call(project_id, &BDS.Git.initialize_repo/1) do
+      {:ok, _repo} ->
+        _ = maybe_set_git_remote(project_id, remote_url)
+
+        socket
+        |> append_output_entry(
+          dgettext("ui", "Initialize Git"),
+          dgettext("ui", "Repository initialized")
+        )
+        |> refresh_sidebar(socket.assigns.workbench)
+
+      {:error, reason} ->
+        socket
+        |> append_output_entry(
+          dgettext("ui", "Initialize Git"),
+          format_git_error(reason),
+          nil,
+          "error"
+        )
+        |> refresh_sidebar(socket.assigns.workbench)
+    end
+  end
+
+  defp git_call(nil, _fun), do: {:error, :no_project}
+  defp git_call("default", _fun), do: {:error, :no_project}
+  defp git_call(project_id, fun) when is_binary(project_id), do: fun.(project_id)
+
+  defp prune_lfs(nil), do: {:error, :no_project}
+  defp prune_lfs("default"), do: {:error, :no_project}
+
+  defp prune_lfs(project_id) when is_binary(project_id),
+    do: BDS.Git.prune_lfs_cache(project_id, 10)
+
+  defp maybe_set_git_remote(_project_id, nil), do: :ok
+
+  defp maybe_set_git_remote(project_id, remote_url),
+    do: BDS.Git.set_remote(project_id, remote_url)
+
+  defp append_git_result(socket, label, {:ok, _result}) do
+    append_output_entry(socket, label, dgettext("ui", "Done"))
+  end
+
+  defp append_git_result(socket, label, {:error, reason}) do
+    append_output_entry(socket, label, format_git_error(reason), nil, "error")
+  end
+
+  defp format_git_error(:no_project), do: dgettext("ui", "No active project")
+  defp format_git_error(%{message: message}) when is_binary(message), do: message
+  defp format_git_error(%{guidance: guidance}) when is_binary(guidance), do: guidance
+  defp format_git_error({:git_failed, message}) when is_binary(message), do: message
+  defp format_git_error(reason), do: inspect(reason)
+
+  defp close_git_diff_tabs(workbench) do
+    workbench.tabs
+    |> Enum.filter(&(&1.type == :git_diff))
+    |> Enum.reduce(workbench, fn tab, wb -> Workbench.close_tab(wb, :git_diff, tab.id) end)
+  end
+
+  defp current_project_id(socket), do: (socket.assigns[:projects] || %{})[:active_project_id]
+
+  defp normalize_git_remote_url(value) do
+    case value |> to_string() |> String.trim() do
+      "" -> nil
+      url -> url
+    end
   end
 
   defp sidebar_create_action(view), do: SidebarCreate.action(view)
