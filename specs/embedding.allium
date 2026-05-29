@@ -48,6 +48,9 @@ value EmbeddingModel {
     -- Lazy-loaded: pipeline created on first embedding request, not at startup
     -- Text preprocessing: prefix all input with "query: " (e5 convention)
     -- Pooling: mean pooling + L2 normalization
+    -- Loaded on-device via Bumblebee+EXLA; the canonical e5 weights come from
+    -- the "intfloat/multilingual-e5-small" repository, surfaced under the
+    -- "Xenova/multilingual-e5-small" model_id identifier.
     model_id: String                    -- "Xenova/multilingual-e5-small"
     dimensions: Integer                 -- 384
 }

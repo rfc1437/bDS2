@@ -321,6 +321,36 @@ defmodule BDS.EmbeddingsTest do
     assert BDS.Embeddings.index_path(project.id) =~ "/embeddings.usearch"
   end
 
+  test "stored embedding vectors are packed Float32 BLOBs, not JSON text", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Blob",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, post} = BDS.Posts.publish_post(post.id)
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
+
+    key = BDS.Repo.get_by!(BDS.Embeddings.Key, project_id: project.id, post_id: post.id)
+
+    assert is_binary(key.vector)
+    # 384 dimensions * 4 bytes per little-endian Float32 (VectorCacheInDb).
+    assert byte_size(key.vector) == 384 * 4
+    refute String.starts_with?(key.vector, "[")
+
+    decoded = for <<value::float-32-little <- key.vector>>, do: value
+    assert length(decoded) == 384
+
+    # The packed vector still drives similarity queries.
+    assert {:ok, scores} = BDS.Embeddings.compute_similarities(post.id, [post.id])
+    assert is_map(scores)
+  end
+
   test "reindex_all rebuilds stored embeddings for the whole project", %{project: project} do
     assert {:ok, _metadata} =
              BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})

@@ -12,7 +12,9 @@ defmodule BDS.Embeddings.Key do
     belongs_to :project, BDS.Projects.Project, type: :string
 
     field :content_hash, :string
-    field :vector, :string
+    # Packed little-endian Float32 BLOB (dimensions * 4 bytes), per the
+    # VectorCacheInDb invariant in specs/embedding.allium.
+    field :vector, :binary
   end
 
   def changeset(key, attrs) do

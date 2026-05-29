@@ -192,8 +192,14 @@ defmodule BDS.Embeddings.Index do
     Path.join(Path.dirname(snapshot_path), "embeddings.index.json")
   end
 
+  # Vectors are stored as a packed little-endian Float32 BLOB; see
+  # BDS.Embeddings and the VectorCacheInDb invariant in embedding.allium.
   defp decode_vector(nil), do: []
-  defp decode_vector(vector), do: Jason.decode!(vector)
+  defp decode_vector(<<>>), do: []
+
+  defp decode_vector(binary) when is_binary(binary) do
+    for <<value::float-32-little <- binary>>, do: value
+  end
 
   defp cosine_similarity([], _other), do: 0.0
   defp cosine_similarity(_vector, []), do: 0.0

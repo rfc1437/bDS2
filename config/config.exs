@@ -61,9 +61,14 @@ config :bds, :scripting,
   job_max_reductions: :none
 
 config :bds, :embeddings,
-  backend: BDS.Embeddings.Backends.InApp,
+  backend: BDS.Embeddings.Backends.Neural,
   model_id: "Xenova/multilingual-e5-small",
+  model_repo: "intfloat/multilingual-e5-small",
   dimensions: 384
+
+# Cache downloaded model files under the app data directory so they persist
+# across sessions (ModelCaching invariant). Overridden at runtime in prod.
+config :bumblebee, :cache_dir, Path.expand("../priv/data/models", __DIR__)
 
 config :logger, :console,
   format: "$time $metadata[$level] $message\n",

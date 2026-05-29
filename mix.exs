@@ -33,7 +33,10 @@ defmodule BDS.MixProject do
       {:plug, "~> 1.18"},
       {:bandit, "~> 1.5"},
       {:desktop, "~> 1.5"},
-      {:image, "~> 0.65"},
+      {:image, "~> 0.67"},
+      {:nx, "~> 0.10"},
+      {:exla, "~> 0.10"},
+      {:bumblebee, "~> 0.6.3"},
       {:stemex, "~> 0.2.1"},
       {:gettext, "~> 0.24"},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
@@ -60,7 +63,7 @@ defmodule BDS.MixProject do
     env = Mix.env()
 
     [
-      plt_add_apps: [:mix, :inets, :ssl],
+      plt_add_apps: [:mix, :inets, :ssl, :nx, :exla, :bumblebee],
       paths: ["_build/#{env}/lib/bds/ebin"]
     ]
   end

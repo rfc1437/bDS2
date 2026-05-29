@@ -8,3 +8,11 @@ config :bds, BDS.Repo,
   busy_timeout: 15_000
 
 config :logger, level: :warning
+
+# Tests use the deterministic lexical stub backend so the suite stays offline
+# and never downloads the ~100 MB neural model.
+config :bds, :embeddings,
+  backend: BDS.Embeddings.Backends.InApp,
+  model_id: "Xenova/multilingual-e5-small",
+  model_repo: "intfloat/multilingual-e5-small",
+  dimensions: 384

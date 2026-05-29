@@ -1,5 +1,13 @@
 defmodule BDS.Embeddings.Backends.InApp do
-  @moduledoc false
+  @moduledoc """
+  Deterministic lexical embedding stub.
+
+  This backend does NOT satisfy the `RealNeuralModel` invariant — it projects
+  stemmed tokens and bigrams into a sparse hashed vector. It exists only as an
+  offline, dependency-free fallback for tests and environments where the neural
+  model (see `BDS.Embeddings.Backends.Neural`) cannot be loaded. Production and
+  development use the neural backend.
+  """
 
   @behaviour BDS.Embeddings.Backend
 

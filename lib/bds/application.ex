@@ -38,11 +38,20 @@ defmodule BDS.Application do
       BDS.Scripting.JobStore,
       {Task.Supervisor, name: BDS.Scripting.TaskSupervisor},
       BDS.Scripting.JobSupervisor
-      | desktop_children(current_env())
-    ]
+    ] ++ embedding_children() ++ desktop_children(current_env())
 
     opts = [strategy: :one_for_one, name: BDS.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  # The neural embedding backend runs as a supervised, lazily-initialised
+  # GenServer (it loads the model only on the first embedding request). Only
+  # start it when it is the configured backend.
+  defp embedding_children do
+    case Application.get_env(:bds, :embeddings, [])[:backend] do
+      BDS.Embeddings.Backends.Neural -> [BDS.Embeddings.Backends.Neural]
+      _other -> []
+    end
   end
 
   defp current_env do

@@ -217,7 +217,7 @@ defmodule BDS.Embeddings do
           post_id: post.id,
           project_id: post.project_id,
           content_hash: content_hash,
-          vector: Jason.encode!(vector)
+          vector: encode_vector(vector)
         })
         |> Repo.insert_or_update()
 
@@ -256,7 +256,7 @@ defmodule BDS.Embeddings do
     else
       {:ok, vector} = embed_text(raw_text, post.language)
       label = if existing_key, do: existing_key.label, else: next_label
-      {:upsert, [label, post.id, post.project_id, content_hash, Jason.encode!(vector)]}
+      {:upsert, [label, post.id, post.project_id, content_hash, encode_vector(vector)]}
     end
   end
 
@@ -655,7 +655,9 @@ defmodule BDS.Embeddings do
   end
 
   defp embed_text(raw_text, language) do
-    configured_backend().embed("query: " <> raw_text, language: language)
+    # Per-backend preprocessing (e5 "query: " prefix, pooling, normalisation)
+    # is the backend's responsibility — see BDS.Embeddings.Backends.Neural.
+    configured_backend().embed(raw_text, language: language)
   end
 
   defp rebuild_snapshot(project_id) do
@@ -726,8 +728,22 @@ defmodule BDS.Embeddings do
 
   defp hash_text(text), do: :crypto.hash(:sha256, text) |> Base.encode16(case: :lower)
 
+  # Vectors are persisted as a packed little-endian Float32 BLOB
+  # (`dimensions` * 4 bytes; 1536 bytes for multilingual-e5-small) per the
+  # VectorCacheInDb invariant in specs/embedding.allium.
+  defp encode_vector(values) when is_list(values) do
+    for value <- values, into: <<>>, do: <<float32(value)::float-32-little>>
+  end
+
+  defp float32(value) when is_float(value), do: value
+  defp float32(value) when is_integer(value), do: value * 1.0
+
   defp decode_vector(nil), do: []
-  defp decode_vector(vector), do: Jason.decode!(vector)
+  defp decode_vector(<<>>), do: []
+
+  defp decode_vector(binary) when is_binary(binary) do
+    for <<value::float-32-little <- binary>>, do: value
+  end
 
   defp cosine_similarity([], _other), do: 0.0
   defp cosine_similarity(_vector, []), do: 0.0
