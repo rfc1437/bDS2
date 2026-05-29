@@ -120,16 +120,7 @@ defmodule BDS.Desktop.ShellCommands do
       "rebuild_embedding_index",
       "Rebuild Embedding Index",
       "Embeddings",
-      fn report ->
-        {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id, on_progress: report)
-        report.(1.0, "Embedding index rebuilt")
-
-        %{
-          project_id: project.id,
-          rebuilt_post_ids: rebuilt_post_ids,
-          rebuilt_count: length(rebuilt_post_ids)
-        }
-      end
+      fn report -> rebuild_embedding_index_work(project, report) end
     )
   end
 
@@ -524,18 +515,37 @@ defmodule BDS.Desktop.ShellCommands do
       },
       %{
         name: "Rebuild Embedding Index",
-        work: fn report ->
-          {:ok, rebuilt_post_ids} = Embeddings.rebuild_project(project.id, on_progress: report)
-          report.(1.0, "Embedding index rebuilt")
-
-          %{
-            project_id: project.id,
-            rebuilt_post_ids: rebuilt_post_ids,
-            rebuilt_count: length(rebuilt_post_ids)
-          }
-        end
+        work: fn report -> rebuild_embedding_index_work(project, report) end
       }
     ]
+  end
+
+  defp rebuild_embedding_index_work(project, report) do
+    case Embeddings.rebuild_project(project.id, on_progress: report) do
+      {:ok, rebuilt_post_ids} ->
+        report.(1.0, "Embedding index rebuilt")
+
+        %{
+          project_id: project.id,
+          rebuilt_post_ids: rebuilt_post_ids,
+          rebuilt_count: length(rebuilt_post_ids)
+        }
+
+      {:error, reason} ->
+        {:error, embedding_error_message(reason)}
+    end
+  end
+
+  defp embedding_error_message(reason) do
+    detail =
+      case reason do
+        message when is_binary(message) -> message
+        {:embedding_backend_unavailable, _inner} -> "the embedding service did not start"
+        other -> inspect(other)
+      end
+
+    "Could not build the embedding index: #{detail}. The model is downloaded on first use, " <>
+      "so check your internet connection — or turn off semantic similarity in Settings."
   end
 
   defp run_rebuild_sequence(_group_id, _attrs, []), do: :ok

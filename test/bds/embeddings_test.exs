@@ -37,6 +37,40 @@ defmodule BDS.EmbeddingsTest do
     end
   end
 
+  defmodule CountingBackend do
+    @behaviour BDS.Embeddings.Backend
+
+    @counter :embeddings_force_counter
+
+    @impl true
+    def model_info, do: %{model_id: "counting/multilingual-e5-small", dimensions: 384}
+
+    @impl true
+    def embed(text, opts) do
+      Agent.update(@counter, &(&1 + 1))
+      BDS.Embeddings.Backends.InApp.embed(text, opts)
+    end
+
+    @impl true
+    def embed_many(texts, opts) do
+      Agent.update(@counter, &(&1 + length(texts)))
+      BDS.Embeddings.Backends.InApp.embed_many(texts, opts)
+    end
+  end
+
+  defmodule FailingBackend do
+    @behaviour BDS.Embeddings.Backend
+
+    @impl true
+    def model_info, do: %{model_id: "failing/multilingual-e5-small", dimensions: 384}
+
+    @impl true
+    def embed(_text, _opts), do: {:error, :model_unavailable}
+
+    @impl true
+    def embed_many(_texts, _opts), do: {:error, :model_unavailable}
+  end
+
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
 
@@ -518,5 +552,76 @@ defmodule BDS.EmbeddingsTest do
     assert {:ok, similar} = BDS.Embeddings.find_similar(alpha.id, 1)
     assert [%{post_id: post_id}] = similar
     assert post_id == beta.id
+  end
+
+  test "explicit rebuild re-embeds every post even when content is unchanged", %{project: project} do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    {:ok, _agent} = Agent.start_link(fn -> 0 end, name: :embeddings_force_counter)
+
+    Application.put_env(:bds, :embeddings,
+      backend: CountingBackend,
+      model_id: "counting/multilingual-e5-small",
+      dimensions: 384,
+      batch_size: 16
+    )
+
+    for index <- 1..3 do
+      assert {:ok, post} =
+               BDS.Posts.create_post(%{
+                 project_id: project.id,
+                 title: "Force #{index}",
+                 content: "space rocket orbit mission galaxy #{index}",
+                 language: "en"
+               })
+
+      assert {:ok, _post} = BDS.Posts.publish_post(post.id)
+    end
+
+    # Ignore embeds triggered while creating/publishing.
+    Agent.update(:embeddings_force_counter, fn _count -> 0 end)
+
+    # index_unindexed honours the content_hash skip: nothing to re-embed.
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
+    assert Agent.get(:embeddings_force_counter, & &1) == 0
+
+    # An explicit rebuild re-embeds all three regardless (ReindexAll).
+    assert {:ok, rebuilt} = BDS.Embeddings.reindex_all(project.id)
+    assert length(rebuilt) == 3
+    assert Agent.get(:embeddings_force_counter, & &1) == 3
+  end
+
+  test "embedding operations degrade gracefully when the model is unavailable", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    Application.put_env(:bds, :embeddings,
+      backend: FailingBackend,
+      model_id: "failing/multilingual-e5-small",
+      dimensions: 384
+    )
+
+    # Saving a post must not crash even though embedding fails; it is just left
+    # unindexed.
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Offline",
+               content: "space rocket orbit mission galaxy",
+               language: "en"
+             })
+
+    assert {:ok, post} = BDS.Posts.publish_post(post.id)
+    assert BDS.Repo.get_by(BDS.Embeddings.Key, project_id: project.id, post_id: post.id) == nil
+
+    # Explicit (re)index operations surface a clean error instead of crashing.
+    assert {:error, :model_unavailable} = BDS.Embeddings.reindex_all(project.id)
+    assert {:error, :model_unavailable} = BDS.Embeddings.index_unindexed(project.id)
+
+    # Queries stay safe.
+    assert {:ok, []} = BDS.Embeddings.find_similar(post.id, 5)
   end
 end

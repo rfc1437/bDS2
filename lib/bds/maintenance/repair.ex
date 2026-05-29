@@ -101,11 +101,18 @@ defmodule BDS.Maintenance.Repair do
           :file_to_db ->
             post_ids = Enum.map(items, &metadata_diff_item_entity_id/1)
 
-            {:ok, repaired_post_ids} = Embeddings.repair_posts(project_id, post_ids)
-            repaired_post_ids = MapSet.new(repaired_post_ids)
+            # If the embedding model is unavailable, every item is reported as
+            # failed rather than crashing the repair task.
+            repaired =
+              case Embeddings.repair_posts(project_id, post_ids) do
+                {:ok, repaired_post_ids} -> repaired_post_ids
+                {:error, _reason} -> []
+              end
+
+            repaired_set = MapSet.new(repaired)
 
             build_batch_repair_result(items, total, on_progress, fn item ->
-              MapSet.member?(repaired_post_ids, metadata_diff_item_entity_id(item))
+              MapSet.member?(repaired_set, metadata_diff_item_entity_id(item))
             end)
 
           :db_to_file ->

@@ -1,6 +1,8 @@
 defmodule BDS.Metadata do
   @moduledoc false
 
+  require Logger
+
   alias BDS.Embeddings
   alias BDS.I18n
   alias BDS.Persistence
@@ -653,7 +655,17 @@ defmodule BDS.Metadata do
        ) do
     if previous_state.semantic_similarity_enabled != true and
          project_metadata.semantic_similarity_enabled == true do
-      {:ok, _indexed_post_ids} = Embeddings.index_unindexed(project_id)
+      # Backfill is best-effort: if the embedding model is unavailable, keep the
+      # setting enabled and log it rather than failing the metadata update.
+      case Embeddings.index_unindexed(project_id) do
+        {:ok, _indexed_post_ids} ->
+          :ok
+
+        {:error, reason} ->
+          Logger.warning(
+            "Embedding backfill skipped for project #{project_id}: #{inspect(reason)}"
+          )
+      end
     end
 
     result
