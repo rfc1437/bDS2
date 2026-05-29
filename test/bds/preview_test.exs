@@ -706,6 +706,44 @@ defmodule BDS.PreviewTest do
     assert :ok = BDS.Preview.stop_preview(project.id)
   end
 
+  test "stop_preview drains an inflight request before completing", %{project: project} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, server} = BDS.Preview.start_preview(project.id)
+
+    # Open a raw connection and hold it open without sending the request line,
+    # so the server has a request task blocked in recv (an inflight request).
+    {:ok, socket} =
+      :gen_tcp.connect(to_charlist(server.host), server.port, [
+        :binary,
+        packet: :raw,
+        active: false
+      ])
+
+    # Give the acceptor time to accept the connection and register the task.
+    Process.sleep(100)
+
+    test_pid = self()
+
+    spawn(fn ->
+      send(test_pid, {:stopped, BDS.Preview.stop_preview(project.id)})
+    end)
+
+    # Shutdown must not complete while the request is still inflight.
+    refute_receive {:stopped, _}, 300
+
+    # Completing the request lets the server drain and finish shutting down.
+    :ok = :gen_tcp.send(socket, "GET / HTTP/1.1\r\nhost: localhost\r\n\r\n")
+
+    assert_receive {:stopped, :ok}, 2_000
+
+    :gen_tcp.close(socket)
+  end
+
   test "preview query params can override the rendered theme for generated and draft pages", %{
     project: project
   } do
