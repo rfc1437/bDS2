@@ -178,6 +178,40 @@ defmodule BDS.TemplateLookupPriorityTest do
     end
   end
 
+  describe "UserTemplateDirectoryOverridesBundledDefaults" do
+    test "published project template with default slug overrides bundled single-post", %{
+      project: project
+    } do
+      _template =
+        create_published_template(
+          project.id,
+          "single-post",
+          "<article data-template=\"user-single-post\">{{ page.title }}</article>"
+        )
+
+      {:ok, source} = TemplateSelection.load_template_source(project.id, :post, nil)
+
+      assert source =~ ~s(data-template="user-single-post")
+      refute source =~ ~s(data-template="single-post")
+    end
+
+    test "published project template overrides bundled default when slug requested explicitly", %{
+      project: project
+    } do
+      _template =
+        create_published_template(
+          project.id,
+          "single-post",
+          "<article data-template=\"user-single-post\">{{ page.title }}</article>"
+        )
+
+      {:ok, source} = TemplateSelection.load_template_source(project.id, :post, "single-post")
+
+      assert source =~ ~s(data-template="user-single-post")
+      refute source =~ ~s(data-template="single-post")
+    end
+  end
+
   describe "end-to-end template lookup with rendering" do
     test "post renders with tag-specific template when no post template set", %{
       project: project
