@@ -310,6 +310,61 @@ defmodule BDS.PostTranslationsTest do
     assert report.do_not_translate_posts == [ignored_post.id]
   end
 
+  test "UniqueTranslationPerLanguage: a post has at most one translation per language", %{
+    project: project
+  } do
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Canonical Post",
+               content: "Hello world",
+               language: "en"
+             })
+
+    assert {:ok, first} =
+             Posts.upsert_post_translation(post.id, "de", %{title: "Titel"})
+
+    # Re-upserting the same language updates the existing row instead of adding a second.
+    assert {:ok, second} =
+             Posts.upsert_post_translation(post.id, "de", %{title: "Geändert"})
+
+    assert second.id == first.id
+
+    assert [persisted] =
+             BDS.Posts.Translation
+             |> where([t], t.translation_for == ^post.id and t.language == "de")
+             |> Repo.all()
+
+    assert persisted.title == "Geändert"
+
+    # A direct insert of a distinct row with the same (post, language) is rejected by the
+    # unique constraint backing the invariant, returning a changeset error rather than crashing.
+    now = BDS.Persistence.now_ms()
+
+    duplicate =
+      BDS.Posts.Translation.changeset(%BDS.Posts.Translation{}, %{
+        id: Ecto.UUID.generate(),
+        project_id: post.project_id,
+        translation_for: post.id,
+        language: "de",
+        title: "Duplicate",
+        status: :draft,
+        created_at: now,
+        updated_at: now
+      })
+
+    assert {:error, changeset} = Repo.insert(duplicate)
+    assert %{language: ["has already been taken"]} = errors_on(changeset)
+  end
+
+  defp errors_on(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
+      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
+        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+      end)
+    end)
+  end
+
   defp configure_auto_translation_test_runtime do
     assert {:ok, _endpoint} =
              AI.put_endpoint(

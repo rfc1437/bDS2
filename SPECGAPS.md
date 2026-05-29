@@ -114,7 +114,7 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 | ID | Claim | Spec | Path |
 |---|---|---|---|
 | D1-1 | ~~UniqueMediaTranslation invariant~~ | media.allium:108 | **Resolved:** test added (re-upsert updates not duplicates; direct duplicate insert rejected). Test exposed a real bug — `Media.Translation` declared the migration's index name but ecto_sqlite3 derives the violated-constraint name from columns, so violations crashed instead of returning a changeset error; fixed `unique_constraint` name to `:media_translations_translation_for_language_index` |
-| D1-2 | UniqueTranslationPerLanguage invariant | translation.allium:94 | Write test: create duplicate post translation, expect rejection |
+| D1-2 | ~~UniqueTranslationPerLanguage invariant~~ | translation.allium:94 | **Resolved:** test added (re-upsert updates not duplicates; direct duplicate insert rejected). Same bug as D1-1 — `Posts.Translation` declared the migration's index name but ecto_sqlite3 derives the violated-constraint name from columns, so duplicates crashed instead of returning a changeset error; fixed `unique_constraint` name to `:post_translations_translation_for_language_index` |
 | D1-3 | BundledDefaultTemplatesExistOutsideProjectData | template.allium:65 | Write test: render with no Template rows, bundled template found |
 | D1-4 | UserTemplateDirectoryOverridesBundledDefaults | template.allium:75 | Write test: project template overrides bundled same-slug |
 | D1-5 | LiquidTagSubset (5 tags only) | template.allium:179 | Write test: unsupported tag raises error |

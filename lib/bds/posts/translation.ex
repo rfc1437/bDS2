@@ -79,6 +79,6 @@ defmodule BDS.Posts.Translation do
       :updated_at
     ])
     |> foreign_key_constraint(:translation_for)
-    |> unique_constraint(:language, name: :post_translations_translation_language_idx)
+    |> unique_constraint(:language, name: :post_translations_translation_for_language_index)
   end
 end
