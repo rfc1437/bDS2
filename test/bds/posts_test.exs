@@ -188,6 +188,54 @@ defmodule BDS.PostsTest do
     refute File.exists?(full_path <> ".tmp")
   end
 
+  test "post frontmatter roundtrips: written fields parsed back match the database record", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Full Roundtrip",
+               excerpt: "Testing full roundtrip",
+               content: "Body content survives roundtrip",
+               tags: ["elixir", "testing"],
+               categories: ["notes"],
+               author: "Test Author",
+               language: "de",
+               template_slug: "article"
+             })
+
+    assert {:ok, post} = BDS.Posts.update_post(post.id, %{do_not_translate: true})
+    assert {:ok, published} = BDS.Posts.publish_post(post.id)
+    assert published.status == :published
+
+    full_path = Path.join(temp_dir, published.file_path)
+    assert File.exists?(full_path)
+
+    file_contents = File.read!(full_path)
+    assert {:ok, %{fields: fields, body: body}} = BDS.Frontmatter.parse_document(file_contents)
+
+    assert fields["id"] == published.id
+    assert fields["title"] == "Full Roundtrip"
+    assert fields["slug"] == "full-roundtrip"
+    assert fields["excerpt"] == "Testing full roundtrip"
+    assert fields["status"] == "published"
+    assert fields["author"] == "Test Author"
+    assert fields["language"] == "de"
+    assert fields["doNotTranslate"] == true
+    assert fields["templateSlug"] == "article"
+    assert fields["tags"] == ["elixir", "testing"]
+    assert fields["categories"] == ["notes"]
+    assert is_integer(fields["createdAt"])
+    assert fields["createdAt"] == published.created_at
+    assert is_integer(fields["updatedAt"])
+    assert fields["updatedAt"] == published.updated_at
+    assert is_integer(fields["publishedAt"])
+    assert fields["publishedAt"] == published.published_at
+
+    assert body == "Body content survives roundtrip"
+  end
+
   test "publish_post omits doNotTranslate from frontmatter when false", %{
     project: project,
     temp_dir: temp_dir
