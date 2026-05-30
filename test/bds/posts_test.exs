@@ -446,6 +446,52 @@ defmodule BDS.PostsTest do
     assert {:error, :not_found} = BDS.Posts.unarchive_post(Ecto.UUID.generate())
   end
 
+  test "discard_post_changes restores the published version from file and updates the FTS index" do
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-post-discard-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    assert {:ok, project} =
+             BDS.Projects.create_project(%{name: "Discard FTS", data_path: temp_dir})
+
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Pristine Headline",
+               content: "pristine meadow body"
+             })
+
+    assert {:ok, published} = BDS.Posts.publish_post(post.id)
+    assert published.status == :published
+    assert published.content == nil
+
+    # The published file is the source of truth; the FTS index reflects it.
+    assert {:ok, %{posts: [%{id: post_id}]}} = BDS.Search.search_posts(project.id, "pristine")
+    assert post_id == post.id
+
+    # Make the DB diverge from the file with unsaved edits, re-indexing the dirty text.
+    assert {:ok, dirty} =
+             BDS.Posts.update_post(post.id, %{
+               title: "Tampered Headline",
+               content: "tampered swamp body"
+             })
+
+    assert dirty.content == "tampered swamp body"
+    assert {:ok, %{posts: [%{id: ^post_id}]}} = BDS.Search.search_posts(project.id, "tampered")
+    assert {:ok, %{posts: []}} = BDS.Search.search_posts(project.id, "pristine")
+
+    # Discarding restores the published file version and re-syncs the FTS index.
+    assert {:ok, restored} = BDS.Posts.discard_post_changes(post.id)
+    assert restored.status == :published
+    assert restored.content == nil
+    assert restored.title == "Pristine Headline"
+
+    assert {:ok, %{posts: [%{id: ^post_id}]}} = BDS.Search.search_posts(project.id, "pristine")
+    assert {:ok, %{posts: []}} = BDS.Search.search_posts(project.id, "tampered")
+  end
+
   test "rebuild_posts_from_files recreates published posts from disk" do
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-post-rebuild-#{System.unique_integer([:positive])}")
