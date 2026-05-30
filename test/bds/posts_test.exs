@@ -256,6 +256,31 @@ defmodule BDS.PostsTest do
     refute file_contents =~ "doNotTranslate"
   end
 
+  test "publish_post omits nil excerpt, author, language from frontmatter", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Nil Optional Fields",
+               content: "body"
+             })
+
+    assert is_nil(post.excerpt)
+    assert is_nil(post.author)
+    assert is_nil(post.language)
+
+    assert {:ok, published} = BDS.Posts.publish_post(post.id)
+
+    full_path = Path.join(temp_dir, published.file_path)
+    file_contents = File.read!(full_path)
+
+    refute file_contents =~ "excerpt:"
+    refute file_contents =~ "author:"
+    refute file_contents =~ "language:"
+  end
+
   test "publish_post deletes old file when file path changes", %{
     project: project,
     temp_dir: temp_dir
