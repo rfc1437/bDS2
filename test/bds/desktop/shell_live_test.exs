@@ -5279,6 +5279,101 @@ defmodule BDS.Desktop.ShellLiveTest do
     run_git!(project_dir, ["commit", "-m", message])
   end
 
+  test "chat editor renders welcome screen with robot icon and tips when no messages exist" do
+    html =
+      render_component(
+        &BDS.Desktop.ShellLive.ChatEditor.render/1,
+        phase3_chat_editor_assigns()
+      )
+
+    assert html =~ "🤖"
+    assert html =~ "Welcome to the AI Assistant"
+    assert html =~ "Search for posts about a specific topic"
+    assert html =~ "Show a chart of posts published per month"
+    assert html =~ "Compare my recent posts in a table"
+    assert html =~ "Update metadata for posts or media"
+    assert html =~ "Show post statistics by year in tabs with charts"
+  end
+
+  test "chat editor rewrites external image URLs in markdown to text links" do
+    {:safe, html} =
+      BDS.Desktop.ShellLive.ChatEditor.markdown_html(
+        "![test](https://example.com/img.jpg)"
+      )
+
+    assert html =~ ~s(<a href="https://example.com/img.jpg")
+    refute html =~ ~r/<img\b/
+  end
+
+  test "chat editor renders chart inline surfaces from render_chart tool calls" do
+    assert {:ok, conversation} = AI.start_chat(%{title: "Chart Chat", model: "gpt-4.1"})
+
+    now = Persistence.now_ms()
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :user,
+        content: "Show a chart",
+        created_at: now
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :assistant,
+        content: "Here is the chart data.",
+        tool_calls:
+          Jason.encode!([
+            %{
+              "id" => "call-chart",
+              "name" => "render_chart",
+              "arguments" => %{
+                "title" => "Posts per Month",
+                "chart_type" => "bar",
+                "series" => [%{"label" => "May", "value" => 5}, %{"label" => "Jun", "value" => 3}]
+              }
+            }
+          ]),
+        created_at: now + 1
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.ChatMessage.changeset(%BDS.AI.ChatMessage{}, %{
+        conversation_id: conversation.id,
+        role: :tool,
+        tool_call_id: "call-chart",
+        content:
+          Jason.encode!(%{
+            "type" => "chart",
+            "title" => "Posts per Month",
+            "chart_type" => "bar",
+            "series" => [%{"label" => "May", "value" => 5}, %{"label" => "Jun", "value" => 3}]
+          }),
+        created_at: now + 2
+      })
+    )
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => conversation.model || "chat"
+      })
+
+    assert html =~ ~s(data-testid="chat-inline-surface")
+    assert html =~ "Posts per Month"
+    assert html =~ "bar"
+    assert html =~ "May"
+    assert html =~ "Jun"
+    assert length(:binary.matches(html, ~s(class="chat-surface-chart-row"))) == 2
+  end
+
   # Sends a message to the LiveView and blocks until it has been processed.
   # Uses a test ping/pong to guarantee the message was handled before returning.
   defp send_and_await(view, message) do
