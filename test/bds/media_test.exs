@@ -697,6 +697,8 @@ defmodule BDS.MediaTest do
     assert media.caption == nil
     assert media.author == nil
     assert media.language == nil
+    assert media.width == nil
+    assert media.height == nil
 
     sidecar_path = Path.join(temp_dir, media.sidecar_path)
     {:ok, contents} = File.read(sidecar_path)
@@ -707,6 +709,8 @@ defmodule BDS.MediaTest do
     refute Map.has_key?(parsed, "caption")
     refute Map.has_key?(parsed, "author")
     refute Map.has_key?(parsed, "language")
+    refute Map.has_key?(parsed, "width")
+    refute Map.has_key?(parsed, "height")
 
     assert Map.has_key?(parsed, "id")
     assert Map.has_key?(parsed, "originalName")
