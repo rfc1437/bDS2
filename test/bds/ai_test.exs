@@ -1209,6 +1209,110 @@ defmodule BDS.AITest do
            end)
   end
 
+  test "chat request is truncated to the model context window, dropping oldest pairs and keeping the system prompt" do
+    {:ok, project} = create_project_fixture("Truncation Chat")
+    _fixtures = seed_project_content(project.id)
+
+    # A catalog model with a small context window forces truncation. No tool
+    # support keeps the round single so the captured request is the chat call.
+    Repo.insert!(
+      BDS.AI.CatalogProvider.changeset(%BDS.AI.CatalogProvider{}, %{
+        id: "test",
+        name: "Test Provider",
+        updated_at: Persistence.now_ms()
+      })
+    )
+
+    Repo.insert!(
+      BDS.AI.Model.changeset(%BDS.AI.Model{}, %{
+        provider: "test",
+        model_id: "tiny-ctx-model",
+        name: "Tiny Context Model",
+        supports_tool_calls: false,
+        context_window: 2_000,
+        max_input_tokens: 2_000,
+        max_output_tokens: 256,
+        updated_at: Persistence.now_ms()
+      })
+    )
+
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "tiny-ctx-model"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(false)
+
+    # Explicit title skips title generation, so only the chat request is sent.
+    assert {:ok, conversation} =
+             BDS.AI.start_chat(%{title: "Truncation Test", model: "tiny-ctx-model"})
+
+    # Seed a long history of alternating user/assistant turns, each large enough
+    # that the full history blows past the context budget.
+    seeded_count = 40
+    base_time = Persistence.now_ms() - 1_000_000
+
+    for n <- 1..seeded_count do
+      role = if rem(n, 2) == 1, do: :user, else: :assistant
+      marker = "[[MARK-#{String.pad_leading(Integer.to_string(n), 4, "0")}]]"
+
+      Repo.insert!(%BDS.AI.ChatMessage{
+        conversation_id: conversation.id,
+        role: role,
+        content: marker <> " " <> String.duplicate("x", 380),
+        created_at: base_time + n
+      })
+    end
+
+    assert {:ok, _reply} =
+             BDS.AI.send_chat_message(conversation.id, "newest question please answer",
+               runtime: FakeRuntime,
+               test_pid: self(),
+               project_id: project.id,
+               secret_backend: FakeSecretBackend
+             )
+
+    assert_received {:runtime_request, _endpoint, request}
+    assert request.operation == :chat
+
+    [system_message | rest] = request.messages
+
+    # The system prompt is preserved as the first message.
+    assert system_message["role"] == "system"
+    assert is_binary(system_message["content"]) and system_message["content"] != ""
+
+    # Truncation actually happened: not every seeded turn survives.
+    refute Enum.any?(rest, &(&1["role"] == "system"))
+    assert length(rest) < seeded_count + 1
+
+    # The newest user turn is always kept (it is the request's last message).
+    assert List.last(rest)["content"] =~ "newest question please answer"
+
+    kept_markers =
+      rest
+      |> Enum.flat_map(fn message ->
+        case Regex.run(~r/\[\[MARK-(\d+)\]\]/, message["content"] || "") do
+          [_full, number] -> [String.to_integer(number)]
+          _no_match -> []
+        end
+      end)
+
+    assert kept_markers != []
+
+    # Oldest pairs are dropped first: the surviving markers form a contiguous
+    # suffix ending at the newest one, and the oldest is gone.
+    assert Enum.max(kept_markers) == seeded_count
+    assert Enum.min(kept_markers) > 1
+    assert kept_markers == Enum.sort(kept_markers)
+    assert Enum.max(kept_markers) - Enum.min(kept_markers) + 1 == length(kept_markers)
+  end
+
   test "chat generates a short title after the first user turn using the title model" do
     {:ok, project} = create_project_fixture("Title Chat")
     _fixtures = seed_project_content(project.id)
