@@ -99,6 +99,10 @@ defmodule BDS.MetadataTest do
     category_meta_path = Path.join([temp_dir, "meta", "category-meta.json"])
     publishing_path = Path.join([temp_dir, "meta", "publishing.json"])
 
+    assert File.read!(categories_path) =~ "\n"
+    assert File.read!(category_meta_path) =~ "\n"
+    assert File.read!(publishing_path) =~ "\n"
+
     assert ["article", "aside", "news", "page", "picture"] =
              Jason.decode!(File.read!(categories_path))
 

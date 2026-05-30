@@ -417,7 +417,7 @@ defmodule BDS.Metadata do
   defp write_json(project, file_name, payload) do
     meta_dir = Path.join(Projects.project_data_dir(project), "meta")
     path = Path.join(meta_dir, file_name)
-    Persistence.atomic_write(path, Jason.encode!(payload))
+    Persistence.atomic_write(path, Jason.encode!(payload, pretty: true))
   end
 
   defp read_json(project, file_name) do

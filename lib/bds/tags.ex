@@ -269,7 +269,7 @@ defmodule BDS.Tags do
         |> maybe_put("postTemplateSlug", tag.post_template_slug)
       end)
 
-    Persistence.atomic_write(path, Jason.encode!(payload))
+    Persistence.atomic_write(path, Jason.encode!(payload, pretty: true))
   end
 
   defp validate_unique_name(project_id, name) do

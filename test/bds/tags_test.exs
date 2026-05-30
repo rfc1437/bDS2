@@ -30,8 +30,12 @@ defmodule BDS.TagsTest do
     tags_path = Path.join([temp_dir, "meta", "tags.json"])
     assert File.exists?(tags_path)
 
+    contents = File.read!(tags_path)
+    assert contents =~ "\n"
+    refute String.contains?(contents, "}],[")
+
     assert [%{"name" => "Alpha"}, %{"color" => "#000000", "name" => "Zebra"}] =
-             Jason.decode!(File.read!(tags_path))
+             Jason.decode!(contents)
   end
 
   test "create_tag rejects case-insensitive duplicates per project", %{project: project} do
