@@ -167,6 +167,54 @@ defmodule BDS.Scripts.TransformsTest do
     assert [%{reason: _}] = result.errors
   end
 
+  test "a failing first transform does not halt the pipeline (TransformPipelineContinuation)", %{
+    project: project
+  } do
+    # First transform fails before producing any valid state; later transforms
+    # must still run against the original input, and each failure is captured
+    # with its slug without halting the pipeline.
+    boom =
+      transform(project.id, "Boom", """
+      function main(_data, _ctx)
+        error("boom")
+      end
+      """)
+
+    Process.sleep(5)
+
+    transform(project.id, "Append", """
+    function main(data, _ctx)
+      data.content = data.content .. "A"
+      return data
+    end
+    """)
+
+    Process.sleep(5)
+
+    kaboom =
+      transform(project.id, "Kaboom", """
+      function main(_data, _ctx)
+        error("kaboom")
+      end
+      """)
+
+    data = %{
+      "title" => "t",
+      "content" => "seed",
+      "tags" => [],
+      "categories" => [],
+      "url" => "http://x"
+    }
+
+    assert {:ok, result} = Transforms.run(project.id, data)
+    # Original input survives the first failure; the surviving transform still runs.
+    assert result.data["content"] == "seedA"
+    # Both failures are captured, in pipeline order, each tagged with its slug.
+    assert [%{slug: first_slug}, %{slug: second_slug}] = result.errors
+    assert first_slug == boom.slug
+    assert second_slug == kaboom.slug
+  end
+
   test "receives blogmark context with source and originating url", %{project: project} do
     transform(project.id, "Ctx", """
     function main(data, ctx)
