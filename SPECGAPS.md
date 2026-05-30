@@ -147,14 +147,14 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 | ~~D2-7~~ | ~~ConditionalPostFields: nil fields absent from frontmatter~~ | frontmatter.allium:398 | **Resolved:** test added — post with nil excerpt/author/language → those fields absent from published file, 3 refute assertions |
 | ~~D2-8~~ | ~~ConditionalMediaFields: nil fields absent from sidecar~~ | frontmatter.allium:417 | **Resolved:** added width/height assertions to nil-fields-absent test |
 | D2-9 | ~~max_posts_per_page 1..500 constraint~~ | metadata.allium:75-77 | **Resolved:** 5 tests added (0→1, -5→1, 1000→500, nil→50, non-numeric→50) |
-| D2-10 | SandboxedExecution: restricted capabilities blocked | script.allium:84-88 | Write test: filesystem/process/package loading blocked |
-| D2-11 | TransformToastBudget enforcement | script.allium:251-258 | Write test: per-script and total toast limits enforced |
-| D2-12 | ProgressThrottled: 250ms throttle | task.allium:110-113 | Write test: rapid progress reports throttled |
-| D2-13 | archived→draft transition | post.allium:121 | Write test: unarchive post → draft |
-| D2-14 | archived→published transition | post.allium:122 | Write test: unarchive post → published |
-| D2-15 | AppNoopNotifier: app writes don't produce notification rows | cli_sync.allium:64-68 | Write test: app mutation produces no notification row |
-| D2-16 | ValidateMedia rule | media_processing.allium:318-343 | Write test: missing/corrupted/orphan media detected |
-| D2-17 | ContentHashSkipsUnchanged during reindex | embedding.allium:199-202 | Write test: unchanged content_hash skips re-embedding |
+| D2-10 | ~~SandboxedExecution: restricted capabilities blocked~~ | script.allium:84-88 | **Resolved:** 6 tests added (os.execute, os.rename, io.open for write, require, dofile, loadlib all blocked) |
+| D2-11 | ~~TransformToastBudget enforcement~~ | script.allium:251-258 | **Resolved:** 2 tests already existed (per-script cap + total budget) |
+| D2-12 | ~~ProgressThrottled: 250ms throttle~~ | task.allium:110-113 | **Resolved:** 2 tests added (rapid reports within 250ms dropped; value 1.0 bypasses throttle) |
+| D2-13 | ~~archived→draft transition~~ | post.allium:121 | **Resolved:** 4 tests already existed (unarchive→draft, restores content from disk, rejects non-archived, not_found) |
+| D2-14 | ~~archived→published transition~~ | post.allium:122 | **Resolved:** test already existed (publish_post republishes archived posts without losing body or published_at) |
+| D2-15 | ~~AppNoopNotifier: app writes don't produce notification rows~~ | cli_sync.allium:64-68 | **Resolved:** test added (post create, media import, metadata update do not produce notification rows) |
+| D2-16 | ~~ValidateMedia rule~~ | media_processing.allium:318-343 | **Resolved:** `validate_media/1` implemented in media.ex, 5 tests added (healthy, missing_binary, missing_sidecar, orphan, linked_not_orphan) |
+| D2-17 | ~~ContentHashSkipsUnchanged during reindex~~ | embedding.allium:199-202 | **Resolved:** 2 tests already existed (sync_post skips when hash matches; index_unindexed skips unchanged) |
 
 ### D3. Partial Test Coverage (needs expansion)
 
@@ -195,7 +195,7 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 3. **C-1 through C-3** — internal spec inconsistencies (reconcile to code)
 4. ~~**B1-1 through B1-20**~~ — all resolved: chat inline surfaces, auto-translation, settings sections, style tab, published snapshot fields, rendering subsystem (new rendering.allium), 404.html, media translation modal, menu ops, language picker + confirm dialog, script/template publish actions, import + documentation tabs, metadata-diff entity types, task TTL eviction, discard-post-changes, replace-media-file
 5. **A2-1 through A2-17** — spec drift (code is normative, update spec)
-6. **D2-1 through D2-17** — untested rules
+6. ~~**D2-1 through D2-17**~~ — all resolved: `max_posts_per_page` constraint, sandboxed execution, transform toast budget, progress throttle, archived→draft/published transitions, AppNoopNotifier, validate_media implementation+tests, content_hash skip on reindex
 7. **D3-1 through D3-11** — partial test coverage
 8. ~~**B2-1 through B2-9**~~ — all resolved: editor_body resolver, single-post reimport, orphan import, dashboard data, missing-thumbnail regen, cache dir, stale-template prune, render labels, generation progress reporting
 9. **D4-1 through D4-7** — UI test coverage

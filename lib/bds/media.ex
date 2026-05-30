@@ -349,6 +349,53 @@ defmodule BDS.Media do
     )
   end
 
+  @spec validate_media(String.t()) :: [%{media_id: String.t(), issue: String.t()}]
+  def validate_media(project_id) do
+    project = BDS.Projects.get_project!(project_id)
+    data_dir = BDS.Projects.project_data_dir(project)
+
+    Repo.all(from m in Media, where: m.project_id == ^project_id)
+    |> Enum.flat_map(fn media ->
+      issues = []
+
+      binary_path = Path.join(data_dir, media.file_path)
+      issues = if File.exists?(binary_path), do: issues, else: [%{media_id: media.id, issue: "missing_binary"} | issues]
+
+      sidecar_path = Path.join(data_dir, media.sidecar_path)
+      issues = if File.exists?(sidecar_path), do: issues, else: [%{media_id: media.id, issue: "missing_sidecar"} | issues]
+
+      issues =
+        if BDS.Media.FileOps.image_mime?(media.mime_type) do
+          thumbnails = BDS.Media.Thumbnails.thumbnail_paths(media)
+
+          Enum.reduce([:small, :medium, :large, :ai], issues, fn size, acc ->
+            thumb_path = Path.join(data_dir, Map.fetch!(thumbnails, size))
+
+            if File.exists?(thumb_path),
+              do: acc,
+              else: [%{media_id: media.id, issue: "missing_thumbnail_#{size}"} | acc]
+          end)
+        else
+          issues
+        end
+
+      issues =
+        if BDS.Media.FileOps.image_mime?(media.mime_type) and File.exists?(binary_path) do
+          case BDS.Media.FileOps.image_dimensions(binary_path, media.mime_type) do
+            {nil, nil} -> [%{media_id: media.id, issue: "corrupted"} | issues]
+            _ -> issues
+          end
+        else
+          issues
+        end
+
+      linked_posts = BDS.Media.Linking.list_linked_posts(media.id)
+      issues = if linked_posts == [], do: [%{media_id: media.id, issue: "orphan"} | issues], else: issues
+
+      Enum.reverse(issues)
+    end)
+  end
+
   defp log_thumbnail_error(:ok, _media_id), do: :ok
 
   defp log_thumbnail_error({:error, reason}, media_id) do

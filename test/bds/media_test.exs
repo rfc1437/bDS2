@@ -773,6 +773,65 @@ defmodule BDS.MediaTest do
     |> Image.open!()
   end
 
+  describe "validate_media (D2-16)" do
+    test "reports no issues for healthy media with a post link", %{project: project, temp_dir: temp_dir} do
+      source_path = Path.join(temp_dir, "sample.png")
+      File.write!(source_path, sample_image_binary(".png"))
+      assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+      {:ok, post} = BDS.Posts.create_post(%{project_id: project.id, title: "Linked", content: "body"})
+      {:ok, :linked} = BDS.Media.Linking.link_media_to_post(media.id, post.id)
+      assert [] == BDS.Media.validate_media(project.id)
+    end
+
+    test "reports missing binary file", %{project: project, temp_dir: temp_dir} do
+      source_path = Path.join(temp_dir, "sample.txt")
+      File.write!(source_path, "hello")
+      assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+      media_id = media.id
+
+      data_dir = BDS.Projects.project_data_dir(project)
+      File.rm!(Path.join(data_dir, media.file_path))
+
+      issues = BDS.Media.validate_media(project.id)
+      assert Enum.any?(issues, &(&1.media_id == media_id and &1.issue == "missing_binary"))
+    end
+
+    test "reports missing sidecar", %{project: project, temp_dir: temp_dir} do
+      source_path = Path.join(temp_dir, "sample.txt")
+      File.write!(source_path, "hello")
+      assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+      media_id = media.id
+
+      data_dir = BDS.Projects.project_data_dir(project)
+      File.rm!(Path.join(data_dir, media.sidecar_path))
+
+      issues = BDS.Media.validate_media(project.id)
+      assert Enum.any?(issues, &(&1.media_id == media_id and &1.issue == "missing_sidecar"))
+    end
+
+    test "reports orphan media (not linked to any post)", %{project: project, temp_dir: temp_dir} do
+      source_path = Path.join(temp_dir, "sample.txt")
+      File.write!(source_path, "hello")
+      assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+      media_id = media.id
+
+      issues = BDS.Media.validate_media(project.id)
+      assert Enum.any?(issues, &(&1.media_id == media_id and &1.issue == "orphan"))
+    end
+
+    test "does not report orphan when linked to a post", %{project: project, temp_dir: temp_dir} do
+      source_path = Path.join(temp_dir, "sample.txt")
+      File.write!(source_path, "hello")
+      assert {:ok, media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+      {:ok, post} = BDS.Posts.create_post(%{project_id: project.id, title: "Linked", content: "body"})
+      {:ok, :linked} = BDS.Media.Linking.link_media_to_post(media.id, post.id)
+
+      issues = BDS.Media.validate_media(project.id)
+      refute Enum.any?(issues, &(&1.issue == "orphan"))
+    end
+  end
+
   defp assert_images_match!(left, right) do
     assert Image.shape(left) == Image.shape(right)
 

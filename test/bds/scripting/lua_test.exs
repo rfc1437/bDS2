@@ -34,6 +34,42 @@ defmodule BDS.Scripting.LuaTest do
     assert_receive {:progress, %{"phase" => "write", "current" => 2, "total" => 2}}
   end
 
+  test "sandbox blocks os.execute" do
+    source = "function main() os.execute('echo hacked') end"
+
+    assert {:error, _reason} = BDS.Scripting.execute(source, "main", [])
+  end
+
+  test "sandbox blocks os.rename" do
+    source = "function main() os.rename('/etc/passwd', '/tmp/hacked') end"
+
+    assert {:error, _reason} = BDS.Scripting.execute(source, "main", [])
+  end
+
+  test "sandbox blocks io.open for writing" do
+    source = "function main() io.open('/tmp/hacked', 'w') end"
+
+    assert {:error, _reason} = BDS.Scripting.execute(source, "main", [])
+  end
+
+  test "sandbox blocks require" do
+    source = "function main() require('socket') end"
+
+    assert {:error, _reason} = BDS.Scripting.execute(source, "main", [])
+  end
+
+  test "sandbox blocks dofile" do
+    source = "function main() dofile('/etc/hosts') end"
+
+    assert {:error, _reason} = BDS.Scripting.execute(source, "main", [])
+  end
+
+  test "sandbox blocks loadlib" do
+    source = "function main() package.loadlib('libc.so', 'system') end"
+
+    assert {:error, _reason} = BDS.Scripting.execute(source, "main", [])
+  end
+
   test "enforces reduction limits" do
     source = "function main() while true do end end"
 

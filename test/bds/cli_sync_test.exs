@@ -13,6 +13,37 @@ defmodule BDS.CliSyncTest do
     :ok
   end
 
+  test "app-side writes do not produce notification rows (AppNoopNotifier)", %{} do
+    existing_before_create = Repo.aggregate(BDS.CliSync.Notification, :count)
+
+    # Perform a few app-side operations — post create, media import, metadata
+    # update — none should leave a notification row behind.
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-app-noop-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    on_exit(fn -> File.rm_rf(temp_dir) end)
+
+    {:ok, project} = BDS.Projects.create_project(%{name: "AppNoop", data_path: temp_dir})
+
+    {:ok, _post} =
+      BDS.Posts.create_post(%{
+        project_id: project.id,
+        title: "App-Created",
+        content: "body"
+      })
+
+    source_path = Path.join(temp_dir, "image.png")
+    File.write!(source_path, "fake png")
+    {:ok, _media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    {:ok, _metadata} =
+      BDS.Metadata.update_project_metadata(project.id, %{name: "Renamed"})
+
+    existing_after = Repo.aggregate(BDS.CliSync.Notification, :count)
+    assert existing_after == existing_before_create
+  end
+
   test "cli mutations are written to db_notifications, processed on file change, and marked seen" do
     assert {:ok, notification} = CliSync.cli_mutation_performed("post", "post-1", :updated)
     assert notification.from_cli == true

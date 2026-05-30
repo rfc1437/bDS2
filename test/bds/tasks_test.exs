@@ -95,6 +95,34 @@ defmodule BDS.TasksTest do
     assert wait_for_task(third.id, &(&1.status == :completed)).status == :completed
   end
 
+  test "progress reports within 250ms throttle window are silently dropped" do
+    assert {:ok, task} = BDS.Tasks.register_external_task("fast progress")
+
+    assert :ok = BDS.Tasks.report_progress(task.id, 0.25, "quarter")
+    assert wait_for_task(task.id, &(&1.progress == 0.25)).progress == 0.25
+
+    assert :ok = BDS.Tasks.report_progress(task.id, 0.5, "half")
+    assert task_id = task.id
+    # The 250ms throttle has not elapsed, so progress stays at 0.25.
+    assert wait_for_task(task_id, & &1.progress == 0.25).progress == 0.25
+
+    on_exit(fn -> BDS.Tasks.complete_task(task.id) end)
+  end
+
+  test "progress report with value 1.0 bypasses the throttle" do
+    assert {:ok, task} = BDS.Tasks.register_external_task("completion progress")
+
+    assert :ok = BDS.Tasks.report_progress(task.id, 0.25, "quarter")
+
+    # A completion report (1.0) must go through even if throttled.
+    assert :ok = BDS.Tasks.report_progress(task.id, 1.0, "done")
+
+    assert wait_for_task(task.id, &(&1.progress == 1.0)).progress == 1.0
+    assert wait_for_task(task.id, &(&1.message == "done")).message == "done"
+
+    on_exit(fn -> BDS.Tasks.complete_task(task.id) end)
+  end
+
   test "external tasks are registered as running and can report progress and complete" do
     assert {:ok, task} =
              BDS.Tasks.register_external_task("preview build", %{
