@@ -579,6 +579,13 @@
   cursor: pointer;
 }
 
+.task-message-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 .status-bar-item.theme-badge {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 3px;

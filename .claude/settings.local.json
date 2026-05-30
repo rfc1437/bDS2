@@ -23,7 +23,9 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(echo \"EXIT: $?\")",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(MIX_ENV=prod mix release bds --overwrite)",
+      "Bash(MIX_ENV=prod mix bds.bundle.macos)"
     ]
   }
 }

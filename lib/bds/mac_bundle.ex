@@ -156,16 +156,79 @@ defmodule BDS.MacBundle do
     if Keyword.get(opts, :skip_codesign, false), do: :ok, else: codesign(app)
   end
 
+  # Mach-O magic numbers (thin 32/64-bit, both endiannesses, and fat) as the
+  # first four bytes appear on disk.
+  @macho_magics [
+    <<0xCF, 0xFA, 0xED, 0xFE>>,
+    <<0xCE, 0xFA, 0xED, 0xFE>>,
+    <<0xFE, 0xED, 0xFA, 0xCF>>,
+    <<0xFE, 0xED, 0xFA, 0xCE>>,
+    <<0xCA, 0xFE, 0xBA, 0xBE>>,
+    <<0xBE, 0xBA, 0xFE, 0xCA>>
+  ]
+
   @doc """
-  Ad-hoc codesign the whole bundle recursively. `--deep` signs every nested
-  Mach-O (the relocated dylibs and the release's `beam.smp`/`erlexec`/escripts),
-  then we verify with `--deep --strict`.
+  Ad-hoc codesign the bundle.
+
+  `codesign --deep` only recurses into nested *bundles* and the main executable;
+  it ignores the loose Mach-O files the release ships — `beam.smp`, `erlexec`,
+  and every NIF `.so`/`.dylib` under `Resources/rel/…`. Those keep their original
+  *linker-signed* ad-hoc signatures, which the macOS code-signing monitor rejects
+  once the files are copied into a new bundle (the process is SIGKILLed with
+  "Code Signature Invalid" the moment it `dlopen`s such a NIF).
+
+  So we sign every Mach-O explicitly with a fresh ad-hoc signature (inside-out),
+  then seal the outer bundle and verify it.
   """
   @spec codesign(String.t()) :: :ok | {:error, term()}
   def codesign(app) do
-    with :ok <- run("codesign", ["--force", "--deep", "--sign", "-", "--timestamp=none", app]) do
-      run("codesign", ["--verify", "--deep", "--strict", app])
+    with :ok <- sign_machos(macho_files(app)),
+         :ok <- run("codesign", ["--force", "--sign", "-", "--timestamp=none", app]) do
+      run("codesign", ["--verify", "--strict", app])
     end
+  end
+
+  @doc """
+  List every Mach-O file under `root`, detected by magic number. These are the
+  loose binaries `codesign --deep` skips and that must be signed individually.
+  """
+  @spec macho_files(String.t()) :: [String.t()]
+  def macho_files(root) do
+    root |> regular_files() |> Enum.filter(&macho?/1)
+  end
+
+  defp regular_files(path) do
+    case File.ls(path) do
+      {:ok, entries} ->
+        Enum.flat_map(entries, fn entry ->
+          full = Path.join(path, entry)
+
+          case File.lstat(full) do
+            {:ok, %File.Stat{type: :directory}} -> regular_files(full)
+            {:ok, %File.Stat{type: :regular}} -> [full]
+            _ -> []
+          end
+        end)
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  defp macho?(file) do
+    case File.open(file, [:read, :binary], &IO.binread(&1, 4)) do
+      {:ok, magic} when magic in @macho_magics -> true
+      _ -> false
+    end
+  end
+
+  defp sign_machos(files) do
+    Enum.reduce_while(files, :ok, fn file, :ok ->
+      case run("codesign", ["--force", "--sign", "-", "--timestamp=none", file]) do
+        :ok -> {:cont, :ok}
+        error -> {:halt, error}
+      end
+    end)
   end
 
   defp run(cmd, args) do

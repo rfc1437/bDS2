@@ -174,6 +174,31 @@ defmodule BDS.MacBundleTest do
     end
   end
 
+  describe "MacBundle.macho_files/1" do
+    test "finds Mach-O binaries anywhere in the tree by magic number, ignoring other files" do
+      tmp = Path.join(System.tmp_dir!(), "bds-macho-#{System.unique_integer([:positive])}")
+      on_exit(fn -> File.rm_rf!(tmp) end)
+
+      # Little-endian 64-bit Mach-O magic (0xFEEDFACF) as stored on disk.
+      macho = <<0xCF, 0xFA, 0xED, 0xFE>>
+
+      beam = Path.join(tmp, "Contents/Resources/rel/erts-16/bin/beam.smp")
+      nif = Path.join(tmp, "Contents/Resources/rel/lib/foo-1.0/priv/foo.so")
+      dylib = Path.join(tmp, "Contents/Frameworks/libbar.dylib")
+
+      for path <- [beam, nif, dylib] do
+        File.mkdir_p!(Path.dirname(path))
+        File.write!(path, macho <> "machine code")
+      end
+
+      # Non-Mach-O files (plist, shell scripts) must be excluded.
+      File.write!(Path.join(tmp, "Contents/Info.plist"), ~s(<?xml version="1.0"?>))
+      File.write!(Path.join(tmp, "Contents/Resources/rel/erts-16/bin/erl"), "#!/bin/sh\n")
+
+      assert Enum.sort(MacBundle.macho_files(tmp)) == Enum.sort([beam, nif, dylib])
+    end
+  end
+
   describe "MacBundle.assemble/1" do
     setup do
       tmp = Path.join(System.tmp_dir!(), "bds-macbundle-#{System.unique_integer([:positive])}")

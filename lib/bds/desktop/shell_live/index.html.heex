@@ -568,7 +568,7 @@
   </div>
 
   <footer class="status-bar flex h-[22px] shrink-0 items-center justify-between gap-2" data-region="status-bar" data-testid="status-bar">
-    <div class="status-bar-left flex min-w-0 items-center gap-2 overflow-hidden">
+    <div class="status-bar-left flex min-w-0 items-center gap-2">
       <%= if @is_mac_ui do %>
         <div class="status-shell-controls flex items-center gap-1" data-testid="status-shell-controls">
           <button
@@ -659,7 +659,7 @@
           </div>
         <% end %>
       </div>
-      <button class="status-bar-item status-bar-task-button inline-flex items-center gap-2" data-testid="status-task-button" type="button" phx-click="open_tasks_panel">
+      <button class="status-bar-item status-bar-task-button inline-flex min-w-0 items-center gap-2" data-testid="status-task-button" type="button" phx-click="open_tasks_panel">
         <%= if @status.left.running_task_message do %>
           <span class="task-spinner"></span>
         <% end %>
