@@ -119,6 +119,79 @@ defmodule BDS.MediaTest do
     end)
   end
 
+  test "replace_media_file copies the new file over the path, updates the row, and regenerates thumbnails synchronously",
+       %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "original.jpg")
+    File.write!(source_path, Image.new!(4, 4, color: [255, 0, 0]) |> Image.write!(:memory, suffix: ".jpg"))
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    assert media.width == 4
+    assert media.height == 4
+
+    thumbnail_paths = BDS.Media.thumbnail_paths(media)
+
+    # Delete thumbnails so their presence after the replace proves regeneration ran.
+    Enum.each(Map.values(thumbnail_paths), fn path ->
+      File.rm!(Path.join(temp_dir, path))
+    end)
+
+    replacement_path = Path.join(temp_dir, "replacement.jpg")
+    File.write!(replacement_path, Image.new!(6, 8, color: [0, 0, 255]) |> Image.write!(:memory, suffix: ".jpg"))
+    replacement_binary = File.read!(replacement_path)
+
+    assert {:ok, updated} = BDS.Media.replace_media_file(media.id, replacement_path)
+
+    refute updated.checksum == media.checksum
+    assert updated.width == 6
+    assert updated.height == 8
+    assert updated.size == byte_size(replacement_binary)
+
+    # New file content is on disk at the same path.
+    assert File.read!(Path.join(temp_dir, updated.file_path)) == replacement_binary
+
+    # Thumbnails were regenerated synchronously (present immediately, no backup left behind).
+    Enum.each(Map.values(BDS.Media.thumbnail_paths(updated)), fn path ->
+      assert File.exists?(Path.join(temp_dir, path))
+    end)
+
+    refute File.exists?(Path.join(temp_dir, updated.file_path) <> ".bak")
+  end
+
+  test "replace_media_file is a no-op when the new file matches the current checksum", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    source_path = Path.join(temp_dir, "same.jpg")
+    File.write!(source_path, Image.new!(4, 4, color: [255, 0, 0]) |> Image.write!(:memory, suffix: ".jpg"))
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    # First replace establishes a stored checksum (import does not compute one).
+    new_path = Path.join(temp_dir, "blue.jpg")
+    File.write!(new_path, Image.new!(6, 8, color: [0, 0, 255]) |> Image.write!(:memory, suffix: ".jpg"))
+
+    assert {:ok, updated} = BDS.Media.replace_media_file(media.id, new_path)
+    refute is_nil(updated.checksum)
+
+    # Replacing with the identical file is a no-op.
+    identical_path = Path.join(temp_dir, "blue_copy.jpg")
+    File.cp!(new_path, identical_path)
+
+    assert {:ok, nil} = BDS.Media.replace_media_file(media.id, identical_path)
+  end
+
+  test "replace_media_file returns {:error, :not_found} for an unknown media id", %{
+    temp_dir: temp_dir
+  } do
+    replacement_path = Path.join(temp_dir, "orphan.jpg")
+    File.write!(replacement_path, Image.new!(4, 4, color: [0, 255, 0]) |> Image.write!(:memory, suffix: ".jpg"))
+
+    assert {:error, :not_found} = BDS.Media.replace_media_file("does-not-exist", replacement_path)
+  end
+
   test "deleting a post rewrites linked media sidecars to remove that post id", %{
     project: project,
     temp_dir: temp_dir
