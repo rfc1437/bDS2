@@ -242,6 +242,71 @@ defmodule BDS.MetadataTest do
     assert File.exists?(BDS.Embeddings.index_path(project.id))
   end
 
+  test "remove_category removes the category and its settings from state, files, and DB", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    # Add a category + settings first
+    assert {:ok, metadata} = BDS.Metadata.add_category(project.id, "news")
+    assert "news" in metadata.categories
+
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_category_settings(project.id, "news", %{
+               render_in_lists: false,
+               show_title: true,
+               post_template_slug: "article"
+             })
+
+    # Remove the category
+    assert {:ok, updated} = BDS.Metadata.remove_category(project.id, "news")
+
+    # 1. Category removed from in-memory list
+    refute "news" in updated.categories
+    assert "article" in updated.categories
+    assert "aside" in updated.categories
+    assert "page" in updated.categories
+    assert "picture" in updated.categories
+
+    # 2. Category settings removed from in-memory map
+    refute Map.has_key?(updated.category_settings, "news")
+
+    # 3. Verify via get_project_metadata
+    assert {:ok, loaded} = BDS.Metadata.get_project_metadata(project.id)
+    refute "news" in loaded.categories
+    refute Map.has_key?(loaded.category_settings, "news")
+
+    # 4. meta/categories.json rewritten without the removed category
+    categories_path = Path.join([temp_dir, "meta", "categories.json"])
+    assert ["article", "aside", "page", "picture"] =
+             Jason.decode!(File.read!(categories_path))
+
+    # 5. meta/category-meta.json rewritten without the removed category's settings
+    category_meta_path = Path.join([temp_dir, "meta", "category-meta.json"])
+    category_meta = Jason.decode!(File.read!(category_meta_path))
+    refute Map.has_key?(category_meta, "news")
+
+    # 6. DB settings updated
+    cat_setting =
+      BDS.Repo.get(BDS.Settings.Setting, "project:#{project.id}:categories")
+    assert cat_setting != nil
+    refute "news" in (cat_setting.value |> Jason.decode!() |> Map.get("categories", []))
+
+    meta_setting =
+      BDS.Repo.get(BDS.Settings.Setting, "project:#{project.id}:category_meta")
+    assert meta_setting != nil
+    meta_categories = meta_setting.value |> Jason.decode!() |> Map.get("categories", %{})
+    refute Map.has_key?(meta_categories, "news")
+  end
+
+  test "remove_category is a no-op for non-existent category", %{
+    project: project
+  } do
+    {:ok, metadata_before} = BDS.Metadata.get_project_metadata(project.id)
+
+    assert {:ok, metadata} = BDS.Metadata.remove_category(project.id, "nonexistent")
+    assert metadata.categories == metadata_before.categories
+  end
+
   test "sync_project_metadata_from_filesystem materializes the canonical metadata files when missing",
        %{project: project, temp_dir: temp_dir} do
     meta_dir = Path.join(temp_dir, "meta")
