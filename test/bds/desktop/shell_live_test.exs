@@ -5374,6 +5374,133 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert length(:binary.matches(html, ~s(class="chat-surface-chart-row"))) == 2
   end
 
+  test "script editor save persists draft changes to the database", %{project: project} do
+    {:ok, script} =
+      Scripts.create_script(%{
+        project_id: project.id,
+        title: "Save Test",
+        kind: :utility,
+        content: "function main() return 42 end"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    render_click(view, "pin_sidebar_item", %{
+      "route" => "scripts",
+      "id" => script.id,
+      "title" => script.title,
+      "subtitle" => "draft"
+    })
+
+    view
+    |> form(".scripts-view-shell form", %{script_editor: %{title: "Updated Save Test"}})
+    |> render_change()
+
+    html =
+      view
+      |> element(".scripts-save-button")
+      |> render_click()
+
+    assert html =~ "Updated Save Test"
+
+    saved = Scripts.get_script(script.id)
+    assert saved.title == "Updated Save Test"
+    assert saved.version == 2
+  end
+
+  test "script editor run executes the script without crashing", %{project: project} do
+    {:ok, script} =
+      Scripts.create_script(%{
+        project_id: project.id,
+        title: "Run Test",
+        kind: :utility,
+        content: "function main() return 42 end"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    render_click(view, "pin_sidebar_item", %{
+      "route" => "scripts",
+      "id" => script.id,
+      "title" => script.title,
+      "subtitle" => "draft"
+    })
+
+    html =
+      view
+      |> element(".scripts-run-button")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="script-editor")
+
+    reloaded = Scripts.get_script(script.id)
+    assert reloaded.title == "Run Test"
+    assert reloaded.version == 1
+  end
+
+  test "script editor check syntax validates lua content without saving", %{project: project} do
+    {:ok, script} =
+      Scripts.create_script(%{
+        project_id: project.id,
+        title: "Check Test",
+        kind: :utility,
+        content: "function main() return 42 end"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    render_click(view, "pin_sidebar_item", %{
+      "route" => "scripts",
+      "id" => script.id,
+      "title" => script.title,
+      "subtitle" => "draft"
+    })
+
+    html =
+      view
+      |> element(".scripts-check-button")
+      |> render_click()
+
+    assert html =~ ~s(data-testid="script-editor")
+
+    reloaded = Scripts.get_script(script.id)
+    assert reloaded.title == "Check Test"
+    assert reloaded.version == 1
+  end
+
+  test "script editor delete removes the record and published file", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    {:ok, script} =
+      Scripts.create_script(%{
+        project_id: project.id,
+        title: "Delete Test",
+        kind: :utility,
+        content: "function main() return 42 end"
+      })
+
+    assert {:ok, published} = Scripts.publish_script(script.id)
+    published_path = Path.join(temp_dir, published.file_path)
+    assert File.exists?(published_path)
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    render_click(view, "pin_sidebar_item", %{
+      "route" => "scripts",
+      "id" => published.id,
+      "title" => published.title,
+      "subtitle" => "published"
+    })
+
+    view
+    |> element(".scripts-view-shell .ui-button-danger")
+    |> render_click()
+
+    assert Repo.get(BDS.Scripts.Script, published.id) == nil
+    refute File.exists?(published_path)
+  end
+
   # Sends a message to the LiveView and blocks until it has been processed.
   # Uses a test ping/pong to guarantee the message was handled before returning.
   defp send_and_await(view, message) do
