@@ -396,8 +396,14 @@ invariant ChatCancellation {
 }
 
 invariant StructuredRenderTools {
-    -- Chat may emit structured render payloads for charts, tables, and forms.
+    -- Chat may emit structured render payloads via tool calls prefixed "render_".
+    -- 9 inline surface types: card, chart, form, list, metric, mindmap, table, tabs, text, json.
+    -- Render tool names: render_card, render_chart, render_form, render_list,
+    --   render_metric, render_mindmap, render_table, render_tabs.
+    -- Unrecognized render tool names render as JSON (raw dump).
+    -- Tab content may nest any surface type including plain text.
     -- These payloads are data contracts, not arbitrary HTML strings.
+    -- Surface data contracts are defined in editor_chat.allium InlineSurface value.
 }
 
 invariant BlogStatsPromptAugmentation {

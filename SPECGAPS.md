@@ -60,7 +60,7 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 
 | ID | Behavior | Code Location | Path |
 |---|---|---|---|
-| B1-1 | Chat inline surfaces (9 types: card, chart, form, list, metric, mindmap, table, tabs, text/json) | `lib/bds/ui/chat/tool_surfaces.ex:6-15` | Distill into spec |
+| ~~B1-1~~ | ~~Chat inline surfaces (9 types: card, chart, form, list, metric, mindmap, table, tabs, text/json)~~ | `tool_surfaces.ex` | **Resolved:** added InlineSurface value type with all 9 discriminators, supporting value types (SurfaceAction, ChartSeries, MindmapNode, FormField, FieldOption, TabPanel), inline_surfaces on ChatMessage, InlineSurfaceRendering guarantee, and surface_form_debounce_ms config to editor_chat.allium; updated StructuredRenderTools invariant in ai.allium to list all 9 types |
 | B1-2 | Auto-translation system (AutoTranslation.maybe_schedule, media cascade, batch fill) | `lib/bds/posts/auto_translation.ex` | Distill into spec |
 | B1-3 | 3 extra settings sections (Technology, MCP, Data Maintenance) | `lib/bds/ui/settings_editor/` | Distill into spec |
 | B1-4 | Style/Theme as separate tab (`:style`), not settings section | `lib/bds/ui/style_editor.ex` | Distill into spec |
