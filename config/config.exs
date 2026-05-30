@@ -63,6 +63,8 @@ config :bds, :scripting,
   transform_max_toasts_total: 20,
   transform_max_toast_length: 300
 
+config :bds, :chat, max_tool_rounds: 10
+
 config :bds, :embeddings,
   backend: BDS.Embeddings.Backends.Neural,
   model_id: "Xenova/multilingual-e5-small",

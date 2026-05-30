@@ -411,7 +411,7 @@ defmodule BDS.AI.Chat do
              tools,
              runtime,
              opts,
-             @chat_max_tool_rounds
+             chat_max_tool_rounds()
            ),
          {:ok, reply} <-
            maybe_generate_chat_title(conversation.id, user_message.content, reply, opts) do
@@ -750,6 +750,14 @@ defmodule BDS.AI.Chat do
 
   defp available_chat_tools(project_id, model) do
     ChatTools.available_specs(project_id, Catalog.model_capabilities(model))
+  end
+
+  # BoundedToolLoop: the tool-calling round count is capped by
+  # config.chat_max_tool_rounds (falling back to the built-in default).
+  defp chat_max_tool_rounds do
+    :bds
+    |> Application.get_env(:chat, [])
+    |> Keyword.get(:max_tool_rounds, @chat_max_tool_rounds)
   end
 
   defp chat_system_prompt(project_id, tools) do

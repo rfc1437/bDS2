@@ -280,6 +280,32 @@ defmodule BDS.AITest do
     end
   end
 
+  # Always returns another tool call and never a final answer, so a chat would
+  # loop forever if the round count were not bounded.
+  defmodule LoopingToolRuntime do
+    def generate(endpoint, request, opts) do
+      test_pid = Keyword.fetch!(opts, :test_pid)
+      send(test_pid, {:looping_request, endpoint, request})
+
+      {:ok,
+       %{
+         tool_calls: [
+           %{
+             id: "call-loop-#{System.unique_integer([:positive])}",
+             name: "blog_stats",
+             arguments: %{}
+           }
+         ],
+         usage: %{
+           input_tokens: 1,
+           output_tokens: 1,
+           cache_read_tokens: 0,
+           cache_write_tokens: 0
+         }
+       }}
+    end
+  end
+
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     :ok
@@ -1311,6 +1337,56 @@ defmodule BDS.AITest do
     assert Enum.min(kept_markers) > 1
     assert kept_markers == Enum.sort(kept_markers)
     assert Enum.max(kept_markers) - Enum.min(kept_markers) + 1 == length(kept_markers)
+  end
+
+  test "chat tool execution is bounded by config.chat_max_tool_rounds" do
+    {:ok, project} = create_project_fixture("Tool Loop Chat")
+    _fixtures = seed_project_content(project.id)
+
+    previous_chat_config = Application.get_env(:bds, :chat, [])
+    max_rounds = 3
+    Application.put_env(:bds, :chat, Keyword.put(previous_chat_config, :max_tool_rounds, max_rounds))
+    on_exit(fn -> Application.put_env(:bds, :chat, previous_chat_config) end)
+
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(false)
+
+    # Explicit title skips title generation, so only chat rounds reach the runtime.
+    assert {:ok, conversation} =
+             BDS.AI.start_chat(%{title: "Tool Loop", model: "gpt-4o-mini"})
+
+    # The runtime never stops calling tools, so the loop only ends because the
+    # round budget is exhausted.
+    assert {:error, %{kind: :tool_loop_exhausted}} =
+             BDS.AI.send_chat_message(conversation.id, "loop forever please",
+               runtime: LoopingToolRuntime,
+               test_pid: self(),
+               project_id: project.id,
+               secret_backend: FakeSecretBackend
+             )
+
+    # Exactly max_rounds generate calls happen: the final (rounds_left == 0)
+    # round short-circuits before contacting the runtime.
+    request_count = drain_looping_requests(0)
+    assert request_count == max_rounds
+  end
+
+  defp drain_looping_requests(count) do
+    receive do
+      {:looping_request, _endpoint, _request} -> drain_looping_requests(count + 1)
+    after
+      0 -> count
+    end
   end
 
   test "chat generates a short title after the first user turn using the title model" do
