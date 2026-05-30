@@ -235,10 +235,16 @@ rule SettingsRebuild {
 
 -- ─── Style view ───────────────────────────────────────────────
 
+-- The Style view is its OWN singleton tab (tab type `style`, see tabs.allium),
+-- NOT one of the SettingsView collapsible sections. It is opened from the
+-- Style menu/tab entry and renders the Pico CSS theme editor, distinct from
+-- the `settings` tab. Shares the settings_editor code group only because both
+-- persist into project metadata.
+
 value StyleView {
-    themes: List<StyleTheme>
-    selected_theme: String?
-    applied_theme: String?
+    themes: List<StyleTheme>            -- 20 named Pico themes (see metadata.supported_pico_themes)
+    selected_theme: String?            -- local selection, defaults to applied_theme
+    applied_theme: String?             -- persisted picoTheme (default when none set)
     preview_mode: String                -- auto | light | dark
 }
 
@@ -268,9 +274,14 @@ surface StyleViewSurface {
             when style.selected_theme != style.applied_theme
         StylePreviewModeChanged(mode)
 
+    @guarantee SeparateTab
+        -- Rendered in its own `style` singleton tab (tabs.allium), never inline
+        -- in the settings view. Requires an active project; no project => no view.
+
     @guarantee ThemePicker
         -- Grid of theme buttons (one per Pico CSS theme).
         -- Each button: swatch with 3 colour tones (accent, light bg, dark bg) + theme name.
+        -- Theme name shown via display transform: "-" -> " ", first letter capitalised.
         -- Selected theme highlighted with aria-pressed.
 
     @guarantee ControlsRow
