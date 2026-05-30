@@ -143,7 +143,7 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 | ~~D2-3~~ | ~~CreateAndPublishScript rule~~ | ~~script.allium:160~~ | **Resolved:** `create_and_publish_script/1` implemented in scripts.ex, 4 tests added (happy path with file assertions + macro entrypoint default + invalid Lua rejection + slug dedup on title conflict) |
 | ~~D2-4~~ | ~~UniqueScriptSlug dedup~~ | ~~script.allium:115~~ | **Resolved:** test added asserting two scripts with same title produce unique slugs (`dup-slug` → `dup-slug-2`) |
 | D2-5 | ~~FrontmatterRoundtrip invariant~~ | post.allium:223 | **Resolved:** test added — creates post with all fields, publishes, parses file back via `Frontmatter.parse_document`, asserts every field (id, title, slug, excerpt, status, author, language, doNotTranslate, templateSlug, tags, categories, createdAt, updatedAt, publishedAt, body) matches the published DB record |
-| D2-6 | SidecarRoundtrip invariant | media.allium:198 | Write test: write sidecar, read back, assert all fields match |
+| ~~D2-6~~ | ~~SidecarRoundtrip invariant~~ | ~~media.allium:198~~ | **Resolved:** 2 tests added — full roundtrip (write sidecar, parse via `Sidecar.parse_document/1`, assert all fields match DB) + nil conditional fields absent from parsed sidecar |
 | D2-7 | ConditionalPostFields: nil fields absent from frontmatter | frontmatter.allium:398 | Write test: post with nil excerpt/author/language → fields not in file |
 | D2-8 | ConditionalMediaFields: nil fields absent from sidecar | frontmatter.allium:417 | Write test: media with nil title/alt → fields not in sidecar |
 | D2-9 | max_posts_per_page 1..500 constraint | metadata.allium:75-77 | Write test: values outside range rejected |

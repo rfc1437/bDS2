@@ -642,6 +642,81 @@ defmodule BDS.MediaTest do
     assert %{language: ["has already been taken"]} = errors_on(changeset)
   end
 
+  test "SidecarRoundtrip: writing then parsing a sidecar yields matching DB metadata", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    source_path = Path.join(temp_dir, "roundtrip.txt")
+    File.write!(source_path, "hello media")
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path,
+               title: "Roundtrip Title",
+               alt: "Roundtrip Alt",
+               caption: "Roundtrip Caption",
+               author: "Tester",
+               language: "en",
+               tags: ["alpha", "beta"]
+             })
+
+    sidecar_path = Path.join(temp_dir, media.sidecar_path)
+    {:ok, contents} = File.read(sidecar_path)
+    {:ok, parsed} = BDS.Sidecar.parse_document(contents)
+
+    assert parsed["title"] == media.title
+    assert parsed["alt"] == media.alt
+    assert parsed["caption"] == media.caption
+    assert parsed["tags"] == media.tags
+    assert parsed["id"] == media.id
+    assert parsed["originalName"] == media.original_name
+    assert parsed["mimeType"] == media.mime_type
+    assert parsed["size"] == media.size
+    assert parsed["author"] == media.author
+    assert parsed["language"] == media.language
+    assert parsed["createdAt"] == media.created_at
+    assert parsed["updatedAt"] == media.updated_at
+  end
+
+  test "SidecarRoundtrip: conditional fields are absent from parsed sidecar when nil", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    source_path = Path.join(temp_dir, "minimal.txt")
+    File.write!(source_path, "hello media")
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{
+               project_id: project.id,
+               source_path: source_path
+             })
+
+    assert media.title == nil
+    assert media.alt == nil
+    assert media.caption == nil
+    assert media.author == nil
+    assert media.language == nil
+
+    sidecar_path = Path.join(temp_dir, media.sidecar_path)
+    {:ok, contents} = File.read(sidecar_path)
+    {:ok, parsed} = BDS.Sidecar.parse_document(contents)
+
+    refute Map.has_key?(parsed, "title")
+    refute Map.has_key?(parsed, "alt")
+    refute Map.has_key?(parsed, "caption")
+    refute Map.has_key?(parsed, "author")
+    refute Map.has_key?(parsed, "language")
+
+    assert Map.has_key?(parsed, "id")
+    assert Map.has_key?(parsed, "originalName")
+    assert Map.has_key?(parsed, "mimeType")
+    assert Map.has_key?(parsed, "size")
+    assert Map.has_key?(parsed, "tags")
+    assert Map.has_key?(parsed, "createdAt")
+    assert Map.has_key?(parsed, "updatedAt")
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->
