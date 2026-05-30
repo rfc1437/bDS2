@@ -103,6 +103,10 @@ defmodule BDS.Embeddings.Index do
 
   @impl true
   def handle_call({:put, project_id, dimensions, entries}, _from, state) do
+    # Cancel any pending debounce for this project first: build_entry/2 returns a
+    # fresh entry with timer: nil, so without this the previous timer would be
+    # orphaned (left to fire a redundant save) instead of coalescing.
+    state = cancel_pending_save(state, project_id)
     entry = build_entry(dimensions, entries)
     state = state |> Map.put(project_id, entry) |> schedule_save(project_id)
     {:reply, :ok, state}
@@ -263,6 +267,17 @@ defmodule BDS.Embeddings.Index do
     if is_reference(entry.timer), do: Process.cancel_timer(entry.timer)
     timer = Process.send_after(self(), {:save, project_id}, @debounce_ms)
     Map.put(state, project_id, %{entry | timer: timer})
+  end
+
+  defp cancel_pending_save(state, project_id) do
+    case Map.get(state, project_id) do
+      %{timer: timer} = entry when is_reference(timer) ->
+        Process.cancel_timer(timer)
+        Map.put(state, project_id, %{entry | timer: nil})
+
+      _other ->
+        state
+    end
   end
 
   defp save_now(state, project_id) do

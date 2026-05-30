@@ -624,4 +624,71 @@ defmodule BDS.EmbeddingsTest do
     # Queries stay safe.
     assert {:ok, []} = BDS.Embeddings.find_similar(post.id, 5)
   end
+
+  # DebouncedPersistence invariant (embedding.allium:213-217): HNSW index
+  # persistence is debounced at 5s so bulk operations don't thrash the disk;
+  # rapid writes coalesce into one deferred save, force-saved via flush.
+  describe "DebouncedPersistence invariant" do
+    alias BDS.Embeddings.Index
+
+    defp packed_vector(seed) do
+      for offset <- 1..384, into: <<>>, do: <<:math.sin(seed + offset)::float-32-little>>
+    end
+
+    defp index_entries do
+      [
+        %{label: 1, post_id: 101, vector: packed_vector(1)},
+        %{label: 2, post_id: 102, vector: packed_vector(2)}
+      ]
+    end
+
+    test "put schedules a ~5s save timer instead of writing to disk immediately", %{
+      project: project
+    } do
+      refute File.exists?(Index.path(project.id))
+
+      :ok = Index.put(project.id, 384, index_entries())
+
+      entry = Map.fetch!(:sys.get_state(Index), project.id)
+      assert is_reference(entry.timer)
+
+      # the debounce window is 5 seconds
+      remaining = Process.read_timer(entry.timer)
+      assert is_integer(remaining)
+      assert remaining > 4_000 and remaining <= 5_000
+
+      # nothing flushed to disk yet — persistence is deferred
+      refute File.exists?(Index.path(project.id))
+    end
+
+    test "rapid puts coalesce: each reschedules the single debounce timer", %{project: project} do
+      :ok = Index.put(project.id, 384, index_entries())
+      first_timer = Map.fetch!(:sys.get_state(Index), project.id).timer
+
+      :ok = Index.put(project.id, 384, index_entries())
+      second_timer = Map.fetch!(:sys.get_state(Index), project.id).timer
+
+      # a new timer replaced the old one (debounce reset) and the old one was
+      # cancelled, so two writes still produce only one pending save
+      refute first_timer == second_timer
+      assert Process.read_timer(first_timer) == false
+
+      refute File.exists?(Index.path(project.id))
+    end
+
+    test "the debounce timer firing flushes to disk and clears the pending timer", %{
+      project: project
+    } do
+      :ok = Index.put(project.id, 384, index_entries())
+      refute File.exists?(Index.path(project.id))
+
+      # simulate the 5s debounce elapsing
+      send(Index, {:save, project.id})
+      # synchronous round-trip ensures the {:save, _} message was processed first
+      entry = Map.fetch!(:sys.get_state(Index), project.id)
+
+      assert File.exists?(Index.path(project.id))
+      assert is_nil(entry.timer)
+    end
+  end
 end
