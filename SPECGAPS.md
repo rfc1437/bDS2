@@ -181,7 +181,7 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 | D4-3 | ~~editor_chat.allium~~ | ~~Chat creation, pinned tab~~ | ~~API key screen, message rendering, input area, model selector, inline surfaces~~ | **Resolved:** 3 tests added — WelcomeScreen assertions (robot icon, title, 5 tips), CSP external image rewriting in markdown, chart inline surface rendering with series labels/values |
 | D4-4 | editor_script.allium | Editor layout, create defaults | ~~Save, syntax check, run, delete~~ | **Resolved:** 4 tests added — save persists title change + version bump to DB, run executes script without crash, check syntax validates without side effects, delete removes DB record + file |
 | D4-5 | editor_template.allium | Editor layout, create defaults | ~~Save with validation, validate, delete with references~~ | **Resolved:** 6 tests added in template_editor_live_test.exs covering save with valid Liquid (version bumps), save with invalid Liquid (rejected, version unchanged), validate (no side effects), delete (removes DB row + .liquid file), delete with references (clears post template_slug) |
-| D4-6 | editor_tags.allium | Sync/discover, merge | Cloud sizing, color picker, delete confirmation, create form |
+| D4-6 | editor_tags.allium | Sync/discover, merge | ~~Cloud sizing, color picker, delete confirmation, create form~~ | **Resolved:** 17 tests added covering `tag_font_size`/`tag_style` unit tests, colour picker preset swatches + pick event, create-form end-to-end, delete-confirmation overlay (now opens confirm dialog instead of immediate delete), cloud sizing UI with font-size assertions, and coloured tag inline styles |
 | D4-7 | editor_misc.allium | Menu add/save, metadata diff, validation | Menu protection, import analysis, translation fix, duplicate dismiss, git diff |
 
 ---
@@ -199,4 +199,5 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 7. ~~**D3-1 through D3-11**~~ — all resolved: content=null assertion, old-file-deletion, DNT guard, validation prerequisites (already tested), macro failure degrades to empty, template roundtrip, default categories, FTS multi-language, canonical URL format, German transliteration expansion
 8. ~~**B2-1 through B2-9**~~ — all resolved: editor_body resolver, single-post reimport, orphan import, dashboard data, missing-thumbnail regen, cache dir, stale-template prune, render labels, generation progress reporting
 9. **D4-1 through D4-3** — ~~UI test coverage~~ **Resolved (D4-1 via standalone delete_media_translation + MediaDetectLanguage tests; D4-2 via 3 new test files + expanded managed_categories — 56 tests added; D4-3 via WelcomeScreen/CSP/chart surface tests)**
-   **D4-4 through D4-7** — remaining UI test coverage
+   **D4-4 through D4-6** — ~~UI test coverage~~ **Resolved (D4-4 script editor save/run/check/delete tests; D4-5 template editor save/validate/delete tests; D4-6 tag editor 17 tests covering cloud sizing, colour picker, create form, delete confirmation via overlay)**
+   **D4-7** — remaining UI test coverage (menu protection, import analysis, translation fix, duplicate dismiss, git diff)

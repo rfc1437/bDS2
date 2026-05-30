@@ -104,6 +104,23 @@ defmodule BDS.Desktop.ShellLive.Bridges do
     {:noreply, callbacks.refresh_content.(socket, socket.assigns.workbench)}
   end
 
+  def handle_info({:confirm_tag_delete, tag_id, _tag_name, post_count}, socket, _callbacks) do
+    page_language = socket.assigns.page_language
+
+    suffix = if post_count == 1, do: "", else: "s"
+    message = "This tag is used in #{post_count} post#{suffix}. Delete anyway?"
+
+    overlay = %{
+      kind: :confirm_dialog,
+      title: BDS.Gettext.lgettext(page_language, "ui", "Delete Tag"),
+      message: message,
+      tag_id: tag_id,
+      confirm_action: :delete_tag
+    }
+
+    {:noreply, assign(socket, :shell_overlay, overlay)}
+  end
+
   def handle_info(:settings_changed, socket, callbacks) do
     {:noreply, callbacks.reload.(socket, socket.assigns.workbench)}
   end

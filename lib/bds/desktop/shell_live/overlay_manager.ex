@@ -6,7 +6,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [send_update: 2]
 
-  alias BDS.{AI, Media, Metadata}
+  alias BDS.{AI, Media, Metadata, Tags}
   alias BDS.Desktop.{Overlay}
 
   alias BDS.Desktop.ShellLive.{
@@ -285,6 +285,25 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
 
         {%{kind: :confirm_delete, title: title, entity_name: entity_name}, _tab} ->
           close_overlay_with_output(socket, callbacks.append_output, title, entity_name)
+
+        {%{kind: :confirm_dialog, confirm_action: :delete_tag, tag_id: tag_id}, _tab} ->
+          case Tags.delete_tag(tag_id) do
+            {:ok, :deleted} ->
+              socket
+              |> assign(:shell_overlay, nil)
+              |> callbacks.reload.(socket.assigns.workbench)
+
+            {:error, reason} ->
+              socket
+              |> assign(:shell_overlay, nil)
+              |> callbacks.append_output.(
+                dgettext("ui", "Delete Tag"),
+                inspect(reason),
+                nil,
+                "error"
+              )
+              |> callbacks.reload.(socket.assigns.workbench)
+          end
 
         {%{kind: :confirm_dialog, title: title, message: message}, _tab} ->
           close_overlay_with_output(socket, callbacks.append_output, title, message)

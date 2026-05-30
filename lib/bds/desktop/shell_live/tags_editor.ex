@@ -144,28 +144,17 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
   def handle_event("delete_tag_editor", _params, socket) do
     case socket.assigns.tags_editor.selected do
       [tag_name] ->
-        case Repo.get_by(Tag,
-               project_id: socket.assigns.project_id,
-               name: tag_name
-             ) do
+        project_id = socket.assigns.project_id
+
+        case Repo.get_by(Tag, project_id: project_id, name: tag_name) do
           nil ->
             {:noreply, socket}
 
-          %Tag{} = tag ->
-            case Tags.delete_tag(tag.id) do
-              {:ok, _deleted} ->
-                notify_parent(:tags_changed)
-
-                socket
-                |> put_in_tags_editor([:selected], [])
-                |> put_in_tags_editor([:edit_draft], %{})
-                |> load_data()
-                |> noreply()
-
-              {:error, reason} ->
-                notify_output(dgettext("ui", "Tags"), inspect(reason), "error")
-                {:noreply, socket}
-            end
+          %Tag{id: tag_id} ->
+            counts = tag_counts(project_id)
+            post_count = Map.get(counts, tag_name, 0)
+            Notify.parent({:confirm_tag_delete, tag_id, tag_name, post_count})
+            {:noreply, socket}
         end
 
       _other ->
