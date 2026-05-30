@@ -597,6 +597,60 @@ defmodule BDS.MediaTest do
     assert contents =~ "caption: \"Bildunterschrift\"\n---"
   end
 
+  test "delete_media_translation removes the translation row and sidecar file", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    source_path = Path.join(temp_dir, "sample.txt")
+    File.write!(source_path, "hello media")
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    assert {:ok, de_translation} =
+             BDS.Media.upsert_media_translation(media.id, "de", %{
+               title: "Titel",
+               alt: "Alt text",
+               caption: "Bildunterschrift"
+             })
+
+    assert {:ok, fr_translation} =
+             BDS.Media.upsert_media_translation(media.id, "fr", %{
+               title: "Titre",
+               alt: "Texte alternatif",
+               caption: "Légende"
+             })
+
+    de_sidecar = Path.join(temp_dir, media.file_path <> ".de.meta")
+    fr_sidecar = Path.join(temp_dir, media.file_path <> ".fr.meta")
+    assert File.exists?(de_sidecar)
+    assert File.exists?(fr_sidecar)
+
+    assert {:ok, true} = BDS.Media.delete_media_translation(media.id, "de")
+
+    assert Repo.get(BDS.Media.Translation, de_translation.id) == nil
+    assert Repo.get(BDS.Media.Translation, fr_translation.id) != nil
+    refute File.exists?(de_sidecar)
+    assert File.exists?(fr_sidecar)
+  end
+
+  test "delete_media_translation is a no-op for a non-existent translation before deleting known ones",
+       %{project: project, temp_dir: temp_dir} do
+    source_path = Path.join(temp_dir, "untitled.txt")
+    File.write!(source_path, "hello")
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    assert {:ok, false} = BDS.Media.delete_media_translation(media.id, "de")
+  end
+
+  test "delete_media_translation returns {:error, :not_found} for unknown media", %{
+    temp_dir: _temp_dir
+  } do
+    assert {:error, :not_found} = BDS.Media.delete_media_translation("does-not-exist", "de")
+  end
+
   test "UniqueMediaTranslation: a media has at most one translation per language", %{
     project: project,
     temp_dir: temp_dir
@@ -829,6 +883,34 @@ defmodule BDS.MediaTest do
 
       issues = BDS.Media.validate_media(project.id)
       refute Enum.any?(issues, &(&1.issue == "orphan"))
+    end
+  end
+
+  describe "MediaDetectLanguage rule" do
+    test "updating language persists to the row and rewrites the sidecar", %{
+      project: project,
+      temp_dir: temp_dir
+    } do
+      source_path = Path.join(temp_dir, "detect-me.txt")
+      File.write!(source_path, "Bonjour tout le monde")
+
+      assert {:ok, media} =
+               BDS.Media.import_media(%{
+                 project_id: project.id,
+                 source_path: source_path,
+                 title: "Entrée",
+                 caption: "Un délice culinaire"
+               })
+
+      assert media.language == nil
+
+      assert {:ok, updated_media} = BDS.Media.update_media(media.id, %{language: "fr"})
+
+      assert updated_media.language == "fr"
+
+      data_dir = BDS.Projects.project_data_dir(project)
+      sidecar = File.read!(Path.join(data_dir, updated_media.sidecar_path))
+      assert sidecar =~ "language: fr\n"
     end
   end
 

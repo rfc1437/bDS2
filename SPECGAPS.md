@@ -176,7 +176,7 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 
 | ID | Spec | Covered | Not Covered |
 |---|---|---|---|
-| D4-1 | editor_media.allium | AI analysis, delete | Translate, replace file, link-to-post, translation CRUD, detect language |
+| ~~D4-1~~ | ~~editor_media.allium~~ | ~~AI analysis, delete~~ | ~~Translate, replace file, link-to-post, translation CRUD, detect language~~ | **Resolved:** backend tests cover replace_file, link-to-post, translation CRUD (upsert + unique constraint); added standalone `delete_media_translation/2` test (row + sidecar deletion, no-op for non-existent, not-found for unknown media); added `MediaDetectLanguage` rule integration test (AI mock, language persisted, sidecar rewritten) |
 | D4-2 | editor_settings.allium | AI endpoints, airplane toggle, rebuild | Protected categories, MCP agents, style/theme, search filter, categories CRUD |
 | D4-3 | editor_chat.allium | Chat creation, pinned tab | API key screen, message rendering, input area, model selector, inline surfaces |
 | D4-4 | editor_script.allium | Editor layout, create defaults | Save, syntax check, run, delete |
