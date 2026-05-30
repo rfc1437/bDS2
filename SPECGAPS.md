@@ -83,17 +83,17 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 
 ### B2. Lower Priority (implementation detail or minor)
 
-| ID | Behavior | Code Location |
-|---|---|---|
-| B2-1 | `editor_body/1` content resolver | `lib/bds/posts.ex:229-252` |
-| B2-2 | `sync_post_from_file/1` single-post reimport | `lib/bds/posts.ex:254-279` |
-| B2-3 | `import_orphan_post_file/1` | `lib/bds/posts.ex:289-291` |
-| B2-4 | `dashboard_stats/1`, `post_counts_by_year_month/1` | `lib/bds/posts.ex:378-413` |
-| B2-5 | `regenerate_missing_thumbnails/2` | `lib/bds/media.ex:47-48` |
-| B2-6 | Cache dir computation | `lib/bds/projects.ex:101-106` |
-| B2-7 | `remove_stale_published_templates` | `lib/bds/templates.ex:524-552` |
-| B2-8 | Rendering Labels module (30+ i18n strings) | `lib/bds/rendering/labels.ex` |
-| B2-9 | Progress reporting during reindex | `lib/bds/generation/progress.ex` |
+| ID | Behavior | Code Location | Resolution |
+|---|---|---|---|
+| ~~B2-1~~ | ~~`editor_body/1` content resolver~~ | `lib/bds/posts.ex:234-256` | **Resolved:** added `editor_body` derived field to the Post entity in post.allium (prefer DB draft content, else read markdown body from file, else empty; same for translations) |
+| ~~B2-2~~ | ~~`sync_post_from_file/1` single-post reimport~~ | `lib/bds/posts.ex:259` | **Resolved:** added `SyncPostFromFileRequested` surface event + `SyncPostFromFile` rule (re-read own .md file, upsert DB, re-sync links) to post.allium |
+| ~~B2-3~~ | ~~`import_orphan_post_file/1`~~ | `lib/bds/posts.ex:293` | **Resolved:** added `ImportOrphanPostFileRequested` surface event + `ImportOrphanPostFile` rule (import a disk .md with no DB row, reject non-markdown) to post.allium |
+| ~~B2-4~~ | ~~`dashboard_stats/1`, `post_counts_by_year_month/1`~~ | `lib/bds/posts.ex:416-450` | **Resolved:** added `ComputeDashboardData` rule to editor_misc.allium (status-grouped counts, (year,month) timeline newest-first limited to recent months, plus clouds/recent) |
+| ~~B2-5~~ | ~~`regenerate_missing_thumbnails/2`~~ | `lib/bds/media/thumbnails.ex:51` | **Resolved:** added `RegenerateMissingThumbnailsRequested` surface event + `RegenerateMissingThumbnails` rule (raster images excl. SVG, regenerate only missing files, background task w/ counts) to media_processing.allium |
+| ~~B2-6~~ | ~~Cache dir computation~~ | `lib/bds/projects.ex:142-147` | **Resolved:** added `cache_dir` derived field (`private_dir/projects/{id}`, :project_cache_root override) to the Project entity in project.allium |
+| ~~B2-7~~ | ~~`remove_stale_published_templates`~~ | `lib/bds/templates.ex:561` | **Resolved:** extended RebuildTemplatesFromFiles in template.allium to prune published templates whose file is neither scanned nor on disk (clearing references first) |
+| ~~B2-8~~ | ~~Rendering Labels module (30+ i18n strings)~~ | `lib/bds/rendering/labels.ex` | **Resolved:** captured as `RenderLabels` value + `LabelsUseContentLanguage` invariant in rendering.allium (with B1-6) — content-language gettext strings + month names |
+| ~~B2-9~~ | ~~Progress reporting during reindex~~ | `lib/bds/generation/progress.ex` | **Resolved:** added `GenerationProgressReported` runtime event + `ProgressReporting` guarantee to generation.allium (count-based + phased fractions, via task progress channel) |
 
 ---
 
@@ -197,5 +197,5 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 5. **A2-1 through A2-17** — spec drift (code is normative, update spec)
 6. **D2-1 through D2-17** — untested rules
 7. **D3-1 through D3-11** — partial test coverage
-8. **B1-7 through B1-20** — minor code behaviors missing from spec
+8. ~~**B2-1 through B2-9**~~ — all resolved: editor_body resolver, single-post reimport, orphan import, dashboard data, missing-thumbnail regen, cache dir, stale-template prune, render labels, generation progress reporting
 9. **D4-1 through D4-7** — UI test coverage

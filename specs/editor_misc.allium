@@ -148,6 +148,16 @@ surface DashboardSurface {
         -- Single-click: preview tab. Double-click: pin tab.
 }
 
+rule ComputeDashboardData {
+    when: DashboardRequested(project)
+    -- stats: post counts grouped by status (total = sum of all statuses),
+    --   plus media/image counts, total media size, tag and category counts.
+    -- timeline: posts grouped by (year, month) of created_at, newest first,
+    --   limited to the most recent config.dashboard_timeline_months with data.
+    -- tag_cloud / category_cloud / recent_posts populated per their guarantees.
+    ensures: Dashboard
+}
+
 -- ─── Menu editor view ────────────────────────────────────────
 
 -- Visual editor for the OPML navigation menu (meta/menu.opml).

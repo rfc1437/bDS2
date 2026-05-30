@@ -175,6 +175,12 @@ rule RebuildTemplatesFromFiles {
         let parsed = parse_template_file(file)
         ensures: Template.created(parsed)
             -- or updated if slug already exists
+    -- Prune stale published templates: a published Template whose file_path is
+    -- neither among the scanned files nor present on disk is deleted, clearing
+    -- its references first (posts' template_slug, tags' post_template_slug).
+    for template in project.templates where status = published and file_path != "":
+        if template.file_path not in scanned_files and not file_exists(template.file_path):
+            ensures: not exists template
 }
 
 -- Exact Liquid subset required (distilled from bundled starter templates)

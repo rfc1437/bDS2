@@ -18,6 +18,7 @@ surface MediaProcessingControlSurface {
         TagMediaRequested(media, tags)
         DeleteMediaRequested(media)
         ValidateMediaRequested(project)
+        RegenerateMissingThumbnailsRequested(project)
 }
 
 surface MediaProcessingRuntimeSurface {
@@ -129,6 +130,18 @@ rule GenerateThumbnails {
         format: config.thumbnail_ai_format,
         quality: config.thumbnail_ai_quality
     )
+}
+
+rule RegenerateMissingThumbnails {
+    when: RegenerateMissingThumbnailsRequested(project)
+    -- Maintenance sweep over the project's raster images (images, excluding SVG),
+    -- oldest first. For each, any thumbnail file absent from disk is regenerated
+    -- from the original binary; images with a full set are skipped.
+    -- Runs as a background task reporting progress (current/total).
+    -- Returns counts: processed, generated, failed.
+    for media in project.media where is_image(media.mime_type) and not is_svg(media.mime_type):
+        if any_thumbnail_missing(media):
+            ensures: ThumbnailsRegenerated(media)
 }
 
 -- Thumbnail generation algorithm

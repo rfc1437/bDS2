@@ -56,6 +56,8 @@ surface PostControlSurface {
         DeletePostRequested(post)
         ArchivePostRequested(post)
         DiscardPostChangesRequested(post)
+        SyncPostFromFileRequested(post)
+        ImportOrphanPostFileRequested(project, relative_path)
 }
 
 surface PostFilePathSurface {
@@ -122,6 +124,10 @@ entity Post {
         -- Slug changes only allowed before first publish
     content_location: if status = published: file_path else: content
         -- Published: body in filesystem. Draft: body in DB field.
+    editor_body: if content != null: content else: read_markdown_body(file_path)
+        -- Resolver used by editors: prefer the in-DB draft content, else read
+        -- the markdown body from the post's file. Empty string when neither
+        -- exists. The same resolver applies to PostTranslation records.
 
     transitions status {
         draft -> published
@@ -226,6 +232,25 @@ rule ArchivePost {
     when: ArchivePostRequested(post)
     requires: post.status = draft or post.status = published
     ensures: post.status = archived
+}
+
+rule SyncPostFromFile {
+    when: SyncPostFromFileRequested(post)
+    requires: post.file_path != ""
+    -- Single-post reimport: re-reads the post's own .md file and upserts the DB
+    -- record from it (the filesystem is treated as truth for that one post).
+    -- Re-syncs the post's link graph. Errors out if the file is missing.
+    ensures: PostFieldsUpdated(post, parse_post_file(post.file_path))
+    ensures: PostLinksUpdated(post)
+}
+
+rule ImportOrphanPostFile {
+    when: ImportOrphanPostFileRequested(project, relative_path)
+    -- Imports a .md file that exists on disk but has no DB record (an orphan,
+    -- e.g. surfaced by RunMetadataDiff). Rejects non-markdown / missing files.
+    ensures:
+        let new_post = Post.created(parse_post_file(relative_path))
+        SearchIndexUpdated(new_post)
 }
 
 rule DiscardPostChanges {

@@ -55,6 +55,10 @@ entity Project {
         --   Linux:   $XDG_CONFIG_HOME/bds  (default ~/.config/bds)
         --   Windows: %APPDATA%\\bds
         -- See PrivateArtifactsLiveInOsAppDir.
+    cache_dir: private_dir + "/projects/" + id
+        -- Per-project subtree of private_dir for that project's regenerable
+        -- artifacts (embeddings index + sidecar). Overridable in tests via the
+        -- :project_cache_root setting; never the repo or the project folder.
 }
 
 surface ProjectSurface {

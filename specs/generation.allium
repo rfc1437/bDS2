@@ -24,7 +24,15 @@ surface GenerationRuntimeSurface {
 
     provides:
         PageRenderRequested(template, context)
+        GenerationProgressReported(current, total, label)
         GenerateSiteCompleted(generation)
+
+    @guarantee ProgressReporting
+        -- Generation, reindex, and site-validation run as background tasks and
+        -- emit count-based progress (current/total + label, e.g. "Processing
+        -- N of M posts") via the task progress channel (see task.allium
+        -- ReportProgress / ProgressThrottled). Multi-phase work (validation)
+        -- maps each phase onto a fixed fraction of the 0.0..1.0 bar.
 }
 
 value GenerationSection {
