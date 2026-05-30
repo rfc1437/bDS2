@@ -5,7 +5,7 @@ defmodule BDS.Desktop.ShellLive do
 
   import Phoenix.HTML
 
-  alias BDS.{AI, BoundedAtoms, Metadata}
+  alias BDS.{AI, Blogmark, BoundedAtoms, Metadata}
   alias BDS.CliSync.Watcher
   alias BDS.Desktop.{ExternalLinks, FilePicker, FolderPicker, ShellData, UILocale}
 
@@ -717,6 +717,10 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, socket}
   end
 
+  def handle_info({:blogmark_deep_link, url}, socket) when is_binary(url) do
+    {:noreply, handle_blogmark_deep_link(socket, url)}
+  end
+
   def handle_info(message, socket) do
     Bridges.handle_info(message, socket, bridges_callbacks())
   end
@@ -1001,6 +1005,56 @@ defmodule BDS.Desktop.ShellLive do
 
   defp create_sidebar_item(socket, kind),
     do: SidebarCreate.create(socket, kind, sidebar_create_callbacks())
+
+  # Receive a bds2://new-post blogmark deep link: run the transform pipeline,
+  # create a draft post, open it in the editor, and surface transform toasts.
+  defp handle_blogmark_deep_link(socket, url) do
+    title = dgettext("ui", "Blogmark")
+
+    case current_project_id(socket) do
+      project_id when is_binary(project_id) ->
+        case Blogmark.receive_deep_link(project_id, url) do
+          {:ok, %{post: post, toasts: toasts, errors: errors}} ->
+            socket
+            |> reload_shell(socket.assigns.workbench)
+            |> open_sidebar_item(
+              %{
+                "route" => "post",
+                "id" => post.id,
+                "title" => post.title,
+                "subtitle" => post.slug
+              },
+              :pin
+            )
+            |> append_blogmark_toasts(title, toasts)
+            |> append_blogmark_errors(title, errors)
+
+          {:error, reason} ->
+            append_output_entry(socket, title, inspect(reason), url, "error")
+        end
+
+      _ ->
+        append_output_entry(
+          socket,
+          title,
+          dgettext("ui", "Open a project before importing a blogmark."),
+          url,
+          "warning"
+        )
+    end
+  end
+
+  defp append_blogmark_toasts(socket, title, toasts) do
+    Enum.reduce(toasts, socket, fn message, acc ->
+      append_output_entry(acc, title, message, nil, "info")
+    end)
+  end
+
+  defp append_blogmark_errors(socket, title, errors) do
+    Enum.reduce(errors, socket, fn %{slug: slug, reason: reason}, acc ->
+      append_output_entry(acc, title, inspect(reason), slug, "error")
+    end)
+  end
 
   defp handle_file_picker_result(socket, {:ok, _media}),
     do: refresh_content(socket, socket.assigns.workbench)

@@ -25,21 +25,22 @@ defmodule BDS.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      {Phoenix.PubSub, name: BDS.PubSub},
-      {BDS.Desktop.Endpoint, secret_key_base: desktop_secret_key_base()},
-      BDS.Repo,
-      BDS.RepoBootstrap,
-      BDS.Tasks,
-      BDS.Preview,
-      BDS.Publishing,
-      {Task.Supervisor, name: BDS.Tasks.TaskSupervisor},
-      {Task.Supervisor, name: BDS.TCP.TaskSupervisor},
-      BDS.Scripting.JobStore,
-      {Task.Supervisor, name: BDS.Scripting.TaskSupervisor},
-      BDS.Scripting.JobSupervisor,
-      BDS.Embeddings.Index
-    ] ++ embedding_children() ++ desktop_children(current_env())
+    children =
+      [
+        {Phoenix.PubSub, name: BDS.PubSub},
+        {BDS.Desktop.Endpoint, secret_key_base: desktop_secret_key_base()},
+        BDS.Repo,
+        BDS.RepoBootstrap,
+        BDS.Tasks,
+        BDS.Preview,
+        BDS.Publishing,
+        {Task.Supervisor, name: BDS.Tasks.TaskSupervisor},
+        {Task.Supervisor, name: BDS.TCP.TaskSupervisor},
+        BDS.Scripting.JobStore,
+        {Task.Supervisor, name: BDS.Scripting.TaskSupervisor},
+        BDS.Scripting.JobSupervisor,
+        BDS.Embeddings.Index
+      ] ++ embedding_children() ++ desktop_children(current_env())
 
     opts = [strategy: :one_for_one, name: BDS.Supervisor]
     Supervisor.start_link(children, opts)
@@ -72,7 +73,8 @@ defmodule BDS.Application do
 
       [
         {Desktop.Window, window_opts},
-        Supervisor.child_spec({BDS.Desktop.MainWindow, []}, id: BDS.Desktop.MainWindow.Watcher)
+        Supervisor.child_spec({BDS.Desktop.MainWindow, []}, id: BDS.Desktop.MainWindow.Watcher),
+        {BDS.Desktop.DeepLink, []}
       ]
     end
   end

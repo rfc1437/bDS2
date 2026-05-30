@@ -846,6 +846,27 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-tab-id="#{created_definition.id}")
   end
 
+  test "blogmark deep link creates a draft post and opens it in the editor", %{project: project} do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+    post_count_before = Repo.aggregate(Post, :count, :id)
+
+    url =
+      "bds2://new-post?title=" <>
+        URI.encode_www_form("Saved From Browser") <>
+        "&url=" <> URI.encode_www_form("https://example.com/article")
+
+    send(view.pid, {:blogmark_deep_link, url})
+    html = render(view)
+
+    assert Repo.aggregate(Post, :count, :id) == post_count_before + 1
+
+    created_post = Repo.get_by!(Post, title: "Saved From Browser")
+    assert created_post.project_id == project.id
+    assert created_post.status == :draft
+    assert html =~ ~s(data-tab-type="post")
+    assert html =~ ~s(data-tab-id="#{created_post.id}")
+  end
+
   test "settings sidebar selections expose a scroll target for the preferences editor" do
     {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 

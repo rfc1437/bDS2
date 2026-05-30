@@ -1,6 +1,6 @@
 #: lib/bds/rendering/labels.ex:18
-#: lib/bds/ui/sidebar.ex:284
-#: lib/bds/ui/sidebar.ex:578
+#: lib/bds/ui/sidebar.ex:288
+#: lib/bds/ui/sidebar.ex:589
 #, elixir-autogen, elixir-format
 msgid "Archive"
 msgstr "Archiv"

@@ -72,7 +72,7 @@ msgid "--"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:217
-#: lib/bds/ui/sidebar.ex:762
+#: lib/bds/ui/sidebar.ex:773
 #, elixir-autogen, elixir-format
 msgid "AI"
 msgstr ""
@@ -102,7 +102,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/tab_helpers.ex:166
 #: lib/bds/ui/sidebar.ex:83
 #: lib/bds/ui/sidebar.ex:131
-#: lib/bds/ui/sidebar.ex:175
+#: lib/bds/ui/sidebar.ex:179
 #, elixir-autogen, elixir-format
 msgid "AI conversations"
 msgstr ""
@@ -235,7 +235,7 @@ msgid "Apply Theme"
 msgstr ""
 
 #: lib/bds/desktop/shell_data.ex:182
-#: lib/bds/ui/sidebar.ex:327
+#: lib/bds/ui/sidebar.ex:331
 #, elixir-autogen, elixir-format
 msgid "Archived"
 msgstr ""
@@ -270,7 +270,7 @@ msgid "Auto"
 msgstr ""
 
 #: lib/bds/desktop/shell_data.ex:98
-#: lib/bds/desktop/shell_live.ex:430
+#: lib/bds/desktop/shell_live.ex:431
 #: lib/bds/desktop/shell_live/chat_editor.ex:231
 #: lib/bds/desktop/shell_live/media_editor.ex:156
 #: lib/bds/desktop/shell_live/media_editor.ex:349
@@ -285,7 +285,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/tab_helpers.ex:146
 #: lib/bds/ui/sidebar.ex:64
 #: lib/bds/ui/sidebar.ex:116
-#: lib/bds/ui/sidebar.ex:155
+#: lib/bds/ui/sidebar.ex:159
 #, elixir-autogen, elixir-format
 msgid "Automation helpers"
 msgstr ""
@@ -387,7 +387,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/settings_editor/managed_categories.ex:131
 #: lib/bds/desktop/shell_live/settings_editor/managed_categories.ex:144
 #: lib/bds/desktop/shell_live/settings_editor/managed_categories.ex:158
-#: lib/bds/ui/sidebar.ex:286
+#: lib/bds/ui/sidebar.ex:290
 #, elixir-autogen, elixir-format
 msgid "Categories"
 msgstr ""
@@ -417,7 +417,7 @@ msgstr ""
 msgid "Category name is required"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:953
+#: lib/bds/desktop/shell_live.ex:979
 #: lib/bds/desktop/shell_live/chat_editor.ex:87
 #: lib/bds/desktop/shell_live/chat_editor.ex:230
 #: lib/bds/desktop/shell_live/chat_editor.ex:318
@@ -426,7 +426,7 @@ msgstr ""
 #: lib/bds/ui/registry.ex:104
 #: lib/bds/ui/sidebar.ex:82
 #: lib/bds/ui/sidebar.ex:130
-#: lib/bds/ui/sidebar.ex:174
+#: lib/bds/ui/sidebar.ex:178
 #, elixir-autogen, elixir-format
 msgid "Chat"
 msgstr ""
@@ -446,13 +446,13 @@ msgstr ""
 msgid "Clear"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:288
+#: lib/bds/ui/sidebar.ex:292
 #, elixir-autogen, elixir-format
 msgid "Clear categories"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:289
-#: lib/bds/ui/sidebar.ex:581
+#: lib/bds/ui/sidebar.ex:293
+#: lib/bds/ui/sidebar.ex:592
 #, elixir-autogen, elixir-format
 msgid "Clear filters"
 msgstr ""
@@ -463,8 +463,8 @@ msgstr ""
 msgid "Clear mapping"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:287
-#: lib/bds/ui/sidebar.ex:580
+#: lib/bds/ui/sidebar.ex:291
+#: lib/bds/ui/sidebar.ex:591
 #, elixir-autogen, elixir-format
 msgid "Clear tags"
 msgstr ""
@@ -515,7 +515,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:362
 #: lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex:34
 #: lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex:32
-#: lib/bds/ui/sidebar.ex:761
+#: lib/bds/ui/sidebar.ex:772
 #, elixir-autogen, elixir-format
 msgid "Content"
 msgstr ""
@@ -556,7 +556,7 @@ msgid "Create"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/tags_editor_html/tags_editor.html.heex:36
-#: lib/bds/ui/sidebar.ex:746
+#: lib/bds/ui/sidebar.ex:757
 #, elixir-autogen, elixir-format
 msgid "Create / Edit"
 msgstr ""
@@ -602,7 +602,7 @@ msgstr ""
 msgid "Dashboard"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:775
+#: lib/bds/ui/sidebar.ex:786
 #, elixir-autogen, elixir-format
 msgid "Data"
 msgstr ""
@@ -804,12 +804,12 @@ msgstr ""
 msgid "Draft"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:313
+#: lib/bds/ui/sidebar.ex:317
 #, elixir-autogen, elixir-format
 msgid "Drafts"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:271
+#: lib/bds/ui/sidebar.ex:275
 #, elixir-autogen, elixir-format
 msgid "Drafts, published entries, and archive history"
 msgstr ""
@@ -842,7 +842,7 @@ msgstr ""
 
 #: lib/bds/desktop/shell_live/index.html.heex:513
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:111
-#: lib/bds/ui/sidebar.ex:760
+#: lib/bds/ui/sidebar.ex:771
 #, elixir-autogen, elixir-format
 msgid "Editor"
 msgstr ""
@@ -1004,8 +1004,8 @@ msgstr ""
 msgid "Generate Site"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:954
-#: lib/bds/ui/sidebar.ex:786
+#: lib/bds/desktop/shell_live.ex:980
+#: lib/bds/ui/sidebar.ex:797
 #, elixir-autogen, elixir-format
 msgid "Git"
 msgstr ""
@@ -1017,7 +1017,7 @@ msgid "Git Diff"
 msgstr ""
 
 #: lib/bds/desktop/shell_data.ex:244
-#: lib/bds/desktop/shell_live.ex:950
+#: lib/bds/desktop/shell_live.ex:976
 #: lib/bds/desktop/shell_live/panel_renderer.ex:171
 #, elixir-autogen, elixir-format
 msgid "Git Log"
@@ -1056,7 +1056,7 @@ msgstr ""
 msgid "Ignore"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:571
+#: lib/bds/ui/sidebar.ex:582
 #, elixir-autogen, elixir-format
 msgid "Images and files"
 msgstr ""
@@ -1095,7 +1095,7 @@ msgstr ""
 #: lib/bds/ui/sidebar.ex:33
 #: lib/bds/ui/sidebar.ex:90
 #: lib/bds/ui/sidebar.ex:137
-#: lib/bds/ui/sidebar.ex:183
+#: lib/bds/ui/sidebar.ex:187
 #, elixir-autogen, elixir-format
 msgid "Import"
 msgstr ""
@@ -1130,7 +1130,7 @@ msgstr ""
 #: lib/bds/ui/sidebar.ex:34
 #: lib/bds/ui/sidebar.ex:91
 #: lib/bds/ui/sidebar.ex:138
-#: lib/bds/ui/sidebar.ex:184
+#: lib/bds/ui/sidebar.ex:188
 #, elixir-autogen, elixir-format
 msgid "Import definitions"
 msgstr ""
@@ -1140,9 +1140,9 @@ msgstr ""
 msgid "Import failed: %{error}"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:601
-#: lib/bds/desktop/shell_live.ex:991
-#: lib/bds/desktop/shell_live.ex:997
+#: lib/bds/desktop/shell_live.ex:604
+#: lib/bds/desktop/shell_live.ex:1067
+#: lib/bds/desktop/shell_live.ex:1073
 #: lib/bds/desktop/shell_live/sidebar_create.ex:47
 #, elixir-autogen, elixir-format
 msgid "Import media"
@@ -1262,7 +1262,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/settings_editor/mcp_config.ex:50
 #: lib/bds/desktop/shell_live/settings_editor/mcp_config.ex:57
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:348
-#: lib/bds/ui/sidebar.ex:776
+#: lib/bds/ui/sidebar.ex:787
 #, elixir-autogen, elixir-format
 msgid "MCP"
 msgstr ""
@@ -1321,7 +1321,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/sidebar_delete.ex:175
 #: lib/bds/ui/registry.ex:30
 #: lib/bds/ui/registry.ex:100
-#: lib/bds/ui/sidebar.ex:570
+#: lib/bds/ui/sidebar.ex:581
 #, elixir-autogen, elixir-format
 msgid "Media"
 msgstr ""
@@ -1347,7 +1347,7 @@ msgid "Merge"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/tags_editor_html/tags_editor.html.heex:78
-#: lib/bds/ui/sidebar.ex:747
+#: lib/bds/ui/sidebar.ex:758
 #, elixir-autogen, elixir-format
 msgid "Merge Tags"
 msgstr ""
@@ -1469,9 +1469,9 @@ msgstr ""
 #: lib/bds/desktop/shell_live/sidebar_components.ex:321
 #: lib/bds/desktop/shell_live/sidebar_components.ex:381
 #: lib/bds/desktop/shell_live/sidebar_components.ex:455
-#: lib/bds/ui/sidebar.ex:198
-#: lib/bds/ui/sidebar.ex:789
-#: lib/bds/ui/sidebar.ex:896
+#: lib/bds/ui/sidebar.ex:202
+#: lib/bds/ui/sidebar.ex:800
+#: lib/bds/ui/sidebar.ex:907
 #, elixir-autogen, elixir-format
 msgid "No items"
 msgstr ""
@@ -1491,13 +1491,13 @@ msgstr ""
 msgid "No matching pages found."
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:292
+#: lib/bds/ui/sidebar.ex:296
 #, elixir-autogen, elixir-format
 msgid "No matching posts"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:573
 #: lib/bds/ui/sidebar.ex:584
+#: lib/bds/ui/sidebar.ex:595
 #, elixir-autogen, elixir-format
 msgid "No media files"
 msgstr ""
@@ -1512,7 +1512,7 @@ msgstr ""
 msgid "No orphan files selected"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:275
+#: lib/bds/ui/sidebar.ex:279
 #, elixir-autogen, elixir-format
 msgid "No pages yet"
 msgstr ""
@@ -1527,7 +1527,7 @@ msgstr ""
 msgid "No posts to link"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:275
+#: lib/bds/ui/sidebar.ex:279
 #, elixir-autogen, elixir-format
 msgid "No posts yet"
 msgstr ""
@@ -1734,7 +1734,7 @@ msgstr ""
 msgid "Other (%{count})"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:949
+#: lib/bds/desktop/shell_live.ex:975
 #: lib/bds/desktop/shell_live/panel_renderer.ex:83
 #, elixir-autogen, elixir-format
 msgid "Output"
@@ -1762,7 +1762,7 @@ msgid "Page Slug Conflicts"
 msgstr ""
 
 #: lib/bds/ui/registry.ex:22
-#: lib/bds/ui/sidebar.ex:267
+#: lib/bds/ui/sidebar.ex:271
 #, elixir-autogen, elixir-format
 msgid "Pages"
 msgstr ""
@@ -1852,7 +1852,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/misc_editor.ex:673
 #: lib/bds/desktop/shell_live/misc_editor.ex:770
 #: lib/bds/ui/registry.ex:14
-#: lib/bds/ui/sidebar.ex:267
+#: lib/bds/ui/sidebar.ex:271
 #, elixir-autogen, elixir-format
 msgid "Posts"
 msgstr ""
@@ -1892,7 +1892,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/misc_editor.ex:748
 #: lib/bds/desktop/shell_live/misc_editor.ex:774
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:27
-#: lib/bds/ui/sidebar.ex:759
+#: lib/bds/ui/sidebar.ex:770
 #, elixir-autogen, elixir-format
 msgid "Project"
 msgstr ""
@@ -1902,7 +1902,7 @@ msgstr ""
 msgid "Project Name"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:756
+#: lib/bds/ui/sidebar.ex:767
 #, elixir-autogen, elixir-format
 msgid "Project and publishing"
 msgstr ""
@@ -1938,7 +1938,7 @@ msgstr ""
 #: lib/bds/desktop/shell_data.ex:181
 #: lib/bds/desktop/shell_live/post_editor.ex:897
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:456
-#: lib/bds/ui/sidebar.ex:320
+#: lib/bds/ui/sidebar.ex:324
 #, elixir-autogen, elixir-format
 msgid "Published"
 msgstr ""
@@ -1952,7 +1952,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/settings_editor/publishing_settings.ex:40
 #: lib/bds/desktop/shell_live/settings_editor/publishing_settings.ex:57
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:335
-#: lib/bds/ui/sidebar.ex:771
+#: lib/bds/ui/sidebar.ex:782
 #, elixir-autogen, elixir-format
 msgid "Publishing"
 msgstr ""
@@ -2240,7 +2240,7 @@ msgstr ""
 #: lib/bds/ui/registry.ex:38
 #: lib/bds/ui/sidebar.ex:63
 #: lib/bds/ui/sidebar.ex:115
-#: lib/bds/ui/sidebar.ex:154
+#: lib/bds/ui/sidebar.ex:158
 #, elixir-autogen, elixir-format
 msgid "Scripts"
 msgstr ""
@@ -2251,12 +2251,12 @@ msgid "Search"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:99
-#: lib/bds/ui/sidebar.ex:576
+#: lib/bds/ui/sidebar.ex:587
 #, elixir-autogen, elixir-format
 msgid "Search media..."
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:280
+#: lib/bds/ui/sidebar.ex:284
 #, elixir-autogen, elixir-format
 msgid "Search pages..."
 msgstr ""
@@ -2267,7 +2267,7 @@ msgid "Search posts"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:62
-#: lib/bds/ui/sidebar.ex:281
+#: lib/bds/ui/sidebar.ex:285
 #, elixir-autogen, elixir-format
 msgid "Search posts..."
 msgstr ""
@@ -2343,7 +2343,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:11
 #: lib/bds/ui/registry.ex:86
 #: lib/bds/ui/registry.ex:101
-#: lib/bds/ui/sidebar.ex:755
+#: lib/bds/ui/sidebar.ex:766
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr ""
@@ -2374,7 +2374,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/tab_helpers.ex:156
 #: lib/bds/ui/sidebar.ex:72
 #: lib/bds/ui/sidebar.ex:123
-#: lib/bds/ui/sidebar.ex:164
+#: lib/bds/ui/sidebar.ex:168
 #, elixir-autogen, elixir-format
 msgid "Site rendering"
 msgstr ""
@@ -2398,7 +2398,7 @@ msgstr ""
 msgid "Source Control"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:270
+#: lib/bds/ui/sidebar.ex:274
 #, elixir-autogen, elixir-format
 msgid "Standalone pages"
 msgstr ""
@@ -2429,7 +2429,7 @@ msgstr ""
 #: lib/bds/desktop/shell_live/settings_editor/style_editor.ex:74
 #: lib/bds/desktop/shell_live/settings_editor_html/style_editor.html.heex:3
 #: lib/bds/ui/registry.ex:102
-#: lib/bds/ui/sidebar.ex:777
+#: lib/bds/ui/sidebar.ex:788
 #, elixir-autogen, elixir-format
 msgid "Style"
 msgstr ""
@@ -2460,12 +2460,12 @@ msgid "System Prompt"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/tags_editor_html/tags_editor.html.heex:16
-#: lib/bds/ui/sidebar.ex:745
+#: lib/bds/ui/sidebar.ex:756
 #, elixir-autogen, elixir-format
 msgid "Tag Cloud"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:742
+#: lib/bds/ui/sidebar.ex:753
 #, elixir-autogen, elixir-format
 msgid "Tag management"
 msgstr ""
@@ -2489,21 +2489,21 @@ msgstr ""
 #: lib/bds/desktop/shell_live/tags_editor_html/tags_editor.html.heex:11
 #: lib/bds/ui/registry.ex:54
 #: lib/bds/ui/registry.ex:103
-#: lib/bds/ui/sidebar.ex:285
-#: lib/bds/ui/sidebar.ex:579
-#: lib/bds/ui/sidebar.ex:741
+#: lib/bds/ui/sidebar.ex:289
+#: lib/bds/ui/sidebar.ex:590
+#: lib/bds/ui/sidebar.ex:752
 #, elixir-autogen, elixir-format
 msgid "Tags"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:948
+#: lib/bds/desktop/shell_live.ex:974
 #: lib/bds/desktop/shell_live/panel_renderer.ex:54
 #, elixir-autogen, elixir-format
 msgid "Tasks"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:318
-#: lib/bds/ui/sidebar.ex:765
+#: lib/bds/ui/sidebar.ex:776
 #, elixir-autogen, elixir-format
 msgid "Technology"
 msgstr ""
@@ -2545,7 +2545,7 @@ msgstr ""
 #: lib/bds/ui/registry.ex:46
 #: lib/bds/ui/sidebar.ex:71
 #: lib/bds/ui/sidebar.ex:122
-#: lib/bds/ui/sidebar.ex:163
+#: lib/bds/ui/sidebar.ex:167
 #, elixir-autogen, elixir-format
 msgid "Templates"
 msgstr ""
@@ -2606,8 +2606,8 @@ msgstr ""
 msgid "Toggle Dev Tools"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:283
-#: lib/bds/ui/sidebar.ex:577
+#: lib/bds/ui/sidebar.ex:287
+#: lib/bds/ui/sidebar.ex:588
 #, elixir-autogen, elixir-format
 msgid "Toggle Filters"
 msgstr ""
@@ -2748,7 +2748,7 @@ msgstr ""
 
 #: lib/bds/desktop/shell_live/import_editor.ex:867
 #: lib/bds/desktop/shell_live/post_editor/post_metadata.ex:166
-#: lib/bds/ui/sidebar.ex:1105
+#: lib/bds/ui/sidebar.ex:1116
 #, elixir-autogen, elixir-format
 msgid "Untitled"
 msgstr ""
@@ -2847,7 +2847,7 @@ msgid "Working tree"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/tab_helpers.ex:191
-#: lib/bds/ui/sidebar.ex:787
+#: lib/bds/ui/sidebar.ex:798
 #, elixir-autogen, elixir-format
 msgid "Working tree and history"
 msgstr ""
@@ -3023,14 +3023,14 @@ msgstr ""
 msgid "posts"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:290
-#: lib/bds/ui/sidebar.ex:582
+#: lib/bds/ui/sidebar.ex:294
+#: lib/bds/ui/sidebar.ex:593
 #, elixir-autogen, elixir-format
 msgid "results"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:291
-#: lib/bds/ui/sidebar.ex:583
+#: lib/bds/ui/sidebar.ex:295
+#: lib/bds/ui/sidebar.ex:594
 #, elixir-autogen, elixir-format
 msgid "results for"
 msgstr ""
@@ -3190,12 +3190,12 @@ msgstr ""
 msgid "Comparing database and filesystem metadata"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:671
+#: lib/bds/desktop/shell_live.ex:680
 #, elixir-autogen, elixir-format
 msgid "Added %{count} images to post"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:642
+#: lib/bds/desktop/shell_live.ex:648
 #, elixir-autogen, elixir-format
 msgid "Added %{title}"
 msgstr ""
@@ -3215,18 +3215,18 @@ msgstr ""
 msgid "Image Import Concurrency"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:429
-#: lib/bds/desktop/shell_live.ex:442
-#: lib/bds/desktop/shell_live.ex:642
-#: lib/bds/desktop/shell_live.ex:670
+#: lib/bds/desktop/shell_live.ex:430
+#: lib/bds/desktop/shell_live.ex:443
+#: lib/bds/desktop/shell_live.ex:647
 #: lib/bds/desktop/shell_live.ex:679
-#: lib/bds/desktop/shell_live.ex:686
+#: lib/bds/desktop/shell_live.ex:690
+#: lib/bds/desktop/shell_live.ex:701
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:407
 #, elixir-autogen, elixir-format
 msgid "Add Gallery Images"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:687
+#: lib/bds/desktop/shell_live.ex:702
 #, elixir-autogen, elixir-format
 msgid "Failed to process %{path}: %{reason}"
 msgstr ""
@@ -3276,9 +3276,9 @@ msgstr ""
 msgid "Changes"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:1055
-#: lib/bds/desktop/shell_live.ex:1071
-#: lib/bds/desktop/shell_live.ex:1077
+#: lib/bds/desktop/shell_live.ex:1131
+#: lib/bds/desktop/shell_live.ex:1147
+#: lib/bds/desktop/shell_live.ex:1153
 #: lib/bds/desktop/shell_live/sidebar_components.ex:556
 #, elixir-autogen, elixir-format
 msgid "Commit"
@@ -3289,17 +3289,17 @@ msgstr ""
 msgid "Commit message"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:1056
+#: lib/bds/desktop/shell_live.ex:1132
 #, elixir-autogen, elixir-format
 msgid "Commit message is required"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:1120
+#: lib/bds/desktop/shell_live.ex:1200
 #, elixir-autogen, elixir-format
 msgid "Done"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:1041
+#: lib/bds/desktop/shell_live.ex:1117
 #: lib/bds/desktop/shell_live/sidebar_components.ex:542
 #: lib/bds/desktop/shell_live/sidebar_components.ex:542
 #, elixir-autogen, elixir-format
@@ -3311,8 +3311,8 @@ msgstr ""
 msgid "History"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:1091
-#: lib/bds/desktop/shell_live.ex:1099
+#: lib/bds/desktop/shell_live.ex:1167
+#: lib/bds/desktop/shell_live.ex:1175
 #: lib/bds/desktop/shell_live/sidebar_components.ex:513
 #, elixir-autogen, elixir-format
 msgid "Initialize Git"
@@ -3323,7 +3323,7 @@ msgstr ""
 msgid "Local only"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:1127
+#: lib/bds/desktop/shell_live.ex:1207
 #, elixir-autogen, elixir-format
 msgid "No active project"
 msgstr ""
@@ -3343,21 +3343,21 @@ msgstr ""
 msgid "Older history available"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:1044
+#: lib/bds/desktop/shell_live.ex:1120
 #: lib/bds/desktop/shell_live/sidebar_components.ex:545
 #: lib/bds/desktop/shell_live/sidebar_components.ex:545
 #, elixir-autogen, elixir-format
 msgid "Prune LFS"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:1042
+#: lib/bds/desktop/shell_live.ex:1118
 #: lib/bds/desktop/shell_live/sidebar_components.ex:543
 #: lib/bds/desktop/shell_live/sidebar_components.ex:543
 #, elixir-autogen, elixir-format
 msgid "Pull"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:1043
+#: lib/bds/desktop/shell_live.ex:1119
 #: lib/bds/desktop/shell_live/sidebar_components.ex:544
 #: lib/bds/desktop/shell_live/sidebar_components.ex:544
 #, elixir-autogen, elixir-format
@@ -3374,7 +3374,7 @@ msgstr ""
 msgid "Remote only"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:1092
+#: lib/bds/desktop/shell_live.ex:1168
 #, elixir-autogen, elixir-format
 msgid "Repository initialized"
 msgstr ""
@@ -3389,28 +3389,38 @@ msgstr ""
 msgid "This project is not a Git repository yet."
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:869
+#: lib/bds/ui/sidebar.ex:880
 #, elixir-autogen, elixir-format
 msgid "added"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:870
+#: lib/bds/ui/sidebar.ex:881
 #, elixir-autogen, elixir-format
 msgid "deleted"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:871
-#: lib/bds/ui/sidebar.ex:874
+#: lib/bds/ui/sidebar.ex:882
+#: lib/bds/ui/sidebar.ex:885
 #, elixir-autogen, elixir-format
 msgid "modified"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:872
+#: lib/bds/ui/sidebar.ex:883
 #, elixir-autogen, elixir-format
 msgid "renamed"
 msgstr ""
 
-#: lib/bds/ui/sidebar.ex:873
+#: lib/bds/ui/sidebar.ex:884
 #, elixir-autogen, elixir-format
 msgid "untracked"
+msgstr ""
+
+#: lib/bds/desktop/shell_live.ex:1012
+#, elixir-autogen, elixir-format
+msgid "Blogmark"
+msgstr ""
+
+#: lib/bds/desktop/shell_live.ex:1040
+#, elixir-autogen, elixir-format
+msgid "Open a project before importing a blogmark."
 msgstr ""
