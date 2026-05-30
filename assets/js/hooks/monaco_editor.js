@@ -118,6 +118,36 @@ export const MonacoEditor = {
       }, 120);
     };
 
+    this.dropEvent = this.el.dataset.monacoDropEvent || "";
+    this.dropPostId = this.el.dataset.monacoDropPostId || "";
+
+    this.handleDragOver = (event) => {
+      if (event.dataTransfer && Array.from(event.dataTransfer.types || []).includes("Files")) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      }
+    };
+
+    this.handleDrop = (event) => {
+      if (!this.dropEvent || !event.dataTransfer) {
+        return;
+      }
+
+      const files = Array.from(event.dataTransfer.files || []);
+      const images = files.filter((file) => (file.type || "").startsWith("image/") && file.path);
+
+      if (images.length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      images.forEach((file) => {
+        this.pushEvent(this.dropEvent, { "post-id": this.dropPostId, path: file.path });
+      });
+    };
+
     this.handleInsert = ({ id, content }) => {
       if (!this.editor || !content || String(id) !== String(this.editorId)) {
         return;
@@ -197,6 +227,11 @@ export const MonacoEditor = {
         if (this.insertEvent) {
           this.handleEvent(this.insertEvent, this.handleInsert);
         }
+
+        if (this.dropEvent) {
+          this.el.addEventListener("dragover", this.handleDragOver);
+          this.el.addEventListener("drop", this.handleDrop);
+        }
       })
       .catch((error) => {
         console.error("Failed to load Monaco editor", error);
@@ -232,6 +267,12 @@ export const MonacoEditor = {
     window.clearTimeout(this.syncTimer);
     this.visibleSizeObserver?.disconnect();
     this.changeSubscription?.dispose();
+
+    if (this.dropEvent) {
+      this.el.removeEventListener("dragover", this.handleDragOver);
+      this.el.removeEventListener("drop", this.handleDrop);
+    }
+
     unregisterMonacoEditor(this.editorId || this.el.id);
     this.editor?.dispose();
   }

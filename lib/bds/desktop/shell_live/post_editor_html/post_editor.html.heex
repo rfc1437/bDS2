@@ -436,11 +436,14 @@
           class="post-editor-markdown-surface monaco-editor-shell"
           data-testid="post-editor-markdown-surface"
           phx-hook="MonacoEditor"
+          phx-target={@myself}
           data-monaco-editor-id={@post_editor.id}
           data-monaco-input-id={"post-editor-content-#{@post_editor.id}"}
           data-monaco-language="markdown-with-macros"
           data-monaco-word-wrap="on"
           data-monaco-insert-event="post-editor-insert-content"
+          data-monaco-drop-event="editor_image_dropped"
+          data-monaco-drop-post-id={@post_editor.id}
         >
           <div id={"post-editor-monaco-#{@post_editor.id}"} class="monaco-editor-instance min-h-0 flex-1" phx-update="ignore"></div>
           <textarea id={"post-editor-content-#{@post_editor.id}"} class="monaco-editor-input post-editor-content" data-testid="post-editor-content" data-post-editor-id={@post_editor.id} name="post_editor[content]" rows="18" spellcheck="false"><%= @post_editor.form["content"] %></textarea>

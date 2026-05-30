@@ -3,9 +3,9 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   use Phoenix.LiveComponent
 
-  alias BDS.{AI, Posts, Preview}
+  alias BDS.{AI, Metadata, Posts, Preview}
   alias BDS.Desktop.ShellData
-  alias BDS.Desktop.ShellLive.Notify
+  alias BDS.Desktop.ShellLive.{EditorImageDrop, Notify}
   alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, ListValues, Persistence, PostMetadata}
   alias BDS.Posts.Post
   alias BDS.Tags
@@ -210,6 +210,11 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   def handle_event("archive_post_editor", _params, socket) do
     {:noreply, do_archive(socket)}
+  end
+
+  def handle_event("editor_image_dropped", %{"path" => path}, socket)
+      when is_binary(path) do
+    {:noreply, do_image_drop(socket, path)}
   end
 
   def handle_event("unarchive_post_editor", _params, socket) do
@@ -616,6 +621,56 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
             |> build_data()
         end
     end
+  end
+
+  # Drag-and-drop image chain (action_patterns.allium DragDropImageChain).
+  # Steps 1-4 run synchronously while the user waits; steps 5-6 (AI analysis +
+  # auto-translate) run in the background and are gated behind airplane mode.
+  defp do_image_drop(socket, path) do
+    case socket.assigns.post do
+      %Post{} = post ->
+        case EditorImageDrop.import_and_link(post.project_id, post.id, path) do
+          {:ok, media, markdown} ->
+            maybe_enrich_dropped_image(media, post)
+
+            socket
+            |> Phoenix.LiveView.push_event("post-editor-insert-content", %{
+              id: socket.assigns.post_id,
+              content: markdown
+            })
+            |> notify_output(
+              dgettext("ui", "Insert Image"),
+              dgettext("ui", "Added %{name}", name: media.original_name)
+            )
+
+          {:error, reason} ->
+            notify_output(
+              socket,
+              dgettext("ui", "Insert Image"),
+              dgettext("ui", "Failed to import %{path}: %{reason}",
+                path: Path.basename(path),
+                reason: inspect(reason)
+              ),
+              "error"
+            )
+        end
+
+      _other ->
+        socket
+    end
+  end
+
+  defp maybe_enrich_dropped_image(media, post) do
+    unless AI.airplane_mode?() do
+      {:ok, metadata} = Metadata.get_project_metadata(post.project_id)
+      language = metadata.main_language || "en"
+
+      Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
+        EditorImageDrop.enrich(media, post.id, language)
+      end)
+    end
+
+    :ok
   end
 
   defp do_unarchive(socket) do
