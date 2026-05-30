@@ -139,7 +139,7 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 | ID | Claim | Spec | Path |
 |---|---|---|---|
 | ~~D2-1~~ | ~~RemoveCategory rule~~ | ~~metadata.allium:100~~ | **Resolved:** 2 tests added in metadata_test.exs — remove_category removes category+settings from state/files/DB (6 assertions); remove_category is a no-op for non-existent category |
-| D2-2 | CreateAndPublishTemplate rule | template.allium:105 | Write test: create+publish in one step |
+| ~~D2-2~~ | ~~CreateAndPublishTemplate rule~~ | template.allium:105 | **Resolved:** added `create_and_publish_template/1` (validates Liquid, creates published template + writs file), 3 tests added (happy path file assertions, invalid liquid rejection, slug dedup on title conflict) |
 | D2-3 | CreateAndPublishScript rule | script.allium:160 | Write test: create+publish in one step |
 | D2-4 | UniqueScriptSlug dedup | script.allium:115 | Write test: two scripts same title → dedup slug |
 | D2-5 | FrontmatterRoundtrip invariant | post.allium:223 | Write test: write file, read back, assert all DB fields match |

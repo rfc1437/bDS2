@@ -109,6 +109,54 @@ defmodule BDS.Templates do
     end
   end
 
+  @spec create_and_publish_template(attrs()) :: template_result()
+  def create_and_publish_template(attrs) do
+    project_id = attr(attrs, :project_id)
+    title = attr(attrs, :title) || ""
+    kind = attr(attrs, :kind)
+    content = attr(attrs, :content) || ""
+
+    case validate_liquid(content) do
+      :ok ->
+        slug = unique_slug(project_id, Slug.slugify(title), "template")
+        file_path = template_file_path(slug)
+        now = Persistence.now_ms()
+
+        changeset =
+          %Template{}
+          |> Template.changeset(%{
+            id: Ecto.UUID.generate(),
+            project_id: project_id,
+            slug: slug,
+            title: title,
+            kind: kind,
+            enabled: true,
+            version: 1,
+            file_path: file_path,
+            status: :published,
+            content: nil,
+            created_at: now,
+            updated_at: now
+          })
+
+        with {:ok, template} <- Repo.insert(changeset) do
+          full_path = full_file_path(template.project_id, file_path)
+          File.mkdir_p!(Path.dirname(full_path))
+
+          :ok =
+            Persistence.atomic_write(
+              full_path,
+              serialize_template_file(template, content)
+            )
+
+          {:ok, template}
+        end
+
+      {:error, reason} ->
+        {:error, {:invalid_liquid, reason}}
+    end
+  end
+
   @spec update_template(String.t(), attrs()) :: template_result() | {:error, :not_found}
   def update_template(template_id, attrs) do
     with %Template{} = template <- Repo.get(Template, template_id) do

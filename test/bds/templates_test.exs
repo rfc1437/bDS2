@@ -488,6 +488,72 @@ defmodule BDS.TemplatesTest do
     assert template.updated_at == 202
   end
 
+  test "create_and_publish_template creates a published template with file in one step", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, template} =
+             BDS.Templates.create_and_publish_template(%{
+               project_id: project.id,
+               title: "Published Layout",
+               kind: :list,
+               content: "<section>{{ content }}</section>"
+             })
+
+    assert template.status == :published
+    assert template.content == nil
+    assert template.slug == "published-layout"
+    assert template.enabled == true
+    assert template.version == 1
+    assert template.file_path == "templates/published-layout.liquid"
+
+    full_path = Path.join(temp_dir, template.file_path)
+    assert File.exists?(full_path)
+
+    contents = File.read!(full_path)
+    assert contents =~ "---\nid: #{template.id}\n"
+    assert contents =~ "projectId: #{project.id}\n"
+    assert contents =~ "slug: published-layout\n"
+    assert contents =~ "title: Published Layout\n"
+    assert contents =~ "kind: list\n"
+    assert contents =~ "enabled: true\n"
+    assert contents =~ "version: 1\n"
+    assert contents =~ ~r/createdAt: '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'\n/
+    assert contents =~ ~r/updatedAt: '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'\n/
+    assert contents =~ "\n---\n<section>{{ content }}</section>\n"
+  end
+
+  test "create_and_publish_template rejects invalid Liquid syntax", %{project: project} do
+    assert {:error, {:invalid_liquid, _reason}} =
+             BDS.Templates.create_and_publish_template(%{
+               project_id: project.id,
+               title: "Bad Layout",
+               kind: :list,
+               content: "{% for item in items %}unclosed"
+             })
+  end
+
+  test "create_and_publish_template deduplicates slug on title conflict", %{project: project} do
+    assert {:ok, _first} =
+             BDS.Templates.create_and_publish_template(%{
+               project_id: project.id,
+               title: "Same Title",
+               kind: :list,
+               content: "<section>v1</section>"
+             })
+
+    assert {:ok, second} =
+             BDS.Templates.create_and_publish_template(%{
+               project_id: project.id,
+               title: "Same Title",
+               kind: :list,
+               content: "<section>v2</section>"
+             })
+
+    assert second.slug == "same-title-2"
+    assert second.status == :published
+  end
+
   test "rebuild_templates_from_files removes stale published default templates when no local template files exist",
        %{
          project: project
