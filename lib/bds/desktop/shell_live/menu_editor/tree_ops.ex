@@ -180,6 +180,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
   end
 
   @spec move_selected(term(), term()) :: term()
+  def move_selected(%{selected_id: @home_item_id} = state, _direction), do: state
+
   def move_selected(%{selected_id: selected_id} = state, direction)
       when direction in [:up, :down] do
     case find_path(state.items, selected_id) do
@@ -209,6 +211,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
   end
 
   @spec indent_selected(term()) :: term()
+  def indent_selected(%{selected_id: @home_item_id} = state), do: state
+
   def indent_selected(%{selected_id: selected_id} = state) do
     case find_path(state.items, selected_id) do
       nil ->
@@ -249,6 +253,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
   end
 
   @spec unindent_selected(term()) :: term()
+  def unindent_selected(%{selected_id: @home_item_id} = state), do: state
+
   def unindent_selected(%{selected_id: selected_id} = state) do
     case find_path(state.items, selected_id) do
       nil ->
@@ -294,6 +300,8 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreeOps do
   def drop_selected(state, drag_item_id, target_item_id, _position)
       when drag_item_id == target_item_id,
       do: state
+
+  def drop_selected(state, @home_item_id, _target_item_id, _position), do: state
 
   @spec drop_selected(term(), term(), term(), term()) :: term()
   def drop_selected(state, drag_item_id, target_item_id, position) do

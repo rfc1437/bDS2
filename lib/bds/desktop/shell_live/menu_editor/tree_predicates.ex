@@ -5,57 +5,73 @@ defmodule BDS.Desktop.ShellLive.MenuEditor.TreePredicates do
 
   @spec can_move_up?(term(), term()) :: term()
   def can_move_up?(items, selected_id) do
-    case TreeOps.find_path(items, selected_id) do
-      [_parent, index] -> index > 0
-      [index] -> index > 0
-      path when is_list(path) -> List.last(path) > 0
-      _other -> false
+    if selected_id == TreeOps.home_item_id() do
+      false
+    else
+      case TreeOps.find_path(items, selected_id) do
+        [_parent, index] -> index > 0
+        [index] -> index > 0
+        path when is_list(path) -> List.last(path) > 0
+        _other -> false
+      end
     end
   end
 
   @spec can_move_down?(term(), term()) :: term()
   def can_move_down?(items, selected_id) do
-    case TreeOps.find_path(items, selected_id) do
-      nil ->
-        false
+    if selected_id == TreeOps.home_item_id() do
+      false
+    else
+      case TreeOps.find_path(items, selected_id) do
+        nil ->
+          false
 
-      path ->
-        parent_path = Enum.drop(path, -1)
-        index = List.last(path)
-        index < length(TreeOps.items_at_path(items, parent_path)) - 1
+        path ->
+          parent_path = Enum.drop(path, -1)
+          index = List.last(path)
+          index < length(TreeOps.items_at_path(items, parent_path)) - 1
+      end
     end
   end
 
   @spec can_indent?(term(), term()) :: term()
   def can_indent?(items, selected_id) do
-    case TreeOps.find_path(items, selected_id) do
-      nil ->
-        false
+    if selected_id == TreeOps.home_item_id() do
+      false
+    else
+      case TreeOps.find_path(items, selected_id) do
+        nil ->
+          false
 
-      [] ->
-        false
+        [] ->
+          false
 
-      [_index] = path ->
-        index = List.last(path)
-        index > 0 and match?(%{kind: :submenu}, TreeOps.item_at_path(items, [index - 1]))
+        [_index] = path ->
+          index = List.last(path)
+          index > 0 and match?(%{kind: :submenu}, TreeOps.item_at_path(items, [index - 1]))
 
-      path ->
-        index = List.last(path)
+        path ->
+          index = List.last(path)
 
-        index > 0 and
-          match?(
-            %{kind: :submenu},
-            TreeOps.item_at_path(items, Enum.drop(path, -1) ++ [index - 1])
-          )
+          index > 0 and
+            match?(
+              %{kind: :submenu},
+              TreeOps.item_at_path(items, Enum.drop(path, -1) ++ [index - 1])
+            )
+      end
     end
   end
 
   @spec can_unindent?(term(), term()) :: term()
   def can_unindent?(items, selected_id) do
-    case TreeOps.find_path(items, selected_id) do
-      [_index] -> false
-      path when is_list(path) -> length(path) > 1
-      _other -> false
+    if selected_id == TreeOps.home_item_id() do
+      false
+    else
+      case TreeOps.find_path(items, selected_id) do
+        [_index] -> false
+        path when is_list(path) -> length(path) > 1
+        _other -> false
+      end
     end
   end
 
