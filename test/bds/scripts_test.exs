@@ -155,6 +155,114 @@ defmodule BDS.ScriptsTest do
     assert published.status == :published
   end
 
+  test "create_and_publish_script creates a published script with file in one step", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, script} =
+             BDS.Scripts.create_and_publish_script(%{
+               project_id: project.id,
+               title: "Published Utility",
+               kind: :utility,
+               content: "function main() return 'ok' end"
+             })
+
+    assert script.status == :published
+    assert script.content == nil
+    assert script.slug == "published-utility"
+    assert script.enabled == true
+    assert script.version == 1
+    assert script.entrypoint == "main"
+    assert script.file_path == "scripts/published-utility.lua"
+
+    full_path = Path.join(temp_dir, script.file_path)
+    assert File.exists?(full_path)
+
+    contents = File.read!(full_path)
+    assert contents =~ "---\nid: #{script.id}\n"
+    assert contents =~ "projectId: #{project.id}\n"
+    assert contents =~ "slug: published-utility\n"
+    assert contents =~ "title: Published Utility\n"
+    assert contents =~ "kind: utility\n"
+    assert contents =~ "entrypoint: main\n"
+    assert contents =~ "enabled: true\n"
+    assert contents =~ "version: 1\n"
+    assert contents =~ ~r/createdAt: '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'\n/
+    assert contents =~ ~r/updatedAt: '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z'\n/
+    assert contents =~ "\n---\nfunction main() return 'ok' end\n"
+  end
+
+  test "create_and_publish_script uses macro default entrypoint", %{
+    project: project
+  } do
+    assert {:ok, script} =
+             BDS.Scripts.create_and_publish_script(%{
+               project_id: project.id,
+               title: "Render Helper",
+               kind: :macro,
+               content: "function render() end"
+             })
+
+    assert script.entrypoint == "render"
+    assert script.slug == "render-helper"
+  end
+
+  test "create_and_publish_script rejects invalid Lua syntax", %{project: project} do
+    assert {:error, {:invalid_script, _reason}} =
+             BDS.Scripts.create_and_publish_script(%{
+               project_id: project.id,
+               title: "Bad Script",
+               kind: :utility,
+               content: "function main( missing end"
+             })
+  end
+
+  test "create_and_publish_script deduplicates slug on title conflict", %{project: project} do
+    assert {:ok, _first} =
+             BDS.Scripts.create_and_publish_script(%{
+               project_id: project.id,
+               title: "Same Title",
+               kind: :utility,
+               content: "function main() return 'v1' end"
+             })
+
+    assert {:ok, second} =
+             BDS.Scripts.create_and_publish_script(%{
+               project_id: project.id,
+               title: "Same Title",
+               kind: :utility,
+               content: "function main() return 'v2' end"
+             })
+
+    assert second.slug == "same-title-2"
+    assert second.status == :published
+  end
+
+  test "create_script deduplicates slug on title conflict (UniqueScriptSlug)", %{
+    project: project
+  } do
+    assert {:ok, first} =
+             BDS.Scripts.create_script(%{
+               project_id: project.id,
+               title: "Dup Slug",
+               kind: :utility,
+               content: "function main() return 'first' end"
+             })
+
+    assert first.slug == "dup-slug"
+
+    assert {:ok, second} =
+             BDS.Scripts.create_script(%{
+               project_id: project.id,
+               title: "Dup Slug",
+               kind: :utility,
+               content: "function main() return 'second' end"
+             })
+
+    assert second.slug == "dup-slug-2"
+    refute second.id == first.id
+  end
+
   test "rebuild_scripts_from_files recreates published scripts from disk", %{
     project: project,
     temp_dir: temp_dir

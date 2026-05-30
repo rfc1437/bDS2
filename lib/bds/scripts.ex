@@ -42,6 +42,56 @@ defmodule BDS.Scripts do
     |> Repo.insert()
   end
 
+  @spec create_and_publish_script(attrs()) :: script_result()
+  def create_and_publish_script(attrs) do
+    project_id = attr(attrs, :project_id)
+    title = attr(attrs, :title) || ""
+    kind = attr(attrs, :kind)
+    content = attr(attrs, :content) || ""
+
+    case validate_script(content) do
+      :ok ->
+        slug = unique_slug(project_id, Slug.slugify(title), "script")
+        entrypoint = attr(attrs, :entrypoint) || default_entrypoint(kind)
+        file_path = script_file_path(slug)
+        now = Persistence.now_ms()
+
+        changeset =
+          %Script{}
+          |> Script.changeset(%{
+            id: Ecto.UUID.generate(),
+            project_id: project_id,
+            slug: slug,
+            title: title,
+            kind: kind,
+            entrypoint: entrypoint,
+            enabled: true,
+            version: 1,
+            file_path: file_path,
+            status: :published,
+            content: nil,
+            created_at: now,
+            updated_at: now
+          })
+
+        with {:ok, script} <- Repo.insert(changeset) do
+          full_path = full_file_path(script.project_id, file_path)
+          File.mkdir_p!(Path.dirname(full_path))
+
+          :ok =
+            Persistence.atomic_write(
+              full_path,
+              serialize_script_file(script, content)
+            )
+
+          {:ok, script}
+        end
+
+      {:error, reason} ->
+        {:error, {:invalid_script, reason}}
+    end
+  end
+
   @spec get_script(String.t()) :: Script.t() | nil
   def get_script(script_id) do
     case Repo.get(Script, script_id) do

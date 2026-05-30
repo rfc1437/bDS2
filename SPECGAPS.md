@@ -140,8 +140,8 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 |---|---|---|---|
 | ~~D2-1~~ | ~~RemoveCategory rule~~ | ~~metadata.allium:100~~ | **Resolved:** 2 tests added in metadata_test.exs — remove_category removes category+settings from state/files/DB (6 assertions); remove_category is a no-op for non-existent category |
 | ~~D2-2~~ | ~~CreateAndPublishTemplate rule~~ | template.allium:105 | **Resolved:** added `create_and_publish_template/1` (validates Liquid, creates published template + writs file), 3 tests added (happy path file assertions, invalid liquid rejection, slug dedup on title conflict) |
-| D2-3 | CreateAndPublishScript rule | script.allium:160 | Write test: create+publish in one step |
-| D2-4 | UniqueScriptSlug dedup | script.allium:115 | Write test: two scripts same title → dedup slug |
+| ~~D2-3~~ | ~~CreateAndPublishScript rule~~ | ~~script.allium:160~~ | **Resolved:** `create_and_publish_script/1` implemented in scripts.ex, 4 tests added (happy path with file assertions + macro entrypoint default + invalid Lua rejection + slug dedup on title conflict) |
+| ~~D2-4~~ | ~~UniqueScriptSlug dedup~~ | ~~script.allium:115~~ | **Resolved:** test added asserting two scripts with same title produce unique slugs (`dup-slug` → `dup-slug-2`) |
 | D2-5 | FrontmatterRoundtrip invariant | post.allium:223 | Write test: write file, read back, assert all DB fields match |
 | D2-6 | SidecarRoundtrip invariant | media.allium:198 | Write test: write sidecar, read back, assert all fields match |
 | D2-7 | ConditionalPostFields: nil fields absent from frontmatter | frontmatter.allium:398 | Write test: post with nil excerpt/author/language → fields not in file |
