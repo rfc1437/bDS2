@@ -71,7 +71,7 @@ defmodule BDS.Scripting do
 
       {:error, reason} ->
         Logger.warning("execute_macro failed for project #{project_id}: #{inspect(reason)}")
-        {:error, reason}
+        {:ok, ""}
     end
   end
 

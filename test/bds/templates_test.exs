@@ -554,6 +554,42 @@ defmodule BDS.TemplatesTest do
     assert second.status == :published
   end
 
+  test "template frontmatter roundtrips: written fields parsed back match the database record", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Roundtrip Layout",
+               kind: :list,
+               content: "<section>{{ page_title }}</section>",
+               enabled: true
+             })
+
+    assert {:ok, published} = BDS.Templates.publish_template(template.id)
+
+    full_path = Path.join(temp_dir, published.file_path)
+    assert File.exists?(full_path)
+
+    contents = File.read!(full_path)
+    assert {:ok, %{fields: fields, body: body}} = BDS.Frontmatter.parse_document(contents)
+
+    assert fields["id"] == published.id
+    assert fields["projectId"] == project.id
+    assert fields["slug"] == "roundtrip-layout"
+    assert fields["title"] == "Roundtrip Layout"
+    assert fields["kind"] == "list"
+    assert fields["enabled"] == true
+    assert fields["version"] == 1
+    assert is_integer(fields["createdAt"])
+    assert fields["createdAt"] == published.created_at
+    assert is_integer(fields["updatedAt"])
+    assert fields["updatedAt"] == published.updated_at
+
+    assert body == "<section>{{ page_title }}</section>"
+  end
+
   test "rebuild_templates_from_files removes stale published default templates when no local template files exist",
        %{
          project: project

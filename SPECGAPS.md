@@ -160,17 +160,17 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 
 | ID | Claim | Spec | Gap | Path |
 |---|---|---|---|---|
-| D3-1 | PublishPost: content=null after publish | post.allium:186 | Not explicitly tested | Add assertion |
-| D3-2 | PublishPost: old file deleted on path change | engine_side_effects.allium:73-74 | Not tested | Add test |
-| D3-3 | UpsertPostTranslation: do_not_translate guard | translation.allium:113 | Indirectly covered only | Add direct test |
-| D3-4 | PublishTemplate: Liquid validation prerequisite | template.allium:139 | Not tested as publish gate | Add test |
-| D3-5 | PublishScript: validation prerequisite | script.allium:181 | Not tested as publish gate | Add test |
-| D3-6 | ExecuteMacro failure degrades to empty | script.allium:199 | Returns error tuple, not empty | Fix code or update spec |
-| D3-7 | TemplateFrontmatter roundtrip | template.allium:53 | Slug verified, no full parse-back | Add roundtrip test |
-| D3-8 | DefaultCategories for fresh project | metadata.allium:60 | Defaults present after add, not verified fresh | Add fresh-project test |
-| D3-9 | FtsIncludesTranslations | translation.allium:178 | Tested for one language; expand | Test all stemmer languages |
-| D3-10 | PostCanonicalUrl format | post.allium:33-40 | Constructed in links test, not asserted as invariant | Add format assertion |
-| D3-11 | Slug generation: German transliteration | post.allium:14-22 | "Föö Bär" → "foo-bar-blog" tested; expand ä/ö/ü/ß/ÄÖÜ | Expand test |
+| D3-1 | ~~PublishPost: content=null after publish~~ | post.allium:186 | **Resolved:** `refute published.content` added to frontmatter roundtrip test |
+| D3-2 | ~~PublishPost: old file deleted on path change~~ | engine_side_effects.allium:73-74 | **Resolved:** test already existed (`publish_post deletes old file when file path changes` at posts_test.exs:284) |
+| D3-3 | ~~UpsertPostTranslation: do_not_translate guard~~ | translation.allium:113 | **Resolved:** direct test added (do_not_translate guard rejects translation upsert with changeset error) |
+| D3-4 | ~~PublishTemplate: Liquid validation prerequisite~~ | template.allium:139 | **Resolved:** tests already existed (publish_template rejects invalid Liquid syntax, create_and_publish rejects invalid Liquid) |
+| D3-5 | ~~PublishScript: validation prerequisite~~ | script.allium:181 | **Resolved:** tests already existed (publish_script rejects invalid Lua syntax, create_and_publish rejects invalid Lua) |
+| D3-6 | ~~ExecuteMacro failure degrades to empty~~ | script.allium:199 | **Resolved:** `execute_macro` now returns `{:ok, ""}` on failure (was `{:error, reason}`), test updated, spec already correct |
+| D3-7 | ~~TemplateFrontmatter roundtrip~~ | template.allium:53 | **Resolved:** roundtrip test added (publish then parse back, compare all fields against DB record) |
+| D3-8 | ~~DefaultCategories for fresh project~~ | metadata.allium:60 | **Resolved:** test added (fresh project has article/aside/page/picture categories before any operations) |
+| D3-9 | ~~FtsIncludesTranslations~~ | translation.allium:178 | **Resolved:** test expanded (de/fr/es/it search terms all find the canonical post after reindex) |
+| D3-10 | ~~PostCanonicalUrl format~~ | post.allium:33-40 | **Resolved:** format test added (`/YYYY/MM/DD/slug/` via `LinksAndLanguages.post_path`) |
+| D3-11 | ~~Slug generation: German transliteration~~ | post.allium:14-22 | **Resolved:** 5 tests added (ß→ss, ö→o, ä→a, ü→u, mixed ÄÖÜäöüß→aouaouss) |
 
 ### D4. UI Test Coverage Gaps (whole-editor specs)
 
@@ -196,6 +196,6 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 4. ~~**B1-1 through B1-20**~~ — all resolved: chat inline surfaces, auto-translation, settings sections, style tab, published snapshot fields, rendering subsystem (new rendering.allium), 404.html, media translation modal, menu ops, language picker + confirm dialog, script/template publish actions, import + documentation tabs, metadata-diff entity types, task TTL eviction, discard-post-changes, replace-media-file
 5. **A2-1 through A2-17** — spec drift (code is normative, update spec)
 6. ~~**D2-1 through D2-17**~~ — all resolved: `max_posts_per_page` constraint, sandboxed execution, transform toast budget, progress throttle, archived→draft/published transitions, AppNoopNotifier, validate_media implementation+tests, content_hash skip on reindex
-7. **D3-1 through D3-11** — partial test coverage
+7. ~~**D3-1 through D3-11**~~ — all resolved: content=null assertion, old-file-deletion, DNT guard, validation prerequisites (already tested), macro failure degrades to empty, template roundtrip, default categories, FTS multi-language, canonical URL format, German transliteration expansion
 8. ~~**B2-1 through B2-9**~~ — all resolved: editor_body resolver, single-post reimport, orphan import, dashboard data, missing-thumbnail regen, cache dir, stale-template prune, render labels, generation progress reporting
 9. **D4-1 through D4-7** — UI test coverage

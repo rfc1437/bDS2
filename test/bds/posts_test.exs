@@ -208,6 +208,7 @@ defmodule BDS.PostsTest do
     assert {:ok, post} = BDS.Posts.update_post(post.id, %{do_not_translate: true})
     assert {:ok, published} = BDS.Posts.publish_post(post.id)
     assert published.status == :published
+    refute published.content
 
     full_path = Path.join(temp_dir, published.file_path)
     assert File.exists?(full_path)
@@ -313,6 +314,45 @@ defmodule BDS.PostsTest do
 
     assert File.exists?(Path.join(temp_dir, republished.file_path))
     refute File.exists?(old_full)
+  end
+
+  test "German ß transliterates to ss" do
+    assert BDS.Slug.slugify("Straße") == "strasse"
+  end
+
+  test "German ö becomes o via NFD decomposition" do
+    assert BDS.Slug.slugify("Öl") == "ol"
+  end
+
+  test "German ä becomes a via NFD decomposition" do
+    assert BDS.Slug.slugify("Äpfel") == "apfel"
+  end
+
+  test "German ü becomes u via NFD decomposition" do
+    assert BDS.Slug.slugify("Über") == "uber"
+  end
+
+  test "mixed German characters transliterate correctly" do
+    assert BDS.Slug.slugify("ÄÖÜäöüß") == "aouaouss"
+  end
+
+  test "canonical post URL follows the format /YYYY/MM/DD/slug/", %{
+    project: project
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Canonical Format",
+               content: "Body"
+             })
+
+    created = BDS.Persistence.from_unix_ms!(post.created_at)
+    year = Integer.to_string(created.year)
+    month = String.pad_leading(Integer.to_string(created.month), 2, "0")
+    day = String.pad_leading(Integer.to_string(created.day), 2, "0")
+
+    canonical = BDS.Rendering.LinksAndLanguages.post_path(post, nil)
+    assert canonical == "/#{year}/#{month}/#{day}/canonical-format/"
   end
 
   test "delete_post removes the database row and published markdown file when present" do

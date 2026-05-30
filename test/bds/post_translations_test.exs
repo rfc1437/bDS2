@@ -428,6 +428,30 @@ defmodule BDS.PostTranslationsTest do
 
   defp wait_for_ai_tasks(count, attempts \\ 100)
 
+  test "do_not_translate guard prevents translation upsert via the API", %{
+    project: project
+  } do
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "DNT Guarded",
+               content: "Body",
+               language: "en"
+             })
+
+    assert {:ok, post} = Posts.update_post(post.id, %{do_not_translate: true})
+    assert post.do_not_translate == true
+
+    assert {:error, changeset} =
+             Posts.upsert_post_translation(post.id, "de", %{
+               title: "Sollte fehlschlagen",
+               content: "Inhalt"
+             })
+
+    assert changeset.errors[:do_not_translate] ==
+             {"cannot add translations when do_not_translate is true", []}
+  end
+
   defp wait_for_ai_tasks(_count, 0) do
     flunk("AI tasks did not reach expected state")
   end

@@ -552,4 +552,53 @@ defmodule BDS.SearchTest do
     assert "hi" in languages
     assert Enum.uniq(languages) == languages
   end
+
+  test "search_posts finds translation text in multiple languages after reindex", %{
+    project: project
+  } do
+    assert {:ok, post} =
+             BDS.Posts.create_post(%{
+               project_id: project.id,
+               title: "Multi Lang",
+               content: "root body",
+               language: "en"
+             })
+
+    now = System.system_time(:second)
+    languages = [{"de", "Hallo Welt"}, {"fr", "Bonjour le monde"}, {"es", "Hola mundo"}, {"it", "Ciao mondo"}]
+
+    for {lang, content} <- languages do
+      Repo.query!(
+        """
+        INSERT INTO post_translations (
+          id, project_id, translation_for, language, title, excerpt, content, status,
+          created_at, updated_at, published_at, file_path, checksum
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+          Ecto.UUID.generate(),
+          project.id,
+          post.id,
+          lang,
+          "Title #{lang}",
+          "Summary",
+          content,
+          "draft",
+          now,
+          now,
+          nil,
+          "",
+          nil
+        ]
+      )
+    end
+
+    assert :ok = BDS.Search.reindex_project(project.id)
+
+    for {_lang, content} <- languages do
+      search_term = String.split(content) |> List.last()
+      assert {:ok, results} = BDS.Search.search_posts(project.id, search_term, %{})
+      assert Enum.map(results.posts, & &1.id) == [post.id]
+    end
+  end
 end

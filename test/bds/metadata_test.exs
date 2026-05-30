@@ -366,4 +366,13 @@ defmodule BDS.MetadataTest do
     refute File.exists?(Path.join(meta_dir, "category-meta.json.tmp"))
     refute File.exists?(Path.join(meta_dir, "publishing.json.tmp"))
   end
+
+  test "fresh project has default categories before any operations", %{project: project} do
+    assert {:ok, metadata} = BDS.Metadata.get_project_metadata(project.id)
+    assert "article" in metadata.categories
+    assert "aside" in metadata.categories
+    assert "page" in metadata.categories
+    assert "picture" in metadata.categories
+    assert length(metadata.categories) == 4
+  end
 end
