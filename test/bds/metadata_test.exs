@@ -307,6 +307,41 @@ defmodule BDS.MetadataTest do
     assert metadata.categories == metadata_before.categories
   end
 
+  test "max_posts_per_page 0 is clamped to 1", %{project: project} do
+    assert {:ok, metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{max_posts_per_page: 0})
+
+    assert metadata.max_posts_per_page == 1
+  end
+
+  test "max_posts_per_page negative is clamped to 1", %{project: project} do
+    assert {:ok, metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{max_posts_per_page: -5})
+
+    assert metadata.max_posts_per_page == 1
+  end
+
+  test "max_posts_per_page above 500 is clamped to 500", %{project: project} do
+    assert {:ok, metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{max_posts_per_page: 1000})
+
+    assert metadata.max_posts_per_page == 500
+  end
+
+  test "max_posts_per_page nil defaults to 50", %{project: project} do
+    assert {:ok, metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{max_posts_per_page: nil})
+
+    assert metadata.max_posts_per_page == 50
+  end
+
+  test "max_posts_per_page non-numeric string defaults to 50", %{project: project} do
+    assert {:ok, metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{max_posts_per_page: "abc"})
+
+    assert metadata.max_posts_per_page == 50
+  end
+
   test "sync_project_metadata_from_filesystem materializes the canonical metadata files when missing",
        %{project: project, temp_dir: temp_dir} do
     meta_dir = Path.join(temp_dir, "meta")

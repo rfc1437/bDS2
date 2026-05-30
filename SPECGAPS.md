@@ -146,7 +146,7 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 | ~~D2-6~~ | ~~SidecarRoundtrip invariant~~ | ~~media.allium:198~~ | **Resolved:** 2 tests added — full roundtrip (write sidecar, parse via `Sidecar.parse_document/1`, assert all fields match DB) + nil conditional fields absent from parsed sidecar |
 | ~~D2-7~~ | ~~ConditionalPostFields: nil fields absent from frontmatter~~ | frontmatter.allium:398 | **Resolved:** test added — post with nil excerpt/author/language → those fields absent from published file, 3 refute assertions |
 | ~~D2-8~~ | ~~ConditionalMediaFields: nil fields absent from sidecar~~ | frontmatter.allium:417 | **Resolved:** added width/height assertions to nil-fields-absent test |
-| D2-9 | max_posts_per_page 1..500 constraint | metadata.allium:75-77 | Write test: values outside range rejected |
+| D2-9 | ~~max_posts_per_page 1..500 constraint~~ | metadata.allium:75-77 | **Resolved:** 5 tests added (0→1, -5→1, 1000→500, nil→50, non-numeric→50) |
 | D2-10 | SandboxedExecution: restricted capabilities blocked | script.allium:84-88 | Write test: filesystem/process/package loading blocked |
 | D2-11 | TransformToastBudget enforcement | script.allium:251-258 | Write test: per-script and total toast limits enforced |
 | D2-12 | ProgressThrottled: 250ms throttle | task.allium:110-113 | Write test: rapid progress reports throttled |
