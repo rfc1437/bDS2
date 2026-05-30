@@ -177,7 +177,7 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 | ID | Spec | Covered | Not Covered |
 |---|---|---|---|
 | ~~D4-1~~ | ~~editor_media.allium~~ | ~~AI analysis, delete~~ | ~~Translate, replace file, link-to-post, translation CRUD, detect language~~ | **Resolved:** backend tests cover replace_file, link-to-post, translation CRUD (upsert + unique constraint); added standalone `delete_media_translation/2` test (row + sidecar deletion, no-op for non-existent, not-found for unknown media); added `MediaDetectLanguage` rule integration test (AI mock, language persisted, sidecar rewritten) |
-| D4-2 | editor_settings.allium | AI endpoints, airplane toggle, rebuild | Protected categories, MCP agents, style/theme, search filter, categories CRUD |
+| ~~D4-2~~ | ~~editor_settings.allium~~ | ~~AI endpoints, airplane toggle, rebuild~~ | ~~Protected categories~~ (resolved D1-17), ~~MCP agents~~ (6 `mcp_rows` + 3 `toggle_mcp_agent` tests), ~~style/theme~~ (19 `build_style` + 4 select/change/apply/display tests), ~~search filter~~ (9 `build_settings` visibility tests), ~~categories CRUD~~ (7 `category_rows` + 2 update + 3 add + 2 save + 4 reset tests) | **Resolved:** 3 new test files (mcp_config_test.exs, style_editor_test.exs, settings_search_test.exs) + expanded managed_categories_test.exs cover all untested areas. Total 56 tests added across MCP agents, style/theme, search filter, and categories CRUD. |
 | D4-3 | editor_chat.allium | Chat creation, pinned tab | API key screen, message rendering, input area, model selector, inline surfaces |
 | D4-4 | editor_script.allium | Editor layout, create defaults | Save, syntax check, run, delete |
 | D4-5 | editor_template.allium | Editor layout, create defaults | Save with validation, validate, delete with references |
@@ -198,4 +198,5 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 6. ~~**D2-1 through D2-17**~~ — all resolved: `max_posts_per_page` constraint, sandboxed execution, transform toast budget, progress throttle, archived→draft/published transitions, AppNoopNotifier, validate_media implementation+tests, content_hash skip on reindex
 7. ~~**D3-1 through D3-11**~~ — all resolved: content=null assertion, old-file-deletion, DNT guard, validation prerequisites (already tested), macro failure degrades to empty, template roundtrip, default categories, FTS multi-language, canonical URL format, German transliteration expansion
 8. ~~**B2-1 through B2-9**~~ — all resolved: editor_body resolver, single-post reimport, orphan import, dashboard data, missing-thumbnail regen, cache dir, stale-template prune, render labels, generation progress reporting
-9. **D4-1 through D4-7** — UI test coverage
+9. **D4-1 through D4-2** — ~~UI test coverage~~ **Resolved (D4-1 via standalone delete_media_translation + MediaDetectLanguage tests; D4-2 via 3 new test files + expanded managed_categories — 56 tests added)**
+   **D4-3 through D4-7** — remaining UI test coverage
