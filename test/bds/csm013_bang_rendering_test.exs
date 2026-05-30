@@ -1,7 +1,6 @@
 defmodule BDS.CSM013BangRenderingTest do
   use ExUnit.Case, async: false
 
-  alias BDS.Rendering
   alias BDS.Rendering.PostRendering
   alias BDS.Rendering.TemplateSelection
 
