@@ -55,6 +55,7 @@ surface PostControlSurface {
         PublishPostRequested(post)
         DeletePostRequested(post)
         ArchivePostRequested(post)
+        DiscardPostChangesRequested(post)
 }
 
 surface PostFilePathSurface {
@@ -99,6 +100,15 @@ entity Post {
     created_at: Timestamp
     updated_at: Timestamp
     published_at: Timestamp?
+
+    -- Published snapshot: copy of title/content/tags/categories/excerpt as of
+    -- the last publish. Used by changes_affect_published_content to decide when
+    -- an edit reopens a published post to draft (see ReopenPublishedPost).
+    published_title: String?
+    published_content: String?
+    published_tags: String?
+    published_categories: String?
+    published_excerpt: String?
 
     -- Relationships
     translations: PostTranslation with canonical_post = this
@@ -216,6 +226,20 @@ rule ArchivePost {
     when: ArchivePostRequested(post)
     requires: post.status = draft or post.status = published
     ensures: post.status = archived
+}
+
+rule DiscardPostChanges {
+    when: DiscardPostChangesRequested(post)
+    requires: post.file_path != ""
+        -- Only posts with a published file on disk can be discarded;
+        -- a never-published draft has no file version to restore.
+    -- Re-reads the published .md file and upserts the DB record from it,
+    -- discarding unsaved draft edits.
+    ensures: post.content = null
+    ensures: post.status = published
+    ensures: PostLinksUpdated(post)
+    ensures: SearchIndexUpdated(post)
+        -- See engine_side_effects.allium DiscardPostChangesSideEffects
 }
 
 -- File format axioms

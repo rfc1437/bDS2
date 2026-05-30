@@ -20,6 +20,7 @@ use "./metadata.allium" as metadata         -- Project config, categories, publi
 
 -- Infrastructure
 use "./search.allium" as search             -- FTS5 full-text search with Snowball stemming
+use "./rendering.allium" as rendering       -- Template render assigns, filters, macros (preview + generation)
 use "./generation.allium" as generation     -- Static site generation (sections, routes, hashing)
 use "./preview.allium" as preview           -- Local HTTP preview server
 use "./publishing.allium" as publishing     -- SSH upload (SCP / rsync)

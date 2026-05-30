@@ -18,6 +18,7 @@ value TemplateEditorView {
     kind: String                        -- select: post | list | not_found | partial
     enabled: Boolean                    -- checkbox
     content: String                     -- code editor content
+    can_publish: Boolean                -- true while status = draft
     created_at: String                  -- locale-formatted date
     updated_at: String                  -- locale-formatted date
 }
@@ -35,12 +36,15 @@ surface TemplateEditorSurface {
 
     provides:
         TemplateSaveRequested(editor.template_id)
+        TemplatePublishRequested(editor.template_id)
+            when editor.can_publish
         TemplateValidateRequested(editor.template_id)
         TemplateDeleteRequested(editor.template_id)
 
     @guarantee HeaderLayout
         -- Header bar with template title tab.
-        -- Actions (right side): Save button, Validate button,
+        -- Actions (right side): Save button, Publish button (shown only when
+        --   can_publish, i.e. status = draft), Validate button,
         --   Delete button (danger style).
 
     @guarantee MetadataRow
@@ -65,6 +69,15 @@ rule TemplateSave {
     -- If invalid: blocks save, shows error inline in editor
     -- If valid: bumps version, saves to DB + rewrites .liquid file
     -- See engine_side_effects.allium UpdateTemplateSideEffects
+}
+
+rule TemplatePublish {
+    when: TemplatePublishRequested(template_id)
+    -- Only offered while the template is a draft (can_publish gate on the button)
+    -- Validates Liquid first (publish gate); invalid source blocks publish
+    -- Saves current draft fields, then publishes (status -> published)
+    -- Writes the published .liquid file to disk
+    -- See template.allium PublishTemplate
 }
 
 rule TemplateValidate {

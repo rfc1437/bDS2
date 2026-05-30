@@ -121,10 +121,13 @@ rule GenerateCoreSectionPages {
         -- Atom feed
     ensures: FileGenerated("calendar.json")
         -- Post dates for calendar widget
+    ensures: FileGenerated("404.html")
+        -- Not-found page rendered from the not-found template
     for lang in generation.blog_languages - {generation.language}:
         ensures: FileGenerated(format("{lang}/index.html", lang: lang))
         ensures: FileGenerated(format("{lang}/feed.xml", lang: lang))
         ensures: FileGenerated(format("{lang}/atom.xml", lang: lang))
+        ensures: FileGenerated(format("{lang}/404.html", lang: lang))
 }
 
 -- Single section: one HTML page per published post

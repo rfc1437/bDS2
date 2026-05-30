@@ -14,6 +14,7 @@ surface MetadataMaintenanceSurface {
     provides:
         MetadataDiffRequested(project)
         RebuildFromFilesystemRequested(project, entity_type)
+        RepairMetadataDiffItemRequested(project, direction, item)
 }
 
 value DiffField {
@@ -23,7 +24,8 @@ value DiffField {
 }
 
 value DiffReport {
-    entity_type: String             -- post, media, script, template
+    entity_type: String             -- post, post_translation, media,
+                                    --   media_translation, script, template, embedding
     entity_id: String
     differences: List<DiffField>
 }
@@ -66,7 +68,26 @@ rule RunMetadataDiff {
         if matching.count = 0:
             ensures: OrphanReport.created(file_path: file)
 
-    -- Same pattern for media sidecar files, scripts, templates
+    -- Same pattern for media sidecars (media), media translation sidecars
+    --   (media_translation), scripts, templates, and embeddings.
+    -- Embedding diffs compare the stored content_hash against the live post
+    --   content to detect vectors that need recomputation.
+}
+
+rule RepairMetadataDiffItem {
+    when: RepairMetadataDiffItemRequested(project, direction, item)
+    -- Resolves a single diff in one direction.
+    -- direction = file_to_db (filesystem wins) | db_to_file (database wins)
+    -- Dispatched per item.entity_type:
+    --   project | categories | category_meta | publishing -> project metadata sync/flush
+    --   post              -> sync_post_from_file / rewrite_published_post
+    --   post_translation  -> sync_post_translation_from_file / rewrite_published_post_translation
+    --   media             -> sync_media_from_sidecar / sync_media_sidecar
+    --   media_translation -> sync_media_translation_from_sidecar / sync_media_translation_sidecar
+    --   script            -> sync_script_from_file / sync_published_script_file
+    --   template          -> sync_template_from_file / sync_published_template_file
+    --   embedding         -> sync_post (file_to_db) / refresh_snapshot (db_to_file)
+    -- Unknown entity_type or direction -> unsupported error.
 }
 
 rule RebuildFromFilesystem {
