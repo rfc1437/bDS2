@@ -239,6 +239,8 @@ entity ChatMessage {
     content: String?
     tool_call_id: String?   -- For tool responses
     tool_calls: String?     -- JSON array of tool calls
+    cache_read_tokens: Integer?
+    cache_write_tokens: Integer?
     created_at: Timestamp
 }
 
@@ -522,6 +524,8 @@ surface ChatMessageRecordSurface {
         message.content when message.content != null
         message.tool_call_id when message.tool_call_id != null
         message.tool_calls when message.tool_calls != null
+        message.cache_read_tokens when message.cache_read_tokens != null
+        message.cache_write_tokens when message.cache_write_tokens != null
         message.created_at
 }
 

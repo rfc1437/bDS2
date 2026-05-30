@@ -102,8 +102,8 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 All reconciled to follow code. Specs must be self-consistent and match code.
 
 | ID | Conflict | Resolution | Path |
-|---|---|---|---|
-| C-1 | schema.allium ChatMessage has no cache tokens; ai.allium ChatMessage has `cache_read_tokens`/`cache_write_tokens` | Code has cache tokens → align schema.allium with ai.allium | Update schema.allium |
+|---|---|---|---|---|
+| C-1 | ~~schema.allium ChatMessage has no cache tokens; ai.allium ChatMessage has `cache_read_tokens`/`cache_write_tokens`~~ | Code has cache tokens → align schema.allium with ai.allium | **Resolved:** added cache_read_tokens + cache_write_tokens to ChatMessage entity and ChatMessageRecordSurface in schema.allium |
 | C-2 | ~~media.allium SidecarFile mentions `linkedPostIds`; frontmatter.allium MediaSidecar does NOT list it~~ | Code writes `linkedPostIds` → add to frontmatter.allium | **Resolved:** linkedPostIds added to MediaSidecar in frontmatter.allium (with A2-15) |
 | C-3 | ~~translation.allium says status/timestamps omitted; frontmatter.allium TranslationFrontmatter defines only 5 fields; code writes 8+ fields~~ | Code writes status/timestamps → update both specs to match code | **Resolved:** both specs updated (see A2-5) |
 
