@@ -1,6 +1,9 @@
 defmodule BDS.Desktop.MenuEditor.HomeItemProtectionTest do
   use ExUnit.Case, async: true
 
+  import Phoenix.LiveViewTest
+
+  alias BDS.Desktop.ShellLive.MenuEditor
   alias BDS.Desktop.ShellLive.MenuEditor.{TreeOps, TreePredicates}
 
   @home_id TreeOps.home_item_id()
@@ -103,6 +106,103 @@ defmodule BDS.Desktop.MenuEditor.HomeItemProtectionTest do
 
       dropped = TreeOps.drop_selected(state, "a", "b", "before")
       assert dropped != state
+    end
+  end
+
+  describe "toolbar disabled states" do
+    test "all conditional toolbar buttons are disabled when home item is selected" do
+      assigns = %{
+        myself: nil,
+        menu_editor: %{
+          draft: nil,
+          selected_id: TreeOps.home_item_id(),
+          title: "Navigation",
+          description: "Manage site navigation",
+          category_titles: %{},
+          has_items?: true,
+          can_move_up?: false,
+          can_move_down?: false,
+          can_indent?: false,
+          can_unindent?: false,
+          can_delete?: false,
+          items: [
+            %{kind: :home, label: "Home", slug: "/", children: [],
+              is_home: true, item_id: TreeOps.home_item_id()},
+            %{kind: :page, label: "About", slug: "about", children: [],
+              is_home: false, item_id: "about"}
+          ]
+        }
+      }
+
+      html = render_component(&MenuEditor.render/1, assigns)
+
+      assert html =~ ~r/data-action="move-up"[^>]*\sdisabled/
+      assert html =~ ~r/data-action="move-down"[^>]*\sdisabled/
+      assert html =~ ~r/data-action="indent"[^>]*\sdisabled/
+      assert html =~ ~r/data-action="unindent"[^>]*\sdisabled/
+      assert html =~ ~r/data-action="delete"[^>]*\sdisabled/
+    end
+
+    test "no conditional toolbar buttons are disabled when a regular item is selected" do
+      assigns = %{
+        myself: nil,
+        menu_editor: %{
+          draft: nil,
+          selected_id: "about",
+          title: "Navigation",
+          description: "Manage site navigation",
+          category_titles: %{},
+          has_items?: true,
+          can_move_up?: true,
+          can_move_down?: true,
+          can_indent?: true,
+          can_unindent?: true,
+          can_delete?: true,
+          items: [
+            %{kind: :home, label: "Home", slug: "/", children: [],
+              is_home: true, item_id: TreeOps.home_item_id()},
+            %{kind: :page, label: "About", slug: "about", children: [],
+              is_home: false, item_id: "about"}
+          ]
+        }
+      }
+
+      html = render_component(&MenuEditor.render/1, assigns)
+
+      refute html =~ ~r/data-action="move-up"[^>]*\sdisabled/
+      refute html =~ ~r/data-action="move-down"[^>]*\sdisabled/
+      refute html =~ ~r/data-action="indent"[^>]*\sdisabled/
+      refute html =~ ~r/data-action="unindent"[^>]*\sdisabled/
+      refute html =~ ~r/data-action="delete"[^>]*\sdisabled/
+    end
+
+    test "non-conditional toolbar buttons have no disabled attribute" do
+      assigns = %{
+        myself: nil,
+        menu_editor: %{
+          draft: nil,
+          selected_id: TreeOps.home_item_id(),
+          title: "Navigation",
+          description: "Manage site navigation",
+          category_titles: %{},
+          has_items?: true,
+          can_move_up?: false,
+          can_move_down?: false,
+          can_indent?: false,
+          can_unindent?: false,
+          can_delete?: false,
+          items: [
+            %{kind: :home, label: "Home", slug: "/", children: [],
+              is_home: true, item_id: TreeOps.home_item_id()}
+          ]
+        }
+      }
+
+      html = render_component(&MenuEditor.render/1, assigns)
+
+      refute html =~ ~r/data-action="add-entry"[^>]*disabled/
+      refute html =~ ~r/data-action="save"[^>]*disabled/
+      refute html =~ ~r/data-action="add-category-archive"[^>]*disabled/
     end
   end
 end

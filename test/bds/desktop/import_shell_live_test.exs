@@ -89,6 +89,12 @@ defmodule BDS.Desktop.ImportShellLiveTest do
     refute html =~ ~s(name="mapped_to")
     refute html =~ "Desktop workbench content routed through the Elixir shell."
 
+    assert html =~ "Legacy Blog"
+    assert html =~ "https://legacy.example"
+    assert html =~ ~s(class="import-stat-cards")
+    assert html =~ "Macros (1)"
+    assert html =~ ~s(class="import-execute-btn")
+
     _html =
       view
       |> element("form:has(input[value='conflict-me'])")
