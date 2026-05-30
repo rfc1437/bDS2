@@ -162,3 +162,56 @@ Notes for developers:
 - [DOCUMENTATION.md](/Users/gb/Projects/bDS2/DOCUMENTATION.md) is for end users, not implementation details.
 - [API.md](/Users/gb/Projects/bDS2/API.md) is generated from the live scripting capability map and should stay in sync with runtime changes.
 - When changing persistence or localization behavior, check both the database side and the filesystem/render side before assuming the change is complete.
+
+## Packaging The macOS App
+
+`mix bds.bundle.macos` produces a self-contained, ad-hoc-signed `BDS2.app`. It
+bundles the `:bds` release (ERTS included) plus the wxWidgets dylibs relocated
+via `@loader_path`, so it runs on a clean Mac with nothing installed. The bundle
+registers the `bds2://` URL scheme (for blogmark deep links) and ships the red-pen
+`AppIcon`. Output: `dist/macos/BDS2.app`. (arm64 / Apple Silicon only.)
+
+### 1. Build the release, then the bundle
+
+```bash
+MIX_ENV=prod mix release bds --overwrite
+mix bds.bundle.macos --app-release _build/prod/rel/bds
+```
+
+The icon `.icns` is generated on first run from
+[priv/desktop/macos/icon-source.svg](/Users/gb/Projects/bDS2/priv/desktop/macos/icon-source.svg)
+and committed under `priv/desktop/macos/`. Pass `--regen-icon` to rebuild it.
+
+### 2. Register the `bds2://` scheme (optional)
+
+`--register` tells LaunchServices about the scheme without moving the app to
+`/Applications` — useful for testing blogmark deep links locally:
+
+```bash
+mix bds.bundle.macos --app-release _build/prod/rel/bds --register
+```
+
+### Run / smoke-test
+
+```bash
+open dist/macos/BDS2.app
+open "bds2://new-post?title=Hello&url=https://example.com"   # opens a draft
+```
+
+### Useful flags
+
+- `--app-release PATH` — release dir to wrap (default `_build/<env>/rel/bds`).
+- `--output DIR` — output directory (default `dist/macos`).
+- `--version V` — version string for `Info.plist` (default from `mix.exs`).
+- `--regen-icon` — regenerate `AppIcon.icns` from the source SVG.
+- `--register` — register the `bds2://` scheme via LaunchServices.
+- `--no-codesign` — skip the ad-hoc codesign step.
+
+### Verifying the bundle
+
+```bash
+plutil -lint dist/macos/BDS2.app/Contents/Info.plist
+codesign --verify --deep --strict dist/macos/BDS2.app
+# no /opt/homebrew or /usr/local references should appear:
+otool -L dist/macos/BDS2.app/Contents/Resources/rel/lib/wx-*/priv/wxe_driver.so
+```

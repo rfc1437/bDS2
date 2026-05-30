@@ -3,12 +3,13 @@ defmodule BDS.Desktop.DeepLink do
   Receives OS URL-scheme events for the `bds2://` scheme and routes them to the
   shell (spec: script.allium `BlogmarkReceived`).
 
-  On macOS the app bundle registers `bds2://` as a custom URL scheme (see the
-  `CFBundleURLTypes` entry in the packaged `Info.plist`). When the browser
-  bookmarklet navigates to `bds2://new-post?title=&url=`, the OS launches/raises
-  the app and `Desktop.Env` delivers an `{:open_url, [url]}` event. This
-  GenServer subscribes to those events and forwards recognised `bds2://` links to
-  the live shell over PubSub, where `BDS.Blogmark` turns them into draft posts.
+  On macOS the `BDS2.app` bundle registers `bds2://` as a custom URL scheme via
+  the `CFBundleURLTypes` entry in its `Info.plist` (built by `BDS.MacBundle` /
+  `mix bds.bundle.macos`). When the browser bookmarklet navigates to
+  `bds2://new-post?title=&url=`, the OS launches/raises the app and `Desktop.Env`
+  delivers an `{:open_url, [url]}` event. This GenServer subscribes to those
+  events and forwards recognised `bds2://` links to the live shell over PubSub,
+  where `BDS.Blogmark` turns them into draft posts.
 
   The `bds2://` scheme is distinct from the legacy app's `bds://` so the two
   installs do not contend for the same registration.
