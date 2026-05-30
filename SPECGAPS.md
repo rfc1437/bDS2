@@ -61,7 +61,7 @@ Gap categories: **SC** = spec correct, fix code | **CS** = code correct, update 
 | ID | Behavior | Code Location | Path |
 |---|---|---|---|
 | ~~B1-1~~ | ~~Chat inline surfaces (9 types: card, chart, form, list, metric, mindmap, table, tabs, text/json)~~ | `tool_surfaces.ex` | **Resolved:** added InlineSurface value type with all 9 discriminators, supporting value types (SurfaceAction, ChartSeries, MindmapNode, FormField, FieldOption, TabPanel), inline_surfaces on ChatMessage, InlineSurfaceRendering guarantee, and surface_form_debounce_ms config to editor_chat.allium; updated StructuredRenderTools invariant in ai.allium to list all 9 types |
-| B1-2 | Auto-translation system (AutoTranslation.maybe_schedule, media cascade, batch fill) | `lib/bds/posts/auto_translation.ex` | Distill into spec |
+| ~~B1-2~~ | ~~Auto-translation system (AutoTranslation.maybe_schedule, media cascade, batch fill)~~ | `lib/bds/posts/auto_translation.ex` | **Resolved:** distilled into translation.allium — added `AutoTranslationControlSurface` (PostSavedForAutoTranslation reactive + FillMissingTranslationsRequested batch triggers), three rules (`ScheduleAutoTranslation` draft-per-missing-language + media cascade, `AutoTranslatePost` upsert/auto-publish primitive, `AutoTranslateMediaCascade` linked-media per-language tasks, `FillMissingTranslations` published-only batch emitting `ProgressReported` + `FillMissingTranslationsCompleted`), three invariants (`AutoTranslationGatedByEndpoint`, `AutoTranslationSkipsDoNotTranslate`, `AutoTranslationOnlyMissingLanguages`), and `auto_translation_task_group_name` config; `allium check` passes |
 | B1-3 | 3 extra settings sections (Technology, MCP, Data Maintenance) | `lib/bds/ui/settings_editor/` | Distill into spec |
 | B1-4 | Style/Theme as separate tab (`:style`), not settings section | `lib/bds/ui/style_editor.ex` | Distill into spec |
 | B1-5 | `published_*` snapshot fields on Post for diffing | `lib/bds/posts/post.ex:61-65` | Add to post.allium entity |
@@ -193,7 +193,7 @@ All reconciled to follow code. Specs must be self-consistent and match code.
 1c. ~~**A1-17**~~ — blogmark deep-link handler resolved: `BDS.Desktop.DeepLink` receives OS `bds2://` URL events and `BDS.Blogmark` parses them, runs the transform pipeline, and creates+opens a draft post (macOS `Info.plist` scheme registration documented, pending an app-bundle pipeline)
 2. **D1-1 through D1-18** — untested invariants/guarantees
 3. **C-1 through C-3** — internal spec inconsistencies (reconcile to code)
-4. **B1-1 through B1-6** — major code behaviors missing from spec
+4. **B1-1 through B1-6** — major code behaviors missing from spec (B1-1, B1-2 resolved)
 5. **A2-1 through A2-17** — spec drift (code is normative, update spec)
 6. **D2-1 through D2-17** — untested rules
 7. **D3-1 through D3-11** — partial test coverage
