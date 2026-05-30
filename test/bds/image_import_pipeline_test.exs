@@ -19,7 +19,9 @@ defmodule BDS.ImageImportPipelineTest do
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
-    {:ok, project} = BDS.Projects.create_project(%{name: "Image Import Test", data_path: temp_dir})
+    {:ok, project} =
+      BDS.Projects.create_project(%{name: "Image Import Test", data_path: temp_dir})
+
     %{project: project, temp_dir: temp_dir}
   end
 
@@ -40,7 +42,8 @@ defmodule BDS.ImageImportPipelineTest do
         )
 
       assert result ==
-               {:ok, ["/Users/test/photo1.jpg", "/Users/test/photo2.png", "/Users/test/photo3.heic"]}
+               {:ok,
+                ["/Users/test/photo1.jpg", "/Users/test/photo2.png", "/Users/test/photo3.heic"]}
     end
 
     test "multi selection filters out empty lines" do
@@ -51,7 +54,8 @@ defmodule BDS.ImageImportPipelineTest do
         )
 
       assert result ==
-               {:ok, ["/Users/test/photo1.jpg", "/Users/test/photo2.png", "/Users/test/photo3.heic"]}
+               {:ok,
+                ["/Users/test/photo1.jpg", "/Users/test/photo2.png", "/Users/test/photo3.heic"]}
     end
 
     test "multi selection with single file returns list with one element" do

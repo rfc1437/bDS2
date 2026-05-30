@@ -178,7 +178,9 @@ defmodule BDS.Preview do
           case kind do
             :media ->
               serve_file(safe_join(server.data_dir, Path.join(["media", relative_path])),
-                server: server, query_params: query_params)
+                server: server,
+                query_params: query_params
+              )
 
             :generated ->
               case BDS.Preview.Router.render_route(server.project_id, request_path) do
@@ -187,7 +189,9 @@ defmodule BDS.Preview do
 
                 :not_matched ->
                   serve_file(safe_join(Path.join(server.data_dir, "html"), relative_path),
-                    server: server, query_params: query_params)
+                    server: server,
+                    query_params: query_params
+                  )
               end
           end
         end
@@ -240,7 +244,10 @@ defmodule BDS.Preview do
 
   defp draft_preview_payload(post, query_params) do
     requested_language = query_params |> Map.get("lang") |> normalize_requested_language()
-    effective_slug = post.template_slug || TemplateSelection.resolve_post_template_slug(post.project_id, post.tags, post.categories)
+
+    effective_slug =
+      post.template_slug ||
+        TemplateSelection.resolve_post_template_slug(post.project_id, post.tags, post.categories)
 
     case draft_preview_translation(post.id, requested_language, post.language) do
       %Translation{} = translation ->

@@ -132,6 +132,7 @@ defmodule BDS.Preview.Router do
   defp render(project_id, {:home, page_number}, language, main_language, metadata) do
     posts = load_published_list_posts(project_id, metadata)
     posts = maybe_resolve_language(posts, language, main_language, project_id)
+
     render_list(project_id, posts, page_number, metadata, language, main_language, %{kind: "core"})
   end
 
@@ -193,7 +194,13 @@ defmodule BDS.Preview.Router do
     })
   end
 
-  defp render(project_id, {:day, year, month, day, page_number}, language, main_language, metadata) do
+  defp render(
+         project_id,
+         {:day, year, month, day, page_number},
+         language,
+         main_language,
+         metadata
+       ) do
     posts = load_published_posts_by_day(project_id, year, month, day)
     posts = maybe_resolve_language(posts, language, main_language, project_id)
 
@@ -208,7 +215,8 @@ defmodule BDS.Preview.Router do
   ## Post rendering
 
   defp render_post(project_id, post, language, main_language) do
-    {effective_record, body} = resolve_post_for_language(project_id, post, language, main_language)
+    {effective_record, body} =
+      resolve_post_for_language(project_id, post, language, main_language)
 
     assigns = %{
       id: effective_record.id,
@@ -220,7 +228,9 @@ defmodule BDS.Preview.Router do
       _post_record: effective_record
     }
 
-    effective_slug = post.template_slug || TemplateSelection.resolve_post_template_slug(project_id, post.tags, post.categories)
+    effective_slug =
+      post.template_slug ||
+        TemplateSelection.resolve_post_template_slug(project_id, post.tags, post.categories)
 
     case Rendering.render_post_page(project_id, effective_slug, assigns) do
       {:ok, rendered} -> {:ok, rendered}
@@ -370,7 +380,8 @@ defmodule BDS.Preview.Router do
 
   defp archive_page_title(%{kind: "date", year: y, month: m, day: d})
        when is_integer(y) and is_integer(m) and is_integer(d),
-       do: "#{y}-#{String.pad_leading(Integer.to_string(m), 2, "0")}-#{String.pad_leading(Integer.to_string(d), 2, "0")}"
+       do:
+         "#{y}-#{String.pad_leading(Integer.to_string(m), 2, "0")}-#{String.pad_leading(Integer.to_string(d), 2, "0")}"
 
   defp archive_page_title(%{kind: "date", year: y, month: m})
        when is_integer(y) and is_integer(m),
@@ -504,7 +515,8 @@ defmodule BDS.Preview.Router do
     if String.downcase(to_string(language)) == String.downcase(to_string(main_language)) do
       posts
     else
-      translations = load_translations_for_language(project_id, Enum.map(posts, & &1.id), language)
+      translations =
+        load_translations_for_language(project_id, Enum.map(posts, & &1.id), language)
 
       Enum.map(posts, fn post ->
         case Map.get(translations, post.id) do

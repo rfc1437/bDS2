@@ -271,10 +271,10 @@ defmodule BDS.Desktop.ShellLive.TagsEditor do
     end
   end
 
-  attr :color, :string, default: nil
-  attr :presets, :list, required: true
-  attr :pick_event, :string, required: true
-  attr :target, :any, required: true
+  attr(:color, :string, default: nil)
+  attr(:presets, :list, required: true)
+  attr(:pick_event, :string, required: true)
+  attr(:target, :any, required: true)
 
   defp colour_picker(assigns) do
     ~H"""

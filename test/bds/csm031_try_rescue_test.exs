@@ -4,6 +4,7 @@ defmodule BDS.CSM031TryRescueTest do
   describe "source-level: no inline try/rescue around Liquex.render!" do
     test "filters.ex has no try/rescue block in render_macro_source" do
       source = File.read!("lib/bds/rendering/filters.ex")
+
       refute source =~ ~r/try do\s+.*Liquex\.render!/s,
              "render_macro_source should use safe_liquex_render helper, not inline try/rescue"
     end
@@ -51,6 +52,7 @@ defmodule BDS.CSM031TryRescueTest do
 
     test "template_selection.ex uses FileSystem.try_read instead of read_template_file" do
       source = File.read!("lib/bds/rendering/template_selection.ex")
+
       refute source =~ "read_template_file",
              "should use FileSystem.try_read, not the raising read_template_file"
 

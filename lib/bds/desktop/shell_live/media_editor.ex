@@ -126,8 +126,12 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
             Notify.dirty(:media, media.id, false)
 
-            Notify.tab_meta(:media, media.id, display_title(updated_media),
-              updated_media.original_name || updated_media.mime_type || "")
+            Notify.tab_meta(
+              :media,
+              media.id,
+              display_title(updated_media),
+              updated_media.original_name || updated_media.mime_type || ""
+            )
 
             {:noreply, socket}
 
@@ -484,8 +488,12 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
             Notify.dirty(:media, media.id, false)
 
-            Notify.tab_meta(:media, media.id, display_title(updated_media),
-              updated_media.original_name || updated_media.mime_type || "")
+            Notify.tab_meta(
+              :media,
+              media.id,
+              display_title(updated_media),
+              updated_media.original_name || updated_media.mime_type || ""
+            )
 
             notify_output(socket, dgettext("ui", "Media"), dgettext("ui", "Media saved"))
             socket

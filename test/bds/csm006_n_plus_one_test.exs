@@ -51,7 +51,10 @@ defmodule BDS.CSM006NPlusOneTest do
         end
 
       # Clear FTS and reindex
-      Repo.query!("DELETE FROM posts_fts WHERE post_id IN (SELECT id FROM posts WHERE project_id = ?)", [project.id])
+      Repo.query!(
+        "DELETE FROM posts_fts WHERE post_id IN (SELECT id FROM posts WHERE project_id = ?)",
+        [project.id]
+      )
 
       # Reindex should succeed and produce correct FTS entries
       assert :ok = BDS.Search.reindex_posts(project.id)
@@ -82,7 +85,11 @@ defmodule BDS.CSM006NPlusOneTest do
           language: "en"
         })
 
-      Repo.query!("DELETE FROM posts_fts WHERE post_id IN (SELECT id FROM posts WHERE project_id = ?)", [project.id])
+      Repo.query!(
+        "DELETE FROM posts_fts WHERE post_id IN (SELECT id FROM posts WHERE project_id = ?)",
+        [project.id]
+      )
+
       assert :ok = BDS.Search.reindex_posts(project.id)
 
       {:ok, results} = BDS.Search.search_posts(project.id, "unique-keyword-xyz")

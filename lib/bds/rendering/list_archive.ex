@@ -349,5 +349,4 @@ defmodule BDS.Rendering.ListArchive do
     do: RenderMetadata.calendar_initial_month(post)
 
   defp calendar_initial_month_from_posts([]), do: nil
-
 end

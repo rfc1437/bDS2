@@ -424,9 +424,10 @@ defmodule BDS.PreviewTest do
     assert :ok = BDS.Preview.stop_preview(project.id)
   end
 
-  test "on-demand rendering: published post route renders via template without generated files", %{
-    project: project
-  } do
+  test "on-demand rendering: published post route renders via template without generated files",
+       %{
+         project: project
+       } do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
                main_language: "en",
@@ -458,9 +459,10 @@ defmodule BDS.PreviewTest do
     assert :ok = BDS.Preview.stop_preview(project.id)
   end
 
-  test "on-demand rendering: home page renders published posts as list without generated files", %{
-    project: project
-  } do
+  test "on-demand rendering: home page renders published posts as list without generated files",
+       %{
+         project: project
+       } do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{
                main_language: "en",

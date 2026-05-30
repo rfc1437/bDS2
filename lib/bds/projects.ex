@@ -104,8 +104,9 @@ defmodule BDS.Projects do
   end
 
   @spec project_data_dir(Project.t()) :: String.t()
-  def project_data_dir(%Project{data_path: data_path}) when is_binary(data_path) and data_path != "",
-    do: data_path
+  def project_data_dir(%Project{data_path: data_path})
+      when is_binary(data_path) and data_path != "",
+      do: data_path
 
   # A project without an explicit data_path resolves to its folder under the
   # per-user default content location — never priv/data inside the repo

@@ -32,7 +32,10 @@ defmodule BDS.ImportDefinitionsTest do
     result = ImportDefinitions.decode_analysis_result(malicious_json)
 
     assert is_map(result)
-    assert Map.get(result, unknown_key_1) == "val" or Map.get(result, "csm001_fictive_#{unique_suffix}") == "val"
+
+    assert Map.get(result, unknown_key_1) == "val" or
+             Map.get(result, "csm001_fictive_#{unique_suffix}") == "val"
+
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key_1) end
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key_2) end
   end

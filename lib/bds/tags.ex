@@ -239,6 +239,7 @@ defmodule BDS.Tags do
               {:error, changeset} -> Repo.rollback(changeset)
             end
           end)
+
           Enum.map(affected_posts, & &1.id)
         end)
         |> case do

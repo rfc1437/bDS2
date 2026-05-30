@@ -49,7 +49,9 @@ defmodule BDS.CSM035ProcessDictTest do
       match = Regex.run(~r/def sidebar_content\(assigns\).*?\n(.*?)\n/s, source)
       assert match, "could not find sidebar_content/1"
       [_, first_line | _] = match
-      assert first_line =~ "UILocale.put", "sidebar_content/1 must call UILocale.put on its first line"
+
+      assert first_line =~ "UILocale.put",
+             "sidebar_content/1 must call UILocale.put on its first line"
     end
 
     test "MenuBar.mount/1 calls UILocale.put" do
@@ -57,7 +59,9 @@ defmodule BDS.CSM035ProcessDictTest do
       match = Regex.run(~r/def mount\(menu\).*?\n(.*?)\n/s, source)
       assert match, "could not find mount/1 in menu_bar.ex"
       [_, first_line | _] = match
-      assert first_line =~ "UILocale.put", "MenuBar.mount/1 must call UILocale.put on its first line"
+
+      assert first_line =~ "UILocale.put",
+             "MenuBar.mount/1 must call UILocale.put on its first line"
     end
   end
 

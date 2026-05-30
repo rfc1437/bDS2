@@ -58,7 +58,11 @@ defmodule BDS.Embeddings.Index do
   """
   def neighbors(project_id, query_label, query_vector, limit)
       when is_binary(project_id) and is_integer(query_label) and is_binary(query_vector) do
-    GenServer.call(__MODULE__, {:neighbors, project_id, query_label, query_vector, limit}, :infinity)
+    GenServer.call(
+      __MODULE__,
+      {:neighbors, project_id, query_label, query_vector, limit},
+      :infinity
+    )
   end
 
   @doc """
@@ -167,7 +171,10 @@ defmodule BDS.Embeddings.Index do
 
   defp build_entry(dimensions, entries) do
     count = length(entries)
-    {:ok, index} = HNSWLib.Index.new(@space, dimensions, count, m: @m, ef_construction: @ef_construction)
+
+    {:ok, index} =
+      HNSWLib.Index.new(@space, dimensions, count, m: @m, ef_construction: @ef_construction)
+
     :ok = HNSWLib.Index.set_ef(index, @ef_search)
 
     tensor =

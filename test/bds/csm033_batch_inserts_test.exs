@@ -118,9 +118,7 @@ defmodule BDS.CSM033BatchInsertsTest do
       assert Enum.all?(posts, fn post -> post.id in indexed end)
 
       keys =
-        BDS.Repo.all(
-          from(k in BDS.Embeddings.Key, where: k.project_id == ^project.id)
-        )
+        BDS.Repo.all(from(k in BDS.Embeddings.Key, where: k.project_id == ^project.id))
 
       assert length(keys) == 5
       labels = Enum.map(keys, & &1.label) |> Enum.sort()
@@ -141,7 +139,8 @@ defmodule BDS.CSM033BatchInsertsTest do
       original_key =
         BDS.Repo.get_by!(BDS.Embeddings.Key, project_id: project.id, post_id: post.id)
 
-      {:ok, _post} = BDS.Posts.update_post(post.id, %{content: "completely different content now"})
+      {:ok, _post} =
+        BDS.Posts.update_post(post.id, %{content: "completely different content now"})
 
       {:ok, rebuilt_ids} = BDS.Embeddings.rebuild_project(project.id)
       assert post.id in rebuilt_ids
@@ -175,9 +174,7 @@ defmodule BDS.CSM033BatchInsertsTest do
       assert repaired == [post_a.id]
 
       keys =
-        BDS.Repo.all(
-          from(k in BDS.Embeddings.Key, where: k.project_id == ^project.id)
-        )
+        BDS.Repo.all(from(k in BDS.Embeddings.Key, where: k.project_id == ^project.id))
 
       assert length(keys) == 2
     end
@@ -206,5 +203,4 @@ defmodule BDS.CSM033BatchInsertsTest do
       assert key_before.vector == key_after.vector
     end
   end
-
 end

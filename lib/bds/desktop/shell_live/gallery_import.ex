@@ -35,14 +35,28 @@ defmodule BDS.Desktop.ShellLive.GalleryImport do
     known_refs = MapSet.new(tasks, & &1.ref)
 
     drain_tasks(
-      remaining, tasks, known_refs, project_id, post_id, language, translate_targets, parent
+      remaining,
+      tasks,
+      known_refs,
+      project_id,
+      post_id,
+      language,
+      translate_targets,
+      parent
     )
 
     send(parent, {:add_images_complete, length(paths)})
   end
 
   defp drain_tasks(
-         [], tasks, _known_refs, _project_id, _post_id, _language, _translate_targets, _parent
+         [],
+         tasks,
+         _known_refs,
+         _project_id,
+         _post_id,
+         _language,
+         _translate_targets,
+         _parent
        ) do
     Enum.each(tasks, fn task -> Task.await(task, :infinity) end)
   end
@@ -65,7 +79,12 @@ defmodule BDS.Desktop.ShellLive.GalleryImport do
           new_task =
             Task.async(fn ->
               process_single_image(
-                next_path, project_id, post_id, language, translate_targets, parent
+                next_path,
+                project_id,
+                post_id,
+                language,
+                translate_targets,
+                parent
               )
             end)
 
@@ -81,8 +100,14 @@ defmodule BDS.Desktop.ShellLive.GalleryImport do
           )
         else
           drain_tasks(
-            [next_path | rest], tasks, known_refs,
-            project_id, post_id, language, translate_targets, parent
+            [next_path | rest],
+            tasks,
+            known_refs,
+            project_id,
+            post_id,
+            language,
+            translate_targets,
+            parent
           )
         end
 
@@ -93,7 +118,12 @@ defmodule BDS.Desktop.ShellLive.GalleryImport do
           new_task =
             Task.async(fn ->
               process_single_image(
-                next_path, project_id, post_id, language, translate_targets, parent
+                next_path,
+                project_id,
+                post_id,
+                language,
+                translate_targets,
+                parent
               )
             end)
 
@@ -109,8 +139,14 @@ defmodule BDS.Desktop.ShellLive.GalleryImport do
           )
         else
           drain_tasks(
-            [next_path | rest], tasks, known_refs,
-            project_id, post_id, language, translate_targets, parent
+            [next_path | rest],
+            tasks,
+            known_refs,
+            project_id,
+            post_id,
+            language,
+            translate_targets,
+            parent
           )
         end
     end
@@ -124,16 +160,22 @@ defmodule BDS.Desktop.ShellLive.GalleryImport do
   end
 
   defp process_single_image(
-         path, project_id, post_id, language, translate_targets, parent
+         path,
+         project_id,
+         post_id,
+         language,
+         translate_targets,
+         parent
        ) do
     with {:ok, media} <- Media.import_media(%{project_id: project_id, source_path: path}),
          true <- String.starts_with?(media.mime_type || "", "image/"),
          {:ok, result} <- AI.analyze_image(media.id, language: language),
-         {:ok, _updated} <- Media.update_media(media.id, %{
-           title: result.title,
-           alt: result.alt,
-           caption: result.caption
-         }),
+         {:ok, _updated} <-
+           Media.update_media(media.id, %{
+             title: result.title,
+             alt: result.alt,
+             caption: result.caption
+           }),
          {:ok, _link} <- Media.link_media_to_post(media.id, post_id) do
       translate_media_translations(media.id, translate_targets)
       title = result.title || media.original_name

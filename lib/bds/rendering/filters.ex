@@ -43,12 +43,26 @@ defmodule BDS.Rendering.Filters do
         _language_prefix,
         context
       ) do
-    render_markdown(value, canonical_post_paths, canonical_media_paths, language, context, post_id)
+    render_markdown(
+      value,
+      canonical_post_paths,
+      canonical_media_paths,
+      language,
+      context,
+      post_id
+    )
   end
 
   @spec render_markdown(term(), map() | nil, map() | nil, String.t(), Liquex.Context.t(), term()) ::
           String.t()
-  def render_markdown(value, canonical_post_paths, canonical_media_paths, language, context, post_id \\ nil) do
+  def render_markdown(
+        value,
+        canonical_post_paths,
+        canonical_media_paths,
+        language,
+        context,
+        post_id \\ nil
+      ) do
     value
     |> to_string()
     |> replace_built_in_macros(language, context, post_id)
@@ -161,7 +175,11 @@ defmodule BDS.Rendering.Filters do
     else
       {:error, reason, line} ->
         require Logger
-        Logger.warning("Macro template parse failed (#{template_path}): #{reason} at line #{line}")
+
+        Logger.warning(
+          "Macro template parse failed (#{template_path}): #{reason} at line #{line}"
+        )
+
         ""
 
       {:error, message} ->
@@ -365,8 +383,7 @@ defmodule BDS.Rendering.Filters do
         "root_classes" => "macro-photo-archive",
         "data_attrs" => [],
         "months" => months,
-        "empty_label" =>
-          BDS.Gettext.lgettext(language, "render", "No photos found")
+        "empty_label" => BDS.Gettext.lgettext(language, "render", "No photos found")
       },
       context
     )
@@ -391,8 +408,7 @@ defmodule BDS.Rendering.Filters do
         "width" => Map.get(params, "width", width),
         "height" => Map.get(params, "height", height),
         "aria_label" => "Tag cloud",
-        "empty_label" =>
-          BDS.Gettext.lgettext(language, "render", "No tags")
+        "empty_label" => BDS.Gettext.lgettext(language, "render", "No tags")
       },
       context
     )
@@ -456,9 +472,18 @@ defmodule BDS.Rendering.Filters do
 
   defp group_by_media_month(media_records) do
     month_names = %{
-      1 => "January", 2 => "February", 3 => "March", 4 => "April",
-      5 => "May", 6 => "June", 7 => "July", 8 => "August",
-      9 => "September", 10 => "October", 11 => "November", 12 => "December"
+      1 => "January",
+      2 => "February",
+      3 => "March",
+      4 => "April",
+      5 => "May",
+      6 => "June",
+      7 => "July",
+      8 => "August",
+      9 => "September",
+      10 => "October",
+      11 => "November",
+      12 => "December"
     }
 
     media_records
@@ -555,8 +580,10 @@ defmodule BDS.Rendering.Filters do
       _ -> default
     end
   end
+
   defp normalize_columns(value, _default, min, max) when is_integer(value),
     do: value |> max(min) |> min(max)
+
   defp normalize_columns(_value, default, _min, _max), do: default
 
   defp parse_integer(value) when is_binary(value) do
@@ -565,6 +592,7 @@ defmodule BDS.Rendering.Filters do
       _ -> nil
     end
   end
+
   defp parse_integer(value) when is_integer(value), do: value
   defp parse_integer(_value), do: nil
 
@@ -583,6 +611,7 @@ defmodule BDS.Rendering.Filters do
         case DateTime.from_iso8601("#{year}-#{pad(month + 1)}-01T00:00:00Z") do
           {:ok, dt, _} ->
             dt |> DateTime.add(-1, :second) |> DateTime.to_date() |> Map.get(:day)
+
           _ ->
             31
         end

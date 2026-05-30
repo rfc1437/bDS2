@@ -240,7 +240,11 @@ defmodule BDS.Media do
                |> Repo.insert_or_update!()
              end) do
           {:ok, updated_translation} ->
-            log_sidecar_error(write_translation_sidecar(project, media, updated_translation), media.id)
+            log_sidecar_error(
+              write_translation_sidecar(project, media, updated_translation),
+              media.id
+            )
+
             :ok = Search.sync_media(media.id)
             {:ok, updated_translation}
 

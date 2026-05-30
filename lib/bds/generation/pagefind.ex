@@ -82,9 +82,7 @@ defmodule BDS.Generation.Pagefind do
   # Returns nil when the page is not marked, so unmarked pages are excluded
   # from the index entirely (matching Pagefind semantics).
   defp body_text(content) do
-    case Regex.run(~r/<([a-zA-Z0-9]+)[^>]*\bdata-pagefind-body\b[^>]*>/, content,
-           return: :index
-         ) do
+    case Regex.run(~r/<([a-zA-Z0-9]+)[^>]*\bdata-pagefind-body\b[^>]*>/, content, return: :index) do
       [{open_start, open_len}, {tag_start, tag_len}] ->
         tag = binary_part(content, tag_start, tag_len)
         region = scoped_region(content, tag, open_start + open_len)
@@ -117,7 +115,10 @@ defmodule BDS.Generation.Pagefind do
   end
 
   defp event_kind(rest, pos, tag) do
-    if String.starts_with?(binary_part(rest, pos, min(2 + byte_size(tag), byte_size(rest) - pos)), "</") do
+    if String.starts_with?(
+         binary_part(rest, pos, min(2 + byte_size(tag), byte_size(rest) - pos)),
+         "</"
+       ) do
       :close
     else
       :open

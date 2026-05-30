@@ -175,25 +175,39 @@ defmodule BDS.UI.ShellTest do
 
   test "phase 3 templates use shared shell and form primitives for common layout" do
     post_template =
-      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex")
+      File.read!(
+        "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex"
+      )
 
     media_template =
-      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex")
+      File.read!(
+        "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex"
+      )
 
     script_template =
-      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex")
+      File.read!(
+        "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex"
+      )
 
     template_template =
-      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex")
+      File.read!(
+        "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex"
+      )
 
     chat_template =
-      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/chat_editor_html/chat_editor.html.heex")
+      File.read!(
+        "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/chat_editor_html/chat_editor.html.heex"
+      )
 
     menu_template =
-      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/menu_editor_html/menu_editor.html.heex")
+      File.read!(
+        "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/menu_editor_html/menu_editor.html.heex"
+      )
 
     settings_template =
-      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex")
+      File.read!(
+        "/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex"
+      )
 
     assert post_template =~ "ui-editor-shell"
     assert post_template =~ "ui-editor-header"
@@ -248,8 +262,12 @@ defmodule BDS.UI.ShellTest do
     assistant_css = File.read!("/Users/gb/Projects/bDS2/assets/css/assistant.css")
     menu_css = File.read!("/Users/gb/Projects/bDS2/assets/css/menu_editor.css")
 
-    refute editor_css =~ ".post-editor .editor-header,\n.scripts-view-shell.editor .editor-header,\n.templates-view-shell.editor .editor-header {\n  display: flex;"
-    refute editor_css =~ ".post-editor .editor-actions,\n.scripts-view-shell.editor .editor-actions,\n.templates-view-shell.editor .editor-actions {\n  display: flex;"
+    refute editor_css =~
+             ".post-editor .editor-header,\n.scripts-view-shell.editor .editor-header,\n.templates-view-shell.editor .editor-header {\n  display: flex;"
+
+    refute editor_css =~
+             ".post-editor .editor-actions,\n.scripts-view-shell.editor .editor-actions,\n.templates-view-shell.editor .editor-actions {\n  display: flex;"
+
     refute editor_css =~ ".post-editor .quick-actions-menu {"
     refute media_css =~ "[data-testid=\"media-editor\"] .editor-header {"
     refute media_css =~ "[data-testid=\"media-editor\"] .editor-actions {"
@@ -287,9 +305,14 @@ defmodule BDS.UI.ShellTest do
     assert css =~ ".chat-panel .chat-input-container"
     assert css =~ ".chat-model-selector-menu"
 
-    assert css =~ "@media (max-width: 720px) {\n  .chat-panel-header {\n    align-items: stretch;\n    flex-direction: column;"
+    assert css =~
+             "@media (max-width: 720px) {\n  .chat-panel-header {\n    align-items: stretch;\n    flex-direction: column;"
+
     assert css =~ ".chat-model-selector-wrap {\n    width: 100%;"
-    assert css =~ ".chat-panel .chat-model-selector-button.chat-model-selector-inline {\n    justify-content: space-between;\n    width: 100%;"
+
+    assert css =~
+             ".chat-panel .chat-model-selector-button.chat-model-selector-inline {\n    justify-content: space-between;\n    width: 100%;"
+
     assert css =~ ".chat-panel .chat-input-container {\n    padding: 8px 12px;"
   end
 

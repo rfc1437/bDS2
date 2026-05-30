@@ -96,7 +96,9 @@ defmodule BDS.Scripts.TransformsTest do
         data.content = data.content .. "D"
         return data
       end
-      """, enabled: false)
+      """,
+      enabled: false
+    )
 
     transform(other.id, "Foreign", """
     function main(data, _ctx)

@@ -37,12 +37,13 @@ defmodule BDS.CSM008RenderPathTest do
       render_click(view, "select_tab", %{"type" => "post", "id" => post.id})
       render_click(view, "select_panel_tab", %{"tab" => "post_links"})
 
-      query_count = count_queries(fn ->
-        1..10 |> Enum.each(fn _ -> render(view) end)
-      end)
+      query_count =
+        count_queries(fn ->
+          1..10 |> Enum.each(fn _ -> render(view) end)
+        end)
 
       assert query_count == 0,
-        "Expected 0 DB queries on panel re-renders, got #{query_count}"
+             "Expected 0 DB queries on panel re-renders, got #{query_count}"
     end
 
     test "git_log panel re-render uses cached assigns", %{post: post} do
@@ -51,12 +52,13 @@ defmodule BDS.CSM008RenderPathTest do
       render_click(view, "select_tab", %{"type" => "post", "id" => post.id})
       render_click(view, "select_panel_tab", %{"tab" => "git_log"})
 
-      query_count = count_queries(fn ->
-        1..10 |> Enum.each(fn _ -> render(view) end)
-      end)
+      query_count =
+        count_queries(fn ->
+          1..10 |> Enum.each(fn _ -> render(view) end)
+        end)
 
       assert query_count == 0,
-        "Expected 0 DB queries on git_log re-renders, got #{query_count}"
+             "Expected 0 DB queries on git_log re-renders, got #{query_count}"
     end
   end
 
@@ -64,26 +66,28 @@ defmodule BDS.CSM008RenderPathTest do
     test "switching to output panel triggers no post/media queries" do
       {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
-      {query_count, query_sources} = count_queries_with_sources(fn ->
-        render_click(view, "select_panel_tab", %{"tab" => "output"})
-      end)
+      {query_count, query_sources} =
+        count_queries_with_sources(fn ->
+          render_click(view, "select_panel_tab", %{"tab" => "output"})
+        end)
 
       refute "post_links" in query_sources,
-        "Switching to output should not query post_links, got: #{inspect(query_sources)}"
+             "Switching to output should not query post_links, got: #{inspect(query_sources)}"
 
       assert query_count == 0,
-        "Expected 0 queries for output panel tab, got #{query_count}"
+             "Expected 0 queries for output panel tab, got #{query_count}"
     end
 
     test "switching to tasks panel triggers no post/media queries" do
       {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
-      {query_count, _query_sources} = count_queries_with_sources(fn ->
-        render_click(view, "select_panel_tab", %{"tab" => "tasks"})
-      end)
+      {query_count, _query_sources} =
+        count_queries_with_sources(fn ->
+          render_click(view, "select_panel_tab", %{"tab" => "tasks"})
+        end)
 
       assert query_count == 0,
-        "Expected 0 queries for tasks panel tab, got #{query_count}"
+             "Expected 0 queries for tasks panel tab, got #{query_count}"
     end
   end
 
@@ -98,12 +102,13 @@ defmodule BDS.CSM008RenderPathTest do
         "subtitle" => "preset subtitle"
       })
 
-      query_count = count_queries(fn ->
-        render_click(view, "select_tab", %{"type" => "post", "id" => post.id})
-      end)
+      query_count =
+        count_queries(fn ->
+          render_click(view, "select_tab", %{"type" => "post", "id" => post.id})
+        end)
 
       assert query_count == 0,
-        "Expected 0 DB queries when tab meta is already complete, got #{query_count}"
+             "Expected 0 DB queries when tab meta is already complete, got #{query_count}"
     end
   end
 

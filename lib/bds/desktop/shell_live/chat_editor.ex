@@ -103,7 +103,9 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         socket
       ) do
     next_data = Map.put(socket.assigns.surface_data, surface_id, fields)
-    {:noreply, assign(socket, :surface_data, next_data) |> schedule_surface_state_persist() |> build_data()}
+
+    {:noreply,
+     assign(socket, :surface_data, next_data) |> schedule_surface_state_persist() |> build_data()}
   end
 
   def handle_event(
@@ -227,8 +229,11 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
         build_data(socket)
 
       socket.assigns.offline_mode ->
-        Notify.output(dgettext("ui", "Chat"),
-          dgettext("ui", "Automatic AI actions stay gated by airplane mode."), "info")
+        Notify.output(
+          dgettext("ui", "Chat"),
+          dgettext("ui", "Automatic AI actions stay gated by airplane mode."),
+          "info"
+        )
 
         build_data(socket)
 

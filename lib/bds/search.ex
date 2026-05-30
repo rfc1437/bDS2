@@ -284,14 +284,24 @@ defmodule BDS.Search do
 
   defp maybe_where_year(query, year) do
     year_str = to_string(year)
-    where(query, [p], fragment("strftime('%Y', datetime(? / 1000, 'unixepoch')) = ?", p.created_at, ^year_str))
+
+    where(
+      query,
+      [p],
+      fragment("strftime('%Y', datetime(? / 1000, 'unixepoch')) = ?", p.created_at, ^year_str)
+    )
   end
 
   defp maybe_where_month(query, nil), do: query
 
   defp maybe_where_month(query, month) do
     month_str = String.pad_leading(to_string(month), 2, "0")
-    where(query, [p], fragment("strftime('%m', datetime(? / 1000, 'unixepoch')) = ?", p.created_at, ^month_str))
+
+    where(
+      query,
+      [p],
+      fragment("strftime('%m', datetime(? / 1000, 'unixepoch')) = ?", p.created_at, ^month_str)
+    )
   end
 
   defp maybe_where_from(query, nil), do: query
@@ -305,7 +315,10 @@ defmodule BDS.Search do
   defp maybe_where_tags(query, tags) do
     tags_clause =
       Enum.reduce(tags, false, fn tag, acc ->
-        dynamic([p], ^acc or fragment("EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)", p.tags, ^tag))
+        dynamic(
+          [p],
+          ^acc or fragment("EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)", p.tags, ^tag)
+        )
       end)
 
     where(query, [p], ^tags_clause)
@@ -316,7 +329,10 @@ defmodule BDS.Search do
   defp maybe_where_tags_media(query, tags) do
     tags_clause =
       Enum.reduce(tags, false, fn tag, acc ->
-        dynamic([m], ^acc or fragment("EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)", m.tags, ^tag))
+        dynamic(
+          [m],
+          ^acc or fragment("EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)", m.tags, ^tag)
+        )
       end)
 
     where(query, [m], ^tags_clause)
@@ -327,7 +343,15 @@ defmodule BDS.Search do
   defp maybe_where_categories(query, categories) do
     categories_clause =
       Enum.reduce(categories, false, fn category, acc ->
-        dynamic([p], ^acc or fragment("EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)", p.categories, ^category))
+        dynamic(
+          [p],
+          ^acc or
+            fragment(
+              "EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)",
+              p.categories,
+              ^category
+            )
+        )
       end)
 
     where(query, [p], ^categories_clause)
@@ -548,8 +572,6 @@ defmodule BDS.Search do
     )
   end
 
-
-
   defp post_index_fields(post, translations) do
     post_language = normalize_language(post.language)
 
@@ -656,8 +678,8 @@ defmodule BDS.Search do
     else
       Repo.all(
         from translation in MediaTranslation,
-        where: translation.translation_for in ^media_ids,
-        select: {translation.translation_for, translation}
+          where: translation.translation_for in ^media_ids,
+          select: {translation.translation_for, translation}
       )
       |> Enum.group_by(fn {media_id, _} -> media_id end, fn {_, translation} -> translation end)
     end

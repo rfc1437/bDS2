@@ -229,6 +229,7 @@ defmodule BDS.PostsTest do
     File.write!(old_full, "stale content")
 
     import Ecto.Query
+
     BDS.Repo.update_all(
       from(p in BDS.Posts.Post, where: p.id == ^published.id),
       set: [file_path: old_relative, content: "edited body"]

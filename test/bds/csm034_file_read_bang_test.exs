@@ -21,7 +21,9 @@ defmodule BDS.CSM034FileReadBangTest do
     test "release_packaging.ex has no File.read! or File.write!" do
       source = File.read!("lib/bds/release_packaging.ex")
       refute source =~ "File.read!", "release_packaging.ex should use File.read, not File.read!"
-      refute source =~ "File.write!", "release_packaging.ex should use File.write, not File.write!"
+
+      refute source =~ "File.write!",
+             "release_packaging.ex should use File.write, not File.write!"
     end
   end
 

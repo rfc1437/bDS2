@@ -111,8 +111,7 @@ defmodule BDS.Scripting.Capabilities do
       get_by_status: one_arg(fn status -> posts_by_status(project_id, status) end),
       get_by_year_month: zero_or_one_arg(fn _args -> post_counts_by_year_month(project_id) end),
       get_dashboard_stats: zero_or_one_arg(fn _args -> post_dashboard_stats(project_id) end),
-      get_linked_by:
-        one_arg(fn post_id -> linked_posts_for(project_id, post_id, :incoming) end),
+      get_linked_by: one_arg(fn post_id -> linked_posts_for(project_id, post_id, :incoming) end),
       get_links_to: one_arg(fn post_id -> linked_posts_for(project_id, post_id, :outgoing) end),
       get_preview_url:
         two_arg(fn post_id, options -> preview_url(project_id, post_id, options) end),
@@ -157,8 +156,7 @@ defmodule BDS.Scripting.Capabilities do
         end),
       filter: one_arg(fn filters -> filter_media(project_id, filters) end),
       import: one_arg(fn attrs -> import_media(project_id, attrs) end),
-      get_by_year_month:
-        zero_or_one_arg(fn _args -> media_counts_by_year_month(project_id) end),
+      get_by_year_month: zero_or_one_arg(fn _args -> media_counts_by_year_month(project_id) end),
       get_file_path: one_arg(fn media_id -> media_file_path(project_id, media_id) end),
       update: two_arg(fn media_id, attrs -> update_media(project_id, media_id, attrs) end),
       delete: one_arg(fn media_id -> delete_media(project_id, media_id) end),
@@ -172,8 +170,7 @@ defmodule BDS.Scripting.Capabilities do
         two_arg(fn media_id, language ->
           load_media_translation(project_id, media_id, language)
         end),
-      get_translations:
-        one_arg(fn media_id -> list_media_translations(project_id, media_id) end),
+      get_translations: one_arg(fn media_id -> list_media_translations(project_id, media_id) end),
       get_url: one_arg(fn media_id -> media_url(project_id, media_id) end),
       rebuild_from_files: zero_or_one_arg(fn _args -> rebuild_media_from_files(project_id) end),
       regenerate_missing_thumbnails:
@@ -201,8 +198,7 @@ defmodule BDS.Scripting.Capabilities do
       get: one_arg(fn script_id -> load_script(project_id, script_id) end),
       get_all: zero_or_one_arg(fn _args -> list_scripts(project_id) end),
       publish: one_arg(fn script_id -> publish_script(project_id, script_id) end),
-      rebuild_from_files:
-        zero_or_one_arg(fn _args -> rebuild_scripts_from_files(project_id) end)
+      rebuild_from_files: zero_or_one_arg(fn _args -> rebuild_scripts_from_files(project_id) end)
     }
   end
 
@@ -295,8 +291,7 @@ defmodule BDS.Scripting.Capabilities do
       find_similar: two_arg(fn post_id, limit -> find_similar(post_id, limit) end),
       compute_similarities:
         two_arg(fn post_id, target_ids -> compute_similarities(post_id, target_ids) end),
-      suggest_tags:
-        two_arg(fn post_id, exclude_tags -> suggest_tags(post_id, exclude_tags) end),
+      suggest_tags: two_arg(fn post_id, exclude_tags -> suggest_tags(post_id, exclude_tags) end),
       find_duplicates: zero_or_one_arg(fn _args -> find_duplicates(project_id) end),
       dismiss_pair: two_arg(fn post_id_a, post_id_b -> dismiss_pair(post_id_a, post_id_b) end),
       index_unindexed_posts: zero_or_one_arg(fn _args -> index_unindexed_posts(project_id) end)

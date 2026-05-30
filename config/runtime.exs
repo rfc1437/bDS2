@@ -10,7 +10,8 @@ if config_env() == :prod do
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "1")
 
   # Persist downloaded embedding model files alongside the database data dir.
-  config :bumblebee, :cache_dir,
-    System.get_env("BDS_MODEL_CACHE_DIR") ||
-      Path.join(Path.dirname(Path.expand(database_path)), "models")
+  config :bumblebee,
+         :cache_dir,
+         System.get_env("BDS_MODEL_CACHE_DIR") ||
+           Path.join(Path.dirname(Path.expand(database_path)), "models")
 end

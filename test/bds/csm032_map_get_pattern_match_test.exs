@@ -35,12 +35,14 @@ defmodule BDS.CSM032MapGetPatternMatchTest do
   describe "source-level: overlay.ex uses pattern matching for known structures" do
     test "delete_details uses pattern matching instead of Map.get" do
       source = File.read!("lib/bds/desktop/overlay.ex")
+
       refute source =~ "Map.get(delete_details,",
              "overlay.ex should pattern match delete_details instead of using Map.get"
     end
 
     test "merge_details uses pattern matching instead of Map.get" do
       source = File.read!("lib/bds/desktop/overlay.ex")
+
       refute source =~ "Map.get(merge,",
              "overlay.ex should pattern match merge_details instead of using Map.get"
     end
@@ -65,32 +67,40 @@ defmodule BDS.CSM032MapGetPatternMatchTest do
   describe "source-level: generation pipeline uses dot access for Post struct fields" do
     test "outputs.ex uses post.language instead of Map.get(post, :language)" do
       source = File.read!("lib/bds/generation/outputs.ex")
+
       refute source =~ "Map.get(post, :language)",
              "outputs.ex should use post.language"
     end
 
     test "data.ex uses dot access for Post struct fields in build_published_translation_variant" do
       source = File.read!("lib/bds/generation/data.ex")
+
       refute source =~ "Map.get(post, :author)",
              "data.ex should use post.author"
+
       refute source =~ "Map.get(post, :tags",
              "data.ex should use post.tags"
+
       refute source =~ "Map.get(post, :categories",
              "data.ex should use post.categories"
+
       refute source =~ "Map.get(post, :template_slug)",
              "data.ex should use post.template_slug"
+
       refute source =~ "Map.get(post, :do_not_translate",
              "data.ex should use post.do_not_translate"
     end
 
     test "validation.ex uses post.file_path instead of Map.get(post, :file_path)" do
       source = File.read!("lib/bds/generation/validation.ex")
+
       refute source =~ "Map.get(post, :file_path)",
              "validation.ex should use post.file_path"
     end
 
     test "sitemap.ex uses post.do_not_translate instead of Map.get" do
       source = File.read!("lib/bds/generation/sitemap.ex")
+
       refute source =~ "Map.get(post, :do_not_translate)",
              "sitemap.ex should use post.do_not_translate"
     end

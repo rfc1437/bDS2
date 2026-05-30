@@ -27,7 +27,9 @@ defmodule BDS.AI.ChatConversation do
 
   def changeset(conversation, attrs) do
     conversation
-    |> cast(attrs, [:id, :title, :model, :copilot_session_id, :surface_state, :created_at, :updated_at],
+    |> cast(
+      attrs,
+      [:id, :title, :model, :copilot_session_id, :surface_state, :created_at, :updated_at],
       empty_values: [nil]
     )
     |> validate_required([:id, :title, :created_at, :updated_at])

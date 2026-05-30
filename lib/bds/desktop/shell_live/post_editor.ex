@@ -471,8 +471,12 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               |> assign(:dirty?, false)
               |> build_data()
 
-            Notify.tab_meta(:post, post.id, record_title(record, refreshed_post),
-              Atom.to_string(record_status(record)))
+            Notify.tab_meta(
+              :post,
+              post.id,
+              record_title(record, refreshed_post),
+              Atom.to_string(record_status(record))
+            )
 
             Notify.dirty(:post, post.id, false)
             Notify.cancel_auto_save(:post, post.id)
@@ -511,8 +515,12 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               |> assign(:dirty?, false)
               |> build_data()
 
-            Notify.tab_meta(:post, post.id, record_title(record, refreshed_post),
-              Atom.to_string(record_status(record)))
+            Notify.tab_meta(
+              :post,
+              post.id,
+              record_title(record, refreshed_post),
+              Atom.to_string(record_status(record))
+            )
 
             Notify.dirty(:post, post.id, false)
             notify_output(socket, dgettext("ui", "Post"), dgettext("ui", "Post published"))
@@ -546,9 +554,12 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               |> assign(:dirty?, false)
               |> build_data()
 
-            Notify.tab_meta(:post, post.id,
+            Notify.tab_meta(
+              :post,
+              post.id,
               restored_post.title || restored_post.slug || restored_post.id,
-              Atom.to_string(restored_post.status || :draft))
+              Atom.to_string(restored_post.status || :draft)
+            )
 
             Notify.dirty(:post, post.id, false)
             socket

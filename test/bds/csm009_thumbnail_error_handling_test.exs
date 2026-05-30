@@ -34,7 +34,10 @@ defmodule BDS.CSM009ThumbnailErrorHandlingTest do
     assert {:error, _reason} = result
   end
 
-  test "ensure_thumbnails returns :ok for non-image media", %{project: project, temp_dir: temp_dir} do
+  test "ensure_thumbnails returns :ok for non-image media", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
     source_path = Path.join(temp_dir, "readme.txt")
     File.write!(source_path, "just text")
 
@@ -86,11 +89,15 @@ defmodule BDS.CSM009ThumbnailErrorHandlingTest do
   } do
     source_path = Path.join(temp_dir, "good.jpg")
     File.write!(source_path, tiny_jpeg_binary())
-    {:ok, good_media} = BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    {:ok, good_media} =
+      BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
 
     corrupt_path = Path.join(temp_dir, "bad.jpg")
     File.write!(corrupt_path, "corrupt data")
-    {:ok, bad_media} = BDS.Media.import_media(%{project_id: project.id, source_path: corrupt_path})
+
+    {:ok, bad_media} =
+      BDS.Media.import_media(%{project_id: project.id, source_path: corrupt_path})
 
     Enum.each(Map.values(Thumbnails.thumbnail_paths(good_media)), fn path ->
       File.rm(Path.join(temp_dir, path))

@@ -79,8 +79,14 @@ defmodule BDS.UI.Dashboard do
       from post in Post,
         where: post.project_id == ^project_id,
         group_by: [
-          fragment("CAST(strftime('%Y', datetime(? / 1000, 'unixepoch')) AS INTEGER)", post.created_at),
-          fragment("CAST(strftime('%m', datetime(? / 1000, 'unixepoch')) AS INTEGER)", post.created_at)
+          fragment(
+            "CAST(strftime('%Y', datetime(? / 1000, 'unixepoch')) AS INTEGER)",
+            post.created_at
+          ),
+          fragment(
+            "CAST(strftime('%m', datetime(? / 1000, 'unixepoch')) AS INTEGER)",
+            post.created_at
+          )
         ],
         select: %{
           year:

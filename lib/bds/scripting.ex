@@ -63,8 +63,12 @@ defmodule BDS.Scripting do
            args,
            Keyword.put(opts, :timeout, timeout)
          ) do
-      {:ok, nil} -> {:ok, ""}
-      {:ok, value} -> {:ok, to_string(value)}
+      {:ok, nil} ->
+        {:ok, ""}
+
+      {:ok, value} ->
+        {:ok, to_string(value)}
+
       {:error, reason} ->
         Logger.warning("execute_macro failed for project #{project_id}: #{inspect(reason)}")
         {:error, reason}

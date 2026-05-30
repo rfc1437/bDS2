@@ -142,7 +142,8 @@ defmodule BDS.TemplateLookupPriorityTest do
 
   describe "BundledDefaultTemplatesExistOutsideProjectData" do
     test "single-post bundled template resolves with no Template rows", %{project: project} do
-      assert [] = BDS.Repo.all(from t in BDS.Templates.Template, where: t.project_id == ^project.id)
+      assert [] =
+               BDS.Repo.all(from t in BDS.Templates.Template, where: t.project_id == ^project.id)
 
       {:ok, source} = TemplateSelection.load_template_source(project.id, :post, nil)
 
@@ -150,7 +151,8 @@ defmodule BDS.TemplateLookupPriorityTest do
     end
 
     test "post-list bundled template resolves with no Template rows", %{project: project} do
-      assert [] = BDS.Repo.all(from t in BDS.Templates.Template, where: t.project_id == ^project.id)
+      assert [] =
+               BDS.Repo.all(from t in BDS.Templates.Template, where: t.project_id == ^project.id)
 
       {:ok, source} = TemplateSelection.load_template_source(project.id, :list, nil)
 
@@ -158,7 +160,8 @@ defmodule BDS.TemplateLookupPriorityTest do
     end
 
     test "not-found bundled template resolves with no Template rows", %{project: project} do
-      assert [] = BDS.Repo.all(from t in BDS.Templates.Template, where: t.project_id == ^project.id)
+      assert [] =
+               BDS.Repo.all(from t in BDS.Templates.Template, where: t.project_id == ^project.id)
 
       {:ok, source} = TemplateSelection.load_template_source(project.id, :not_found, nil)
 

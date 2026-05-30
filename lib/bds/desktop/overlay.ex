@@ -263,8 +263,13 @@ defmodule BDS.Desktop.Overlay do
   def set_ai_suggestions_error(overlay, _error_message), do: overlay
 
   defp normalize_ai_fields(fields) do
-    Enum.map(fields, fn %{key: key, label: label, current_value: current,
-                          suggested_value: suggested, locked: locked} = field ->
+    Enum.map(fields, fn %{
+                          key: key,
+                          label: label,
+                          current_value: current,
+                          suggested_value: suggested,
+                          locked: locked
+                        } = field ->
       %{
         key: to_string(key),
         label: label,

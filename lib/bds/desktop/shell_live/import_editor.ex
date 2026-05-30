@@ -642,7 +642,10 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   defp maybe_update_tab_meta(socket, name) do
     title = name || dgettext("ui", "Untitled Import")
 
-    Notify.tab_meta(:import, socket.assigns.definition_id, title,
+    Notify.tab_meta(
+      :import,
+      socket.assigns.definition_id,
+      title,
       dgettext(
         "ui",
         "Select a WordPress export file (WXR) and an uploads folder to analyze what would be imported."

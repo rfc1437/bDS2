@@ -100,7 +100,9 @@ defmodule BDS.Desktop.AutomationTest do
 
     assert :ok = Automation.reload(session)
 
-    snapshot = await(session, &(&1.sidebar_visible == true and &1.sidebar_width >= resized_width - 2))
+    snapshot =
+      await(session, &(&1.sidebar_visible == true and &1.sidebar_width >= resized_width - 2))
+
     assert snapshot.sidebar_visible == true
     assert snapshot.sidebar_width >= resized_width - 2
     assert snapshot.sidebar_width <= resized_width + 2

@@ -155,7 +155,9 @@ defmodule BDS.Embeddings.Backends.Neural do
   # Place model params/tensors on the Apple GPU (Metal) when accelerating with
   # EMLX so the compiled inference pass actually runs on-device. EXLA manages
   # its own device placement, so nothing to do there.
-  defp maybe_set_default_backend(:emlx), do: Nx.global_default_backend({EMLX.Backend, device: :gpu})
+  defp maybe_set_default_backend(:emlx),
+    do: Nx.global_default_backend({EMLX.Backend, device: :gpu})
+
   defp maybe_set_default_backend(:exla), do: :ok
 
   @doc false

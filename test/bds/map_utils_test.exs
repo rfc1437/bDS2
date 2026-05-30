@@ -83,9 +83,10 @@ defmodule BDS.MapUtilsTest do
     test "safe_atomize_keys does not create atoms for malicious payloads" do
       unique_suffix = :erlang.unique_integer()
 
-      malicious = for i <- 1..500, into: %{} do
-        {"csm001_malicious_#{i}_#{unique_suffix}", "val"}
-      end
+      malicious =
+        for i <- 1..500, into: %{} do
+          {"csm001_malicious_#{i}_#{unique_suffix}", "val"}
+        end
 
       result = MapUtils.safe_atomize_keys(malicious)
 

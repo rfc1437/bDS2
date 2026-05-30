@@ -24,12 +24,13 @@ defmodule BDS.CSM007ReloadShellTest do
     test "triggers no dashboard or git queries", %{project: _project} do
       {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
-      query_count = count_queries(fn ->
-        render_click(view, "toggle_sidebar", %{})
-      end)
+      query_count =
+        count_queries(fn ->
+          render_click(view, "toggle_sidebar", %{})
+        end)
 
       assert query_count == 0,
-        "Expected 0 DB queries for sidebar toggle, got #{query_count}"
+             "Expected 0 DB queries for sidebar toggle, got #{query_count}"
     end
   end
 
@@ -37,12 +38,13 @@ defmodule BDS.CSM007ReloadShellTest do
     test "triggers no DB queries" do
       {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
-      query_count = count_queries(fn ->
-        render_click(view, "toggle_panel", %{})
-      end)
+      query_count =
+        count_queries(fn ->
+          render_click(view, "toggle_panel", %{})
+        end)
 
       assert query_count == 0,
-        "Expected 0 DB queries for panel toggle, got #{query_count}"
+             "Expected 0 DB queries for panel toggle, got #{query_count}"
     end
   end
 
@@ -50,16 +52,17 @@ defmodule BDS.CSM007ReloadShellTest do
     test "triggers no DB queries" do
       {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
-      query_count = count_queries(fn ->
-        render_click(view, "sync_layout", %{
-          "sidebar_width" => "300",
-          "sidebar_visible" => "true",
-          "panel_visible" => "false"
-        })
-      end)
+      query_count =
+        count_queries(fn ->
+          render_click(view, "sync_layout", %{
+            "sidebar_width" => "300",
+            "sidebar_visible" => "true",
+            "panel_visible" => "false"
+          })
+        end)
 
       assert query_count == 0,
-        "Expected 0 DB queries for sync_layout, got #{query_count}"
+             "Expected 0 DB queries for sync_layout, got #{query_count}"
     end
   end
 
@@ -67,12 +70,13 @@ defmodule BDS.CSM007ReloadShellTest do
     test "triggers no DB queries" do
       {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
-      query_count = count_queries(fn ->
-        render_click(view, "select_panel_tab", %{"tab" => "output"})
-      end)
+      query_count =
+        count_queries(fn ->
+          render_click(view, "select_panel_tab", %{"tab" => "output"})
+        end)
 
       assert query_count == 0,
-        "Expected 0 DB queries for select_panel_tab, got #{query_count}"
+             "Expected 0 DB queries for select_panel_tab, got #{query_count}"
     end
   end
 
@@ -80,14 +84,15 @@ defmodule BDS.CSM007ReloadShellTest do
     test "triggers sidebar query but not dashboard or git queries" do
       {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
-      {query_count, query_sources} = count_queries_with_sources(fn ->
-        render_click(view, "select_view", %{"view" => "media"})
-      end)
+      {query_count, query_sources} =
+        count_queries_with_sources(fn ->
+          render_click(view, "select_view", %{"view" => "media"})
+        end)
 
       assert query_count > 0, "Expected at least 1 query for view change"
 
       refute "dashboard" in query_sources or "projects" in query_sources,
-        "View change should not query dashboard or projects, got: #{inspect(query_sources)}"
+             "View change should not query dashboard or projects, got: #{inspect(query_sources)}"
     end
   end
 
@@ -95,14 +100,15 @@ defmodule BDS.CSM007ReloadShellTest do
     test "do not trigger dashboard or git queries" do
       {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
-      {_count, query_sources} = count_queries_with_sources(fn ->
-        render_click(view, "update_sidebar_search", %{
-          "sidebar_filters" => %{"search" => "test"}
-        })
-      end)
+      {_count, query_sources} =
+        count_queries_with_sources(fn ->
+          render_click(view, "update_sidebar_search", %{
+            "sidebar_filters" => %{"search" => "test"}
+          })
+        end)
 
       refute "dashboard" in query_sources,
-        "Sidebar search should not query dashboard, got: #{inspect(query_sources)}"
+             "Sidebar search should not query dashboard, got: #{inspect(query_sources)}"
     end
   end
 
@@ -110,12 +116,13 @@ defmodule BDS.CSM007ReloadShellTest do
     test "triggers only the settings write, no refresh queries" do
       {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 
-      query_count = count_queries(fn ->
-        render_click(view, "toggle_offline_mode", %{})
-      end)
+      query_count =
+        count_queries(fn ->
+          render_click(view, "toggle_offline_mode", %{})
+        end)
 
       assert query_count == 1,
-        "Expected exactly 1 DB query (settings write) for offline mode toggle, got #{query_count}"
+             "Expected exactly 1 DB query (settings write) for offline mode toggle, got #{query_count}"
     end
   end
 

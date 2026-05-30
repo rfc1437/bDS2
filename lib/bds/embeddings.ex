@@ -584,7 +584,9 @@ defmodule BDS.Embeddings do
   end
 
   defp duplicate_pairs_with_rebuild(project_id, entries, on_progress) do
-    case Index.duplicate_pairs(project_id, entries, @duplicate_threshold, on_progress: on_progress) do
+    case Index.duplicate_pairs(project_id, entries, @duplicate_threshold,
+           on_progress: on_progress
+         ) do
       {:ok, pairs} ->
         {:ok, pairs}
 
