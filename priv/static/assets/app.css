@@ -2122,6 +2122,243 @@ button svg, button svg * {
     grid-template-columns: 1fr;
   }
 }
+.git-sidebar {
+  display: flex;
+  flex-direction: column;
+}
+.git-header {
+  padding: 8px 12px 12px;
+  border-bottom: 1px solid var(--vscode-sideBar-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.git-branch {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-sideBar-foreground);
+}
+.git-branch-icon {
+  font-size: 14px;
+  color: var(--vscode-descriptionForeground);
+  flex-shrink: 0;
+}
+.git-upstream {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+.git-ahead {
+  font-size: 11px;
+  color: var(--vscode-testing-iconPassed);
+}
+.git-behind {
+  font-size: 11px;
+  color: var(--vscode-notificationsInfoIcon-foreground);
+}
+.git-legend-item {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.git-sync-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.git-sync-synced {
+  background-color: var(--vscode-testing-iconPassed);
+}
+.git-sync-local_only {
+  background-color: var(--vscode-editorWarning-foreground);
+}
+.git-sync-remote_only {
+  background-color: var(--vscode-notificationsInfoIcon-foreground);
+}
+.git-actions {
+  border-bottom: 1px solid var(--vscode-sideBar-border);
+  padding: 8px 12px;
+}
+.git-action-button {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 11px;
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  text-align: center;
+}
+.git-action-button:hover:not(:disabled) {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+}
+.git-action-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.git-section {
+  padding: 0;
+}
+.git-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-sideBar-foreground);
+}
+.git-section-count {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+}
+.git-commit-form, .git-init-form {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-sideBar-border);
+}
+.git-commit-form input, .git-init-form input {
+  padding: 4px 8px;
+  font-size: 12px;
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border);
+  color: var(--vscode-input-foreground);
+  border-radius: 3px;
+}
+.git-commit-form input::placeholder, .git-init-form input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+.git-commit-form input:focus, .git-init-form input:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+}
+.git-commit-form .git-action-button, .git-init-form .git-action-button {
+  flex: 1;
+}
+.git-status-file {
+  width: 100%;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--vscode-sideBar-foreground);
+  cursor: pointer;
+  text-align: left;
+  font-size: 12px;
+}
+.git-status-file:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+.git-status-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.git-status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.git-status-added {
+  color: var(--vscode-testing-iconPassed);
+  background: var(--vscode-testing-iconPassed);
+  @supports (color: color-mix(in lab, red, red)) {
+    background: color-mix(in srgb, var(--vscode-testing-iconPassed) 15%, transparent);
+  }
+}
+.git-status-modified {
+  color: var(--vscode-editorWarning-foreground);
+  background: var(--vscode-editorWarning-foreground);
+  @supports (color: color-mix(in lab, red, red)) {
+    background: color-mix(in srgb, var(--vscode-editorWarning-foreground) 15%, transparent);
+  }
+}
+.git-status-deleted {
+  color: var(--vscode-errorForeground);
+  background: var(--vscode-errorForeground);
+  @supports (color: color-mix(in lab, red, red)) {
+    background: color-mix(in srgb, var(--vscode-errorForeground) 15%, transparent);
+  }
+}
+.git-status-renamed {
+  color: var(--vscode-notificationsInfoIcon-foreground);
+  background: var(--vscode-notificationsInfoIcon-foreground);
+  @supports (color: color-mix(in lab, red, red)) {
+    background: color-mix(in srgb, var(--vscode-notificationsInfoIcon-foreground) 15%, transparent);
+  }
+}
+.git-status-untracked {
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-descriptionForeground);
+  @supports (color: color-mix(in lab, red, red)) {
+    background: color-mix(in srgb, var(--vscode-descriptionForeground) 15%, transparent);
+  }
+}
+.git-history-entry {
+  width: 100%;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--vscode-sideBar-foreground);
+  cursor: pointer;
+  text-align: left;
+}
+.git-history-entry:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+.git-history-subject {
+  font-size: 12px;
+  color: var(--vscode-sideBar-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.git-history-meta {
+  margin-top: 2px;
+}
+.git-history-hash, .git-history-author, .git-history-date {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+}
+.git-history-hash {
+  font-family: var(--vscode-editor-font-family);
+}
+.git-history-more {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+}
+.git-not-a-repo {
+  padding: 12px;
+}
+.git-empty-hint {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  padding: 8px 12px;
+}
+.git-section + .git-section {
+  border-top: 1px solid var(--vscode-sideBar-border);
+}
+.git-header + .git-actions {
+  border-top: 1px solid var(--vscode-sideBar-border);
+}
 .tab-bar {
   display: flex;
   align-items: center;

@@ -7,6 +7,7 @@
 @import "./tokens.css";
 @import "./shell.css";
 @import "./sidebar.css";
+@import "./git_sidebar.css";
 @import "./tabs.css";
 @import "./editor.css";
 @import "./forms.css";
