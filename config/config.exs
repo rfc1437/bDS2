@@ -4,7 +4,9 @@ config :bds,
   ecto_repos: [BDS.Repo]
 
 config :bds, BDS.Repo,
-  database: Path.expand("../priv/data/bds_dev.db", __DIR__),
+  database:
+    System.get_env("BDS_DATABASE_PATH") ||
+      Path.expand("~/Library/Application Support/BDS2/bds_dev.db"),
   pool_size: 5,
   journal_mode: :wal,
   busy_timeout: 15_000,
@@ -20,6 +22,9 @@ config :bds, :desktop,
   window_min_size: {800, 600},
   title: "Blogging Desktop Server",
   secret_key_base: "bds_desktop_shell_secret_key_base_64_chars_minimum_seed_value_001"
+
+config :bds, :ai_secret_key,
+  "bds_desktop_shell_secret_key_base_64_chars_minimum_seed_value_001"
 
 config :bds, BDS.Desktop.Endpoint,
   url: [host: "127.0.0.1"],
@@ -80,7 +85,9 @@ config :bds, :embeddings,
 
 # Cache downloaded model files under the app data directory so they persist
 # across sessions (ModelCaching invariant). Overridden at runtime in prod.
-config :bumblebee, :cache_dir, Path.expand("../priv/data/models", __DIR__)
+config :bumblebee, :cache_dir,
+  System.get_env("BDS_MODEL_CACHE_DIR") ||
+    Path.expand("~/Library/Application Support/BDS2/models")
 
 config :logger, :console,
   format: "$time $metadata[$level] $message\n",

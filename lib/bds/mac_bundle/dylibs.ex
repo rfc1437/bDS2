@@ -76,21 +76,46 @@ defmodule BDS.MacBundle.Dylibs do
     File.mkdir_p!(frameworks_dir)
 
     with {:ok, {_seen, externals}} <- collect(nif_path, MapSet.new(), []) do
-      copied =
+      externals = Enum.reverse(externals)
+
+      {physical, logical_entries, _inode_map} =
         externals
-        |> Enum.reverse()
-        |> Enum.map(fn src ->
+        |> Enum.reduce({[], [], %{}}, fn src, {phys_acc, log_acc, inode_map} ->
           dest = Path.join(frameworks_dir, Path.basename(src))
-          File.cp!(src, dest)
-          File.chmod!(dest, 0o644)
-          {src, dest}
+
+          if File.exists?(dest) do
+            {phys_acc, [{src, dest} | log_acc], inode_map}
+          else
+            ino = file_inode(src)
+
+            case Map.get(inode_map, ino) do
+              nil ->
+                File.cp!(src, dest)
+                File.chmod!(dest, 0o644)
+                {[{src, dest} | phys_acc], [{src, dest} | log_acc],
+                 Map.put(inode_map, ino, dest)}
+
+              existing_dest ->
+                # Same inode already copied under a different name.
+                # Point this logical entry to the physical copy.
+                {phys_acc, [{src, existing_dest} | log_acc], inode_map}
+            end
+          end
         end)
 
+      copied = Enum.reverse(logical_entries)
+      physical = Enum.reverse(physical)
+
       with :ok <- rewrite(nif_path, copied, nif_loader_prefix),
-           :ok <- rewrite_each(copied) do
-        {:ok, Enum.map(copied, &elem(&1, 1))}
+           :ok <- rewrite_each(physical) do
+        {:ok, Enum.map(physical, &elem(&1, 1))}
       end
     end
+  end
+
+  defp file_inode(path) do
+    stat = File.stat!(path)
+    {stat.major_device, stat.inode}
   end
 
   # Depth-first transitive collection of external dependency paths. Returns
@@ -100,16 +125,17 @@ defmodule BDS.MacBundle.Dylibs do
       {:ok, deps} ->
         deps
         |> Enum.filter(&external?/1)
-        |> Enum.reject(&MapSet.member?(seen, &1))
         |> Enum.reduce_while({:ok, {seen, acc}}, fn dep, {:ok, {seen_acc, list_acc}} ->
-          seen_acc = MapSet.put(seen_acc, dep)
-
-          case collect(dep, seen_acc, [dep | list_acc]) do
-            {:ok, _} = ok -> {:cont, ok}
-            error -> {:halt, error}
+          if MapSet.member?(seen_acc, dep) do
+            {:cont, {:ok, {seen_acc, list_acc}}}
+          else
+            seen_acc = MapSet.put(seen_acc, dep)
+            case collect(dep, seen_acc, [dep | list_acc]) do
+              {:ok, _} = ok -> {:cont, ok}
+              error -> {:halt, error}
+            end
           end
         end)
-
       error ->
         error
     end

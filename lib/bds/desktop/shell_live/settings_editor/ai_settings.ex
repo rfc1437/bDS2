@@ -9,8 +9,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
 
   @spec ai_form(term()) :: term()
   def ai_form(assigns) do
-    {:ok, online_endpoint} = AI.get_endpoint(:online)
-    {:ok, airplane_endpoint} = AI.get_endpoint(:airplane)
+    online_endpoint = safe_endpoint(:online)
+    airplane_endpoint = safe_endpoint(:airplane)
 
     %{
       "online_url" => Map.get(online_endpoint || %{}, :url, ""),
@@ -165,6 +165,13 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
         socket
         |> append_output.(dgettext("ui", "AI Settings"), inspect(reason), nil, "error")
         |> reload.(socket.assigns.workbench)
+    end
+  end
+
+  defp safe_endpoint(kind) do
+    case AI.get_endpoint(kind) do
+      {:ok, ep} -> ep
+      _error -> nil
     end
   end
 

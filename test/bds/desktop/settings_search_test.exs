@@ -2,6 +2,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.SettingsSearchTest do
   use ExUnit.Case, async: false
 
   alias BDS.Desktop.ShellLive.SettingsEditor
+  alias BDS.Repo
+  alias BDS.Settings.Setting
 
   describe "build_settings/1 — search filter" do
     setup do
@@ -109,6 +111,64 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.SettingsSearchTest do
   describe "build_settings/1 — returns nil without active project" do
     test "returns nil when active_project_id is nil" do
       assert SettingsEditor.build_settings(%{projects: %{active_project_id: nil}}) == nil
+    end
+  end
+
+  describe "build_settings/1 — handles undecryptable API key gracefully" do
+    setup do
+      :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+      temp_dir =
+        Path.join(System.tmp_dir!(), "bds-settings-cipher-#{System.unique_integer([:positive])}")
+
+      File.mkdir_p!(temp_dir)
+
+      on_exit(fn -> File.rm_rf(temp_dir) end)
+
+      {:ok, project} =
+        BDS.Projects.create_project(%{name: "CipherTest", data_path: temp_dir})
+
+      now = DateTime.utc_now() |> DateTime.to_unix(:millisecond)
+
+      Repo.insert!(%Setting{
+        key: "ai.online.url",
+        value: "https://example.com",
+        updated_at: now
+      })
+
+      Repo.insert!(%Setting{
+        key: "ai.online.model",
+        value: "gpt-4",
+        updated_at: now
+      })
+
+      Repo.insert!(%Setting{
+        key: "__encrypted_ai.online.api_key",
+        value: "NOT_VALID_BASE64",
+        updated_at: now
+      })
+
+      %{project: project, temp_dir: temp_dir}
+    end
+
+    test "does not crash when encrypted API key cannot be decrypted", %{
+      project: project,
+      temp_dir: temp_dir
+    } do
+      result =
+        SettingsEditor.build_settings(%{
+          projects: %{active_project_id: project.id},
+          current_project: %{data_path: temp_dir},
+          settings_editor_search: "",
+          settings_editor_project_draft: %{},
+          settings_editor_editor_draft: %{},
+          settings_editor_ai_draft: %{},
+          settings_editor_publishing_draft: %{},
+          current_tab: %{type: :settings, id: "settings"},
+          tab_meta: %{}
+        })
+
+      assert is_map(result)
+      assert result.ai_visible?
     end
   end
 end

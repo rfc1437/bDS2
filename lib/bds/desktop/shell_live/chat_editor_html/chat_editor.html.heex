@@ -154,7 +154,7 @@
 
       <form class="chat-input-wrapper flex items-end gap-2" phx-change="change_chat_editor_input" phx-submit="send_chat_editor_message" phx-target={@myself}>
         <textarea class="chat-input chat-surface-input ui-textarea" name="message" rows="1" placeholder={dgettext("ui", "Type a message...")} disabled={@chat_editor.is_streaming}><%= @chat_editor.input %></textarea>
-        <button class="chat-send-button ui-button ui-button-primary" data-testid="chat-send-button" type="button" phx-click="send_chat_editor_message" phx-target={@myself} disabled={@chat_editor.send_disabled?}>↑</button>
+        <button class="chat-send-button ui-button ui-button-primary" data-testid="chat-send-button" type="button" phx-click="send_chat_editor_message" phx-target={@myself}>↑</button>
       </form>
 
       <%= if @chat_editor.action_error do %>

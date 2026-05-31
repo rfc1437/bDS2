@@ -398,15 +398,6 @@ defmodule BDS.Desktop.ShellLive do
   def handle_event("overlay_confirm", params, socket),
     do: OverlayManager.handle_event("overlay_confirm", params, socket, overlay_callbacks())
 
-  def handle_event("overlay_select_gallery_image", params, socket),
-    do:
-      OverlayManager.handle_event(
-        "overlay_select_gallery_image",
-        params,
-        socket,
-        overlay_callbacks()
-      )
-
   def handle_event("overlay_close_lightbox", params, socket),
     do: OverlayManager.handle_event("overlay_close_lightbox", params, socket, overlay_callbacks())
 

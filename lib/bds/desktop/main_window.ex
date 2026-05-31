@@ -190,7 +190,7 @@ defmodule BDS.Desktop.MainWindow do
   end
 
   defp config_dir do
-    case :filename.basedir(:user_config, "bds") do
+    case :filename.basedir(:user_config, "BDS2") do
       path when is_list(path) -> List.to_string(path)
       path -> path
     end

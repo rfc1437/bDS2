@@ -119,7 +119,7 @@ defmodule BDS.ProjectsTest do
 
   test "project_cache_dir never falls back into the project data directory" do
     # Private app-internal artifacts (the embeddings index) must live under the
-    # OS private app directory (macOS: ~/Library/Application Support/bds), never
+    # OS private app directory (macOS: ~/Library/Application Support/BDS2), never
     # inside priv/data/projects/<id> — leaving them in the project tree pollutes
     # the repository.
     saved = Application.get_env(:bds, :project_cache_root)
@@ -134,7 +134,7 @@ defmodule BDS.ProjectsTest do
     refute String.starts_with?(cache_dir, Path.expand("../../priv/data", __DIR__))
 
     private_app_dir =
-      case :filename.basedir(:user_config, "bds") do
+      case :filename.basedir(:user_config, "BDS2") do
         path when is_list(path) -> List.to_string(path)
         path -> path
       end

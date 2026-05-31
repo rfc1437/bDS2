@@ -9143,6 +9143,8 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
     mounted() {
       this.stickToBottom = true;
       this.scrollContainer = null;
+      this._enterKeyHandled = false;
+      this._prevInputValue = "";
       this.autoResize = () => {
         const textarea = this.el.querySelector(".chat-input");
         if (!textarea) {
@@ -9202,10 +9204,30 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
         const distanceFromBottom = this.scrollContainer.scrollHeight - this.scrollContainer.scrollTop - this.scrollContainer.clientHeight;
         this.stickToBottom = distanceFromBottom < 48;
       };
+      this._submitChat = () => {
+        const form = this.el.querySelector(".chat-input-wrapper");
+        if (form && typeof form.requestSubmit === "function") {
+          form.requestSubmit();
+        } else {
+          const sendButton = this.el.querySelector("[data-testid='chat-send-button']");
+          if (sendButton) sendButton.click();
+        }
+      };
       this.handleInput = (event) => {
         if (!event.target.closest(".chat-input")) {
           return;
         }
+        const textarea = event.target;
+        if (!this._enterKeyHandled && textarea.value.includes("\n") && !this._prevInputValue.includes("\n")) {
+          textarea.value = textarea.value.replace(/\n/g, "");
+          this._prevInputValue = textarea.value;
+          this.stickToBottom = true;
+          this.autoResize();
+          this._submitChat();
+          return;
+        }
+        this._enterKeyHandled = false;
+        this._prevInputValue = textarea.value;
         this.stickToBottom = true;
         this.autoResize();
       };
@@ -9215,10 +9237,8 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
         }
         if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
           event.preventDefault();
-          const sendButton = this.el.querySelector("[data-testid='chat-send-button']");
-          if (sendButton && !sendButton.disabled) {
-            sendButton.click();
-          }
+          this._enterKeyHandled = true;
+          this._submitChat();
         }
       };
       this.el.addEventListener("input", this.handleInput);

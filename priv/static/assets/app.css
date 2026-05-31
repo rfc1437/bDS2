@@ -1076,13 +1076,15 @@ button svg, button svg * {
   background: transparent;
   color: inherit;
   cursor: pointer;
-  opacity: 0.4;
   font-size: 13px;
   padding: 0 4px;
 }
 .status-bar-item.offline-badge.active {
-  background-color: rgba(255, 196, 0, 0.28);
+  background-color: #e6a800;
+  color: #000;
+  font-weight: 600;
   opacity: 1;
+  border-radius: 3px;
 }
 .project-selector {
   position: relative;
