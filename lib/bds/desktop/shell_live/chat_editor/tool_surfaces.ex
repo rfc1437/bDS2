@@ -104,7 +104,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
       id: surface_id,
       type: "chart",
       title: map_value(arguments, "title"),
-      chart_type: map_value(arguments, "chart_type", "bar"),
+      chart_type: map_value(arguments, "chartType") || map_value(arguments, "chart_type", "bar"),
       series: series,
       max_value: Enum.max([0 | Enum.map(series, & &1.value)])
     }

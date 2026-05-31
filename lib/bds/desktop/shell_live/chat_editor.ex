@@ -738,21 +738,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
             <% "heatmap" -> %>
               <% heat = BDS.Desktop.ShellLive.ChatEditor.ChartView.heatmap(@surface.series) %>
-              <%= if heat.rows == [] do %>
-                <div class="chat-surface-chart-list">
-                  <%= for series <- @surface.series do %>
-                    <div class="chat-surface-chart-row">
-                      <div class="chat-surface-chart-meta">
-                        <span><%= series.label %></span>
-                        <span><%= series.value %></span>
-                      </div>
-                      <div class="chat-surface-chart-bar">
-                        <span style={"width: #{chart_width(@surface.max_value, series.value)}%"}></span>
-                      </div>
-                    </div>
-                  <% end %>
-                </div>
-              <% else %>
+              <%= if heat.rows != [] do %>
                 <div class="chat-surface-chart-heatmap" style={"grid-template-columns: auto repeat(#{heat.column_count}, 1fr)"}>
                   <span class="chat-surface-chart-heatmap-corner"></span>
                   <%= for col <- heat.columns do %>
