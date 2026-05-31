@@ -803,10 +803,40 @@ defmodule BDS.AI.ChatTools do
     %{
       "type" => "object",
       "properties" => %{
-        "title" => %{"type" => "string"},
-        "fields" => %{"type" => "array"},
-        "submitLabel" => %{"type" => "string"},
-        "submitAction" => %{"type" => "string"}
+        "title" => %{"type" => "string", "description" => "Optional form title"},
+        "fields" => %{
+          "type" => "array",
+          "description" => "Form fields to display",
+          "items" => %{
+            "type" => "object",
+            "properties" => %{
+              "key" => %{"type" => "string", "description" => "Field identifier"},
+              "label" => %{"type" => "string", "description" => "Field label shown to user"},
+              "inputType" => %{
+                "type" => "string",
+                "enum" => ["text", "textarea", "select", "checkbox", "date", "number"],
+                "description" => "Type of input control"
+              },
+              "placeholder" => %{"type" => "string", "description" => "Placeholder text"},
+              "defaultValue" => %{"type" => "string", "description" => "Default value"},
+              "options" => %{
+                "type" => "array",
+                "description" => "Options for select fields",
+                "items" => %{
+                  "type" => "object",
+                  "properties" => %{
+                    "label" => %{"type" => "string"},
+                    "value" => %{"type" => "string"}
+                  }
+                }
+              },
+              "required" => %{"type" => "boolean", "description" => "Whether the field is required"}
+            },
+            "required" => ["key", "label", "inputType"]
+          }
+        },
+        "submitLabel" => %{"type" => "string", "description" => "Label for the submit button"},
+        "submitAction" => %{"type" => "string", "description" => "Action to dispatch on submit"}
       }
     }
   end
@@ -815,10 +845,25 @@ defmodule BDS.AI.ChatTools do
     %{
       "type" => "object",
       "properties" => %{
-        "title" => %{"type" => "string"},
-        "subtitle" => %{"type" => "string"},
-        "body" => %{"type" => "string"},
-        "actions" => %{"type" => "array"}
+        "title" => %{"type" => "string", "description" => "Card title"},
+        "subtitle" => %{"type" => "string", "description" => "Optional subtitle"},
+        "body" => %{"type" => "string", "description" => "Card body text (supports markdown)"},
+        "actions" => %{
+          "type" => "array",
+          "description" => "Optional action buttons on the card",
+          "items" => %{
+            "type" => "object",
+            "properties" => %{
+              "label" => %{"type" => "string", "description" => "Button label"},
+              "action" => %{"type" => "string", "description" => "Action name to dispatch"},
+              "payload" => %{
+                "type" => "object",
+                "description" => "Optional action payload"
+              }
+            },
+            "required" => ["label", "action"]
+          }
+        }
       }
     }
   end
@@ -827,8 +872,8 @@ defmodule BDS.AI.ChatTools do
     %{
       "type" => "object",
       "properties" => %{
-        "label" => %{"type" => "string"},
-        "value" => %{"type" => "string"}
+        "label" => %{"type" => "string", "description" => "Metric label"},
+        "value" => %{"type" => "string", "description" => "Metric value (displayed prominently)"}
       }
     }
   end
@@ -837,8 +882,12 @@ defmodule BDS.AI.ChatTools do
     %{
       "type" => "object",
       "properties" => %{
-        "title" => %{"type" => "string"},
-        "items" => %{"type" => "array"}
+        "title" => %{"type" => "string", "description" => "Optional list title"},
+        "items" => %{
+          "type" => "array",
+          "items" => %{"type" => "string"},
+          "description" => "List items"
+        }
       }
     }
   end
@@ -847,8 +896,58 @@ defmodule BDS.AI.ChatTools do
     %{
       "type" => "object",
       "properties" => %{
-        "title" => %{"type" => "string"},
-        "tabs" => %{"type" => "array"}
+        "title" => %{"type" => "string", "description" => "Optional tabs title"},
+        "tabs" => %{
+          "type" => "array",
+          "description" => "Array of tabs",
+          "items" => %{
+            "type" => "object",
+            "properties" => %{
+              "label" => %{"type" => "string", "description" => "Tab label"},
+              "content" => %{
+                "type" => "array",
+                "description" => "Content items within the tab",
+                "items" => %{
+                  "type" => "object",
+                  "properties" => %{
+                    "type" => %{
+                      "type" => "string",
+                      "enum" => ["text", "metric", "list", "chart", "table"],
+                      "description" => "Content type"
+                    },
+                    "text" => %{"type" => "string", "description" => "Text content (for type text)"},
+                    "label" => %{"type" => "string", "description" => "Label (for type metric)"},
+                    "value" => %{"type" => "string", "description" => "Display value (for type metric)"},
+                    "title" => %{"type" => "string", "description" => "Title (for type list, chart, or table)"},
+                    "items" => %{
+                      "type" => "array", "items" => %{"type" => "string"},
+                      "description" => "Items (for type list)"
+                    },
+                    "chartType" => %{
+                      "type" => "string",
+                      "enum" => ["bar", "stacked-bar", "line", "area", "pie", "donut", "heatmap"],
+                      "description" => "Chart type (for type chart)"
+                    },
+                    "series" => %{
+                      "type" => "array",
+                      "description" => "Data series (for type chart)"
+                    },
+                    "columns" => %{
+                      "type" => "array", "items" => %{"type" => "string"},
+                      "description" => "Column headers (for type table)"
+                    },
+                    "rows" => %{
+                      "type" => "array", "items" => %{"type" => "array", "items" => %{"type" => "string"}},
+                      "description" => "Table rows (for type table)"
+                    }
+                  },
+                  "required" => ["type"]
+                }
+              }
+            },
+            "required" => ["label", "content"]
+          }
+        }
       }
     }
   end
@@ -857,8 +956,24 @@ defmodule BDS.AI.ChatTools do
     %{
       "type" => "object",
       "properties" => %{
-        "title" => %{"type" => "string"},
-        "nodes" => %{"type" => "array"}
+        "title" => %{"type" => "string", "description" => "Optional mind map title"},
+        "nodes" => %{
+          "type" => "array",
+          "description" => "Flat array of nodes. The first node is the root. Each node references children by ID.",
+          "items" => %{
+            "type" => "object",
+            "properties" => %{
+              "id" => %{"type" => "string", "description" => "Unique node identifier"},
+              "label" => %{"type" => "string", "description" => "Node label text"},
+              "children" => %{
+                "type" => "array",
+                "items" => %{"type" => "string"},
+                "description" => "IDs of child nodes"
+              }
+            },
+            "required" => ["id", "label"]
+          }
+        }
       }
     }
   end

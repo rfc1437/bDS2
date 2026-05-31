@@ -786,15 +786,16 @@ defmodule BDS.AI.Chat do
         "- Use list_tags, list_categories, and count_posts for taxonomy and grouped analytics questions.",
         "If a requested blog fact is available through these tools, call the tool instead of saying you cannot access the data.",
         "",
-        "Available UI Render Tools:",
-        "- Use render_chart to show data as a bar, stacked-bar, line, area, pie, donut, or heatmap chart. Use it when presenting statistics or comparisons. Prefer heatmap over tables with emoji or color indicators for intensity grids or calendar-style activity.",
-        "- Use render_table for tabular data, comparisons, and structured listings.",
-        "- Use render_form to collect structured user input.",
-        "- Use render_card for summaries, highlights, or actionable items.",
-        "- Use render_metric for a single KPI or important statistic.",
-        "- Use render_list for bullet lists, checklists, or simple enumerations.",
-        "- Use render_tabs to organize multiple views into switchable tabs; tab content can contain text, metrics, lists, charts, and tables.",
-        "When presenting data, statistics, or comparisons, prefer render tools over plain text. When building any visualization, render it as soon as you have enough data."
+        "Available UI Render Tools (use these to show rich interactive elements):",
+        "- render_chart: Show data as a bar, stacked-bar, line, area, pie, donut, or heatmap chart. Use when presenting statistics or comparisons. Use stacked-bar when each bar has multiple segments (e.g., published vs draft posts per year). Use area for cumulative or trend data where the filled region emphasizes volume. Use donut for proportional breakdowns with a total displayed in the center. Use heatmap for grid/matrix visualizations where color intensity shows magnitude — e.g., posts per month across years (each series entry is a row like a year, each segment is a column like a month), or a calendar view where rows are weekdays and columns are week numbers. ALWAYS prefer heatmap over a table with emojis or color indicators when showing intensity grids or calendar-style activity views. IMPORTANT: a heatmap needs structured data — each entry in 'series' is a ROW and must include a 'segments' array whose entries are the COLUMNS (every segment needs a 'label' and a numeric 'value'); the row's own 'value' is ignored. Plan what the rows and columns represent before fetching data (e.g. rows = years, columns = months). A heatmap sent without segments renders empty.",
+        "- render_table: Show data in a structured table. Use for tabular comparisons and listings.",
+        "- render_form: Show an interactive form to collect user input (e.g., metadata edits, settings).",
+        "- render_card: Show an information card with title, body, and action buttons.",
+        "- render_metric: Show a single KPI or statistic prominently.",
+        "- render_list: Show a bulleted list of items.",
+        "- render_tabs: Organize information into switchable tabs. Tab content supports all content types: text, metrics, lists, charts, and tables.",
+        "",
+        "When presenting data, statistics, or comparisons, prefer using render tools (render_chart, render_table, render_metric) to show rich interactive UI instead of plain text. When you need user input for a multi-field operation, use render_form to present a structured form. Use render_card with action buttons when presenting items the user might want to navigate to (e.g., posts, media). When comparing data across multiple dimensions (e.g., statistics per year), use render_tabs with embedded charts or tables in each tab. When building any visualization, render it as soon as you have enough data."
       ],
       "\n"
     )

@@ -272,6 +272,129 @@
   transition: width 0.3s ease;
 }
 
+/* Stacked bars: segments sit side by side inside the track. */
+.chat-surface-chart-bar-stacked {
+  display: flex;
+}
+
+.chat-surface-chart-bar-segment {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  transition: width 0.3s ease;
+}
+
+/* Shared legend (pie/donut/stacked-bar). */
+.chat-surface-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.chat-surface-chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.chat-surface-chart-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* Pie / donut. */
+.chat-surface-chart-pie {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-surface-chart-pie-svg {
+  width: 140px;
+  height: 140px;
+}
+
+.chat-surface-chart-pie-slice {
+  stroke: var(--vscode-editor-background, #1e1e1e);
+  stroke-width: 1;
+}
+
+.chat-surface-chart-donut-hole {
+  fill: var(--vscode-editor-background, #1e1e1e);
+}
+
+.chat-surface-chart-donut-total {
+  fill: var(--vscode-editor-foreground);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Line / area. */
+.chat-surface-chart-line-svg {
+  width: 100%;
+  height: auto;
+}
+
+.chat-surface-chart-line-grid {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+}
+
+.chat-surface-chart-line-y-label,
+.chat-surface-chart-line-x-label {
+  fill: var(--vscode-descriptionForeground);
+  font-size: 9px;
+}
+
+.chat-surface-chart-line-path {
+  stroke: var(--accent-color);
+  stroke-width: 2;
+}
+
+.chat-surface-chart-area-fill {
+  fill: var(--accent-color);
+  opacity: 0.18;
+}
+
+.chat-surface-chart-line-dot {
+  fill: var(--accent-color);
+}
+
+/* Heatmap. */
+.chat-surface-chart-heatmap {
+  display: grid;
+  gap: 2px;
+  font-size: 10px;
+}
+
+.chat-surface-chart-heatmap-col-label,
+.chat-surface-chart-heatmap-row-label {
+  display: flex;
+  align-items: center;
+  padding: 2px 4px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.chat-surface-chart-heatmap-col-label {
+  justify-content: center;
+}
+
+.chat-surface-chart-heatmap-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 4px 2px;
+  border-radius: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Card surface ──────────────────────────────────────────────────── */
 
 .chat-surface-card {

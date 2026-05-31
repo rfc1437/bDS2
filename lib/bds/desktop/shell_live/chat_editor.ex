@@ -684,19 +684,130 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
             <h3><%= @surface.title %></h3>
           <% end %>
           <p class="chat-surface-chart-type"><%= @surface.chart_type %></p>
-          <div class="chat-surface-chart-list">
-            <%= for series <- @surface.series do %>
-              <div class="chat-surface-chart-row">
-                <div class="chat-surface-chart-meta">
-                  <span><%= series.label %></span>
-                  <span><%= series.value %></span>
-                </div>
-                <div class="chat-surface-chart-bar">
-                  <span style={"width: #{chart_width(@surface.max_value, series.value)}%"}></span>
+          <%= case @surface.chart_type do %>
+            <% chart_type when chart_type in ["pie", "donut"] -> %>
+              <% pie = BDS.Desktop.ShellLive.ChatEditor.ChartView.pie(@surface.series) %>
+              <div class="chat-surface-chart-pie">
+                <svg class="chat-surface-chart-pie-svg" viewBox={"0 0 #{pie.size} #{pie.size}"} preserveAspectRatio="xMidYMid meet">
+                  <%= for slice <- pie.slices do %>
+                    <%= if slice.full_circle do %>
+                      <circle class="chat-surface-chart-pie-slice" cx={pie.center} cy={pie.center} r={pie.radius} fill={slice.color}>
+                        <title><%= slice.label %>: <%= slice.value %></title>
+                      </circle>
+                    <% else %>
+                      <path class="chat-surface-chart-pie-slice" d={slice.d} fill={slice.color}>
+                        <title><%= slice.label %>: <%= slice.value %></title>
+                      </path>
+                    <% end %>
+                  <% end %>
+                  <%= if @surface.chart_type == "donut" do %>
+                    <circle class="chat-surface-chart-donut-hole" cx={pie.center} cy={pie.center} r={pie.donut_inner} />
+                    <text class="chat-surface-chart-donut-total" x={pie.center} y={pie.center} text-anchor="middle" dominant-baseline="central"><%= pie.total %></text>
+                  <% end %>
+                </svg>
+                <div class="chat-surface-chart-legend">
+                  <%= for item <- pie.legend do %>
+                    <span class="chat-surface-chart-legend-item">
+                      <span class="chat-surface-chart-legend-swatch" style={"background-color: #{item.color}"}></span>
+                      <%= item.label %>
+                    </span>
+                  <% end %>
                 </div>
               </div>
-            <% end %>
-          </div>
+
+            <% chart_type when chart_type in ["line", "area"] -> %>
+              <% line = BDS.Desktop.ShellLive.ChatEditor.ChartView.line(@surface.series, @surface.chart_type == "area") %>
+              <svg class="chat-surface-chart-line-svg" viewBox={line.view_box} preserveAspectRatio="xMidYMid meet">
+                <%= for tick <- line.grid do %>
+                  <line class="chat-surface-chart-line-grid" x1={tick.x1} y1={tick.y} x2={tick.x2} y2={tick.y} />
+                  <text class="chat-surface-chart-line-y-label" x={tick.label_x} y={tick.y} text-anchor="end" dominant-baseline="middle"><%= tick.label %></text>
+                <% end %>
+                <%= if line.area? do %>
+                  <polygon class="chat-surface-chart-area-fill" points={line.area_points} />
+                <% end %>
+                <polyline class="chat-surface-chart-line-path" points={line.polyline} fill="none" />
+                <%= for dot <- line.dots do %>
+                  <circle class="chat-surface-chart-line-dot" cx={dot.x} cy={dot.y} r="3">
+                    <title><%= dot.label %>: <%= dot.value %></title>
+                  </circle>
+                <% end %>
+                <%= for label <- line.x_labels do %>
+                  <text class="chat-surface-chart-line-x-label" x={label.x} y={label.y} text-anchor="middle"><%= label.label %></text>
+                <% end %>
+              </svg>
+
+            <% "heatmap" -> %>
+              <% heat = BDS.Desktop.ShellLive.ChatEditor.ChartView.heatmap(@surface.series) %>
+              <%= if heat.rows == [] do %>
+                <div class="chat-surface-chart-list">
+                  <%= for series <- @surface.series do %>
+                    <div class="chat-surface-chart-row">
+                      <div class="chat-surface-chart-meta">
+                        <span><%= series.label %></span>
+                        <span><%= series.value %></span>
+                      </div>
+                      <div class="chat-surface-chart-bar">
+                        <span style={"width: #{chart_width(@surface.max_value, series.value)}%"}></span>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              <% else %>
+                <div class="chat-surface-chart-heatmap" style={"grid-template-columns: auto repeat(#{heat.column_count}, 1fr)"}>
+                  <span class="chat-surface-chart-heatmap-corner"></span>
+                  <%= for col <- heat.columns do %>
+                    <span class="chat-surface-chart-heatmap-col-label"><%= col %></span>
+                  <% end %>
+                  <%= for row <- heat.rows do %>
+                    <span class="chat-surface-chart-heatmap-row-label"><%= row.label %></span>
+                    <%= for cell <- row.cells do %>
+                      <span class="chat-surface-chart-heatmap-cell" style={"background: #{cell.bg}; color: #{cell.fg}"} title={cell.value}><%= if cell.value > 0, do: cell.value %></span>
+                    <% end %>
+                  <% end %>
+                </div>
+              <% end %>
+
+            <% "stacked-bar" -> %>
+              <% stacked = BDS.Desktop.ShellLive.ChatEditor.ChartView.stacked(@surface.series) %>
+              <div class="chat-surface-chart-list">
+                <%= for row <- stacked.rows do %>
+                  <div class="chat-surface-chart-row">
+                    <div class="chat-surface-chart-meta">
+                      <span><%= row.label %></span>
+                      <span><%= row.total %></span>
+                    </div>
+                    <div class="chat-surface-chart-bar chat-surface-chart-bar-stacked">
+                      <%= for seg <- row.segments do %>
+                        <span class="chat-surface-chart-bar-segment" style={"width: #{seg.width}%; background-color: #{seg.color}"} title={"#{seg.label}: #{seg.value}"}></span>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+              <div class="chat-surface-chart-legend">
+                <%= for item <- stacked.legend do %>
+                  <span class="chat-surface-chart-legend-item">
+                    <span class="chat-surface-chart-legend-swatch" style={"background-color: #{item.color}"}></span>
+                    <%= item.label %>
+                  </span>
+                <% end %>
+              </div>
+
+            <% _bar -> %>
+              <div class="chat-surface-chart-list">
+                <%= for series <- @surface.series do %>
+                  <div class="chat-surface-chart-row">
+                    <div class="chat-surface-chart-meta">
+                      <span><%= series.label %></span>
+                      <span><%= series.value %></span>
+                    </div>
+                    <div class="chat-surface-chart-bar">
+                      <span style={"width: #{chart_width(@surface.max_value, series.value)}%"}></span>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+          <% end %>
 
         <% "metric" -> %>
           <div class="chat-surface-metric">

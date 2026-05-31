@@ -87,7 +87,16 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
         %{
           label: map_value(entry, "label", dgettext("ui", "Assistant")),
           value: numeric_value(map_value(entry, "value", 0)),
-          segments: List.wrap(map_value(entry, "segments", []))
+          segments:
+            entry
+            |> map_value("segments", [])
+            |> List.wrap()
+            |> Enum.map(fn segment ->
+              %{
+                label: map_value(segment, "label", ""),
+                value: numeric_value(map_value(segment, "value", 0))
+              }
+            end)
         }
       end)
 
