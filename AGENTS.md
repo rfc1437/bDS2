@@ -29,6 +29,7 @@ This document provides context and best practices for GitHub Copilot when workin
 - when changing the spec, validate the spec with the available command line tool.
 - you MUST run tests with command line tools at least once to capture compile errors in tests, do not use the integrated testing of vscode, as that blocks on compile errors
 - you MUST run build, test and check dialyzer messages and you MUST treet warnings as errors and fix them. we want clean builds, clean tests and clean dialyzer results
+- on a headless Linux machine, you have to run tests with this command (if mix test complains about DISPLAX): xvfb-run mix test
 
 ---
 
