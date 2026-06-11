@@ -168,9 +168,22 @@ concurrent-first-use race is impossible by construction.
 
 ---
 
-### TD-04: Flush embedding indexes on shutdown (or delete the dead `flush_all`)
+### TD-04: Flush embedding indexes on shutdown (or delete the dead `flush_all`) ✅ DONE (2026-06-11)
 
 **Severity: Medium (perf/contract), High confidence.**
+
+**Status: implemented.** `Shutdown.persist_safely/0` now calls
+`BDS.Embeddings.Index.flush_all()` next to `MainWindow.persist_now()`; each
+persist step is hardened individually (own rescue/catch) so one failure never
+blocks quit or skips the other step. `terminate/2` stays as defense-in-depth
+for supervised restarts. A test proves a debounced (unsaved) index reaches
+disk through the real shutdown path before the hard quit fires. The
+`terminate/2` audit found no other graceful-shutdown dependency:
+`job_runner.ex` only detaches in-memory state (moot under SIGKILL),
+`automation.ex` is the test-automation harness whose ports die with the VM,
+and `main_window.ex` bounds persistence was already covered by
+`MainWindow.persist_now()` in the shutdown path. The code now matches the
+spec's DebouncedPersistence invariant (`specs/embedding.allium:216`).
 
 **Context.** App shutdown SIGKILLs the BEAM (`BDS.Desktop.Shutdown.quit/0` —
 a documented and legitimate workaround for a wxWidgets static-destructor

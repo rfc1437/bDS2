@@ -256,6 +256,39 @@ defmodule BDS.DesktopTest do
     assert_receive :window_quit_requested
   end
 
+  test "app-owned shutdown flushes pending embedding index saves before hard quit" do
+    previous_module = Application.get_env(:bds, :desktop_shutdown_module)
+    previous_quit_module = Application.get_env(:bds, :desktop_window_quit_module)
+    previous_pid = Application.get_env(:bds, :desktop_shutdown_test_pid)
+
+    Application.put_env(:bds, :desktop_shutdown_module, BDS.Desktop.Shutdown)
+    Application.put_env(:bds, :desktop_window_quit_module, FakeWindowQuit)
+    Application.put_env(:bds, :desktop_shutdown_test_pid, self())
+
+    project_id = "shutdown-flush-#{System.unique_integer([:positive])}"
+    index_path = BDS.Embeddings.Index.path(project_id)
+
+    on_exit(fn ->
+      restore_env(:desktop_shutdown_module, previous_module)
+      restore_env(:desktop_window_quit_module, previous_quit_module)
+      restore_env(:desktop_shutdown_test_pid, previous_pid)
+      :ok = BDS.Embeddings.Index.forget(project_id)
+      File.rm_rf(Path.dirname(index_path))
+    end)
+
+    vector = for offset <- 1..384, into: <<>>, do: <<:math.sin(offset)::float-32-little>>
+    :ok = BDS.Embeddings.Index.put(project_id, 384, [%{label: 1, post_id: 101, vector: vector}])
+
+    # the save is debounced; without a shutdown flush nothing is on disk yet
+    refute File.exists?(index_path)
+
+    assert :ok = BDS.Desktop.Shutdown.request_quit()
+    # quit is the final shutdown step, so persistence has completed by now
+    assert_receive :window_quit_requested
+
+    assert File.exists?(index_path)
+  end
+
   test "the app owns final termination instead of delegating to Desktop.Window/System.halt" do
     # Desktop.Window.quit/0 routes through System.halt/1, which runs the wx C++
     # static destructors on exit and crashes on macOS. The app-owned shutdown

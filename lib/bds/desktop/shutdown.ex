@@ -89,8 +89,17 @@ defmodule BDS.Desktop.Shutdown do
     :ok
   end
 
+  # quit/0 SIGKILLs the BEAM, so no terminate/2 callback ever runs on shutdown;
+  # everything that must reach disk has to be flushed here. Each step is
+  # hardened individually so one failure never blocks quit or the other steps.
   defp persist_safely do
-    MainWindow.persist_now()
+    persist_step(fn -> MainWindow.persist_now() end)
+    persist_step(fn -> BDS.Embeddings.Index.flush_all() end)
+    :ok
+  end
+
+  defp persist_step(fun) do
+    fun.()
     :ok
   rescue
     _error -> :ok
