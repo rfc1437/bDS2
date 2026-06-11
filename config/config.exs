@@ -67,7 +67,13 @@ config :bds, :scripting,
   transform_max_toasts_total: 20,
   transform_max_toast_length: 300
 
-config :bds, :chat, max_tool_rounds: 10
+# streaming: chat completions use SSE when the provider supports it (set to
+# false for OpenAI-compatible servers that reject the "stream" flag).
+# stream_emit_interval_ms throttles how often streamed content reaches the UI.
+config :bds, :chat,
+  max_tool_rounds: 10,
+  streaming: true,
+  stream_emit_interval_ms: 100
 
 config :bds, :embeddings,
   backend: BDS.Embeddings.Backends.Neural,

@@ -565,9 +565,10 @@ defmodule BDS.AI.Chat do
          rounds_left
        ) do
     request = build_chat_request(conversation, messages, model, project_id, tools)
+    generate_opts = put_stream_callback(opts, conversation.id)
 
     with {:ok, response} <-
-           runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts),
+           runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, generate_opts),
          {:ok, assistant_message} <- persist_assistant_response(conversation.id, response),
          :ok <- touch_conversation(conversation.id) do
       if is_binary(Map.get(response, :content)) and String.trim(Map.get(response, :content)) != "" do
@@ -918,6 +919,26 @@ defmodule BDS.AI.Chat do
 
       _other ->
         @default_context_window
+    end
+  end
+
+  # When someone is listening for chat events, ask the runtime to stream:
+  # it emits cumulative content snapshots, which the editor renders with
+  # replace semantics. The full-content notify after each round stays the
+  # authoritative final state (and the only event for non-streaming runtimes).
+  defp put_stream_callback(opts, conversation_id) do
+    case Keyword.get(opts, :event_target) do
+      nil ->
+        opts
+
+      _target ->
+        Keyword.put(opts, :on_stream, fn %{content: content} ->
+          if is_binary(content) and String.trim(content) != "" do
+            notify_chat_event(opts, {:chat_streaming_content, conversation_id, content})
+          end
+
+          :ok
+        end)
     end
   end
 

@@ -59,6 +59,62 @@ defmodule BDS.AI.HttpClient do
     |> normalize_result()
   end
 
+  @doc """
+  Streaming POST: body chunks of a 200 response are folded into `acc` via
+  `reducer.(chunk, acc)` as they arrive; non-200 bodies are collected whole
+  for error reporting. Returns the final accumulator alongside the response.
+
+  Never retried (same reasoning as `post/3`), and `accept-encoding` is
+  disabled so event-stream chunks arrive uncompressed. The request runs in
+  the calling process — killing that process aborts the underlying
+  connection, which is what makes mid-stream chat cancellation work.
+  """
+  @spec post_stream(String.t(), %{String.t() => String.t()}, binary(), acc, (binary(), acc ->
+                                                                               acc)) ::
+          {:ok, %{status: non_neg_integer(), headers: map(), body: binary()}, acc}
+          | {:error, term()}
+        when acc: term()
+  def post_stream(url, headers, body, acc, reducer)
+      when is_binary(url) and is_map(headers) and is_binary(body) and is_function(reducer, 2) do
+    into = fn {:data, data}, {req, resp} ->
+      resp =
+        if resp.status == 200 do
+          next_acc = reducer.(data, Req.Response.get_private(resp, :bds_stream_acc, acc))
+          Req.Response.put_private(resp, :bds_stream_acc, next_acc)
+        else
+          %{resp | body: collected_body(resp.body) <> data}
+        end
+
+      {:cont, {req, resp}}
+    end
+
+    [
+      method: :post,
+      url: url,
+      headers: headers,
+      body: body,
+      retry: false,
+      compressed: false,
+      into: into
+    ]
+    |> Keyword.merge(base_options())
+    |> Req.request()
+    |> case do
+      {:ok, %Req.Response{} = resp} ->
+        {:ok, %{status: resp.status, headers: normalize_headers(resp.headers), body: collected_body(resp.body)},
+         Req.Response.get_private(resp, :bds_stream_acc, acc)}
+
+      {:error, %Req.TransportError{reason: reason}} ->
+        {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp collected_body(body) when is_binary(body), do: body
+  defp collected_body(_body), do: ""
+
   defp base_options do
     [
       connect_options: [timeout: config(:connect_timeout_ms, @default_connect_timeout_ms)],

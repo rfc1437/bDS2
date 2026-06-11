@@ -4,6 +4,7 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
   require Logger
 
   alias BDS.AI.HttpClient
+  alias BDS.AI.SSE
 
   def list_models(endpoint, opts \\ []) when is_map(endpoint) and is_list(opts) do
     http_client = Keyword.get(opts, :http_client, HttpClient)
@@ -22,7 +23,7 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
     end
   end
 
-  def generate(endpoint, request, _opts) when is_map(endpoint) and is_map(request) do
+  def generate(endpoint, request, opts) when is_map(endpoint) and is_map(request) do
     url = completions_url(endpoint.url)
 
     headers =
@@ -41,6 +42,14 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
       |> maybe_disable_thinking(request.model)
       |> maybe_put_tools(Map.get(request, :tools, []))
 
+    if stream?(request, opts) do
+      generate_streaming(url, headers, payload, request, Keyword.fetch!(opts, :on_stream))
+    else
+      generate_blocking(url, headers, payload, request)
+    end
+  end
+
+  defp generate_blocking(url, headers, payload, request) do
     payload_json = Jason.encode!(payload)
 
     Logger.debug(
@@ -81,6 +90,81 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
     end
   end
 
+  # Streaming variant: same request payload plus stream flags; SSE chunks are
+  # folded into a BDS.AI.SSE assembler that emits cumulative content
+  # snapshots to `on_stream` as they arrive. The assembled message goes
+  # through the same normalization as the blocking path.
+  defp generate_streaming(url, headers, payload, request, on_stream) do
+    payload_json =
+      payload
+      |> Map.put("stream", true)
+      |> Map.put("stream_options", %{"include_usage" => true})
+      |> Jason.encode!()
+
+    Logger.debug(
+      "AI OpenAI-compatible streaming request operation=#{inspect(Map.get(request, :operation))} model=#{inspect(request.model)} url=#{url} payload_size=#{byte_size(payload_json)}"
+    )
+
+    sse = SSE.new(on_stream, emit_interval_ms: stream_emit_interval_ms())
+
+    case HttpClient.post_stream(url, headers, payload_json, sse, fn chunk, acc ->
+           SSE.feed(acc, chunk)
+         end) do
+      {:ok, %{status: 200, headers: response_headers}, sse} ->
+        if event_stream?(response_headers) do
+          assembled = SSE.finish(sse)
+
+          {:ok,
+           %{
+             content: assembled.content,
+             json: decode_json_content(assembled.content),
+             tool_calls: normalize_tool_calls(assembled.tool_calls),
+             usage: normalize_usage(assembled.usage || %{})
+           }}
+        else
+          # The provider ignored the stream flag and sent a plain completion.
+          normalize_response(SSE.raw_body(sse))
+        end
+
+      {:ok, %{status: status, body: body}, _sse} ->
+        Logger.error(
+          "AI OpenAI-compatible streaming HTTP error status=#{status} body=#{String.slice(body, 0, 2000)}"
+        )
+
+        {:error, %{kind: :http_error, status: status, body: body}}
+
+      {:error, reason} ->
+        Logger.error("AI OpenAI-compatible streaming request failed: #{inspect(reason)}")
+        {:error, %{kind: :http_error, reason: reason}}
+    end
+  end
+
+  # Streaming is opt-in per request (the caller passes :on_stream), limited
+  # to interactive chat, and can be disabled globally for providers that do
+  # not support SSE (config :bds, :chat, streaming: false).
+  defp stream?(request, opts) do
+    Map.get(request, :operation) == :chat and
+      is_function(Keyword.get(opts, :on_stream), 1) and
+      chat_config(:streaming, true)
+  end
+
+  defp stream_emit_interval_ms, do: chat_config(:stream_emit_interval_ms, 100)
+
+  defp event_stream?(headers) do
+    case headers["content-type"] do
+      content_type when is_binary(content_type) ->
+        String.contains?(content_type, "text/event-stream")
+
+      _missing ->
+        # No content type: trust the request we made and parse as SSE.
+        true
+    end
+  end
+
+  defp chat_config(key, default) do
+    :bds |> Application.get_env(:chat, []) |> Keyword.get(key, default)
+  end
+
   defp normalize_response(body) do
     with {:ok, payload} <- decode_json_body(body) do
       message = get_in(payload, ["choices", Access.at(0), "message"]) || %{}
@@ -88,19 +172,22 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
       tool_calls = normalize_tool_calls(message["tool_calls"] || [])
       usage = normalize_usage(payload["usage"] || %{})
 
-      json =
-        case content do
-          nil ->
-            nil
+      {:ok,
+       %{
+         content: content,
+         json: decode_json_content(content),
+         tool_calls: tool_calls,
+         usage: usage
+       }}
+    end
+  end
 
-          value when is_binary(value) ->
-            case Jason.decode(value) do
-              {:ok, decoded} when is_map(decoded) -> decoded
-              _other -> nil
-            end
-        end
+  defp decode_json_content(nil), do: nil
 
-      {:ok, %{content: content, json: json, tool_calls: tool_calls, usage: usage}}
+  defp decode_json_content(content) when is_binary(content) do
+    case Jason.decode(content) do
+      {:ok, decoded} when is_map(decoded) -> decoded
+      _other -> nil
     end
   end
 

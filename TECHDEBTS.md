@@ -238,9 +238,22 @@ batching speedup.
 
 ## Phase 2 — Unbounded blocking & cancellation
 
-### TD-06: Real SSE streaming for chat
+### TD-06: Real SSE streaming for chat ✅ DONE (2026-06-11)
 
 **Depends on TD-02 (Req).**
+
+**Status: implemented.** Chat requests now send `"stream": true` (+
+`stream_options.include_usage`) and consume the SSE response incrementally
+via `HttpClient.post_stream/5` (Req `into:`). `BDS.AI.SSE` assembles content
+deltas, tool-call fragments, and usage, emitting **cumulative content
+snapshots** throttled to `stream_emit_interval_ms` (default 100ms) — replace
+semantics, so the chat editor needed no changes and tool rounds reset
+naturally. Streaming applies only to `operation: :chat` with an `:on_stream`
+callback, can be disabled via `config :bds, :chat, streaming: false`, and
+providers that ignore the stream flag are auto-detected by content-type and
+parsed as plain JSON. Cancellation kills the chat task, which aborts the
+underlying connection (server-observed in tests). Persistence semantics are
+unchanged (one assistant row per round, same usage normalization).
 
 **Context.** `OpenAICompatibleRuntime.generate/3` never sets `"stream": true`;
 the UI's `{:chat_streaming_content, ...}` event fires exactly once with the
