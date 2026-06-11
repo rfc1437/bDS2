@@ -15,6 +15,11 @@ defmodule BDS.Generation.Validation do
 
   alias BDS.Slug
 
+  # POSIX mtimes from File.stat/2 have second granularity while generation
+  # timestamps are milliseconds, so ordering within one second is unknowable;
+  # only treat a source file as newer when it is beyond this tolerance.
+  @mtime_granularity_tolerance_ms 1_000
+
   @spec generated_file_updated_at_map([map()]) :: map()
   def generated_file_updated_at_map(generated_files) do
     Map.new(generated_files, &{&1.relative_path, &1.updated_at})
@@ -139,7 +144,8 @@ defmodule BDS.Generation.Validation do
                 effective_generated_at_ms =
                   max(mtime_ms(html_stat), check.generated_updated_at_ms || 0)
 
-                if mtime_ms(post_stat) > effective_generated_at_ms do
+                if mtime_ms(post_stat) >
+                     effective_generated_at_ms + @mtime_granularity_tolerance_ms do
                   MapSet.put(acc, normalized_url_path)
                 else
                   acc

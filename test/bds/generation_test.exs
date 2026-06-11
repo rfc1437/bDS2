@@ -890,8 +890,8 @@ defmodule BDS.GenerationTest do
     source_path = Path.join([temp_dir, published_post.file_path])
     extra_path = Path.join([temp_dir, "html", "obsolete", "index.html"])
 
+    backdate_generated_outputs(project.id, temp_dir)
     File.rm!(post_file_path)
-    Process.sleep(1200)
     File.write!(source_path, File.read!(source_path) <> "\n")
     File.mkdir_p!(Path.dirname(extra_path))
     File.write!(extra_path, "<html>obsolete</html>")
@@ -973,12 +973,12 @@ defmodule BDS.GenerationTest do
     updated_post_source_path = Path.join([temp_dir, published_updated_post.file_path])
     extra_route_path = Path.join([temp_dir, "html", "obsolete", "deep", "index.html"])
 
+    backdate_generated_outputs(project.id, temp_dir)
     File.rm!(sitemap_path)
     File.rm!(missing_post_html_path)
     File.mkdir_p!(Path.dirname(extra_route_path))
     File.write!(extra_route_path, "<html>obsolete</html>")
 
-    Process.sleep(1200)
     File.write!(updated_post_source_path, File.read!(updated_post_source_path) <> "\n")
 
     assert {:ok, report} = BDS.Generation.validate_site(project.id)
@@ -1317,9 +1317,9 @@ defmodule BDS.GenerationTest do
     post_html_path = Path.join([temp_dir, "html", post_path])
     post_source_path = Path.join([temp_dir, published_post.file_path])
 
+    backdate_generated_outputs(project.id, temp_dir)
     before_stat = File.stat!(post_html_path)
 
-    Process.sleep(1200)
     File.write!(post_source_path, File.read!(post_source_path) <> "\n")
 
     assert {:ok, report} = BDS.Generation.validate_site(project.id)
@@ -1338,6 +1338,23 @@ defmodule BDS.GenerationTest do
     assert clean_report.missing_url_paths == []
     assert clean_report.extra_url_paths == []
     assert clean_report.updated_post_url_paths == []
+  end
+
+  # Pushes generation timestamps and html mtimes far into the past so a
+  # subsequent source-file write is newer by more than the second-granularity
+  # mtime tolerance, without sleeping across real second boundaries.
+  defp backdate_generated_outputs(project_id, temp_dir) do
+    past_posix = System.os_time(:second) - 120
+
+    Repo.update_all(
+      from(g in BDS.Generation.GeneratedFileHash, where: g.project_id == ^project_id),
+      set: [updated_at: past_posix * 1000]
+    )
+
+    [temp_dir, "html", "**"]
+    |> Path.join()
+    |> Path.wildcard()
+    |> Enum.each(&File.touch!(&1, past_posix))
   end
 
   defp relative_path_to_url_path(relative_path) do
