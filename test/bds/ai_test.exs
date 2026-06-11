@@ -3,7 +3,6 @@ defmodule BDS.AITest do
 
   import ExUnit.CaptureLog
   import Ecto.Query
-  require Logger
 
   alias BDS.Media.Media
   alias BDS.Persistence
@@ -366,6 +365,31 @@ defmodule BDS.AITest do
     assert Repo.get(Setting, "__encrypted_ai.online.api_key") == nil
   end
 
+  test "airplane_endpoint_configured? reflects the airplane endpoint url and model" do
+    refute BDS.AI.airplane_endpoint_configured?()
+
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{url: "http://localhost:11434/v1", api_key: nil, model: ""},
+               secret_backend: FakeSecretBackend
+             )
+
+    refute BDS.AI.airplane_endpoint_configured?()
+
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{url: "http://localhost:11434/v1", api_key: nil, model: "llama3.3"},
+               secret_backend: FakeSecretBackend
+             )
+
+    assert BDS.AI.airplane_endpoint_configured?()
+
+    assert :ok = BDS.AI.delete_endpoint(:airplane)
+    refute BDS.AI.airplane_endpoint_configured?()
+  end
+
   test "refresh_model_catalog stores providers, models, modalities, and etag metadata" do
     assert {:ok, result} =
              BDS.AI.refresh_model_catalog(http_client: FakeHttpClient)
@@ -609,6 +633,95 @@ defmodule BDS.AITest do
 
     assert log =~ "AI extract_json_response failed to parse content as JSON"
     assert log =~ "This is not valid JSON"
+  end
+
+  test "analyze_image accepts JSON wrapped in markdown fences from local models" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{
+                 url: "http://localhost:11434/v1",
+                 api_key: nil,
+                 model: "llama-default"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(true)
+    assert :ok = BDS.AI.put_model_preference(:airplane_image_analysis, "qwen-vision")
+
+    assert :ok =
+             BDS.AI.put_model_capabilities("qwen-vision", %{
+               supports_attachment: true,
+               supports_tool_calls: false,
+               disables_reasoning: false
+             })
+
+    defmodule FencedJsonContentRuntime do
+      def generate(_endpoint, _request, _opts) do
+        content = """
+        ```json
+        {
+          "title": "Ahornblätter im Herbstlicht",
+          "alt": "Nahaufnahme von Ahornblättern",
+          "caption": "Einige Ahornblätter verfärben sich."
+        }
+        ```
+        """
+
+        {:ok,
+         %{
+           content: content,
+           json: nil,
+           tool_calls: [],
+           usage: %{input_tokens: 4, output_tokens: 2}
+         }}
+      end
+    end
+
+    assert {:ok, result} =
+             BDS.AI.analyze_image(
+               %{
+                 mime_type: "image/png",
+                 image_url: "data:image/png;base64,abc123"
+               },
+               runtime: FencedJsonContentRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend
+             )
+
+    assert result.title == "Ahornblätter im Herbstlicht"
+    assert result.alt == "Nahaufnahme von Ahornblättern"
+    assert result.caption == "Einige Ahornblätter verfärben sich."
+  end
+
+  test "one-shot system prompts demand raw JSON without markdown fences" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :airplane,
+               %{
+                 url: "http://localhost:11434/v1",
+                 api_key: nil,
+                 model: "llama-default"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert :ok = BDS.AI.set_airplane_mode(true)
+
+    assert {:ok, _result} =
+             BDS.AI.analyze_post(
+               %{title: "Title", excerpt: "Excerpt", content: "Content"},
+               runtime: FakeRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend
+             )
+
+    assert_received {:runtime_request, _endpoint, request}
+
+    system_content = get_in(request.messages, [Access.at(0), "content"])
+    assert system_content =~ "raw JSON only"
+    assert system_content =~ "without markdown code fences"
   end
 
   test "airplane mode routes title tasks to airplane endpoint and offline title model" do

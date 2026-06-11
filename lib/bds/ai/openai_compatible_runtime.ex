@@ -182,14 +182,7 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
     end
   end
 
-  defp decode_json_content(nil), do: nil
-
-  defp decode_json_content(content) when is_binary(content) do
-    case Jason.decode(content) do
-      {:ok, decoded} when is_map(decoded) -> decoded
-      _other -> nil
-    end
-  end
+  defp decode_json_content(content), do: BDS.AI.JsonContent.decode(content)
 
   defp completions_url(url) do
     cond do

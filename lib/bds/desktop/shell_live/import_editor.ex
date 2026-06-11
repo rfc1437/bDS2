@@ -434,7 +434,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     socket =
       with %{} = definition <- ImportDefinitions.get_definition(definition_id),
            %{} = report <- ImportDefinitions.decode_analysis_result(definition) do
-        if socket.assigns.offline_mode? do
+        if socket.assigns.offline_mode? and not AI.airplane_endpoint_configured?() do
           notify_output(
             dgettext("ui", "Import"),
             BDS.Gettext.lgettext(

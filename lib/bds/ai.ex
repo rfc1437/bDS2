@@ -111,6 +111,19 @@ defmodule BDS.AI do
     end
   end
 
+  @doc """
+  True when the airplane (local) endpoint has both a URL and a model
+  configured, so gated AI features can run against the local model.
+  """
+  @spec airplane_endpoint_configured?() :: boolean()
+  def airplane_endpoint_configured? do
+    present_setting?(get_setting("ai.airplane.url")) and
+      present_setting?(get_setting("ai.airplane.model"))
+  end
+
+  defp present_setting?(value) when is_binary(value), do: String.trim(value) != ""
+  defp present_setting?(_value), do: false
+
   @spec put_model_preference(atom(), String.t()) ::
           :ok | {:error, :unknown_model_preference | term()}
   def put_model_preference(key, model) when is_atom(key) and is_binary(model) do

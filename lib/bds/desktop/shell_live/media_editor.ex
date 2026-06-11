@@ -153,7 +153,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   end
 
   def handle_event("detect_media_editor_language", _params, socket) do
-    if socket.assigns.offline_mode do
+    if socket.assigns.offline_mode and not AI.airplane_endpoint_configured?() do
       notify_output(
         socket,
         dgettext("ui", "Detect Language"),
@@ -346,7 +346,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   def handle_event("refresh_media_translation", %{"language" => language}, socket) do
     media = socket.assigns.media
 
-    if socket.assigns.offline_mode do
+    if socket.assigns.offline_mode and not AI.airplane_endpoint_configured?() do
       notify_output(
         socket,
         dgettext("ui", "Translate"),
@@ -539,7 +539,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
   end
 
   defp do_translate(socket, language) do
-    if socket.assigns.offline_mode do
+    if socket.assigns.offline_mode and not AI.airplane_endpoint_configured?() do
       notify_output(
         socket,
         dgettext("ui", "Translate"),

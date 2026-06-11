@@ -3230,6 +3230,129 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ "Automatic AI actions stay gated by airplane mode"
   end
 
+  test "ai suggestions overlay uses the local model in airplane mode for media", %{
+    project: project
+  } do
+    Application.put_env(:bds, :test_pid, self())
+
+    server =
+      start_supervised!({Bandit, plug: AiSuggestionsServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert :ok = AI.set_airplane_mode(true)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:airplane, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: nil,
+               model: "llava-local"
+             })
+
+    assert :ok = AI.put_model_preference(:airplane_image_analysis, "llava-local")
+    assert :ok = AI.put_model_capabilities("llava-local", %{supports_attachment: true})
+
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-shell-live-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    media_source_path = Path.join(temp_dir, "airplane-media.jpg")
+    File.write!(media_source_path, "fake image body")
+
+    {:ok, media} =
+      Media.import_media(%{
+        project_id: project.id,
+        source_path: media_source_path,
+        title: "Airplane Media"
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "media",
+        "id" => media.id,
+        "title" => media.title,
+        "subtitle" => "draft"
+      })
+
+    assert html =~ ~s(data-testid="media-editor")
+
+    html =
+      view
+      |> element("[data-testid='media-editor'] .quick-actions-btn")
+      |> render_click()
+
+    assert html =~ "quick-actions-menu"
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='ai_suggestions']")
+      |> render_click()
+
+    assert html =~ "ai-suggestions-modal"
+
+    assert_receive {:ai_suggestions_request, request}, 2_000
+    assert request["model"] == "llava-local"
+
+    Process.sleep(200)
+    html = render(view)
+
+    assert html =~ "AI Image Title"
+    assert html =~ "AI Alt Text"
+    assert html =~ "AI Caption"
+  end
+
+  test "chat editor sends messages to the local model in airplane mode" do
+    Application.put_env(:bds, :test_pid, self())
+
+    server =
+      start_supervised!({Bandit, plug: TitleChatServer, port: 0, startup_log: false})
+
+    {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+
+    assert :ok = AI.set_airplane_mode(true)
+
+    assert {:ok, _endpoint} =
+             AI.put_endpoint(:airplane, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: nil,
+               model: "llama-local"
+             })
+
+    assert {:ok, conversation} = AI.start_chat(%{title: "New Chat"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "chat",
+        "id" => conversation.id,
+        "title" => conversation.title,
+        "subtitle" => "chat"
+      })
+
+    assert html =~ ~s(data-testid="chat-send-button")
+
+    _html =
+      view
+      |> element(".chat-input-wrapper")
+      |> render_change(%{"message" => "Beschreibe das neueste Bild"})
+
+    _html =
+      view
+      |> element("[data-testid='chat-send-button']")
+      |> render_click()
+
+    assert_receive {:title_chat_request, request}, 2_000
+    assert request["model"] == "llama-local"
+
+    Process.sleep(350)
+    html = render(view)
+
+    assert html =~ "Ich habe die Posts pro Monat ermittelt."
+  end
+
   test "ai suggestions overlay fetches async results for media when online", %{project: project} do
     Application.put_env(:bds, :test_pid, self())
 

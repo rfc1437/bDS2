@@ -4,6 +4,7 @@ defmodule BDS.AI.OneShot do
   require Logger
 
   alias BDS.AI.Chat
+  alias BDS.AI.JsonContent
   alias BDS.AI.OpenAICompatibleRuntime
   alias BDS.AI.Runtime
   alias BDS.Media.Media
@@ -213,7 +214,9 @@ defmodule BDS.AI.OneShot do
       messages: [
         %{
           "role" => "system",
-          "content" => one_shot_system_prompt(operation, language, source_language)
+          "content" =>
+            one_shot_system_prompt(operation, language, source_language) <>
+              " Output raw JSON only, without markdown code fences."
         },
         %{
           "role" => "user",
@@ -351,11 +354,11 @@ defmodule BDS.AI.OneShot do
   defp extract_json_response(%{json: json}) when is_map(json), do: {:ok, json}
 
   defp extract_json_response(%{content: content}) when is_binary(content) do
-    case Jason.decode(content) do
-      {:ok, json} when is_map(json) ->
+    case JsonContent.decode(content) do
+      json when is_map(json) ->
         {:ok, json}
 
-      _other ->
+      nil ->
         Logger.error(
           "AI extract_json_response failed to parse content as JSON. Content: #{String.slice(content, 0, 1000)}"
         )

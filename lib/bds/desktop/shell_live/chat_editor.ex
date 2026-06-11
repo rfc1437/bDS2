@@ -230,7 +230,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
       not is_nil(socket.assigns.request) ->
         build_data(socket)
 
-      socket.assigns.offline_mode ->
+      socket.assigns.offline_mode and not AI.airplane_endpoint_configured?() ->
         Notify.output(
           dgettext("ui", "Chat"),
           dgettext("ui", "Automatic AI actions stay gated by airplane mode."),
@@ -239,7 +239,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
 
         build_data(socket)
 
-      ModelSelection.needs_api_key?(false) ->
+      ModelSelection.needs_api_key?(socket.assigns.offline_mode) ->
         build_data(socket)
 
       true ->

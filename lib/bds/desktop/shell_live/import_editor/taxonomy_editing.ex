@@ -82,7 +82,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
          %{} = definition <- ImportDefinitions.get_definition(definition_id),
          %{} = report <- ImportDefinitions.decode_analysis_result(definition) do
       cond do
-        socket.assigns.offline_mode ->
+        socket.assigns.offline_mode and not AI.airplane_endpoint_configured?() ->
           socket
           |> append_output.(
             dgettext("ui", "Import"),

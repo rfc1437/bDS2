@@ -707,7 +707,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   end
 
   defp do_detect_language(socket) do
-    if Map.get(socket.assigns, :offline_mode, true) do
+    if Map.get(socket.assigns, :offline_mode, true) and not AI.airplane_endpoint_configured?() do
       notify_output(
         socket,
         dgettext("ui", "Detect Language"),
@@ -756,7 +756,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   end
 
   defp do_translate(socket, language) do
-    if Map.get(socket.assigns, :offline_mode, true) do
+    if Map.get(socket.assigns, :offline_mode, true) and not AI.airplane_endpoint_configured?() do
       notify_output(
         socket,
         dgettext("ui", "Translate"),

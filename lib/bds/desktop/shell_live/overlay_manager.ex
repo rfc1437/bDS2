@@ -66,7 +66,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
 
     socket =
       if kind == "ai_suggestions" and not is_nil(overlay) do
-        if socket.assigns.offline_mode do
+        if socket.assigns.offline_mode and not AI.airplane_endpoint_configured?() do
           callbacks.append_output.(
             socket,
             dgettext("ui", "AI Suggestions"),

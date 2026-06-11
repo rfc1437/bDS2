@@ -414,7 +414,7 @@ defmodule BDS.Desktop.ShellLive do
     do: OverlayManager.handle_event("overlay_lightbox_next", params, socket, overlay_callbacks())
 
   def handle_event("add_gallery_images", %{"post-id" => post_id}, socket) do
-    if socket.assigns.offline_mode do
+    if socket.assigns.offline_mode and not AI.airplane_endpoint_configured?() do
       {:noreply,
        append_output_entry(
          socket,
