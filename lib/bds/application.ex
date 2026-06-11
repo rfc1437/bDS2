@@ -32,6 +32,7 @@ defmodule BDS.Application do
         BDS.Repo,
         BDS.RepoBootstrap,
         BDS.Tasks,
+        BDS.AI.InFlight,
         BDS.Preview,
         BDS.Publishing,
         {Task.Supervisor, name: BDS.Tasks.TaskSupervisor},

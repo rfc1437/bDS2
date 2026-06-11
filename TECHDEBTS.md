@@ -127,9 +127,19 @@ within the configured budget instead of hanging; dialyzer clean.
 
 ---
 
-### TD-03: Fix `BDS.AI.InFlight` ETS ownership and creation race
+### TD-03: Fix `BDS.AI.InFlight` ETS ownership and creation race ✅ DONE (2026-06-11)
 
 **Severity: High (correctness).**
+
+**Status: implemented.** `BDS.AI.InFlight` is now a minimal GenServer whose
+`init/1` creates the named table (`:named_table, :public, :set,
+read_concurrency: true`); it is supervised in `BDS.Application` (before
+anything that uses chat), so the table lives for the VM's lifetime and the
+concurrent-first-use race is impossible by construction. The lazy `table/0`
+creation path is deleted; `register/unregister/lookup` reference the named
+table directly. `test/bds/ai/in_flight_test.exs` proves registrations survive
+the death of the registering process and that the supervised process owns the
+table.
 
 **Context.** `lib/bds/ai/in_flight.ex` creates its named ETS table lazily in
 whichever process first calls `table/0`. Two defects: (1) the table is owned
