@@ -82,9 +82,21 @@ for `BDS.Desktop.Endpoint`.
 
 ---
 
-### TD-02: Replace the hand-rolled `:httpc` client with Req
+### TD-02: Replace the hand-rolled `:httpc` client with Req ✅ DONE (2026-06-11)
 
 **Severity: High (reliability), enables TD-06 (streaming).**
+
+**Status: implemented.** `BDS.AI.HttpClient` is a Req wrapper with explicit
+connect/receive timeouts and constant-delay transient retries for GETs only
+(POST completions are never retried), configurable under
+`config :bds, BDS.AI.HttpClient` (`:connect_timeout_ms`,
+`:receive_timeout_ms`, `:get_max_retries`, `:retry_delay_ms`). The legacy
+`{:ok, %{status, headers, body}}` contract is preserved (raw binary body,
+downcased single-valued headers), so runtime/catalog callers are unchanged.
+The automation driver's health check also moved to Req, `:inets` left
+`extra_applications`, and no `:httpc` remains under `lib/`
+(test files still use `:httpc` as a client against local servers — they start
+`:inets` themselves). TD-06 (SSE streaming via Req `into:`) is now unblocked.
 
 **Context.** `BDS.AI.HttpClient` wraps `:httpc` with empty http options — the
 default timeout is **infinity**, so a hung LLM endpoint (Ollama, LM Studio,

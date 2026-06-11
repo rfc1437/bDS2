@@ -58,7 +58,6 @@ defmodule BDS.Desktop.Automation do
     base_url = BDS.Desktop.url(port)
 
     File.mkdir_p!(screenshot_dir)
-    ensure_http_client_started()
 
     app_port = start_app_process(project_root, port)
     :ok = wait_for_server(base_url)
@@ -319,8 +318,14 @@ defmodule BDS.Desktop.Automation do
   end
 
   defp do_wait_for_server(base_url, deadline) do
-    case :httpc.request(:get, {String.to_charlist(base_url <> "health"), []}, [], []) do
-      {:ok, {{_, 200, _}, _headers, _body}} ->
+    case Req.request(
+           method: :get,
+           url: base_url <> "health",
+           retry: false,
+           connect_options: [timeout: 1_000],
+           receive_timeout: 1_000
+         ) do
+      {:ok, %Req.Response{status: 200}} ->
         :ok
 
       _other ->
@@ -338,12 +343,6 @@ defmodule BDS.Desktop.Automation do
     {:ok, port} = :inet.port(socket)
     :gen_tcp.close(socket)
     port
-  end
-
-  defp ensure_http_client_started do
-    _ = Application.ensure_all_started(:inets)
-    _ = Application.ensure_all_started(:ssl)
-    :ok
   end
 
   defp await_port_exit(nil, _timeout), do: :ok

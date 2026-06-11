@@ -17,7 +17,7 @@ defmodule BDS.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :wx, :inets, :ssl],
+      extra_applications: [:logger, :wx, :ssl],
       mod: {BDS.Application, []}
     ]
   end
@@ -32,6 +32,7 @@ defmodule BDS.MixProject do
       {:liquex, "~> 0.13.1"},
       {:plug, "~> 1.18"},
       {:bandit, "~> 1.5"},
+      {:req, "~> 0.5"},
       {:desktop, "~> 1.5"},
       {:image, "~> 0.67"},
       {:nx, "~> 0.10"},
