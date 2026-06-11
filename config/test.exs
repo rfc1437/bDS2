@@ -9,6 +9,10 @@ config :bds, BDS.Repo,
 
 config :logger, level: :warning
 
+# Deterministic, test-only master key so secret round-trips never touch the
+# OS keyring (Keychain) or write key files on developer machines.
+config :bds, :ai_secret_key, "bds-test-only-ai-secret-key-not-used-outside-the-test-env"
+
 # Tests use the deterministic lexical stub backend so the suite stays offline
 # and never downloads the ~100 MB neural model.
 config :bds, :embeddings,

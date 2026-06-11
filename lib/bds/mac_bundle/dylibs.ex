@@ -75,7 +75,7 @@ defmodule BDS.MacBundle.Dylibs do
   def bundle(nif_path, frameworks_dir, nif_loader_prefix) do
     File.mkdir_p!(frameworks_dir)
 
-    with {:ok, {_seen, externals}} <- collect(nif_path, MapSet.new(), []) do
+    with {:ok, {_seen, externals}} <- collect(nif_path, %{}, []) do
       externals = Enum.reverse(externals)
 
       {physical, logical_entries, _inode_map} =
@@ -119,17 +119,19 @@ defmodule BDS.MacBundle.Dylibs do
   end
 
   # Depth-first transitive collection of external dependency paths. Returns
-  # `{:ok, {seen, acc}}` where `acc` is the reverse-discovery-order path list.
+  # `{:ok, {seen, acc}}` where `seen` is a plain map used as a set (a MapSet's
+  # opaque internals trip dialyzer when threaded through the recursion) and
+  # `acc` is the reverse-discovery-order path list.
   defp collect(binary, seen, acc) do
     case otool(binary) do
       {:ok, deps} ->
         deps
         |> Enum.filter(&external?/1)
         |> Enum.reduce_while({:ok, {seen, acc}}, fn dep, {:ok, {seen_acc, list_acc}} ->
-          if MapSet.member?(seen_acc, dep) do
+          if Map.has_key?(seen_acc, dep) do
             {:cont, {:ok, {seen_acc, list_acc}}}
           else
-            seen_acc = MapSet.put(seen_acc, dep)
+            seen_acc = Map.put(seen_acc, dep, true)
             case collect(dep, seen_acc, [dep | list_acc]) do
               {:ok, _} = ok -> {:cont, ok}
               error -> {:halt, error}

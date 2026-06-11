@@ -16,15 +16,14 @@ config :bds, BDS.Repo,
 
 config :bds, BDS.Application, desktop_adapter: :desktop
 
+# No secrets live in this file: the endpoint signing secret is generated per
+# boot (BDS.Application) and the AI secret master key comes from the OS
+# keyring (BDS.AI.SecretKey).
 config :bds, :desktop,
   port: 4010,
   window_size: {1280, 780},
   window_min_size: {800, 600},
-  title: "Blogging Desktop Server",
-  secret_key_base: "bds_desktop_shell_secret_key_base_64_chars_minimum_seed_value_001"
-
-config :bds, :ai_secret_key,
-  "bds_desktop_shell_secret_key_base_64_chars_minimum_seed_value_001"
+  title: "Blogging Desktop Server"
 
 config :bds, BDS.Desktop.Endpoint,
   url: [host: "127.0.0.1"],

@@ -294,12 +294,11 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
   defp short_commit_hash(hash) when is_binary(hash), do: String.slice(hash, 0, 7)
   defp short_commit_hash(_hash), do: "-------"
 
+  # Only called inside the template's `is_number(task.progress)` guard.
   defp progress_percent(progress) when is_number(progress) do
     rounded = progress |> Kernel.*(100) |> Float.round(0) |> trunc()
     "#{rounded}%"
   end
-
-  defp progress_percent(_), do: ""
 
   defp present?(value), do: value not in [nil, ""]
 end

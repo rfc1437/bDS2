@@ -28,9 +28,24 @@ the review snapshot (commit `bf93403`).
 
 ## Phase 1 — Top five (security & correctness)
 
-### TD-01: Move the AI secret encryption key out of the repo
+### TD-01: Move the AI secret encryption key out of the repo ✅ DONE (2026-06-11)
 
 **Severity: High (security).**
+
+**Status: implemented.** `BDS.AI.SecretKey` resolves the master key from the
+macOS Keychain (`security` CLI) with a 0600 key-file fallback under the
+private app dir; the deterministic node-name fallback is gone (operations
+return `{:error, :secret_key_unavailable}`); `BDS.AI.SecretMigration`
+re-encrypts legacy rows at every boot from `BDS.RepoBootstrap`; the endpoint
+`secret_key_base` is generated per boot. The legacy repo key literal remains
+in `SecretBackend`/tests **only** to decrypt and migrate existing user
+databases — remove it together with `SecretMigration` in a future release.
+The test env pins a deterministic `:ai_secret_key` in `config/test.exs` so
+the suite never touches the keyring; that string protects nothing.
+Rode along (mandated clean-gates): fixed all 10 pre-existing compiler type
+warnings surfaced by the full recompile and the one dialyzer finding
+(MapSet opacity in `mac_bundle/dylibs.ex`), so `mix compile
+--warnings-as-errors --force` and `mix dialyzer` are now clean baselines.
 
 **Context.** `BDS.AI.SecretBackend` encrypts AI provider API keys at rest with
 AES-256-GCM, but the key is the hardcoded string in `config/config.exs`
@@ -641,24 +656,14 @@ verify whether that section should say LiveView/HEEx).
 
 **Acceptance.** AGENTS.md commands all match the Elixir toolchain.
 
-### TD-25: Generate the desktop endpoint secret at runtime
+### TD-25: Generate the desktop endpoint secret at runtime ✅ DONE (2026-06-11, shipped with TD-01)
 
-**Context.** Partially covered by TD-01; tracked separately in case TD-01
-ships Keychain-only. The Phoenix endpoint `secret_key_base` (session/LiveView
-signing) is a hardcoded repo string in all envs. The endpoint is
-loopback-only, which mitigates remote exploitation, but a random per-boot
-secret costs nothing for a desktop app (sessions don't need to survive
-restarts).
+**Context.** The Phoenix endpoint `secret_key_base` (session/LiveView
+signing) was a hardcoded repo string in all envs.
 
-**Files.**
-- `config/config.exs` (line ~24), `lib/bds/application.ex` (`desktop_secret_key_base/0`)
-
-**Approach.** In `Application.start/2` (or runtime.exs for prod), generate
-`Base.encode64(:crypto.strong_rand_bytes(48))` when no explicit config is
-set; keep a fixed value only for `:test` if tests depend on it.
-
-**Acceptance.** Released app has no static signing secret; LiveView still
-connects after restart (fresh session is acceptable and verified).
+**Status: implemented as part of TD-01.** `BDS.Application.desktop_secret_key_base/0`
+now generates `Base.encode64(:crypto.strong_rand_bytes(48))` per boot when no
+explicit config is set; the static value was removed from `config/config.exs`.
 
 ---
 

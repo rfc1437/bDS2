@@ -24,6 +24,9 @@ defmodule BDS.RepoBootstrap do
         {:ok, _project} -> :ok
         {:error, reason} -> raise "failed to ensure default project: #{inspect(reason)}"
       end
+
+      {:ok, _summary} = BDS.AI.SecretMigration.migrate_legacy_secrets()
+      :ok
     else
       :ok
     end

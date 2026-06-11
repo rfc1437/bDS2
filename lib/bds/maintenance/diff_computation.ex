@@ -66,8 +66,8 @@ defmodule BDS.Maintenance.DiffComputation do
   end
 
   def stringify_value(nil), do: ""
+  # Booleans are atoms, so this clause also renders true/false.
   def stringify_value(value) when is_atom(value), do: Atom.to_string(value)
-  def stringify_value(value) when is_boolean(value), do: to_string(value)
   def stringify_value(value) when is_integer(value), do: Integer.to_string(value)
   def stringify_value(value) when is_binary(value), do: value
 

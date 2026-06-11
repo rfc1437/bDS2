@@ -189,6 +189,8 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
     |> mark_surfaces_expanded(assigns)
   end
 
+  # Only called from pending_user_message/2, which already narrows the
+  # request to %{message: binary}.
   defp persisted_user_message_for_request?(messages, %{message: message} = request)
        when is_binary(message) do
     messages
@@ -197,8 +199,6 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.MessageBuild do
       persisted_message.role == :user and persisted_message.content == message
     end)
   end
-
-  defp persisted_user_message_for_request?(_messages, _request), do: false
 
   defp persisted_assistant_content_for_request?(messages, request, content)
        when is_binary(content) and content != "" do

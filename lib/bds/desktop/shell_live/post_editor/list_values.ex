@@ -114,9 +114,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
     end
   end
 
-  defp normalize_color(nil), do: nil
-  defp normalize_color(""), do: nil
-
+  # nil is handled by tag_chip_style/1 before this is reached.
   defp normalize_color("#" <> rest = color) when byte_size(rest) == 6 do
     if String.match?(rest, ~r/\A[0-9a-fA-F]{6}\z/), do: color, else: nil
   end

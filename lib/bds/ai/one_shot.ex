@@ -406,7 +406,9 @@ defmodule BDS.AI.OneShot do
        title: media.title || "",
        alt: media.alt || "",
        caption: media.caption || "",
-       image_url: Map.get(media, :image_url),
+       # A stored media row has no remote URL; resolve_image_data_url/1 fills
+       # this from file_path before an :analyze_image request is built.
+       image_url: nil,
        file_path: media.file_path,
        project_id: media.project_id,
        language: media.language || ""

@@ -1356,7 +1356,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                 class="taxonomy-mapping-input"
                 type="text"
                 name="mapped_to"
-                value={Map.get(@edit || %{}, :value, Map.get(item, :mapped_to) || "") || ""}
+                value={Map.get(@edit, :value, Map.get(item, :mapped_to) || "") || ""}
                 placeholder={dgettext("ui", "Map to...")}
                 list={"taxonomy-suggestions-#{@type}"}
                 autocomplete="off"

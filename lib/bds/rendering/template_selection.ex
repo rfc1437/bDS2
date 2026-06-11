@@ -82,20 +82,16 @@ defmodule BDS.Rendering.TemplateSelection do
   end
 
   defp select_template(project_id, :post, nil) do
-    case StarterTemplates.default_slug(:post) do
-      nil ->
-        nil
+    default_slug = StarterTemplates.default_slug(:post)
 
-      default_slug ->
-        Repo.one(
-          from template in Template,
-            where:
-              template.project_id == ^project_id and template.kind == :post and
-                template.status == :published and
-                template.enabled == true and template.slug == ^default_slug,
-            limit: 1
-        )
-    end
+    Repo.one(
+      from template in Template,
+        where:
+          template.project_id == ^project_id and template.kind == :post and
+            template.status == :published and
+            template.enabled == true and template.slug == ^default_slug,
+        limit: 1
+    )
   end
 
   defp select_template(project_id, kind, nil) do

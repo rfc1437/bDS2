@@ -1027,9 +1027,8 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   defp present?(value) when is_binary(value), do: String.trim(value) != ""
   defp present?(value), do: not is_nil(value)
 
-  defp format_error(%{kind: :endpoint_not_configured}),
-    do: dgettext("ui", "Configure an API key in Settings to enable AI chat.")
-
+  # :endpoint_not_configured is handled by its own case clause before this is
+  # reached; the chat surface already shows the configuration hint.
   defp format_error(reason), do: inspect(reason)
 
   defp parse_integer(value) when is_integer(value), do: value

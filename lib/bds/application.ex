@@ -83,8 +83,11 @@ defmodule BDS.Application do
     System.get_env("BDS_DESKTOP_AUTOMATION") in ["1", "true", "TRUE"]
   end
 
+  # The desktop endpoint binds to loopback only and its sessions do not need
+  # to survive restarts, so without explicit config the signing secret is a
+  # random per-boot value rather than a static one shipped in the repo.
   defp desktop_secret_key_base do
     Application.get_env(:bds, :desktop)[:secret_key_base] ||
-      raise "missing :desktop secret_key_base configuration"
+      Base.encode64(:crypto.strong_rand_bytes(48))
   end
 end

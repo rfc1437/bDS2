@@ -25,8 +25,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
         model_disables_reasoning?(
           get_model_preference(:chat) || Map.get(online_endpoint || %{}, :model, "")
         ),
-      "online_title_model" => get_model_preference(:title),
-      "online_image_analysis_model" => get_model_preference(:image_analysis),
+      "online_title_model" => get_model_preference(:title) || "",
+      "online_image_analysis_model" => get_model_preference(:image_analysis) || "",
       "online_chat_images" => model_supports_images?(get_model_preference(:image_analysis)),
       "offline_url" => Map.get(airplane_endpoint || %{}, :url, ""),
       "offline_api_key" => Map.get(airplane_endpoint || %{}, :api_key, ""),
@@ -42,8 +42,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
         model_disables_reasoning?(
           get_model_preference(:airplane_chat) || Map.get(airplane_endpoint || %{}, :model, "")
         ),
-      "offline_title_model" => get_model_preference(:airplane_title),
-      "offline_image_analysis_model" => get_model_preference(:airplane_image_analysis),
+      "offline_title_model" => get_model_preference(:airplane_title) || "",
+      "offline_image_analysis_model" => get_model_preference(:airplane_image_analysis) || "",
       "offline_chat_images" =>
         model_supports_images?(get_model_preference(:airplane_image_analysis)),
       "system_prompt" => EditorSettings.get_global_setting("ai.system_prompt") || ""
@@ -225,10 +225,12 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
     }
   end
 
+  # Returns nil when no preference is stored so `||` fallbacks to the
+  # endpoint's model actually fire.
   defp get_model_preference(key) do
     case AI.get_model_preference(key) do
-      {:ok, value} -> value || ""
-      _other -> ""
+      {:ok, value} when is_binary(value) and value != "" -> value
+      _other -> nil
     end
   end
 
