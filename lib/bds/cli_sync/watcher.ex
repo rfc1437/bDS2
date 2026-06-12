@@ -29,7 +29,12 @@ defmodule BDS.CliSync.Watcher do
           Keyword.get(opts, :poll_interval_ms),
           @default_poll_interval_ms
         ),
-      pubsub: Keyword.get(opts, :pubsub, BDS.PubSub)
+      pubsub: Keyword.get(opts, :pubsub, BDS.PubSub),
+      data_version_reader: Keyword.get(opts, :data_version_reader, &CliSync.data_version/0),
+      notification_fetcher:
+        Keyword.get(opts, :notification_fetcher, &CliSync.db_file_change_detected/0),
+      pruner: Keyword.get(opts, :pruner, &CliSync.prune_notifications/0),
+      last_data_version: nil
     }
 
     {:ok, schedule_poll(state)}
@@ -49,18 +54,24 @@ defmodule BDS.CliSync.Watcher do
   end
 
   defp process_notifications(state) do
-    {:ok, notifications} = CliSync.db_file_change_detected()
-    {:ok, _pruned} = CliSync.prune_notifications()
+    current_data_version = state.data_version_reader.()
 
-    Enum.each(notifications, fn notification ->
-      Phoenix.PubSub.broadcast(
-        state.pubsub,
-        topic(),
-        {:entity_changed, notification_payload(notification)}
-      )
-    end)
+    if state.last_data_version == current_data_version do
+      %{state | last_data_version: current_data_version}
+    else
+      {:ok, notifications} = state.notification_fetcher.()
+      {:ok, _pruned} = state.pruner.()
 
-    state
+      Enum.each(notifications, fn notification ->
+        Phoenix.PubSub.broadcast(
+          state.pubsub,
+          topic(),
+          {:entity_changed, notification_payload(notification)}
+        )
+      end)
+
+      %{state | last_data_version: current_data_version}
+    end
   end
 
   defp notification_payload(notification) do

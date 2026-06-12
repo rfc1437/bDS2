@@ -914,6 +914,21 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert message =~ "Project database is not initialized"
   end
 
+  test "rebuild sequencing waits on task messages instead of sleep polling" do
+    source = File.read!("lib/bds/desktop/shell_commands.ex")
+
+    func_source =
+      Regex.scan(~r/defp wait_for_group_phase(?:_message)?\(.*?(?=\n  defp |\nend)/s, source)
+      |> Enum.map(&List.first/1)
+      |> Enum.join("\n")
+
+    refute String.contains?(func_source, "Process.sleep"),
+           "wait_for_group_phase should not use sleep polling"
+
+    assert String.contains?(func_source, "Phoenix.PubSub.subscribe")
+    assert String.contains?(func_source, "receive")
+  end
+
   defp wait_for_task(task_id, matcher, timeout \\ 2_000)
 
   defp wait_for_task(task_id, _matcher, timeout) when timeout <= 0 do

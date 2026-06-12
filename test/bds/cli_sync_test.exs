@@ -76,6 +76,47 @@ defmodule BDS.CliSyncTest do
     assert is_integer(seen_notification.seen_at)
   end
 
+  test "watcher skips notification queries when sqlite data_version is unchanged" do
+    test_pid = self()
+    data_version = :erlang.make_ref()
+    :persistent_term.put(data_version, [7, 7])
+
+    data_version_reader = fn ->
+      [next | rest] = :persistent_term.get(data_version)
+      :persistent_term.put(data_version, rest)
+      next
+    end
+
+    notification_fetcher = fn ->
+      send(test_pid, :notifications_fetched)
+      {:ok, []}
+    end
+
+    pruner = fn ->
+      send(test_pid, :notifications_pruned)
+      {:ok, %{processed: 0, unprocessed: 0}}
+    end
+
+    on_exit(fn -> :persistent_term.erase(data_version) end)
+
+    watcher =
+      start_supervised!(
+        {Watcher,
+         poll_interval_ms: 60_000,
+         data_version_reader: data_version_reader,
+         notification_fetcher: notification_fetcher,
+         pruner: pruner}
+      )
+
+    :ok = Watcher.poll_now(watcher)
+    assert_receive :notifications_fetched, 500
+    assert_receive :notifications_pruned, 500
+
+    :ok = Watcher.poll_now(watcher)
+    refute_receive :notifications_fetched, 100
+    refute_receive :notifications_pruned, 100
+  end
+
   test "processed notifications are pruned after one hour and unprocessed notifications after one day" do
     now = BDS.Persistence.now_ms()
 

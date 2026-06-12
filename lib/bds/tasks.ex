@@ -7,10 +7,13 @@ defmodule BDS.Tasks do
   @default_progress_throttle_ms 250
   @default_recent_finished_limit 10
   @default_finished_task_ttl_ms :timer.hours(1)
+  @topic "tasks"
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
+
+  def topic, do: @topic
 
   def submit_task(name, work, attrs \\ %{})
       when is_binary(name) and is_function(work, 1) and is_map(attrs) do
@@ -136,6 +139,8 @@ defmodule BDS.Tasks do
           |> start_queued_tasks()
           |> schedule_finished_task_eviction()
 
+        broadcast_terminal_task(next_state.tasks[task_id])
+
         {:reply, :ok, next_state}
 
       Enum.any?(state.queue, fn {queued_id, _work} -> queued_id == task_id end) ->
@@ -147,6 +152,8 @@ defmodule BDS.Tasks do
           end)
           |> start_queued_tasks()
           |> schedule_finished_task_eviction()
+
+        broadcast_terminal_task(next_state.tasks[task_id])
 
         {:reply, :ok, next_state}
 
@@ -179,6 +186,8 @@ defmodule BDS.Tasks do
       |> start_queued_tasks()
       |> schedule_finished_task_eviction()
 
+    broadcast_terminal_task(next_state.tasks[task_id])
+
     {:reply, :ok, next_state}
   end
 
@@ -192,6 +201,8 @@ defmodule BDS.Tasks do
       })
       |> start_queued_tasks()
       |> schedule_finished_task_eviction()
+
+    broadcast_terminal_task(next_state.tasks[task_id])
 
     {:reply, :ok, next_state}
   end
@@ -240,6 +251,10 @@ defmodule BDS.Tasks do
           |> start_queued_tasks()
           |> schedule_finished_task_eviction()
 
+        if task.status != :cancelled do
+          broadcast_terminal_task(next_state.tasks[task_id])
+        end
+
         {:noreply, next_state}
     end
   end
@@ -270,6 +285,10 @@ defmodule BDS.Tasks do
           |> remove_running(task_id, ref)
           |> start_queued_tasks()
           |> schedule_finished_task_eviction()
+
+        if task.status != :cancelled and next_state.tasks[task_id].status == :failed do
+          broadcast_terminal_task(next_state.tasks[task_id])
+        end
 
         {:noreply, next_state}
     end
@@ -361,6 +380,14 @@ defmodule BDS.Tasks do
       task -> Map.merge(task, attrs)
     end)
   end
+
+  defp broadcast_terminal_task(nil), do: :ok
+
+  defp broadcast_terminal_task(task) when task.status in [:completed, :failed, :cancelled] do
+    Phoenix.PubSub.broadcast(BDS.PubSub, topic(), {:task_terminal, public_task(task)})
+  end
+
+  defp broadcast_terminal_task(_task), do: :ok
 
   defp schedule_finished_task_eviction(state) do
     Process.send_after(self(), :evict_finished_tasks, finished_task_ttl_ms())

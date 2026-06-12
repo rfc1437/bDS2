@@ -547,7 +547,20 @@ file. Consider whether `scp_uploads` state should be ETS
 **Acceptance.** Upload of N files makes O(1) GenServer calls for mtime
 bookkeeping, not O(N)·2; behavior identical for incremental uploads.
 
-### TD-14: Replace polling with messaging (CliSync watcher + rebuild sequencing)
+### TD-14: Replace polling with messaging (CliSync watcher + rebuild sequencing) ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.CliSync.Watcher` now gates notification-table
+work behind SQLite `PRAGMA data_version`, so unchanged databases no longer force
+repeated `db_notifications` queries at the 100 ms watch cadence; the watcher
+still performs a real notification fetch/prune pass on the first poll and on
+every external commit boundary. Rebuild sequencing in
+`BDS.Desktop.ShellCommands` no longer sleep-polls `Tasks.list_tasks/0`.
+`BDS.Tasks` now broadcasts terminal task states on `BDS.PubSub`, and
+`wait_for_group_phase/3` subscribes and waits on those messages with the same
+deadline semantics. Coverage now includes a watcher test that proves unchanged
+`data_version` skips notification queries, a tasks test that proves terminal
+state broadcasts, and a shell-command guard test that forbids `Process.sleep`
+polling in the rebuild wait path.
 
 **Context.** Two polling loops:
 1. `CliSync.Watcher` polls the SQLite notifications table every **100 ms

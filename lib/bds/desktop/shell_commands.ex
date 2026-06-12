@@ -559,27 +559,62 @@ defmodule BDS.Desktop.ShellCommands do
     end
   end
 
-  defp wait_for_group_phase(_group_id, _names, timeout) when timeout <= 0, do: :timeout
-
   defp wait_for_group_phase(group_id, names, timeout) do
+    if timeout <= 0 do
+      :timeout
+    else
+      Phoenix.PubSub.subscribe(BDS.PubSub, Tasks.topic())
+
+      try do
+        case group_phase_status(group_id, names) do
+          :waiting -> wait_for_group_phase_message(group_id, names, timeout)
+          status -> status
+        end
+      after
+        Phoenix.PubSub.unsubscribe(BDS.PubSub, Tasks.topic())
+      end
+    end
+  end
+
+  defp wait_for_group_phase_message(group_id, names, timeout) do
+    started_at = System.monotonic_time(:millisecond)
+
+    receive do
+      {:task_terminal, task} ->
+        elapsed = System.monotonic_time(:millisecond) - started_at
+
+        cond do
+          task.group_id == group_id and task.name in names and task.status == :failed ->
+            :failed
+
+          task.group_id == group_id and task.name in names ->
+            case group_phase_status(group_id, names) do
+              :waiting ->
+                wait_for_group_phase_message(group_id, names, timeout - elapsed)
+
+              status ->
+                status
+            end
+
+          true ->
+            wait_for_group_phase_message(group_id, names, timeout - elapsed)
+        end
+    after
+      timeout ->
+        :timeout
+    end
+  end
+
+  defp group_phase_status(group_id, names) do
     tasks =
       BDS.Tasks.list_tasks()
       |> Enum.filter(&(&1.group_id == group_id and &1.name in names))
 
     cond do
-      length(tasks) < length(names) ->
-        Process.sleep(50)
-        wait_for_group_phase(group_id, names, timeout - 50)
-
-      Enum.any?(tasks, &(&1.status == :failed)) ->
-        :failed
-
-      Enum.all?(tasks, &(&1.status == :completed)) ->
-        :ok
-
-      true ->
-        Process.sleep(50)
-        wait_for_group_phase(group_id, names, timeout - 50)
+      length(tasks) < length(names) -> :waiting
+      Enum.any?(tasks, &(&1.status == :failed)) -> :failed
+      Enum.all?(tasks, &(&1.status == :completed)) -> :ok
+      true -> :waiting
     end
   end
 

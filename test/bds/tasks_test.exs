@@ -266,6 +266,20 @@ defmodule BDS.TasksTest do
     assert running.id in task_ids
   end
 
+  test "terminal task states are broadcast on PubSub" do
+    Phoenix.PubSub.subscribe(BDS.PubSub, BDS.Tasks.topic())
+
+    assert {:ok, completed} =
+             BDS.Tasks.submit_task("broadcast completion", fn _report -> {:ok, :done} end,
+               %{group_id: "broadcast-group", group_name: "Maintenance"}
+             )
+
+    assert_receive {:task_terminal, task_event}, 1_000
+    assert task_event.id == completed.id
+    assert task_event.group_id == "broadcast-group"
+    assert task_event.status == :completed
+  end
+
   defp receive_started do
     receive do
       {:started, name, pid} -> {name, pid}

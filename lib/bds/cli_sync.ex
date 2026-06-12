@@ -54,6 +54,11 @@ defmodule BDS.CliSync do
      end)}
   end
 
+  def data_version do
+    %{rows: [[version]]} = Repo.query!("PRAGMA data_version", [])
+    version
+  end
+
   def prune_notifications(now \\ Persistence.now_ms()) when is_integer(now) do
     {processed_count, _} =
       Repo.delete_all(
