@@ -13,6 +13,7 @@ defmodule BDS.Preview do
 
   @host "127.0.0.1"
   @port 4123
+  @server_table __MODULE__.ServerTable
 
   # Max time to wait for inflight requests to finish during graceful shutdown
   # before remaining request tasks are forcibly terminated.
@@ -48,18 +49,24 @@ defmodule BDS.Preview do
 
   def request(project_id, request_path) when is_binary(project_id) and is_binary(request_path) do
     {path, query_params} = split_request_path(request_path)
-    GenServer.call(__MODULE__, {:request, project_id, path, query_params})
+
+    run_tracked_request(fn ->
+      resolve_preview_request(project_id, path, query_params)
+    end)
   end
 
   def preview_draft(project_id, request_path, post_id)
       when is_binary(project_id) and is_binary(request_path) and is_binary(post_id) do
     {_path, query_params} = split_request_path(request_path)
 
-    GenServer.call(__MODULE__, {:preview_draft, project_id, query_params, post_id})
+    run_tracked_request(fn ->
+      resolve_draft_preview_request(project_id, query_params, post_id)
+    end)
   end
 
   @impl true
   def init(_state) do
+    ensure_server_table!()
     {:ok, %{current: nil, stopping: nil}}
   end
 
@@ -90,57 +97,6 @@ defmodule BDS.Preview do
     end
   end
 
-  def handle_call({:request, project_id, request_path, query_params}, _from, state) do
-    with :ok <- ensure_running(state.current, project_id),
-         {:ok, response} <- resolve_request(state.current, request_path, query_params) do
-      {:reply, {:ok, response}, state}
-    else
-      {:error, reason} -> {:reply, {:error, reason}, state}
-    end
-  end
-
-  def handle_call({:preview_draft, project_id, query_params, post_id}, _from, state) do
-    with :ok <- ensure_running(state.current, project_id),
-         {:ok, payload} <- load_draft_preview_payload(project_id, post_id, query_params) do
-      body =
-        case Rendering.render_post_page(project_id, payload.template_slug, payload) do
-          {:ok, rendered} -> rendered
-          {:error, _reason} -> render_draft(payload)
-        end
-        |> apply_preview_overrides(query_params)
-
-      response = %{
-        content_type: "text/html",
-        body: body
-      }
-
-      {:reply, {:ok, response}, state}
-    else
-      {:error, :not_found} = error -> {:reply, error, state}
-      {:error, reason} -> {:reply, {:error, reason}, state}
-    end
-  end
-
-  def handle_call({:http_request, project_id, method, request_path, query_params}, _from, state) do
-    response =
-      with :ok <- ensure_running(state.current, project_id),
-           :ok <- ensure_get(method) do
-        case query_params["post_id"] do
-          post_id when is_binary(post_id) ->
-            if String.starts_with?(request_path, "/draft/") or query_params["draft"] == "true" do
-              resolve_draft_request(project_id, post_id, query_params)
-            else
-              resolve_request(state.current, request_path, query_params)
-            end
-
-          _other ->
-            resolve_request(state.current, request_path, query_params)
-        end
-      end
-
-    {:reply, response, state}
-  end
-
   @impl true
   def handle_cast({:track_request, pid}, %{current: %{} = current} = state) when is_pid(pid) do
     ref = Process.monitor(pid)
@@ -167,6 +123,43 @@ defmodule BDS.Preview do
 
   defp ensure_running(%{project_id: project_id, is_running: true}, project_id), do: :ok
   defp ensure_running(_server, _project_id), do: {:error, :not_running}
+
+  defp resolve_preview_request(project_id, request_path, query_params) do
+    with {:ok, server} <- current_server(project_id),
+         {:ok, response} <- run_request(fn -> resolve_request(server, request_path, query_params) end) do
+      {:ok, response}
+    end
+  end
+
+  defp resolve_draft_preview_request(project_id, query_params, post_id) do
+    with {:ok, _server} <- current_server(project_id),
+         {:ok, response} <-
+           run_request(fn -> resolve_draft_request(project_id, post_id, query_params) end) do
+      {:ok, response}
+    else
+      {:error, :not_found} = error -> error
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp resolve_http_request(project_id, method, request_path, query_params) do
+    with {:ok, server} <- current_server(project_id),
+         :ok <- ensure_get(method) do
+      run_request(fn ->
+        case query_params["post_id"] do
+          post_id when is_binary(post_id) ->
+            if String.starts_with?(request_path, "/draft/") or query_params["draft"] == "true" do
+              resolve_draft_request(project_id, post_id, query_params)
+            else
+              resolve_request(server, request_path, query_params)
+            end
+
+          _other ->
+            resolve_request(server, request_path, query_params)
+        end
+      end)
+    end
+  end
 
   defp resolve_request(server, request_path, query_params) do
     case PreviewAssets.response(request_path) do
@@ -311,10 +304,11 @@ defmodule BDS.Preview do
     end
   end
 
-  defp accept_loop(listener, project_id) do
+  defp accept_loop(listener, project_id, owner_pid) do
     case :gen_tcp.accept(listener) do
       {:ok, socket} ->
         case Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
+               maybe_allow_repo(owner_pid)
                serve_client(socket, project_id)
              end) do
           {:ok, pid} ->
@@ -327,7 +321,7 @@ defmodule BDS.Preview do
             :ok
         end
 
-        accept_loop(listener, project_id)
+        accept_loop(listener, project_id, owner_pid)
 
       {:error, :closed} ->
         :ok
@@ -373,11 +367,7 @@ defmodule BDS.Preview do
     path = uri.path || "/"
     query_params = URI.decode_query(uri.query || "")
 
-    case GenServer.call(
-           __MODULE__,
-           {:http_request, project_id, method, path, query_params},
-           5_000
-         ) do
+    case resolve_http_request(project_id, method, path, query_params) do
       {:ok, response} -> http_ok_response(response)
       {:error, :not_found} -> http_error_response(404)
       {:error, :not_running} -> http_error_response(503)
@@ -453,14 +443,18 @@ defmodule BDS.Preview do
   # is parked (no immediate reply) and finalized from the :DOWN handlers, so the
   # GenServer stays available to serve the requests it is draining.
   defp begin_graceful_stop(%{current: current} = state, from) do
+    current = %{current | is_running: false}
+    put_current_server(current)
+
     _ = :gen_tcp.close(current.listener)
     if is_pid(current.acceptor_pid), do: Process.exit(current.acceptor_pid, :normal)
 
     if map_size(current.inflight) == 0 do
+      clear_current_server()
       {:reply, :ok, %{state | current: nil, stopping: nil}}
     else
       timer = Process.send_after(self(), :drain_timeout, @drain_timeout)
-      {:noreply, %{state | stopping: %{from: from, timer: timer}}}
+      {:noreply, %{state | current: current, stopping: %{from: from, timer: timer}}}
     end
   end
 
@@ -469,6 +463,7 @@ defmodule BDS.Preview do
        )
        when map_size(inflight) == 0 do
     if is_reference(timer), do: Process.cancel_timer(timer)
+    clear_current_server()
     GenServer.reply(from, :ok)
     %{state | current: nil, stopping: nil}
   end
@@ -477,6 +472,7 @@ defmodule BDS.Preview do
 
   defp force_finalize_stop(%{stopping: %{from: from}, current: %{inflight: inflight}} = state) do
     kill_inflight(inflight)
+    clear_current_server()
     GenServer.reply(from, :ok)
     %{state | current: nil, stopping: nil}
   end
@@ -488,6 +484,7 @@ defmodule BDS.Preview do
     _ = :gen_tcp.close(current.listener)
     if is_pid(current.acceptor_pid), do: Process.exit(current.acceptor_pid, :normal)
     kill_inflight(current.inflight)
+    clear_current_server()
     %{state | current: nil}
   end
 
@@ -513,7 +510,7 @@ defmodule BDS.Preview do
         ip: {127, 0, 0, 1}
       ])
 
-    acceptor_pid = spawn_link(fn -> accept_loop(listener, project_id) end)
+    acceptor_pid = spawn_link(fn -> accept_loop(listener, project_id, owner_pid) end)
 
     server = %{
       project_id: project_id,
@@ -521,12 +518,68 @@ defmodule BDS.Preview do
       host: @host,
       port: @port,
       is_running: true,
+      owner_pid: owner_pid,
       listener: listener,
       acceptor_pid: acceptor_pid,
       inflight: %{}
     }
 
+    put_current_server(server)
     {{:ok, public_server(server)}, %{state | current: server}}
+  end
+
+  defp run_tracked_request(fun) when is_function(fun, 0) do
+    owner_pid = self()
+
+    task =
+      Task.Supervisor.async_nolink(BDS.TCP.TaskSupervisor, fn ->
+        maybe_allow_repo(owner_pid)
+        fun.()
+      end)
+
+    GenServer.cast(__MODULE__, {:track_request, task.pid})
+    Task.await(task, :infinity)
+  end
+
+  defp run_request(fun) when is_function(fun, 0) do
+    case Application.get_env(:bds, __MODULE__, []) |> Keyword.get(:request_runner) do
+      {module, opts} -> module.run(fun, opts)
+      nil -> fun.()
+    end
+  end
+
+  defp ensure_server_table! do
+    case :ets.whereis(@server_table) do
+      :undefined ->
+        :ets.new(@server_table, [:named_table, :public, :set, read_concurrency: true])
+        :ok
+
+      _table ->
+        :ok
+    end
+  end
+
+  defp current_server(project_id) do
+    case :ets.lookup(@server_table, :current) do
+      [{:current, %{project_id: ^project_id} = server}] ->
+        case ensure_running(server, project_id) do
+          :ok -> {:ok, server}
+          {:error, reason} -> {:error, reason}
+        end
+
+      _other ->
+        {:error, :not_running}
+    end
+  end
+
+  defp put_current_server(server) do
+    true = :ets.insert(@server_table, {:current, server})
+    :ok
+  end
+
+  defp clear_current_server do
+    true = :ets.delete(@server_table, :current)
+    :ok
   end
 
   defp public_server(server) do

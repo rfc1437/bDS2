@@ -1,3 +1,17 @@
+defmodule BDS.PreviewTest.SlowRequestRunner do
+  def run(fun, %{controller: controller}) when is_function(fun, 0) and is_pid(controller) do
+    send(controller, {:preview_request_started, self()})
+
+    receive do
+      :continue -> :ok
+    after
+      1_000 -> :ok
+    end
+
+    fun.()
+  end
+end
+
 defmodule BDS.PreviewTest do
   use ExUnit.Case, async: false
 
@@ -744,6 +758,117 @@ defmodule BDS.PreviewTest do
     assert_receive {:stopped, :ok}, 2_000
 
     :gen_tcp.close(socket)
+  end
+
+  test "preview HTTP requests overlap instead of serializing through the GenServer", %{
+    project: project
+  } do
+    :inets.start()
+
+    Application.put_env(:bds, BDS.Preview,
+      request_runner: {BDS.PreviewTest.SlowRequestRunner, %{controller: self()}}
+    )
+
+    on_exit(fn ->
+      Application.delete_env(:bds, BDS.Preview)
+    end)
+
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Concurrent Preview",
+               content: "Body",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, server} = BDS.Preview.start_preview(project.id)
+
+    published_at = DateTime.from_unix!(published_post.created_at, :millisecond)
+
+    request_url =
+      "http://#{server.host}:#{server.port}/#{published_at.year}/#{String.pad_leading(Integer.to_string(published_at.month), 2, "0")}/#{String.pad_leading(Integer.to_string(published_at.day), 2, "0")}/#{published_post.slug}"
+
+    request = fn ->
+      :httpc.request(:get, {to_charlist(request_url), []}, [], body_format: :binary)
+    end
+
+    task_one = Task.async(request)
+    task_two = Task.async(request)
+
+    assert_receive {:preview_request_started, first_pid}, 500
+    assert_receive {:preview_request_started, second_pid}, 500
+    refute first_pid == second_pid
+
+    send(first_pid, :continue)
+    send(second_pid, :continue)
+
+    assert {:ok, {{_version, 200, _reason}, _headers, body_one}} = Task.await(task_one, 2_000)
+    assert {:ok, {{_version, 200, _reason}, _headers, body_two}} = Task.await(task_two, 2_000)
+    assert body_one =~ "Concurrent Preview"
+    assert body_two =~ "Concurrent Preview"
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "stop_preview waits for an inflight render to finish", %{project: project} do
+    Application.put_env(:bds, BDS.Preview,
+      request_runner: {BDS.PreviewTest.SlowRequestRunner, %{controller: self()}}
+    )
+
+    on_exit(fn ->
+      Application.delete_env(:bds, BDS.Preview)
+    end)
+
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Drain Preview",
+               content: "Body",
+               language: "en"
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    published_at = DateTime.from_unix!(published_post.created_at, :millisecond)
+
+    request_path =
+      "/#{published_at.year}/#{String.pad_leading(Integer.to_string(published_at.month), 2, "0")}/#{String.pad_leading(Integer.to_string(published_at.day), 2, "0")}/#{published_post.slug}"
+
+    request_task =
+      Task.async(fn ->
+        BDS.Preview.request(project.id, request_path)
+      end)
+
+    assert_receive {:preview_request_started, render_pid}, 500
+
+    stopper =
+      Task.async(fn ->
+        BDS.Preview.stop_preview(project.id)
+      end)
+
+    refute Task.yield(stopper, 200)
+
+    send(render_pid, :continue)
+
+    assert {:ok, %{body: body, content_type: "text/html"}} = Task.await(request_task, 2_000)
+    assert body =~ "Drain Preview"
+    assert :ok = Task.await(stopper, 2_000)
   end
 
   test "preview query params can override the rendered theme for generated and draft pages", %{

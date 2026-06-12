@@ -451,7 +451,18 @@ error like the existing `%{kind: :auth, ...}` shape so the UI can toast it.
 
 ## Phase 3 — Process architecture (de-bottleneck singletons)
 
-### TD-11: Move preview rendering out of the `BDS.Preview` GenServer
+### TD-11: Move preview rendering out of the `BDS.Preview` GenServer ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.Preview` now keeps only preview-server lifecycle and
+drain coordination in the GenServer. The current server state lives in a public
+ETS table, so both direct preview calls and socket-served HTTP requests resolve
+against that fast state read and render outside the singleton owner process.
+Direct `request/2` and `preview_draft/3` calls now run in short-lived tracked
+tasks, while TCP request workers render inline after inheriting the test sandbox
+allowance; graceful stop flips `is_running` false in ETS before draining and
+waits for those tracked render workers to finish. Coverage now proves two real
+HTTP preview renders can be in flight at once and that `stop_preview/1` waits
+for a blocked render to complete before returning.
 
 **Context.** Every preview HTTP request (`Preview.request/2`,
 `preview_draft/3`) renders Markdown + Liquid **inside** the singleton
