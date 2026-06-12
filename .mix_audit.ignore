@@ -1,0 +1,4 @@
+# GHSA-rhv4-8758-jx7v is pinned transitively through bumblebee -> progress_bar.
+# ecto_sqlite3 0.24.x can move to decimal 3.x, but that line is currently
+# unsatisfiable alongside the app's Bumblebee dependency.
+GHSA-rhv4-8758-jx7v

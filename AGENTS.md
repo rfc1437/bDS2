@@ -28,7 +28,7 @@ This document provides context and best practices for GitHub Copilot when workin
 - we have an allium spec in the specs/ folder. you must weed the specs against built code to make sure you follow the spec.
 - when changing the spec, validate the spec with the available command line tool.
 - you MUST run tests with command line tools at least once to capture compile errors in tests, do not use the integrated testing of vscode, as that blocks on compile errors
-- you MUST run build, test and check dialyzer messages and you MUST treet warnings as errors and fix them. we want clean builds, clean tests and clean dialyzer results
+- you MUST run build, test, credo, deps.audit and check dialyzer messages and you MUST treet warnings as errors and fix them. we want clean builds, clean tests, clean credo, clean dependency audits and clean dialyzer results
 - on a headless Linux machine, you have to run tests with this command (if mix test complains about DISPLAX): xvfb-run mix test
 
 ---

@@ -22,6 +22,10 @@ defmodule BDS.MixProject do
     ]
   end
 
+  def cli do
+    [preferred_envs: [validate: :test]]
+  end
+
   defp deps do
     [
       {:ecto_sql, "~> 3.13"},
@@ -49,6 +53,8 @@ defmodule BDS.MixProject do
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:lazy_html, ">= 0.1.0", only: :test},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
@@ -62,7 +68,7 @@ defmodule BDS.MixProject do
       "assets.build": ["tailwind default", "esbuild default"],
       "assets.deploy": ["tailwind default --minify", "esbuild default --minify"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
-      validate: ["test", "dialyzer"]
+      validate: ["test", "credo --strict", "deps.audit --ignore-file .mix_audit.ignore", "dialyzer"]
     ]
   end
 

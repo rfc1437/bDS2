@@ -728,7 +728,21 @@ close.
 its current persisted-status model and the task closes without an Oban
 migration.
 
-### TD-19: Add credo, mix_audit (and consider sobelow) to the quality gates
+### TD-19: Add credo, mix_audit (and consider sobelow) to the quality gates ✅ DONE (2026-06-12)
+
+**Status: implemented.** `mix.exs` now adds `credo` and `mix_audit` as
+dev/test-only tooling, and `mix validate` runs in the test environment with
+all four gates wired in: tests, Credo, dependency audit, and dialyzer.
+`.credo.exs` deliberately scopes the initial baseline to stable, actionable
+checks and explicitly disables the repo-wide legacy style/refactor rules that
+would otherwise drown the signal. The dependency audit is clean except for one
+documented upstream exception in `.mix_audit.ignore`:
+`GHSA-rhv4-8758-jx7v` remains unavoidable while `bumblebee` depends on
+`progress_bar ~> 3.0`, which pins `decimal ~> 2.0`; the higher-signal Phoenix
+advisory was removed by updating the lockfile to `phoenix 1.8.8`.
+Sobelow was evaluated and not adopted: for this desktop app's loopback-only
+endpoint it would mostly duplicate checks already covered by compile/test,
+Credo, and dependency audit while adding little release signal.
 
 **Context.** The project enforces dialyzer + warnings-as-errors but has no
 style/consistency linter and no dependency CVE audit. Cheap, high-leverage
