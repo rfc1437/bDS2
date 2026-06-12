@@ -691,7 +691,19 @@ to `@stemmer_algorithms` keys; default `"en"` unchanged. Delete
 **Acceptance.** Misclassification fixtures (umlaut-free German, accented-free
 French) detect correctly; stemmer selection unchanged for English.
 
-### TD-18: Evaluate Oban (Lite engine) for durable jobs
+### TD-18: Evaluate Oban (Lite engine) for durable jobs ✅ DONE (2026-06-12)
+
+**Status: evaluated; no-go for now.** `BDS.Publishing` already persists
+`PublishJob` rows and the suite proves those rows survive a
+`BDS.Publishing` restart; what it does **not** provide is durable mid-upload
+resume/retry, and the current desktop spec does not require that behavior.
+Moving publishing to Oban Lite now would add another coordination layer on top
+of `BDS.Tasks`, force a redesign of the in-memory SCP mtime cache in
+`BDS.Publishing`, and complicate the existing Ecto sandbox/release split for a
+benefit that is not yet part of the product contract. `BDS.Scripting.JobStore`
+and `BDS.Tasks` remain intentionally in-memory: they provide UI/runtime job
+tracking, not durable work queues. Re-open this only if real crash-recovery
+requirements emerge and a spike shows acceptable desktop binary/startup impact.
 
 **Context.** Three overlapping job systems exist: in-memory UI tasks
 (`BDS.Tasks`), DB-persisted publish jobs (`Publishing` + `PublishJob` rows),
@@ -712,8 +724,9 @@ check interplay with the test sandbox and with the `bds_mcp` release. Write
 up a go/no-go with the spike branch. If no-go, document why in this file and
 close.
 
-**Acceptance.** Decision documented; if go: publishing migrated first, with
-crash-recovery test (kill app mid-upload, job resumes/retries on restart).
+**Acceptance.** Decision documented. Outcome: no-go for now; publishing keeps
+its current persisted-status model and the task closes without an Oban
+migration.
 
 ### TD-19: Add credo, mix_audit (and consider sobelow) to the quality gates
 
