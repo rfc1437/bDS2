@@ -385,7 +385,17 @@ production code.
 **Acceptance.** Production module has zero sandbox references; full suite
 green.
 
-### TD-09: Graceful task cancellation in `BDS.Tasks`
+### TD-09: Graceful task cancellation in `BDS.Tasks` ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.Tasks.cancel_task/1` and
+`BDS.Scripting.JobRunner.handle_call(:cancel, ...)` now terminate supervised
+workers through their owning `Task.Supervisor` (`terminate_child/2`), so the
+worker receives `:shutdown` instead of an immediate `:kill`. Queue bookkeeping
+and `:cancelled` status semantics are unchanged, but cooperative cleanup now
+runs before the slot is freed. Coverage now includes a task worker that traps
+exits, confirms cleanup executes on cancellation, and proves the queued task is
+promoted afterward, plus a managed scripting job runtime test that traps exits
+and observes the same shutdown-driven cleanup path.
 
 **Context.** `Tasks.cancel_task/1` uses `Process.exit(pid, :kill)` — the
 worker gets no chance to clean up mid-upload or mid-file-write

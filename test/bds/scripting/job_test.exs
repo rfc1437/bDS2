@@ -36,6 +36,30 @@ defmodule BDS.Scripting.JobTest do
     end
   end
 
+  defmodule ShutdownAwareRuntime do
+    @behaviour BDS.Scripting.Runtime
+
+    @impl true
+    def validate(_source), do: :ok
+
+    @impl true
+    def execute(_source, _entrypoint, _args, opts) do
+      Process.flag(:trap_exit, true)
+
+      if callback = Keyword.get(opts, :on_progress) do
+        callback.(%{"phase" => "started", "current" => 1, "total" => 2})
+      end
+
+      test_pid = Keyword.fetch!(opts, :test_pid)
+
+      receive do
+        {:EXIT, _from, :shutdown} ->
+          send(test_pid, :job_cleanup_ran)
+          {:ok, :cancelled}
+      end
+    end
+  end
+
   setup do
     original = Application.fetch_env!(:bds, :scripting)
 
@@ -85,6 +109,25 @@ defmodule BDS.Scripting.JobTest do
     _running_job = wait_for_job(job.id, &(&1.status == :running))
 
     assert :ok = BDS.Scripting.cancel_job(job.id)
+
+    cancelled_job = wait_for_job(job.id, &(&1.status == :cancelled))
+    assert cancelled_job.finished_at != nil
+  end
+
+  test "cancelled managed script jobs receive shutdown for cleanup" do
+    Application.put_env(:bds, :scripting,
+      runtime: ShutdownAwareRuntime,
+      timeout: 300_000,
+      max_reductions: 5_000_000,
+      job_timeout: :infinity,
+      job_max_reductions: :none
+    )
+
+    assert {:ok, job} = BDS.Scripting.start_job("irrelevant", "main", [], test_pid: self())
+    _running_job = wait_for_job(job.id, &(&1.status == :running))
+
+    assert :ok = BDS.Scripting.cancel_job(job.id)
+    assert_receive :job_cleanup_ran, 1_000
 
     cancelled_job = wait_for_job(job.id, &(&1.status == :cancelled))
     assert cancelled_job.finished_at != nil

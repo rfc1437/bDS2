@@ -127,7 +127,7 @@ defmodule BDS.Tasks do
     cond do
       Map.has_key?(state.running, task_id) ->
         %{pid: pid, ref: ref} = state.running[task_id]
-        Process.exit(pid, :kill)
+        _ = Task.Supervisor.terminate_child(BDS.Tasks.TaskSupervisor, pid)
 
         next_state =
           state

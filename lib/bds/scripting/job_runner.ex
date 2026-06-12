@@ -66,7 +66,7 @@ defmodule BDS.Scripting.JobRunner do
   @impl true
   def handle_call(:cancel, _from, state) do
     if is_pid(state.task_pid) do
-      Process.exit(state.task_pid, :kill)
+      _ = Task.Supervisor.terminate_child(BDS.Scripting.TaskSupervisor, state.task_pid)
     end
 
     :ok =

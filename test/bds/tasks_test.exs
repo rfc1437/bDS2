@@ -95,6 +95,41 @@ defmodule BDS.TasksTest do
     assert wait_for_task(third.id, &(&1.status == :completed)).status == :completed
   end
 
+  test "cancel_task delivers shutdown so cleanup runs before freeing the slot" do
+    Application.put_env(:bds, :tasks, max_concurrent: 1, progress_throttle_ms: 250)
+
+    runner = self()
+
+    cleanup_work = fn _report ->
+      Process.flag(:trap_exit, true)
+      send(runner, {:started, "cleanup", self()})
+
+      receive do
+        {:EXIT, _from, :shutdown} ->
+          send(runner, :cleanup_ran)
+          {:ok, :cancelled}
+      end
+    end
+
+    queued_work = fn _report ->
+      send(runner, {:started, "queued", self()})
+      {:ok, :queued_completed}
+    end
+
+    assert {:ok, running} = BDS.Tasks.submit_task("cleanup", cleanup_work)
+    assert {:ok, queued} = BDS.Tasks.submit_task("queued", queued_work)
+
+    assert {"cleanup", _pid} = receive_started()
+    assert BDS.Tasks.get_task(queued.id).status == :pending
+
+    assert :ok = BDS.Tasks.cancel_task(running.id)
+    assert_receive :cleanup_ran, 1_000
+    assert wait_for_task(running.id, &(&1.status == :cancelled)).status == :cancelled
+
+    assert {"queued", _pid} = receive_started()
+    assert wait_for_task(queued.id, &(&1.status == :completed)).result == :queued_completed
+  end
+
   test "progress reports within 250ms throttle window are silently dropped" do
     assert {:ok, task} = BDS.Tasks.register_external_task("fast progress")
 
