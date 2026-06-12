@@ -2,6 +2,7 @@ defmodule BDS.ImportAnalysis do
   @moduledoc false
 
   import Ecto.Query
+  require Logger
 
   alias BDS.Media.Media
   alias BDS.Posts.Post
@@ -25,7 +26,12 @@ defmodule BDS.ImportAnalysis do
     wxr_data = WxrParser.parse_file(wxr_file_path)
     {:ok, build_report(project_id, wxr_data, wxr_file_path, uploads_folder_path, on_progress)}
   rescue
-    error -> {:error, %{message: Exception.message(error)}}
+    error ->
+      Logger.warning(
+        "import analysis failed project_id=#{project_id} file=#{wxr_file_path}: #{Exception.message(error)}"
+      )
+
+      {:error, %{message: Exception.message(error)}}
   end
 
   defp build_report(project_id, wxr_data, wxr_file_path, uploads_folder_path, on_progress) do
@@ -459,7 +465,7 @@ defmodule BDS.ImportAnalysis do
         value
     end
   rescue
-    _error -> nil
+    _error in [ArgumentError] -> nil
   end
 
   defp year_from(value) when is_binary(value) do
@@ -491,7 +497,12 @@ defmodule BDS.ImportAnalysis do
     try do
       callback.(step, detail)
     rescue
-      _error -> :ok
+      error ->
+        Logger.warning(
+          "import analysis progress callback failed step=#{inspect(step)}: #{Exception.message(error)}"
+        )
+
+        :ok
     end
 
     :ok

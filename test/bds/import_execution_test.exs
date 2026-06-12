@@ -112,6 +112,34 @@ defmodule BDS.ImportExecutionTest do
     assert File.exists?(Path.join(temp_dir, imported_media.file_path))
   end
 
+  import ExUnit.CaptureLog
+
+  test "execute_import logs and continues when the progress callback raises", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    uploads_dir = Path.join(temp_dir, "uploads")
+    File.mkdir_p!(Path.join(uploads_dir, "2024/05"))
+    File.write!(Path.join(uploads_dir, "2024/05/import-asset.txt"), "legacy attachment")
+
+    wxr_path = Path.join(temp_dir, "legacy.xml")
+    File.write!(wxr_path, basic_wxr_xml())
+
+    assert {:ok, report} = ImportAnalysis.analyze_wxr(project.id, wxr_path, uploads_dir)
+
+    log =
+      capture_log(fn ->
+        assert {:ok, _result} =
+                 ImportExecution.execute_import(project.id, report,
+                   default_author: "Imported Author",
+                   uploads_folder_path: uploads_dir,
+                   on_progress: fn _phase, _current, _total, _detail -> raise "boom" end
+                 )
+      end)
+
+    assert log =~ "import execution progress callback failed"
+  end
+
   test "execute_import skips conflicts by default and can import them with a new slug", %{
     project: project,
     temp_dir: temp_dir

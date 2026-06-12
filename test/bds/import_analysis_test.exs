@@ -224,6 +224,30 @@ defmodule BDS.ImportAnalysisTest do
     assert_received {:analysis_progress, "Discovering macros...", nil}
   end
 
+  import ExUnit.CaptureLog
+
+  test "analyze_wxr logs and continues when the progress callback raises", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    uploads_dir = Path.join(temp_dir, "uploads")
+    File.mkdir_p!(Path.join(uploads_dir, "2024/05"))
+    File.write!(Path.join(uploads_dir, "2024/05/import-asset.txt"), "legacy attachment")
+
+    wxr_path = Path.join(temp_dir, "legacy.xml")
+    File.write!(wxr_path, basic_wxr_xml())
+
+    log =
+      capture_log(fn ->
+        assert {:ok, _report} =
+                 ImportAnalysis.analyze_wxr(project.id, wxr_path, uploads_dir,
+                   on_progress: fn _step, _detail -> raise "boom" end
+                 )
+      end)
+
+    assert log =~ "import analysis progress callback failed"
+  end
+
   defp sha256(value) do
     :sha256
     |> :crypto.hash(value)

@@ -1,6 +1,8 @@
 defmodule BDS.ImportExecution do
   @moduledoc false
 
+  require Logger
+
   alias BDS.Media
   alias BDS.Metadata
   alias BDS.Posts
@@ -118,7 +120,9 @@ defmodule BDS.ImportExecution do
       {:error, reason} -> {:error, %{message: format_import_error(reason)}}
     end
   rescue
-    error -> {:error, %{message: Exception.message(error)}}
+    error ->
+      Logger.warning("import execution failed project_id=#{project_id}: #{Exception.message(error)}")
+      {:error, %{message: Exception.message(error)}}
   end
 
   defp execute_taxonomies(category_items, tag_items, project_id, result, on_progress, started_at) do
@@ -363,9 +367,19 @@ defmodule BDS.ImportExecution do
       try do
         Media.link_media_to_post(media_id, post_id)
       rescue
-        _ -> :ok
+        error ->
+          Logger.warning(
+            "import execution failed to link media_id=#{media_id} post_id=#{post_id}: #{Exception.message(error)}"
+          )
+
+          :ok
       catch
-        _, _ -> :ok
+        kind, reason ->
+          Logger.warning(
+            "import execution failed to link media_id=#{media_id} post_id=#{post_id}: #{kind}: #{inspect(reason)}"
+          )
+
+          :ok
       end
     end)
 
@@ -586,9 +600,13 @@ defmodule BDS.ImportExecution do
   defp run_repo_transaction(fun) when is_function(fun, 0) do
     Repo.transaction(fun)
   rescue
-    error -> {:error, error}
+    error ->
+      Logger.warning("import execution transaction failed: #{Exception.message(error)}")
+      {:error, error}
   catch
-    kind, reason -> {:error, {kind, reason}}
+    kind, reason ->
+      Logger.warning("import execution transaction failed: #{kind}: #{inspect(reason)}")
+      {:error, {kind, reason}}
   end
 
   defp post_item_label(item) do
@@ -628,11 +646,20 @@ defmodule BDS.ImportExecution do
     try do
       callback.(phase, current, total, %{detail: detail, eta: eta})
     rescue
-      _error ->
+      error ->
+        Logger.warning(
+          "import execution progress callback failed phase=#{inspect(phase)}: #{Exception.message(error)}"
+        )
+
         try do
           callback.(phase, current, total, detail)
         rescue
-          _error -> :ok
+          legacy_error ->
+            Logger.warning(
+              "import execution legacy progress callback failed phase=#{inspect(phase)}: #{Exception.message(legacy_error)}"
+            )
+
+            :ok
         end
     end
 

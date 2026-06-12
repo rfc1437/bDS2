@@ -855,7 +855,19 @@ add `ON DELETE CASCADE` via an Ecto migration on the
 **Acceptance.** Injected failure between the two deletes leaves both intact;
 no orphaned messages possible.
 
-### TD-23: Sweep blanket `rescue`/`catch` blocks for silent failure
+### TD-23: Sweep blanket `rescue`/`catch` blocks for silent failure ✅ DONE (2026-06-12)
+
+**Status: implemented.** The named sweep surface was tightened in the intended
+way instead of being rewritten wholesale. `ImportAnalysis` and
+`ImportExecution` now log contextual warnings when top-level import handling,
+repo-transaction wrappers, media linking, or progress callbacks fall back after
+exceptions; the tests now prove those progress-callback failures are no longer
+silent. In `ImportAnalysis.year_from/1`, the blanket integer-date rescue was
+narrowed to `ArgumentError`, which is the actual parsing failure path there.
+`OverlayComponents` kept its defensive UI fallbacks, but every rescue now logs
+why the fallback path was taken instead of silently swallowing the error.
+`MainWindow` needed no change in this pass: its catches are already scoped to
+expected `:exit`/wx failures rather than bare rescue-all blocks.
 
 **Context.** Several modules rescue *all* exceptions into `:ok`/fallbacks
 (`shutdown.ex` defensibly — it must never block quit; but also

@@ -5,6 +5,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   use Gettext, backend: BDS.Gettext
 
   import Ecto.Query
+  require Logger
 
   alias BDS.{I18n, Media, Metadata, Posts, Repo}
   alias BDS.Media.Media, as: MediaRecord
@@ -70,7 +71,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     {:ok, metadata} = Metadata.get_project_metadata(project_id)
     metadata
   rescue
-    _error -> %{main_language: "en", blog_languages: []}
+    error ->
+      log_overlay_warning("project metadata", error)
+      %{main_language: "en", blog_languages: []}
   end
 
   defp posts(nil), do: []
@@ -137,7 +140,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
         select: pm.media_id
     )
   rescue
-    _error -> []
+    error ->
+      log_overlay_warning("post media ids for #{post_id}", error)
+      []
   end
 
   defp post_media_ids(_tab), do: []
@@ -150,7 +155,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     )
     |> Map.new(fn {language, status} -> {language, Atom.to_string(status || :draft)} end)
   rescue
-    _error -> %{}
+    error ->
+      log_overlay_warning("post translations for #{post_id}", error)
+      %{}
   end
 
   defp existing_translations(%{type: :media, id: media_id}) do
@@ -161,7 +168,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     )
     |> Map.new(fn {language, status} -> {language, status} end)
   rescue
-    _error -> %{}
+    error ->
+      log_overlay_warning("media translations for #{media_id}", error)
+      %{}
   end
 
   defp existing_translations(_tab), do: %{}
@@ -179,7 +188,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       _other -> metadata.main_language || "en"
     end
   rescue
-    _error -> metadata.main_language || "en"
+    error ->
+      log_overlay_warning("post source language for #{post_id}", error)
+      metadata.main_language || "en"
   end
 
   defp source_language(%{type: :media, id: media_id}, metadata) do
@@ -188,7 +199,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       _other -> metadata.main_language || "en"
     end
   rescue
-    _error -> metadata.main_language || "en"
+    error ->
+      log_overlay_warning("media source language for #{media_id}", error)
+      metadata.main_language || "en"
   end
 
   defp source_language(_tab, metadata), do: metadata.main_language || "en"
@@ -242,7 +255,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
         []
     end
   rescue
-    _error -> []
+    error ->
+      log_overlay_warning("post AI fields for #{post_id}", error)
+      []
   end
 
   defp ai_fields(%{type: :media, id: media_id}, title, _subtitle, page_language) do
@@ -279,7 +294,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
         []
     end
   rescue
-    _error -> []
+    error ->
+      log_overlay_warning("media AI fields for #{media_id}", error)
+      []
   end
 
   defp ai_fields(_tab, _title, _subtitle, _page_language), do: []
@@ -309,7 +326,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       reference_list: reference_list
     }
   rescue
-    _error ->
+    error ->
+      log_overlay_warning("delete media details for #{media_id}", error)
+
       %{
         title: BDS.Gettext.lgettext(page_language, "ui", "Delete Media"),
         entity_name: media_id,
@@ -330,7 +349,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       reference_list: []
     }
   rescue
-    _error ->
+    error ->
+      log_overlay_warning("delete tag details", error)
+
       %{
         title: BDS.Gettext.lgettext(page_language, "ui", "Delete Tag"),
         entity_name: "tag",
@@ -367,7 +388,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       message: BDS.Gettext.lgettext(page_language, "ui", "Cannot be undone.")
     }
   rescue
-    _error ->
+    error ->
+      log_overlay_warning("merge tag details for project #{project_id}", error)
+
       %{
         target: "tag",
         count: 1,
@@ -390,5 +413,9 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     |> String.downcase()
     |> String.replace(~r/[^a-z0-9]+/u, "-")
     |> String.trim("-")
+  end
+
+  defp log_overlay_warning(context, error) do
+    Logger.warning("overlay component fallback for #{context}: #{Exception.message(error)}")
   end
 end
