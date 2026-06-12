@@ -5,6 +5,15 @@ antipatterns, build-vs-buy decisions, and architecture. Tasks are ordered in
 phases that make sense to execute sequentially; within a phase, tasks are
 independent unless noted. Phase 1 contains the top five findings.
 
+**Revalidated 2026-06-12:** every entry's implementation claims were re-checked
+against the code, and all quality gates re-run clean (compile
+--warnings-as-errors, full test suite 1191 passed / 0 failed, credo --strict,
+deps.audit, dialyzer). All 25 entries confirmed done. One adjacent observation
+outside any entry's scope: `lib/bds/menu.ex` still parsed OPML with
+`:xmerl_scan` (same atom-creation class as TD-05's WXR finding, lower exposure
+since the file is project-local) — fixed 2026-06-12 by rewriting the OPML
+parsing on Saxy with atom-safety tests, mirroring TD-05's approach.
+
 ## How to work these tasks
 
 Every task must follow the project rules in `AGENTS.md`:

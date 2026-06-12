@@ -1,17 +1,70 @@
 defmodule BDS.Menu do
   @moduledoc false
 
-  require Record
-
   alias BDS.Persistence
   alias BDS.Projects
 
-  Record.defrecord(:xmlElement, Record.extract(:xmlElement, from_lib: "xmerl/include/xmerl.hrl"))
+  defmodule OpmlHandler do
+    @moduledoc false
 
-  Record.defrecord(
-    :xmlAttribute,
-    Record.extract(:xmlAttribute, from_lib: "xmerl/include/xmerl.hrl")
-  )
+    @behaviour Saxy.Handler
+
+    # Collects /opml/body/outline trees as {attrs_map, children} tuples without
+    # interning element or attribute names as atoms. Outlines outside the body
+    # (or separated from their outline parent by a foreign element) are pushed
+    # as :ignored frames so the stack stays balanced.
+    def handle_event(:start_document, _prolog, state), do: {:ok, state}
+    def handle_event(:end_document, _data, state), do: {:ok, state}
+    def handle_event(:characters, _chars, state), do: {:ok, state}
+    def handle_event(:cdata, _chars, state), do: {:ok, state}
+
+    def handle_event(:start_element, {name, attributes}, state) do
+      state =
+        if name == "outline" do
+          frame =
+            if collect_outline?(state) do
+              {Map.new(attributes), []}
+            else
+              :ignored
+            end
+
+          %{state | stack: [frame | state.stack]}
+        else
+          state
+        end
+
+      {:ok, %{state | path: [name | state.path]}}
+    end
+
+    def handle_event(:end_element, name, state) do
+      state = %{state | path: tl(state.path)}
+      state = if name == "outline", do: pop_outline(state), else: state
+      {:ok, state}
+    end
+
+    defp collect_outline?(%{path: ["body", "opml"]}), do: true
+
+    defp collect_outline?(%{path: ["outline" | _rest], stack: [{_attrs, _children} | _frames]}),
+      do: true
+
+    defp collect_outline?(_state), do: false
+
+    defp pop_outline(%{stack: [:ignored | rest]} = state), do: %{state | stack: rest}
+
+    defp pop_outline(%{stack: [{attrs, children} | rest]} = state) do
+      outline = {attrs, Enum.reverse(children)}
+
+      case rest do
+        [{parent_attrs, parent_children} | frames] ->
+          %{state | stack: [{parent_attrs, [outline | parent_children]} | frames]}
+
+        _top_level ->
+          %{state | stack: rest, outlines: [outline | state.outlines]}
+      end
+    end
+
+    defp pop_outline(state), do: state
+  end
 
   @valid_kinds [:page, :submenu, :category_archive, :home]
 
@@ -135,27 +188,28 @@ defmodule BDS.Menu do
   end
 
   defp parse_opml(contents) do
-    {document, _rest} = :xmerl_scan.string(String.to_charlist(contents))
+    case Saxy.parse_string(contents, OpmlHandler, %{path: [], stack: [], outlines: []}) do
+      {:ok, %{outlines: outlines}} ->
+        outlines
+        |> Enum.reverse()
+        |> Enum.map(&parse_outline/1)
 
-    :xmerl_xpath.string(~c"/opml/body/outline", document)
-    |> Enum.map(&parse_outline/1)
+      {:error, error} ->
+        raise RuntimeError, "Invalid OPML menu file: #{Exception.message(error)}"
+    end
   end
 
-  defp parse_outline(element) do
-    kind = element |> outline_kind() |> normalize_kind()
+  defp parse_outline({attrs, children}) do
+    kind = attrs |> outline_kind() |> normalize_kind()
 
     base = %{
       kind: kind,
-      label: xml_attr(element, :text) || "",
-      slug: element |> outline_slug(kind) |> normalize_optional_string()
+      label: Map.get(attrs, "text") || "",
+      slug: attrs |> outline_slug(kind) |> normalize_optional_string()
     }
 
-    children =
-      :xmerl_xpath.string(~c"./outline", element)
-      |> Enum.map(&parse_outline/1)
-
     if kind == :submenu do
-      Map.put(base, :children, children)
+      Map.put(base, :children, Enum.map(children, &parse_outline/1))
     else
       base
     end
@@ -172,13 +226,12 @@ defmodule BDS.Menu do
     ]
   end
 
-  defp outline_kind(element), do: xml_attr(element, :type) || xml_attr(element, :kind)
+  defp outline_kind(attrs), do: Map.get(attrs, "type") || Map.get(attrs, "kind")
 
-  defp outline_slug(element, :category_archive),
-    do: xml_attr(element, :categoryName) || xml_attr(element, :slug)
+  defp outline_slug(attrs, :category_archive),
+    do: Map.get(attrs, "categoryName") || Map.get(attrs, "slug")
 
-  defp outline_slug(element, :home), do: xml_attr(element, :pageSlug) || xml_attr(element, :slug)
-  defp outline_slug(element, _kind), do: xml_attr(element, :pageSlug) || xml_attr(element, :slug)
+  defp outline_slug(attrs, _kind), do: Map.get(attrs, "pageSlug") || Map.get(attrs, "slug")
 
   defp render_outline_kind(:category_archive), do: "category-archive"
   defp render_outline_kind(kind), do: to_string(kind)
@@ -189,16 +242,6 @@ defmodule BDS.Menu do
 
   defp render_category_name(:category_archive, slug), do: slug
   defp render_category_name(_kind, _slug), do: nil
-
-  defp xml_attr(element, name) do
-    element
-    |> xmlElement(:attributes)
-    |> Enum.find_value(fn attribute ->
-      if xmlAttribute(attribute, :name) == name do
-        attribute |> xmlAttribute(:value) |> to_string()
-      end
-    end)
-  end
 
   defp normalize_kind(kind) when is_atom(kind) and kind in @valid_kinds, do: kind
 

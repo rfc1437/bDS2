@@ -96,4 +96,120 @@ defmodule BDS.MenuTest do
              }
            ]
   end
+
+  test "get_menu parses legacy kind/slug attributes and drops children of non-submenu items",
+       %{project: project, temp_dir: temp_dir} do
+    write_menu_opml(temp_dir, [
+      ~s(    <outline text="About" kind="page" slug="about">),
+      ~s(      <outline text="Nested" kind="page" slug="nested"/>),
+      ~s(    </outline>),
+      ~s(    <outline text="Notes" kind="category-archive" slug="notes"/>)
+    ])
+
+    assert {:ok, menu} = BDS.Menu.get_menu(project.id)
+
+    assert menu.items == [
+             %{kind: :home, label: "Home", slug: nil},
+             %{kind: :page, label: "About", slug: "about"},
+             %{kind: :category_archive, label: "Notes", slug: "notes"}
+           ]
+  end
+
+  test "get_menu ignores outlines outside /opml/body and decodes XML entities",
+       %{project: project, temp_dir: temp_dir} do
+    File.mkdir_p!(Path.join(temp_dir, "meta"))
+
+    File.write!(
+      Path.join([temp_dir, "meta", "menu.opml"]),
+      [
+        ~s(<?xml version="1.0" encoding="UTF-8"?>),
+        ~s(<opml version="2.0">),
+        ~s(  <head>),
+        ~s(    <outline text="Stray" type="page" pageSlug="stray"/>),
+        ~s(  </head>),
+        ~s(  <body>),
+        ~s(    <outline text="Q &amp; A" type="page" pageSlug="q-and-a"/>),
+        ~s(  </body>),
+        ~s(</opml>)
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:ok, menu} = BDS.Menu.get_menu(project.id)
+
+    assert menu.items == [
+             %{kind: :home, label: "Home", slug: nil},
+             %{kind: :page, label: "Q & A", slug: "q-and-a"}
+           ]
+  end
+
+  test "get_menu raises on malformed OPML", %{project: project, temp_dir: temp_dir} do
+    File.mkdir_p!(Path.join(temp_dir, "meta"))
+    File.write!(Path.join([temp_dir, "meta", "menu.opml"]), "<opml><body><outline")
+
+    assert_raise RuntimeError, fn ->
+      BDS.Menu.get_menu(project.id)
+    end
+  end
+
+  test "get_menu does not intern OPML element or attribute names as atoms",
+       %{project: project, temp_dir: temp_dir} do
+    unique_element = "untrusted_element_#{System.unique_integer([:positive])}"
+    unique_attr = "untrusted_attr_#{System.unique_integer([:positive])}"
+
+    write_menu_opml(temp_dir, [
+      ~s(    <#{unique_element}>ignored</#{unique_element}>),
+      ~s(    <outline text="About" type="page" pageSlug="about" #{unique_attr}="x"/>)
+    ])
+
+    assert {:ok, menu} = BDS.Menu.get_menu(project.id)
+    assert Enum.at(menu.items, 1) == %{kind: :page, label: "About", slug: "about"}
+
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unique_element) end
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unique_attr) end
+  end
+
+  test "get_menu keeps atom growth bounded for many unique attribute names",
+       %{project: project, temp_dir: temp_dir} do
+    unique_attrs =
+      Enum.map(1..250, fn index ->
+        "untrusted_bulk_attr_#{System.unique_integer([:positive])}_#{index}"
+      end)
+
+    outlines =
+      Enum.map(unique_attrs, fn attr ->
+        ~s(    <outline text="Item" type="page" pageSlug="item" #{attr}="x"/>)
+      end)
+
+    write_menu_opml(temp_dir, outlines)
+    assert {:ok, _warmup} = BDS.Menu.get_menu(project.id)
+
+    atom_count_before = :erlang.system_info(:atom_count)
+    assert {:ok, menu} = BDS.Menu.get_menu(project.id)
+    atom_count_after = :erlang.system_info(:atom_count)
+
+    assert length(menu.items) == 251
+    assert atom_count_after - atom_count_before < 20
+
+    Enum.each(unique_attrs, fn attr ->
+      assert_raise ArgumentError, fn -> String.to_existing_atom(attr) end
+    end)
+  end
+
+  defp write_menu_opml(temp_dir, body_lines) do
+    File.mkdir_p!(Path.join(temp_dir, "meta"))
+
+    File.write!(
+      Path.join([temp_dir, "meta", "menu.opml"]),
+      [
+        ~s(<?xml version="1.0" encoding="UTF-8"?>),
+        ~s(<opml version="2.0">),
+        ~s(  <head><title>Menu</title></head>),
+        ~s(  <body>)
+      ]
+      |> Enum.concat(body_lines)
+      |> Enum.concat([~s(  </body>), ~s(</opml>)])
+      |> Enum.join("\n")
+    )
+  end
 end
