@@ -28,52 +28,7 @@ defmodule BDS.Publishing do
     project = Projects.get_project!(project_id)
     normalized_credentials = normalize_credentials(credentials)
     targets = build_upload_targets(Projects.project_data_dir(project), normalized_credentials)
-    GenServer.call(__MODULE__, {:upload_site, project_id, normalized_credentials, targets, opts})
-  end
 
-  @spec get_job(String.t()) :: PublishJob.t() | nil
-  def get_job(job_id) when is_binary(job_id) do
-    GenServer.call(__MODULE__, {:get_job, job_id})
-  end
-
-  @impl true
-  def init(_state) do
-    {:ok, %{scp_uploads: %{}}}
-  end
-
-  @impl true
-  def handle_call({:get_job, job_id}, _from, state) do
-    {:reply, Repo.get(PublishJob, job_id), state}
-  end
-
-  @impl true
-  def handle_call({:update_job, job_id, attrs}, _from, state) do
-    with %PublishJob{} = job <- Repo.get(PublishJob, job_id) do
-      attrs = Map.put(attrs, :updated_at, Persistence.now_ms())
-      job |> PublishJob.changeset(attrs) |> Repo.update()
-    end
-
-    {:reply, :ok, state}
-  end
-
-  @impl true
-  def handle_call({:should_upload_scp_file, upload_key, local_mtime}, _from, state) do
-    should_upload? =
-      case state.scp_uploads[upload_key] do
-        nil -> true
-        recorded_mtime -> local_mtime > recorded_mtime
-      end
-
-    {:reply, should_upload?, state}
-  end
-
-  @impl true
-  def handle_call({:mark_uploaded_scp_file, upload_key, local_mtime}, _from, state) do
-    {:reply, :ok, put_in(state, [:scp_uploads, upload_key], local_mtime)}
-  end
-
-  @impl true
-  def handle_call({:upload_site, project_id, credentials, targets, opts}, _from, state) do
     job_id = "publish-" <> Integer.to_string(System.unique_integer([:positive, :monotonic]))
     uploader = build_uploader(Keyword.put_new(opts, :project_id, project_id))
     now = Persistence.now_ms()
@@ -83,10 +38,10 @@ defmodule BDS.Publishing do
       project_id: project_id,
       status: :pending,
       task_id: nil,
-      ssh_host: credentials.ssh_host,
-      ssh_user: credentials.ssh_user,
-      ssh_remote_path: credentials.ssh_remote_path,
-      ssh_mode: credentials.ssh_mode,
+      ssh_host: normalized_credentials.ssh_host,
+      ssh_user: normalized_credentials.ssh_user,
+      ssh_remote_path: normalized_credentials.ssh_remote_path,
+      ssh_mode: normalized_credentials.ssh_mode,
       targets: Enum.map(targets, &to_string(&1.kind)),
       error: nil,
       inserted_at: now,
@@ -102,7 +57,7 @@ defmodule BDS.Publishing do
       Tasks.submit_task(
         "publish #{project_id}",
         fn report ->
-          run_upload(job_id, credentials, targets, uploader, report)
+          run_upload(job_id, normalized_credentials, targets, uploader, report)
         end,
         %{
           group_id: project_id,
@@ -115,7 +70,51 @@ defmodule BDS.Publishing do
       |> PublishJob.changeset(%{task_id: task.id, updated_at: Persistence.now_ms()})
       |> Repo.update!()
 
-    {:reply, {:ok, next_job}, state}
+    {:ok, next_job}
+  end
+
+  @spec get_job(String.t()) :: PublishJob.t() | nil
+  def get_job(job_id) when is_binary(job_id) do
+    Repo.get(PublishJob, job_id)
+  end
+
+  @impl true
+  def init(_state) do
+    {:ok, %{scp_uploads: %{}}}
+  end
+
+  @impl true
+  def handle_call({:filter_scp_uploads, project_id, credentials, target_kind, files}, _from, state) do
+    {files_to_upload, next_uploads} =
+      Enum.reduce(files, {[], state.scp_uploads}, fn {relative_path, local_mtime}, {acc, uploads} ->
+        upload_key = scp_upload_key(project_id, credentials, target_kind, relative_path)
+
+        if should_upload_mtime?(uploads[upload_key], local_mtime) do
+          {[{relative_path, local_mtime} | acc], uploads}
+        else
+          {acc, uploads}
+        end
+      end)
+
+    {:reply, Enum.reverse(files_to_upload), %{state | scp_uploads: next_uploads}}
+  end
+
+  @impl true
+  def handle_call(
+        {:record_uploaded_scp_files, project_id, credentials, target_kind, uploaded_files},
+        _from,
+        state
+      ) do
+    next_uploads =
+      Enum.reduce(uploaded_files, state.scp_uploads, fn {relative_path, local_mtime}, uploads ->
+        Map.put(
+          uploads,
+          scp_upload_key(project_id, credentials, target_kind, relative_path),
+          local_mtime
+        )
+      end)
+
+    {:reply, :ok, %{state | scp_uploads: next_uploads}}
   end
 
   defp run_upload(job_id, credentials, targets, uploader, report) do
@@ -147,7 +146,14 @@ defmodule BDS.Publishing do
   end
 
   defp update_job(job_id, attrs) do
-    GenServer.call(__MODULE__, {:update_job, job_id, attrs})
+    repo_opts = repo_call_opts()
+
+    with %PublishJob{} = job <- Repo.get(PublishJob, job_id, repo_opts) do
+      attrs = Map.put(attrs, :updated_at, Persistence.now_ms())
+      _ = job |> PublishJob.changeset(attrs) |> Repo.update(repo_opts)
+    end
+
+    :ok
   end
 
   defp build_uploader(opts) do
@@ -188,41 +194,27 @@ defmodule BDS.Publishing do
   end
 
   defp run_command_upload(project_id, target, files, credentials, runner, ssh_auth_sock) do
-    Enum.reduce_while(files, :ok, fn relative_path, :ok ->
-      local_path = Path.join(target.local_dir, relative_path)
+    with {:ok, files_with_mtimes} <- collect_file_mtimes(target.local_dir, files) do
+      files_to_upload =
+        filter_scp_uploads(project_id, credentials, target.kind, files_with_mtimes)
 
-      with {:ok, local_mtime} <- file_mtime(local_path),
-           true <-
-             should_upload_scp_file?(
-               project_id,
-               credentials,
-               target.kind,
-               relative_path,
-               local_mtime
-             ) do
-        remote_path = remote_file_spec(credentials, target.remote_dir, relative_path)
+      case upload_scp_files(
+             project_id,
+             target,
+             credentials,
+             runner,
+             ssh_auth_sock,
+             files_to_upload,
+             []
+           ) do
+        {:ok, uploaded_files} ->
+          persist_uploaded_scp_files(project_id, credentials, target.kind, uploaded_files)
+          :ok
 
-        case run_command(runner, "scp", ["-q", local_path, remote_path], ssh_auth_sock) do
-          :ok ->
-            :ok =
-              mark_uploaded_scp_file(
-                project_id,
-                credentials,
-                target.kind,
-                relative_path,
-                local_mtime
-              )
-
-            {:cont, :ok}
-
-          {:error, reason} ->
-            {:halt, {:error, reason}}
-        end
-      else
-        false -> {:cont, :ok}
-        {:error, reason} -> {:halt, {:error, reason}}
+        {:error, reason} ->
+          {:error, reason}
       end
-    end)
+    end
   end
 
   defp run_command(runner, command, args, ssh_auth_sock) do
@@ -254,20 +246,96 @@ defmodule BDS.Publishing do
     end
   end
 
-  defp should_upload_scp_file?(project_id, credentials, target_kind, relative_path, local_mtime) do
+  defp filter_scp_uploads(project_id, credentials, target_kind, files_with_mtimes) do
     GenServer.call(
       __MODULE__,
-      {:should_upload_scp_file,
-       scp_upload_key(project_id, credentials, target_kind, relative_path), local_mtime}
+      {:filter_scp_uploads, project_id, credentials, target_kind, files_with_mtimes}
     )
   end
 
-  defp mark_uploaded_scp_file(project_id, credentials, target_kind, relative_path, local_mtime) do
+  defp record_uploaded_scp_files(project_id, credentials, target_kind, uploaded_files) do
     GenServer.call(
       __MODULE__,
-      {:mark_uploaded_scp_file,
-       scp_upload_key(project_id, credentials, target_kind, relative_path), local_mtime}
+      {:record_uploaded_scp_files, project_id, credentials, target_kind, uploaded_files}
     )
+  end
+
+  defp upload_scp_files(
+         _project_id,
+         _target,
+         _credentials,
+         _runner,
+         _ssh_auth_sock,
+         [],
+         uploaded_files
+       ) do
+    {:ok, Enum.reverse(uploaded_files)}
+  end
+
+  defp upload_scp_files(
+         project_id,
+         target,
+         credentials,
+         runner,
+         ssh_auth_sock,
+         [{relative_path, local_mtime} | rest],
+         uploaded_files
+       ) do
+    local_path = Path.join(target.local_dir, relative_path)
+    remote_path = remote_file_spec(credentials, target.remote_dir, relative_path)
+
+    case run_command(runner, "scp", ["-q", local_path, remote_path], ssh_auth_sock) do
+      :ok ->
+        upload_scp_files(
+          project_id,
+          target,
+          credentials,
+          runner,
+          ssh_auth_sock,
+          rest,
+          [{relative_path, local_mtime} | uploaded_files]
+        )
+
+      {:error, reason} ->
+        persist_uploaded_scp_files(project_id, credentials, target.kind, uploaded_files)
+        {:error, reason}
+    end
+  end
+
+  defp collect_file_mtimes(local_dir, files) do
+    Enum.reduce_while(files, {:ok, []}, fn relative_path, {:ok, acc} ->
+      local_path = Path.join(local_dir, relative_path)
+
+      case file_mtime(local_path) do
+        {:ok, local_mtime} -> {:cont, {:ok, [{relative_path, local_mtime} | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, files_with_mtimes} -> {:ok, Enum.reverse(files_with_mtimes)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp persist_uploaded_scp_files(_project_id, _credentials, _target_kind, []), do: :ok
+
+  defp persist_uploaded_scp_files(project_id, credentials, target_kind, uploaded_files) do
+    record_uploaded_scp_files(
+      project_id,
+      credentials,
+      target_kind,
+      Enum.reverse(uploaded_files)
+    )
+  end
+
+  defp should_upload_mtime?(nil, _local_mtime), do: true
+  defp should_upload_mtime?(recorded_mtime, local_mtime), do: local_mtime > recorded_mtime
+
+  defp repo_call_opts do
+    case Process.whereis(__MODULE__) do
+      pid when is_pid(pid) -> [caller: pid]
+      _other -> []
+    end
   end
 
   defp scp_upload_key(project_id, credentials, target_kind, relative_path) do

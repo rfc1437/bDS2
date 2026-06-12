@@ -280,6 +280,46 @@ defmodule BDS.PublishingTest do
     assert elem(html_upload, 1) == ["-q", html_index, "deploy@example.com:/srv/blog/index.html"]
   end
 
+  test "upload_site batches scp mtime bookkeeping instead of calling the publishing server per file",
+       %{project: project, temp_dir: temp_dir} do
+    test_pid = self()
+
+    File.mkdir_p!(Path.join([temp_dir, "html", "posts"]))
+
+    for index <- 1..5 do
+      File.write!(Path.join([temp_dir, "html", "posts", "entry-#{index}.html"]), "<html />")
+    end
+
+    credentials = %{
+      ssh_host: "example.com",
+      ssh_user: "deploy",
+      ssh_remote_path: "/srv/blog",
+      ssh_mode: :scp
+    }
+
+    publishing_pid = Process.whereis(BDS.Publishing)
+    :erlang.trace(publishing_pid, true, [:receive])
+
+    runner = fn command, args, opts ->
+      send(test_pid, {:command_run, command, args, opts})
+      {"", 0}
+    end
+
+    assert {:ok, job} =
+             BDS.Publishing.upload_site(project.id, credentials,
+               command_runner: runner,
+               ssh_auth_sock: "/tmp/test-agent.sock"
+             )
+
+    assert wait_for_publish_job(job.id, &(&1.status == :completed)).status == :completed
+
+    :erlang.trace(publishing_pid, false, [:receive])
+
+    bookkeeping_calls = collect_publishing_bookkeeping_calls(publishing_pid)
+
+    assert length(bookkeeping_calls) <= 6
+  end
+
   test "publish jobs survive a publishing server restart because they are persisted", %{
     project: project,
     temp_dir: temp_dir
@@ -320,6 +360,25 @@ defmodule BDS.PublishingTest do
   defp collect_command_runs(acc \\ []) do
     receive do
       {:command_run, command, args, _opts} -> collect_command_runs([{command, args} | acc])
+    after
+      50 -> Enum.reverse(acc)
+    end
+  end
+
+  defp collect_publishing_bookkeeping_calls(publishing_pid, acc \\ []) do
+    receive do
+      {:trace, ^publishing_pid, :receive, {:"$gen_call", _from, message}}
+      when is_tuple(message) and tuple_size(message) > 0 and
+             elem(message, 0) in [
+               :should_upload_scp_file,
+               :mark_uploaded_scp_file,
+               :filter_scp_uploads,
+               :record_uploaded_scp_files
+             ] ->
+        collect_publishing_bookkeeping_calls(publishing_pid, [message | acc])
+
+      {:trace, ^publishing_pid, :receive, _message} ->
+        collect_publishing_bookkeeping_calls(publishing_pid, acc)
     after
       50 -> Enum.reverse(acc)
     end

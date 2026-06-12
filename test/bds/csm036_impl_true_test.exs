@@ -14,7 +14,7 @@ defmodule BDS.CSM036ImplTrueTest do
           String.contains?(line, "def handle_call(")
         end)
 
-      assert length(handle_call_lines) >= 5, "expected at least 5 handle_call clauses"
+      assert length(handle_call_lines) >= 2, "expected at least 2 handle_call clauses"
 
       for {_line, idx} <- handle_call_lines do
         preceding = Enum.at(lines, idx - 2)

@@ -518,7 +518,17 @@ debounced save. Queries during a rebuild keep hitting the old index.
 **Acceptance.** Neighbor queries return while a duplicate scan is running
 (test with a large synthetic index); debounce/flush semantics unchanged.
 
-### TD-13: Slim down the `Publishing` GenServer call surface
+### TD-13: Slim down the `Publishing` GenServer call surface ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.Publishing` now keeps only SCP mtime state in its
+GenServer. Publish-job creation, lookup, and status updates run directly through
+`Repo`, while background-task job updates use a stable Repo caller so sandboxed
+tests still exercise the real async path. SCP uploads no longer round-trip
+through `should_upload_scp_file` / `mark_uploaded_scp_file` per file; each
+target now batches one filter call for changed files and one bulk record call
+for successfully uploaded mtimes. Coverage includes a focused batching test that
+proves a multi-file SCP publish keeps bookkeeping traffic bounded instead of
+scaling linearly with file count.
 
 **Context.** `Publishing` does Repo writes inside `handle_call`
 (`:upload_site`, `:update_job`) and the uploader makes per-file synchronous

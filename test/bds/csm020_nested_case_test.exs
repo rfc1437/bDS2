@@ -76,18 +76,18 @@ defmodule BDS.CSM020NestedCaseTest do
     end
   end
 
-  describe "Publishing.handle_call :update_job uses with" do
+  describe "Publishing.update_job/2 uses with" do
     test "source code uses with instead of case" do
       source = File.read!("lib/bds/publishing.ex")
 
       [func_source] =
-        Regex.scan(~r/def handle_call\(\{:update_job.*?(?=\n  def |\n  @impl)/s, source)
+        Regex.scan(~r/defp update_job\(job_id, attrs\).*?(?=\n  defp |\nend)/s, source)
 
       assert func_source |> List.first() |> String.contains?("with"),
-             "update_job handler should use with"
+             "update_job should use with"
 
       refute func_source |> List.first() |> String.contains?("case Repo.get"),
-             "update_job handler should not use case Repo.get"
+             "update_job should not use case Repo.get"
     end
   end
 end
