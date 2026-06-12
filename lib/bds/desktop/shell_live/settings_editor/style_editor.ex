@@ -4,6 +4,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.StyleEditor do
   use Phoenix.Component
 
   alias BDS.Metadata
+  alias BDS.Preview
   use Gettext, backend: BDS.Gettext
 
   @themes [
@@ -42,7 +43,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.StyleEditor do
       applied_theme: current_theme(assigns),
       preview_mode: preview_mode,
       preview_url:
-        "http://127.0.0.1:4123/__style-preview?theme=#{selected_theme}&mode=#{preview_mode}"
+        Preview.base_url() <>
+          "/__style-preview?theme=#{selected_theme}&mode=#{preview_mode}"
     }
   end
 

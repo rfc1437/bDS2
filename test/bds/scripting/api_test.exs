@@ -36,6 +36,7 @@ defmodule BDS.Scripting.ApiTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, :manual) end)
 
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-scripting-api-#{System.unique_integer([:positive])}")
@@ -44,6 +45,10 @@ defmodule BDS.Scripting.ApiTest do
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
     {:ok, project} = BDS.Projects.create_project(%{name: "Scripting API", data_path: temp_dir})
+
+    on_exit(fn ->
+      _ = BDS.Preview.stop_preview(project.id)
+    end)
 
     %{project: project}
   end

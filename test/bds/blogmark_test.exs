@@ -7,6 +7,7 @@ defmodule BDS.BlogmarkTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, :manual) end)
 
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-blogmark-#{System.unique_integer([:positive])}")

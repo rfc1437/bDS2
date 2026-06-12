@@ -12,12 +12,14 @@ defmodule BDS.Preview do
   alias BDS.Rendering.TemplateSelection
 
   @host "127.0.0.1"
-  @port 4123
+  @preferred_port 4123
   @server_table __MODULE__.ServerTable
 
   # Max time to wait for inflight requests to finish during graceful shutdown
   # before remaining request tasks are forcibly terminated.
   @drain_timeout 5_000
+  @listen_retry_attempts 10
+  @listen_retry_delay_ms 50
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -41,7 +43,17 @@ defmodule BDS.Preview do
     )
   end
 
-  def base_url, do: "http://#{@host}:#{@port}"
+  def base_url do
+    case :ets.whereis(@server_table) do
+      :undefined -> "http://#{@host}:#{@preferred_port}"
+
+      _table ->
+        case :ets.lookup(@server_table, :current) do
+          [{:current, %{host: host, port: port}}] -> "http://#{host}:#{port}"
+          _other -> "http://#{@host}:#{@preferred_port}"
+        end
+    end
+  end
 
   def stop_preview(project_id) when is_binary(project_id) do
     GenServer.call(__MODULE__, {:stop_preview, project_id})
@@ -501,14 +513,7 @@ defmodule BDS.Preview do
     state = stop_current_server(state)
     maybe_allow_repo(owner_pid)
 
-    {:ok, listener} =
-      :gen_tcp.listen(@port, [
-        :binary,
-        packet: :raw,
-        active: false,
-        reuseaddr: true,
-        ip: {127, 0, 0, 1}
-      ])
+    {:ok, listener, port} = listen_with_retry(@listen_retry_attempts)
 
     acceptor_pid = spawn_link(fn -> accept_loop(listener, project_id, owner_pid) end)
 
@@ -516,7 +521,7 @@ defmodule BDS.Preview do
       project_id: project_id,
       data_dir: data_dir,
       host: @host,
-      port: @port,
+      port: port,
       is_running: true,
       owner_pid: owner_pid,
       listener: listener,
@@ -526,6 +531,40 @@ defmodule BDS.Preview do
 
     put_current_server(server)
     {{:ok, public_server(server)}, %{state | current: server}}
+  end
+
+  defp listen_with_retry(attempts_left) when attempts_left > 0 do
+    case listen_on_port(@preferred_port) do
+      {:ok, listener, port} ->
+        {:ok, listener, port}
+
+      {:error, :eaddrinuse} when attempts_left > 1 ->
+        Process.sleep(@listen_retry_delay_ms)
+        listen_with_retry(attempts_left - 1)
+
+      {:error, :eaddrinuse} ->
+        listen_on_port(0)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp listen_on_port(port) do
+    case :gen_tcp.listen(port, [
+           :binary,
+           packet: :raw,
+           active: false,
+           reuseaddr: true,
+           ip: {127, 0, 0, 1}
+         ]) do
+      {:ok, listener} ->
+        {:ok, {_host, actual_port}} = :inet.sockname(listener)
+        {:ok, listener, actual_port}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp run_tracked_request(fun) when is_function(fun, 0) do

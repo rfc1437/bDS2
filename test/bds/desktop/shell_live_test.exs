@@ -640,8 +640,29 @@ defmodule BDS.Desktop.ShellLiveTest do
   end
 
   setup do
+    if :ets.whereis(BDS.Preview.ServerTable) != :undefined do
+      case :ets.lookup(BDS.Preview.ServerTable, :current) do
+        [{:current, %{project_id: project_id}}] ->
+          _ = BDS.Preview.stop_preview(project_id)
+
+        _other ->
+          :ok
+      end
+    end
+
+    if :ets.whereis(BDS.Preview.ServerTable) != :undefined do
+      case :ets.lookup(BDS.Preview.ServerTable, :current) do
+        [{:current, %{project_id: project_id}}] ->
+          _ = BDS.Preview.stop_preview(project_id)
+
+        _other ->
+          :ok
+      end
+    end
+
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, :manual) end)
 
     Enum.each(BDS.Tasks.list_running_tasks(), fn task ->
       BDS.Tasks.cancel_task(task.id)
@@ -661,7 +682,8 @@ defmodule BDS.Desktop.ShellLiveTest do
       DynamicSupervisor.terminate_child(BDS.Tasks.TaskSupervisor, pid)
     end
 
-    Process.sleep(100)
+    wait_for_supervisor_clear(BDS.TCP.TaskSupervisor)
+    wait_for_supervisor_clear(BDS.Tasks.TaskSupervisor)
 
     temp_dir =
       Path.join(System.tmp_dir!(), "bds-shell-live-#{System.unique_integer([:positive])}")
@@ -698,6 +720,21 @@ defmodule BDS.Desktop.ShellLiveTest do
     end)
 
     %{project: project, temp_dir: temp_dir}
+  end
+
+  defp wait_for_supervisor_clear(supervisor, attempts \\ 50)
+
+  defp wait_for_supervisor_clear(_supervisor, 0), do: :ok
+
+  defp wait_for_supervisor_clear(supervisor, attempts) do
+    case DynamicSupervisor.which_children(supervisor) do
+      [] ->
+        :ok
+
+      _children ->
+        Process.sleep(10)
+        wait_for_supervisor_clear(supervisor, attempts - 1)
+    end
   end
 
   test "sidebar headers expose old-app create actions for posts, media, scripts, templates, chat, and imports" do

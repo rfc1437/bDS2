@@ -8,6 +8,7 @@ defmodule BDS.RealBlogRebuildDiagnosticTest do
     setup do
       :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo, ownership_timeout: 600_000)
       Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+      on_exit(fn -> Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, :manual) end)
 
       now = BDS.Persistence.now_ms()
       unique = Integer.to_string(System.unique_integer([:positive]))

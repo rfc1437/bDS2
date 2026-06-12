@@ -21,13 +21,44 @@ defmodule BDS.PreviewTest do
   alias BDS.Posts
 
   setup do
+    reset_preview_process()
+
+    for {_, pid, _, _} <- DynamicSupervisor.which_children(BDS.TCP.TaskSupervisor) do
+      DynamicSupervisor.terminate_child(BDS.TCP.TaskSupervisor, pid)
+    end
+
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+    Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, :manual) end)
+
     temp_dir = Path.join(System.tmp_dir!(), "bds-preview-#{System.unique_integer([:positive])}")
     File.mkdir_p!(temp_dir)
     on_exit(fn -> File.rm_rf(temp_dir) end)
 
     {:ok, project} = BDS.Projects.create_project(%{name: "Preview", data_path: temp_dir})
+
+    on_exit(fn ->
+      _ = BDS.Preview.stop_preview(project.id)
+    end)
+
     %{project: project, temp_dir: temp_dir}
+  end
+
+  defp reset_preview_process do
+    case :ets.whereis(BDS.Preview.ServerTable) do
+      :undefined ->
+        :ok
+
+      _table ->
+        case :ets.lookup(BDS.Preview.ServerTable, :current) do
+          [{:current, %{project_id: project_id}}] ->
+            _ = BDS.Preview.stop_preview(project_id)
+            :ok
+
+          _other ->
+            :ok
+        end
+    end
   end
 
   test "start_preview binds localhost and request resolves generated routes, assets, media, and draft previews",
@@ -77,8 +108,9 @@ defmodule BDS.PreviewTest do
 
     assert {:ok, server} = BDS.Preview.start_preview(project.id)
     assert server.host == "127.0.0.1"
-    assert server.port == 4123
+    assert server.port > 0
     assert server.is_running == true
+    assert BDS.Preview.base_url() == "http://127.0.0.1:#{server.port}"
 
     assert {:ok, %{body: home_html, content_type: "text/html"}} =
              BDS.Preview.request(project.id, "/")

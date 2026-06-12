@@ -240,7 +240,7 @@ defmodule BDS.TemplatesTest do
              Jason.decode!(File.read!(tags_path))
   end
 
-  test "update_template keeps committed database changes when renaming the published file fails",
+  test "update_template keeps committed database changes when rewriting the published file fails",
        %{project: project, temp_dir: temp_dir} do
     assert {:ok, template} =
              BDS.Templates.create_template(%{
@@ -269,8 +269,9 @@ defmodule BDS.TemplatesTest do
                post_template_slug: published.slug
              })
 
-    blocked_path = Path.join([temp_dir, "templates", "feature-view.liquid.tmp"])
-    File.mkdir_p!(blocked_path)
+    published_template_path = Path.join(temp_dir, published.file_path)
+    File.rm!(published_template_path)
+    File.mkdir_p!(published_template_path)
 
     assert {:error, _reason} =
              BDS.Templates.update_template(published.id, %{slug: "feature-view"})

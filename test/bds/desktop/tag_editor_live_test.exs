@@ -12,6 +12,7 @@ defmodule BDS.Desktop.TagEditorLiveTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, :manual) end)
 
     Enum.each(BDS.Tasks.list_running_tasks(), fn task ->
       BDS.Tasks.cancel_task(task.id)

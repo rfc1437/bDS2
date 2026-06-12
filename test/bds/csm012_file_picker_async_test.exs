@@ -9,6 +9,7 @@ defmodule BDS.CSM012FilePickerAsyncTest do
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, :manual) end)
 
     prev = System.get_env("BDS_DESKTOP_AUTOMATION")
     System.put_env("BDS_DESKTOP_AUTOMATION", "1")

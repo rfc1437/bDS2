@@ -87,8 +87,19 @@ defmodule BDS.Desktop.ShellCommandsTest do
   end
 
   setup do
+    if :ets.whereis(BDS.Preview.ServerTable) != :undefined do
+      case :ets.lookup(BDS.Preview.ServerTable, :current) do
+        [{:current, %{project_id: project_id}}] ->
+          _ = BDS.Preview.stop_preview(project_id)
+
+        _other ->
+          :ok
+      end
+    end
+
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
     Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, :manual) end)
     :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), Process.whereis(BDS.Preview))
     :ok = Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), Process.whereis(BDS.Publishing))
     :ok = BDS.Tasks.clear_finished()
@@ -117,7 +128,7 @@ defmodule BDS.Desktop.ShellCommandsTest do
 
     assert result.kind == "open_url"
     assert result.action == "open_in_browser"
-    assert result.url == "http://127.0.0.1:4123/"
+    assert result.url == BDS.Preview.base_url() <> "/"
     assert result.project_id == project.id
   end
 

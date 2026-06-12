@@ -12,6 +12,8 @@ defmodule BDS.Projects do
 
   @default_project_id "default"
   @default_project_name "My Blog"
+  @create_project_retry_attempts 5
+  @create_project_retry_delay_ms 50
 
   @typedoc "An attribute map that may use atom or string keys."
   @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
@@ -152,22 +154,24 @@ defmodule BDS.Projects do
     name = attr(attrs, :name) || ""
     slug = unique_slug(attr(attrs, :slug) || Slug.slugify(name))
 
-    Repo.transaction(fn ->
-      project =
-        %Project{}
-        |> Project.changeset(%{
-          id: Ecto.UUID.generate(),
-          name: name,
-          slug: slug,
-          description: attr(attrs, :description),
-          data_path: attr(attrs, :data_path),
-          created_at: now,
-          updated_at: now,
-          is_active: false
-        })
-        |> Repo.insert!()
+    retry_create_project(fn ->
+      Repo.transaction(fn ->
+        project =
+          %Project{}
+          |> Project.changeset(%{
+            id: Ecto.UUID.generate(),
+            name: name,
+            slug: slug,
+            description: attr(attrs, :description),
+            data_path: attr(attrs, :data_path),
+            created_at: now,
+            updated_at: now,
+            is_active: false
+          })
+          |> Repo.insert!()
 
-      project
+        project
+      end)
     end)
     |> case do
       {:ok, project} ->
@@ -181,6 +185,22 @@ defmodule BDS.Projects do
         {:error, reason}
     end
   end
+
+  defp retry_create_project(fun, attempts_left \\ @create_project_retry_attempts)
+
+  defp retry_create_project(fun, attempts_left) when attempts_left > 1 do
+    fun.()
+  rescue
+    error in [Exqlite.Error] ->
+      if String.contains?(Exception.message(error), "Database busy") do
+        Process.sleep(@create_project_retry_delay_ms)
+        retry_create_project(fun, attempts_left - 1)
+      else
+        reraise error, __STACKTRACE__
+      end
+  end
+
+  defp retry_create_project(fun, _attempts_left), do: fun.()
 
   @spec set_active_project(String.t()) :: {:ok, Project.t()} | {:error, :not_found | term()}
   def set_active_project(project_id) do

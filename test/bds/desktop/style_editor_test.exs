@@ -72,7 +72,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.StyleEditorTest do
       result = StyleEditor.build_style(assigns)
       assert result.preview_url =~ "theme=default"
       assert result.preview_url =~ "mode=auto"
-      assert result.preview_url =~ "127.0.0.1:4123/__style-preview"
+      assert result.preview_url =~ BDS.Preview.base_url() <> "/__style-preview"
     end
 
     test "preview_url reflects selected_theme", %{project: project} do
