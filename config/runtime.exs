@@ -7,9 +7,11 @@ if config_env() == :prod do
 
   File.mkdir_p!(Path.dirname(database_path))
 
+  # Keep prod on the same modest SQLite pool as dev so WAL + busy_timeout see
+  # the same concurrency behavior in both environments unless explicitly tuned.
   config :bds, BDS.Repo,
     database: database_path,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "1")
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5")
 
   # Persist downloaded embedding model files alongside the database data dir.
   config :bumblebee,

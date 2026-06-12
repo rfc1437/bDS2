@@ -85,6 +85,32 @@ defmodule BDS.Repo.BootstrapTest do
     assert repo_config[:busy_timeout] == 15_000
   end
 
+  test "prod runtime repo config defaults to the same pool size as dev" do
+    config_path = Path.expand("../../../config/runtime.exs", __DIR__)
+    database_path = Path.join(System.tmp_dir!(), "bds-runtime-#{System.unique_integer([:positive])}.db")
+
+    previous_pool_size = System.get_env("POOL_SIZE")
+    previous_database_path = System.get_env("BDS_DATABASE_PATH")
+
+    System.delete_env("POOL_SIZE")
+    System.put_env("BDS_DATABASE_PATH", database_path)
+
+    on_exit(fn ->
+      restore_env("POOL_SIZE", previous_pool_size)
+      restore_env("BDS_DATABASE_PATH", previous_database_path)
+      File.rm_rf(Path.dirname(database_path))
+    end)
+
+    config = Config.Reader.read!(config_path, env: :prod)
+
+    repo_config =
+      config
+      |> Keyword.fetch!(:bds)
+      |> Keyword.fetch!(BDS.Repo)
+
+    assert repo_config[:pool_size] == 5
+  end
+
   defmodule RepoConfigBackup do
     def put_env do
       Process.put({__MODULE__, :temp_repo_config}, Application.get_env(:bds, TempRepo))
@@ -97,4 +123,7 @@ defmodule BDS.Repo.BootstrapTest do
       end
     end
   end
+
+  defp restore_env(key, nil), do: System.delete_env(key)
+  defp restore_env(key, value), do: System.put_env(key, value)
 end

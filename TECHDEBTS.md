@@ -766,7 +766,16 @@ instructions (AGENTS.md) updated to mention them.
 
 ## Phase 5 — Consistency, config & hygiene
 
-### TD-20: Align SQLite pool configuration between dev and prod
+### TD-20: Align SQLite pool configuration between dev and prod ✅ DONE (2026-06-12)
+
+**Status: implemented.** The effective mismatch was narrowed to one place:
+`config.exs`, `dev.exs`, `prod.exs`, and `test.exs` were already aligned on a
+modest pool of `5`, but `config/runtime.exs` still defaulted production to
+`POOL_SIZE=1`. The prod runtime default now also uses `5`, with an inline
+comment documenting the rationale: keep SQLite concurrency behavior consistent
+across dev and prod under the existing WAL + `busy_timeout` setup unless an
+operator explicitly overrides `POOL_SIZE`. A regression test reads
+`config/runtime.exs` in `:prod` and locks that default to `5`.
 
 **Context.** Dev runs `pool_size: 5` (config.exs), prod runs `pool_size: 1`
 (runtime.exs) — so dev and prod have **different concurrency semantics**: dev
