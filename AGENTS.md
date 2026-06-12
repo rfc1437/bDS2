@@ -55,7 +55,7 @@ This document provides context and best practices for GitHub Copilot when workin
 
 - Never leave tests failing, even if they appear unrelated to your changes
 - If a test failure is pre-existing, fix it as part of your current work
-- Run the full test suite (`npm test`) before considering any task complete
+- Run the full test suite (`mix test`) before considering any task complete
 - If you cannot fix a test, explain why and propose a solution
 
 > **Zero failing tests. No exceptions.**
@@ -106,7 +106,7 @@ This document provides context and best practices for GitHub Copilot when workin
 
 **All user-facing text MUST follow proper i18n patterns.**
 
-- Do not hardcode UI strings directly in React components, menu templates, dialogs, or toasts
+- Do not hardcode UI strings directly in LiveView/HEEx components, menu templates, dialogs, or toasts
 - Store UI copy in language resources and resolve text through i18n helpers/hooks
 - UI language MUST come from the operating system locale
 - Rendering/preview/generated-content language MUST come from project preferences (`mainLanguage`), not UI locale

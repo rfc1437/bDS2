@@ -887,7 +887,11 @@ call, and delete rescues that guard nothing. Shutdown.ex's rescues stay as-is
 **Acceptance.** No bare `rescue _ ->` without either a narrow exception match
 or a logged justification; suite green.
 
-### TD-24: Fix stale `npm test` reference in AGENTS.md
+### TD-24: Fix stale `npm test` reference in AGENTS.md ✅ DONE (2026-06-12)
+
+**Status: implemented.** `AGENTS.md` now tells agents to run `mix test`
+instead of the stale `npm test`, and the nearby UI i18n wording was updated to
+refer to LiveView/HEEx components rather than leftover React-era terminology.
 
 **Context.** AGENTS.md "Fix All Test Failures" section says "Run the full
 test suite (`npm test`)" — stale from the pre-Elixir rewrite. It's an
