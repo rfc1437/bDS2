@@ -78,6 +78,44 @@ defmodule BDS.WxrParserTest do
     end
   end
 
+  test "parse_xml keeps atom growth bounded for many unique element names" do
+    unique_names =
+      Enum.map(1..250, fn index ->
+        "csm036_bulk_untrusted_#{System.unique_integer([:positive])}_#{index}"
+      end)
+
+    dynamic_elements =
+      unique_names
+      |> Enum.map_join("\n", fn name -> "<#{name}>ignored</#{name}>" end)
+
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0"
+      xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+      xmlns:content="http://purl.org/rss/1.0/modules/content/"
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:wp="http://wordpress.org/export/1.2/">
+      <channel>
+        <title>Legacy Blog</title>
+        #{dynamic_elements}
+      </channel>
+    </rss>
+    """
+
+    atom_count_before = :erlang.system_info(:atom_count)
+    parsed = WxrParser.parse_xml(xml)
+    atom_count_after = :erlang.system_info(:atom_count)
+
+    assert parsed.site.title == "Legacy Blog"
+    assert atom_count_after - atom_count_before < 20
+
+    Enum.each(unique_names, fn name ->
+      assert_raise ArgumentError, fn ->
+        String.to_existing_atom(name)
+      end
+    end)
+  end
+
   defp sample_wxr_xml do
     """
     <?xml version="1.0" encoding="UTF-8"?>

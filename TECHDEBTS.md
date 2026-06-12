@@ -217,9 +217,20 @@ correctness.
 
 ---
 
-### TD-05: Replace xmerl with Saxy in the WXR importer; add import transactions
+### TD-05: Replace xmerl with Saxy in the WXR importer; add import transactions ✅ DONE (2026-06-12)
 
 **Severity: Medium-High (DoS + integrity on user-supplied files).**
+
+**Status: implemented.** `BDS.WxrParser` now parses WXR with `Saxy.parse_stream/3`
+for files and `Saxy.parse_string/3` for in-memory XML, keeping element names as
+binaries instead of interning atoms and preserving the existing result shape.
+Both import write paths now batch work in `Repo.transaction` chunks of 500
+(`BDS.ImportExecution` and `BDS.Posts.RebuildFromFiles`), so mid-batch failures
+roll back cleanly instead of leaving partial imports behind. Acceptance proof now
+includes a bounded atom-growth parser test with many unique element names,
+existing import fixture tests, rollback tests for both import and rebuild, and a
+local SQLite benchmark showing the batching win (`1000` inserts: `183ms`
+per-row transactions vs `83ms` in `500`-row chunks, `2.2x` faster).
 
 **Context.** `BDS.WxrParser.parse_xml/1` uses `:xmerl_scan.string/1`, which
 **creates atoms from element and attribute names** in the parsed document. WXR
