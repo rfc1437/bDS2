@@ -622,7 +622,18 @@ existing task lifecycle tests green.
 
 ## Phase 4 — Build-vs-buy replacements
 
-### TD-16: Frontmatter robustness — yaml_elixir/ymlr or harden the hand-rolled parser
+### TD-16: Frontmatter robustness — yaml_elixir/ymlr or harden the hand-rolled parser ✅ DONE (2026-06-12)
+
+**Status: implemented.** The project keeps the hand-rolled serializer/parser for
+byte-stable frontmatter output, but `BDS.Frontmatter` is now hardened for the
+known user-edited-file cases: `parse_document/1` normalizes CRLF and lone `\r`
+line endings before splitting the gray-matter envelope, and quoted scalar
+parsing now removes exactly one closing quote and unescapes content explicitly
+instead of `trim_trailing/2`, which previously corrupted strings whose content
+ended in a quote character. Coverage now includes focused parser tests for CRLF
+documents and quoted-string roundtrips with embedded quotes, backslashes, and
+trailing-quote content, plus adjacent post/template/maintenance frontmatter and
+serializer parity suites.
 
 **Context.** `BDS.Frontmatter` is a hand-rolled YAML subset with concrete
 bugs for user-edited files:

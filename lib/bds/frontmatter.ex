@@ -17,7 +17,9 @@ defmodule BDS.Frontmatter do
   end
 
   def parse_document(contents) when is_binary(contents) do
-    case String.split(contents, "\n---\n", parts: 2) do
+    normalized_contents = normalize_newlines(contents)
+
+    case String.split(normalized_contents, "\n---\n", parts: 2) do
       [frontmatter_with_marker, body] ->
         frontmatter = String.replace_prefix(frontmatter_with_marker, "---\n", "")
 
@@ -163,19 +165,11 @@ defmodule BDS.Frontmatter do
   end
 
   defp parse_string("\"" <> rest) do
-    rest
-    |> String.trim_trailing("\"")
-    |> String.replace("\\n", "\n")
-    |> String.replace("\\\"", "\"")
-    |> String.replace("\\\\", "\\")
+    parse_quoted_string(rest, ?")
   end
 
   defp parse_string("'" <> rest) do
-    rest
-    |> String.trim_trailing("'")
-    |> String.replace("\\n", "\n")
-    |> String.replace("\\'", "'")
-    |> String.replace("\\\\", "\\")
+    parse_quoted_string(rest, ?')
   end
 
   defp parse_string(value), do: value
@@ -234,5 +228,47 @@ defmodule BDS.Frontmatter do
   defp timestamp_key?(key) do
     rendered = to_string(key)
     String.ends_with?(rendered, "_at") or String.ends_with?(rendered, "At")
+  end
+
+  defp normalize_newlines(contents) do
+    contents
+    |> String.replace("\r\n", "\n")
+    |> String.replace("\r", "\n")
+  end
+
+  defp parse_quoted_string(rest, quote) do
+    quote_binary = <<quote::utf8>>
+
+    if String.ends_with?(rest, quote_binary) do
+      inner = binary_part(rest, 0, byte_size(rest) - byte_size(quote_binary))
+      unescape_quoted_string(inner, quote, "")
+    else
+      quote_binary <> rest
+    end
+  end
+
+  defp unescape_quoted_string(<<>>, _quote, acc), do: acc
+
+  defp unescape_quoted_string("\\" <> rest, quote, acc) do
+    case rest do
+      <<"n", tail::binary>> ->
+        unescape_quoted_string(tail, quote, acc <> "\n")
+
+      <<"\\", tail::binary>> ->
+        unescape_quoted_string(tail, quote, acc <> "\\")
+
+      <<escaped, tail::binary>> when escaped == quote ->
+        unescape_quoted_string(tail, quote, acc <> <<quote::utf8>>)
+
+      <<char::utf8, tail::binary>> ->
+        unescape_quoted_string(tail, quote, acc <> "\\" <> <<char::utf8>>)
+
+      <<>> ->
+        acc <> "\\"
+    end
+  end
+
+  defp unescape_quoted_string(<<char::utf8, tail::binary>>, quote, acc) do
+    unescape_quoted_string(tail, quote, acc <> <<char::utf8>>)
   end
 end

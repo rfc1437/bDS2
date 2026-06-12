@@ -104,24 +104,18 @@ defmodule BDS.AI.ChatStreamingTest do
 
     server = start_supervised!({Bandit, plug: StreamingChatPlug, port: 0, startup_log: false})
     {:ok, {_address, port}} = ThousandIsland.listener_info(server)
-
-    assert {:ok, _endpoint} =
-             BDS.AI.put_endpoint(:online, %{
-               url: "http://127.0.0.1:#{port}/v1",
-               api_key: "sk-stream",
-               model: "stream-model"
-             })
-
-    assert :ok = BDS.AI.set_airplane_mode(false)
     assert {:ok, conversation} = BDS.AI.start_chat(%{model: "stream-model"})
 
-    {:ok, conversation: conversation}
+    {:ok, conversation: conversation, streaming_port: port}
   end
 
   test "incremental content events arrive before the final reply and persistence matches", %{
-    conversation: conversation
+    conversation: conversation,
+    streaming_port: port
   } do
     conversation_id = conversation.id
+
+    configure_streaming_runtime!(port)
 
     assert {:ok, reply} =
              BDS.AI.send_chat_message(conversation_id, "tell me a story",
@@ -142,10 +136,15 @@ defmodule BDS.AI.ChatStreamingTest do
     assert assistant_message.token_usage_output == 4
   end
 
-  test "cancel_chat mid-stream aborts the HTTP request", %{conversation: conversation} do
+  test "cancel_chat mid-stream aborts the HTTP request", %{
+    conversation: conversation,
+    streaming_port: port
+  } do
     Application.put_env(:bds, :chat_stream_scenario, :endless)
     conversation_id = conversation.id
     test_pid = self()
+
+    configure_streaming_runtime!(port)
 
     task =
       Task.async(fn ->
@@ -160,5 +159,17 @@ defmodule BDS.AI.ChatStreamingTest do
 
     # The server notices the closed connection — the request was truly aborted.
     assert_receive :sse_client_disconnected, 2_000
+  end
+
+  defp configure_streaming_runtime!(port) do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(:online, %{
+               url: "http://127.0.0.1:#{port}/v1",
+               api_key: "sk-stream",
+               model: "stream-model"
+             })
+
+    assert :ok = BDS.AI.put_model_preference(:chat, "stream-model")
+    assert :ok = BDS.AI.set_airplane_mode(false)
   end
 end
