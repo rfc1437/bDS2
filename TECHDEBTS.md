@@ -824,7 +824,17 @@ are scanned (check rebuild-from-files glob patterns ignore them).
 **Acceptance.** Concurrent-writer test produces two intact outcomes (last
 write wins, no corruption); rebuild file globs ignore temp files.
 
-### TD-22: Wrap `delete_chat_conversation` in a transaction
+### TD-22: Wrap `delete_chat_conversation` in a transaction ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.AI.Chat.delete_chat_conversation/1` now performs
+message deletion and conversation deletion inside a single `Repo.transaction`.
+If the second step fails, the whole delete rolls back and both the
+conversation and its messages remain intact. The regression test injects a
+mid-delete failure through a local test hook and proves the rollback by
+asserting both rows still exist afterward. The nearby audit requested by this
+TD found no equivalent multi-statement write outlier in `lib/bds/ai/catalog.ex`
+or `lib/bds/scripts.ex`: catalog refresh already runs in a transaction and the
+script operations are single-row writes.
 
 **Context.** `chat.ex` deletes all messages (`Repo.delete_all`) then the
 conversation (`Repo.delete`) without a transaction — a failure in between

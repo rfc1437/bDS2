@@ -1641,6 +1641,36 @@ defmodule BDS.AITest do
            end)
   end
 
+  test "delete_chat_conversation rolls back message deletion when the conversation delete fails" do
+    previous_hook = Application.get_env(:bds, :chat_delete_conversation_test_hook)
+
+    on_exit(fn ->
+      if is_nil(previous_hook) do
+        Application.delete_env(:bds, :chat_delete_conversation_test_hook)
+      else
+        Application.put_env(:bds, :chat_delete_conversation_test_hook, previous_hook)
+      end
+    end)
+
+    assert {:ok, conversation} = BDS.AI.start_chat(%{title: "Rollback Chat", model: "gpt-4o-mini"})
+
+    message =
+      Repo.insert!(%BDS.AI.ChatMessage{
+        conversation_id: conversation.id,
+        role: :user,
+        content: "keep me",
+        created_at: Persistence.now_ms()
+      })
+
+    Application.put_env(:bds, :chat_delete_conversation_test_hook, fn _conversation_id ->
+      {:error, :forced_failure}
+    end)
+
+    assert {:error, :forced_failure} = BDS.AI.delete_chat_conversation(conversation.id)
+    assert Repo.get(BDS.AI.ChatConversation, conversation.id)
+    assert Repo.get(BDS.AI.ChatMessage, message.id)
+  end
+
   test "non-stat chat tools expose concrete project data" do
     {:ok, project} = create_project_fixture("Concrete Tools")
     %{post: post, media: media} = seed_project_content(project.id)

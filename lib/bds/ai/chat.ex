@@ -106,12 +106,24 @@ defmodule BDS.AI.Chat do
         {:error, :not_found}
 
       %ChatConversation{} = conversation ->
-        Repo.delete_all(
-          from message in ChatMessage, where: message.conversation_id == ^conversation_id
-        )
+        Repo.transaction(fn ->
+          Repo.delete_all(
+            from message in ChatMessage, where: message.conversation_id == ^conversation_id
+          )
 
-        case Repo.delete(conversation) do
-          {:ok, _conversation} -> {:ok, :deleted}
+          case delete_chat_conversation_test_hook(conversation_id) do
+            :ok ->
+              case Repo.delete(conversation) do
+                {:ok, _conversation} -> :ok
+                {:error, reason} -> Repo.rollback(reason)
+              end
+
+            {:error, reason} ->
+              Repo.rollback(reason)
+          end
+        end)
+        |> case do
+          {:ok, :ok} -> {:ok, :deleted}
           {:error, reason} -> {:error, reason}
         end
     end
@@ -607,6 +619,13 @@ defmodule BDS.AI.Chat do
              tool_messages: []
            }}
       end
+    end
+  end
+
+  defp delete_chat_conversation_test_hook(conversation_id) do
+    case Application.get_env(:bds, :chat_delete_conversation_test_hook) do
+      hook when is_function(hook, 1) -> hook.(conversation_id)
+      _other -> :ok
     end
   end
 
