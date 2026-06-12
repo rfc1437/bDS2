@@ -349,7 +349,20 @@ better end state; the `after` clause is the cheap immediate fix.
 deadline; cancel during a round kills the HTTP request and leaves the
 conversation in a consistent persisted state.
 
-### TD-08: Remove test-sandbox scaffolding from production chat code
+### TD-08: Remove test-sandbox scaffolding from production chat code ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.AI.Chat.send_chat_message/3` now starts the
+chat worker directly with `Task.Supervisor.async_nolink/2`; the temporary
+`:sandbox_ready` receive/send barrier and `allow_repo_sandbox/1` are deleted
+from production code. The repo is on `ecto_sql 3.13.5`, and the supervised
+chat task works correctly through sandbox `$callers` propagation in the
+project's existing test modes (manual checkout plus the suite's ownership /
+shared-mode callers). `test/bds/ai/chat_sandbox_cleanup_test.exs` now proves
+both acceptance points: the production module has zero sandbox references, and
+`send_chat_message/3` still persists its user/assistant messages through the
+supervised task without explicit sandbox allowance. Validation gates are clean:
+`mix compile --warnings-as-errors --force`, full `mix test`, and
+`mix dialyzer` all pass.
 
 **Context.** `chat.ex` contains a `:sandbox_ready` send/receive handshake and
 `allow_repo_sandbox/1` (with `Code.ensure_loaded?` + blanket `rescue`) purely

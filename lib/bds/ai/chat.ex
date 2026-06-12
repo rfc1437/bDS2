@@ -197,16 +197,10 @@ defmodule BDS.AI.Chat do
            }) do
       task =
         Task.Supervisor.async_nolink(BDS.Tasks.TaskSupervisor, fn ->
-          receive do
-            :sandbox_ready -> :ok
-          end
-
           do_send_chat_message(conversation, user_message, opts)
         end)
 
       InFlight.register(conversation.id, task.pid)
-      :ok = allow_repo_sandbox(task.pid)
-      send(task.pid, :sandbox_ready)
 
       try do
         await_chat_task(task, chat_await_timeout_ms())
@@ -970,20 +964,6 @@ defmodule BDS.AI.Chat do
 
   defp active_project_id do
     Repo.one(from project in Project, where: project.is_active == true, select: project.id)
-  end
-
-  defp allow_repo_sandbox(pid) when is_pid(pid) do
-    if Code.ensure_loaded?(Ecto.Adapters.SQL.Sandbox) do
-      try do
-        Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), pid)
-      rescue
-        _error -> :ok
-      end
-    else
-      :ok
-    end
-
-    :ok
   end
 
   defp encode_nullable(nil), do: nil
