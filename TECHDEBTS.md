@@ -590,7 +590,16 @@ polling in the rebuild wait path.
 unchanged (or interval ≥ 1s with backoff); rebuild sequencing has no
 `Process.sleep`; CLI-sync round-trip latency stays ≤ current behavior.
 
-### TD-15: `BDS.Tasks` housekeeping (queue type, eviction timers)
+### TD-15: `BDS.Tasks` housekeeping (queue type, eviction timers) ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.Tasks` now uses `:queue` for its pending work
+queue, so enqueue/dequeue on the hot path are O(1) and the FIFO behavior is
+unchanged. Finished-task cleanup now tracks a single live eviction timer ref
+instead of scheduling a fresh `send_after/3` on every terminal task; the timer
+fires, prunes expired finished tasks, and only reschedules itself if finished
+tasks still remain. Coverage now includes a focused task-state test proving
+multiple finished tasks share the same live eviction timer and a source guard
+that forbids `queue ++` churn.
 
 **Context.** Minor inefficiencies in `tasks.ex`: the pending queue is a list
 appended with `++` (O(n) per submit), and **every** finishing task schedules

@@ -69,9 +69,10 @@ defmodule BDS.Tasks do
     {:ok,
      %{
        tasks: %{},
-       queue: [],
+       queue: :queue.new(),
        running: %{},
-       ref_to_task: %{}
+       ref_to_task: %{},
+       finished_task_eviction_timer: nil
      }}
   end
 
@@ -83,8 +84,7 @@ defmodule BDS.Tasks do
     if map_size(next_state.running) < max_concurrent() do
       {:reply, {:ok, public_task(task)}, start_task(next_state, task.id, work)}
     else
-      {:reply, {:ok, public_task(task)},
-       %{next_state | queue: next_state.queue ++ [{task.id, work}]}}
+      {:reply, {:ok, public_task(task)}, enqueue_task(next_state, task.id, work)}
     end
   end
 
@@ -143,13 +143,11 @@ defmodule BDS.Tasks do
 
         {:reply, :ok, next_state}
 
-      Enum.any?(state.queue, fn {queued_id, _work} -> queued_id == task_id end) ->
+      queued_task?(state.queue, task_id) ->
         next_state =
           state
           |> update_task(task_id, %{status: :cancelled, finished_at: DateTime.utc_now()})
-          |> Map.update!(:queue, fn queue ->
-            Enum.reject(queue, fn {queued_id, _work} -> queued_id == task_id end)
-          end)
+          |> remove_queued_task(task_id)
           |> start_queued_tasks()
           |> schedule_finished_task_eviction()
 
@@ -213,7 +211,19 @@ defmodule BDS.Tasks do
   end
 
   def handle_info(:evict_finished_tasks, state) do
-    {:noreply, prune_expired_finished_tasks(state)}
+    next_state =
+      state
+      |> Map.put(:finished_task_eviction_timer, nil)
+      |> prune_expired_finished_tasks()
+
+    next_state =
+      if any_finished_tasks?(next_state) do
+        schedule_finished_task_eviction(next_state)
+      else
+        next_state
+      end
+
+    {:noreply, next_state}
   end
 
   def handle_info({ref, result}, state) do
@@ -315,11 +325,11 @@ defmodule BDS.Tasks do
       map_size(state.running) >= max_concurrent() ->
         state
 
-      state.queue == [] ->
+      :queue.is_empty(state.queue) ->
         state
 
       true ->
-        [{task_id, work} | remaining] = state.queue
+        {{:value, {task_id, work}}, remaining} = :queue.out(state.queue)
 
         state
         |> Map.put(:queue, remaining)
@@ -390,8 +400,12 @@ defmodule BDS.Tasks do
   defp broadcast_terminal_task(_task), do: :ok
 
   defp schedule_finished_task_eviction(state) do
-    Process.send_after(self(), :evict_finished_tasks, finished_task_ttl_ms())
-    state
+    if state.finished_task_eviction_timer do
+      state
+    else
+      timer_ref = Process.send_after(self(), :evict_finished_tasks, finished_task_ttl_ms())
+      %{state | finished_task_eviction_timer: timer_ref}
+    end
   end
 
   defp prune_expired_finished_tasks(state) do
@@ -403,6 +417,32 @@ defmodule BDS.Tasks do
       end)
 
     %{state | tasks: tasks}
+  end
+
+  defp enqueue_task(state, task_id, work) do
+    %{state | queue: :queue.in({task_id, work}, state.queue)}
+  end
+
+  defp queued_task?(queue, task_id) do
+    queue
+    |> :queue.to_list()
+    |> Enum.any?(fn {queued_id, _work} -> queued_id == task_id end)
+  end
+
+  defp remove_queued_task(state, task_id) do
+    remaining_queue =
+      state.queue
+      |> :queue.to_list()
+      |> Enum.reject(fn {queued_id, _work} -> queued_id == task_id end)
+      |> :queue.from_list()
+
+    %{state | queue: remaining_queue}
+  end
+
+  defp any_finished_tasks?(state) do
+    Enum.any?(state.tasks, fn {_task_id, task} ->
+      task.status in [:completed, :failed, :cancelled]
+    end)
   end
 
   defp expired_finished_task?(%{status: status, finished_at: %DateTime{} = finished_at}, now)

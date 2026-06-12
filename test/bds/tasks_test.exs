@@ -266,6 +266,37 @@ defmodule BDS.TasksTest do
     assert running.id in task_ids
   end
 
+  test "finished task eviction uses a single live timer" do
+    Application.put_env(:bds, :tasks,
+      max_concurrent: 3,
+      progress_throttle_ms: 250,
+      finished_task_ttl_ms: 50
+    )
+
+    assert {:ok, first} = BDS.Tasks.register_external_task("first finished")
+    assert {:ok, second} = BDS.Tasks.register_external_task("second finished")
+
+    assert :ok = BDS.Tasks.complete_task(first.id)
+    first_timer = :sys.get_state(BDS.Tasks).finished_task_eviction_timer
+    assert is_reference(first_timer)
+    assert is_integer(Process.read_timer(first_timer))
+
+    assert :ok = BDS.Tasks.complete_task(second.id)
+    second_timer = :sys.get_state(BDS.Tasks).finished_task_eviction_timer
+
+    assert second_timer == first_timer
+    assert is_integer(Process.read_timer(second_timer))
+  end
+
+  test "task queue implementation avoids list append churn" do
+    source = File.read!("lib/bds/tasks.ex")
+
+    assert String.contains?(source, ":queue"), "tasks queue should use :queue"
+
+    refute String.contains?(source, "queue ++"),
+           "tasks queue should not append with ++"
+  end
+
   test "terminal task states are broadcast on PubSub" do
     Phoenix.PubSub.subscribe(BDS.PubSub, BDS.Tasks.topic())
 
@@ -304,4 +335,5 @@ defmodule BDS.TasksTest do
   defp wait_for_task(_task_id, _predicate, 0) do
     flunk("task did not reach expected state")
   end
+
 end
