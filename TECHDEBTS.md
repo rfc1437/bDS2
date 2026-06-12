@@ -796,7 +796,15 @@ setting.
 **Acceptance.** Same pool model in dev and prod; rationale comment in config;
 no busy-timeout regressions in tests.
 
-### TD-21: Harden `Persistence.atomic_write`
+### TD-21: Harden `Persistence.atomic_write` ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.Persistence.atomic_write/2` now writes through a
+per-call temp path (`.tmp.<unique_integer>`) instead of the fixed `.tmp`
+suffix, eliminating the concurrent-writer collision that previously produced
+`:enoent` races. The new test coverage proves two things: many simultaneous
+writers to the same target all complete successfully and the final file is one
+intact payload, and the post-rebuild glob still ignores atomic temp files
+because the temp suffix no longer matches the `*.md` pattern.
 
 **Context.** `atomic_write/2` uses a fixed `path <> ".tmp"` temp name — two
 concurrent writers to the same path corrupt each other's temp file before
