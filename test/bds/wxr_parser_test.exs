@@ -53,6 +53,31 @@ defmodule BDS.WxrParserTest do
     end
   end
 
+  test "parse_xml does not intern unknown element names as atoms" do
+    unique_name = "csm036_untrusted_#{System.unique_integer([:positive])}"
+
+    xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0"
+      xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+      xmlns:content="http://purl.org/rss/1.0/modules/content/"
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:wp="http://wordpress.org/export/1.2/">
+      <channel>
+        <title>Legacy Blog</title>
+        <#{unique_name}>ignored payload</#{unique_name}>
+      </channel>
+    </rss>
+    """
+
+    parsed = WxrParser.parse_xml(xml)
+    assert parsed.site.title == "Legacy Blog"
+
+    assert_raise ArgumentError, fn ->
+      String.to_existing_atom(unique_name)
+    end
+  end
+
   defp sample_wxr_xml do
     """
     <?xml version="1.0" encoding="UTF-8"?>

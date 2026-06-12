@@ -331,7 +331,7 @@ defmodule BDS.CSM005SQLFilteringTest do
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp create_post(project_id, opts \\ []) do
+  defp create_post(project_id, opts) do
     title = Keyword.get(opts, :title, "Post #{System.unique_integer([:positive])}")
     status = Keyword.get(opts, :status, :draft)
     tags = Keyword.get(opts, :tags, [])

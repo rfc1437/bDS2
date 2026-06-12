@@ -187,6 +187,66 @@ defmodule BDS.ImportExecutionTest do
     assert_received {:execution_progress, "complete", 1, 1, %{detail: "import_complete"}}
   end
 
+  test "execute_import rolls back imported posts when a later post write fails", %{
+    project: project
+  } do
+    report = %{
+      items: %{
+        categories: [],
+        tags: [],
+        posts: [
+          %{
+            item_type: "post",
+            post_type: "post",
+            wp_id: 101,
+            title: "Committed Too Early",
+            slug: "committed-too-early",
+            status: "new",
+            author: nil,
+            excerpt: nil,
+            categories: [],
+            tags: [],
+            wp_status: "publish",
+            content_markdown: "first body",
+            content_checksum: sha256("first body"),
+            created_at: "2024-05-01 12:00:00",
+            updated_at: "2024-05-01 12:30:00",
+            published_at: "2024-05-01 12:00:00"
+          },
+          %{
+            item_type: "post",
+            post_type: "post",
+            wp_id: 102,
+            title: "Broken Overwrite",
+            slug: "broken-overwrite",
+            status: "conflict",
+            resolution: "overwrite",
+            existing_id: "missing-post-id",
+            author: nil,
+            excerpt: nil,
+            categories: [],
+            tags: [],
+            wp_status: "publish",
+            content_markdown: "second body",
+            content_checksum: sha256("second body"),
+            created_at: "2024-05-02 12:00:00",
+            updated_at: "2024-05-02 12:30:00",
+            published_at: "2024-05-02 12:00:00"
+          }
+        ],
+        pages: [],
+        media: []
+      },
+      details: %{posts: [], pages: [], media: []}
+    }
+
+    assert {:error, %{message: message}} =
+             ImportExecution.execute_import(project.id, report, default_author: "Imported Author")
+
+    assert message =~ "not_found"
+    assert Repo.aggregate(Posts.Post, :count, :id) == 0
+  end
+
   defp sha256(value) do
     :sha256
     |> :crypto.hash(value)

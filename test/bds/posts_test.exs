@@ -802,6 +802,50 @@ defmodule BDS.PostsTest do
              BDS.Posts.rebuild_posts_from_files(project.id)
   end
 
+  test "rebuild_posts_from_files rolls back created posts when a later translation import fails", %{
+    project: project
+  } do
+    posts_dir = Path.join([BDS.Projects.project_data_dir(project), "posts", "2026", "04"])
+    File.mkdir_p!(posts_dir)
+
+    File.write!(
+      Path.join(posts_dir, "chimera.md"),
+      [
+        "---",
+        "id: canonical-post-id",
+        "title: Chimera Source",
+        "slug: chimera",
+        "status: published",
+        "language: de",
+        "createdAt: 2024-03-30T21:20:00.000Z",
+        "updatedAt: 2024-03-31T21:20:00.000Z",
+        "publishedAt: 2024-04-01T21:20:00.000Z",
+        "---",
+        "Quelle",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    File.write!(
+      Path.join(posts_dir, "chimera.en.md"),
+      [
+        "---",
+        "id: broken-translation-id",
+        "translationFor: missing-source-post-id",
+        "language: en",
+        "title: Broken Translation",
+        "---",
+        "Translated body",
+        ""
+      ]
+      |> Enum.join("\n")
+    )
+
+    assert {:error, _reason} = BDS.Posts.rebuild_posts_from_files(project.id)
+    assert BDS.Repo.aggregate(BDS.Posts.Post, :count, :id) == 0
+  end
+
   test "rebuild_posts_from_files parses folded multiline title and slug scalars alongside translations" do
     temp_dir =
       Path.join(

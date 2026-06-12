@@ -33,6 +33,7 @@ defmodule BDS.MixProject do
       {:plug, "~> 1.18"},
       {:bandit, "~> 1.5"},
       {:req, "~> 0.5"},
+      {:saxy, "~> 1.4"},
       {:desktop, "~> 1.5"},
       {:image, "~> 0.67"},
       {:nx, "~> 0.10"},

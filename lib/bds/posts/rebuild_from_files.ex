@@ -15,6 +15,8 @@ defmodule BDS.Posts.RebuildFromFiles do
   alias BDS.Repo
   alias BDS.Search
 
+  @transaction_batch_size 500
+
   @spec rebuild_posts_from_files(String.t(), keyword()) :: {:ok, [Post.t()]} | {:error, term()}
   def rebuild_posts_from_files(project_id, opts \\ []) do
     project = Projects.get_project!(project_id)
@@ -34,46 +36,29 @@ defmodule BDS.Posts.RebuildFromFiles do
       {translation_files, post_files} =
         Enum.split_with(rebuild_files, &TranslationValidation.translation_rebuild_file?/1)
 
-      posts =
-        post_files
-        |> Enum.with_index(1)
-        |> Enum.map(fn {file, index} ->
-          post =
-            upsert_post_from_rebuild_file(project_id, file,
-              sync_search: false,
-              sync_embeddings: false
+      operations = Enum.map(post_files, &{:post, &1}) ++ Enum.map(translation_files, &{:translation, &1})
+
+      with {:ok, posts} <- persist_rebuild_operations(project_id, operations, total_files, on_progress) do
+        if Keyword.get(opts, :reindex_search, true) do
+          :ok = report_rebuild_phase(on_progress, 0.97, "Refreshing post search index")
+
+          :ok =
+            Search.reindex_posts(project_id,
+              on_progress: scaled_progress_reporter(on_progress, 0.97, 0.99)
             )
+        end
 
-          :ok = report_rebuild_progress(on_progress, index, total_files, "post files")
-          post
-        end)
+        if Keyword.get(opts, :rebuild_embeddings, true) do
+          :ok = report_rebuild_phase(on_progress, 0.99, "Refreshing post embeddings")
 
-      translation_files
-      |> Enum.with_index(length(post_files) + 1)
-      |> Enum.each(fn {file, index} ->
-        upsert_post_translation_from_rebuild_file(project_id, file, sync_search: false)
-        :ok = report_rebuild_progress(on_progress, index, total_files, "post files")
-      end)
+          {:ok, _rebuilt_post_ids} =
+            Embeddings.rebuild_project(project_id,
+              on_progress: scaled_progress_reporter(on_progress, 0.99, 1.0)
+            )
+        end
 
-      if Keyword.get(opts, :reindex_search, true) do
-        :ok = report_rebuild_phase(on_progress, 0.97, "Refreshing post search index")
-
-        :ok =
-          Search.reindex_posts(project_id,
-            on_progress: scaled_progress_reporter(on_progress, 0.97, 0.99)
-          )
+        {:ok, posts}
       end
-
-      if Keyword.get(opts, :rebuild_embeddings, true) do
-        :ok = report_rebuild_phase(on_progress, 0.99, "Refreshing post embeddings")
-
-        {:ok, _rebuilt_post_ids} =
-          Embeddings.rebuild_project(project_id,
-            on_progress: scaled_progress_reporter(on_progress, 0.99, 1.0)
-          )
-      end
-
-      {:ok, posts}
     end
   end
 
@@ -313,5 +298,50 @@ defmodule BDS.Posts.RebuildFromFiles do
       {:ok, contents} -> {:ok, contents}
       {:error, reason} -> {:error, {:read_rebuild_file, path, reason}}
     end
+  end
+
+  defp persist_rebuild_operations(project_id, operations, total_files, on_progress) do
+    operations
+    |> Enum.chunk_every(@transaction_batch_size)
+    |> Enum.reduce_while({:ok, [], 0}, fn chunk, {:ok, posts, processed} ->
+      case run_repo_transaction(fn ->
+             Enum.map(chunk, fn
+               {:post, file} ->
+                 {:post,
+                  upsert_post_from_rebuild_file(project_id, file,
+                    sync_search: false,
+                    sync_embeddings: false
+                  )}
+
+               {:translation, file} ->
+                 {:translation,
+                  upsert_post_translation_from_rebuild_file(project_id, file, sync_search: false)}
+             end)
+           end) do
+        {:ok, committed} ->
+          Enum.with_index(committed, processed + 1)
+          |> Enum.each(fn {_entry, index} ->
+            :ok = report_rebuild_progress(on_progress, index, total_files, "post files")
+          end)
+
+          chunk_posts = for {:post, post} <- committed, do: post
+          {:cont, {:ok, posts ++ chunk_posts, processed + length(chunk)}}
+
+        {:error, reason} ->
+          {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, posts, _processed} -> {:ok, posts}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp run_repo_transaction(fun) when is_function(fun, 0) do
+    Repo.transaction(fun)
+  rescue
+    error -> {:error, error}
+  catch
+    kind, reason -> {:error, {kind, reason}}
   end
 end
