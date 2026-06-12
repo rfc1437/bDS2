@@ -485,7 +485,18 @@ renderers via monitors or a counter.
 **Acceptance.** A test issues N concurrent slow renders and asserts they
 overlap (wall time « N × single render); stop_preview still drains correctly.
 
-### TD-12: Move HNSW builds and duplicate scans out of `Embeddings.Index` handle_call
+### TD-12: Move HNSW builds and duplicate scans out of `Embeddings.Index` handle_call ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.Embeddings.Index` now runs duplicate scans and
+HNSW rebuilds in supervised tasks instead of inside `handle_call`, while the
+GenServer keeps only the small serialized state surface (current index, label
+map, debounce timers, and flush coordination). Neighbor queries continue to hit
+the current index while a scan or rebuild is in flight; rebuild requests for a
+project coalesce onto the latest requested snapshot; `flush/1` and `flush_all/0`
+wait for in-flight rebuilds before persisting; and `forget/1` cancels pending
+index work cleanly. Acceptance proof now includes focused concurrency tests for
+both slow duplicate scans and slow rebuilds, and the existing debounced
+persistence coverage remains green.
 
 **Context.** `Embeddings.Index` (singleton) builds HNSW graphs and runs full
 duplicate scans inside `handle_call` with client timeout `:infinity`. A long

@@ -691,4 +691,101 @@ defmodule BDS.EmbeddingsTest do
       assert is_nil(entry.timer)
     end
   end
+
+  describe "non-blocking index work" do
+    alias BDS.Embeddings.Index
+
+    defp index_entries(count) do
+      for seed <- 1..count do
+        %{label: seed, post_id: 100 + seed, vector: packed_vector(seed)}
+      end
+    end
+
+    test "neighbors stay available while duplicate scanning is in flight", %{project: project} do
+      entries = index_entries(4)
+      :ok = Index.put(project.id, 384, entries)
+
+      test_pid = self()
+      scan_ref = make_ref()
+
+      duplicate_task =
+        Task.async(fn ->
+          Index.duplicate_pairs(project.id, entries, 0.0,
+            on_progress: fn progress, message ->
+              if Process.get({:duplicate_scan_blocked, scan_ref}) do
+                :ok
+              else
+                Process.put({:duplicate_scan_blocked, scan_ref}, true)
+                send(test_pid, {:duplicate_scan_progress, scan_ref, self(), progress, message})
+
+                receive do
+                  {:release_duplicate_scan, ^scan_ref} -> :ok
+                end
+              end
+            end
+          )
+        end)
+
+      assert_receive {:duplicate_scan_progress, ^scan_ref, scan_worker_pid, _progress, _message}, 1_000
+
+      assert {:ok, neighbors} = Index.neighbors(project.id, 1, packed_vector(1), 1)
+      assert [%{post_id: 102}] = neighbors
+      assert Task.yield(duplicate_task, 0) == nil
+
+      send(scan_worker_pid, {:release_duplicate_scan, scan_ref})
+      assert {:ok, {:ok, pairs}} = Task.yield(duplicate_task, 1_000)
+      assert is_list(pairs)
+    end
+
+    test "neighbors keep using the previous index while a rebuild is in flight", %{project: project} do
+      project_id = project.id
+      test_pid = self()
+      original_entries = index_entries(2)
+      replacement_entries = index_entries(3)
+      :ok = Index.put(project_id, 384, original_entries)
+
+      original_hook = Application.get_env(:bds, :embeddings_index_test_hook)
+
+      Application.put_env(:bds, :embeddings_index_test_hook, fn event ->
+        case event do
+          {:before_build, ^project_id, build_pid} ->
+            send(test_pid, {:index_build_blocked, project_id, build_pid})
+
+            receive do
+              {:release_index_build, ^project_id} -> :ok
+            end
+
+          _other ->
+            :ok
+        end
+      end)
+
+      on_exit(fn ->
+        if is_nil(original_hook) do
+          Application.delete_env(:bds, :embeddings_index_test_hook)
+        else
+          Application.put_env(:bds, :embeddings_index_test_hook, original_hook)
+        end
+      end)
+
+      rebuild_task =
+        Task.async(fn ->
+          Index.put(project_id, 384, replacement_entries)
+        end)
+
+      assert_receive {:index_build_blocked, ^project_id, build_pid}, 1_000
+
+      assert {:ok, neighbors} = Index.neighbors(project.id, 1, packed_vector(1), 1)
+      assert [%{post_id: 102}] = neighbors
+      assert Process.alive?(build_pid)
+      assert Task.yield(rebuild_task, 0) == nil
+
+      send(build_pid, {:release_index_build, project_id})
+      assert {:ok, :ok} = Task.yield(rebuild_task, 1_000)
+
+      assert {:ok, neighbors_after_rebuild} = Index.neighbors(project.id, 1, packed_vector(1), 2)
+      assert Enum.any?(neighbors_after_rebuild, &(&1.post_id == 102))
+      assert Enum.any?(neighbors_after_rebuild, &(&1.post_id == 103))
+    end
+  end
 end
