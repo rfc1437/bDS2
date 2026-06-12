@@ -3,6 +3,9 @@ defmodule BDS.Git do
 
   alias BDS.Projects
 
+  @default_local_timeout_ms 15_000
+  @default_network_timeout_ms 120_000
+
   @lfs_patterns [
     "*.jpg",
     "*.jpeg",
@@ -94,9 +97,10 @@ defmodule BDS.Git do
       when is_binary(project_id) and is_binary(file_path) and is_list(opts) do
     with {:ok, project_dir} <- project_dir(project_id) do
       runner = Keyword.get(opts, :runner, &system_runner/3)
+      timeout_ms = git_timeout_ms(["show"], opts)
 
       original =
-        case runner.("git", ["show", "HEAD:#{file_path}"], command_opts(project_dir)) do
+        case runner.("git", ["show", "HEAD:#{file_path}"], command_opts(project_dir, timeout_ms)) do
           {output, 0} -> output
           {_output, _status} -> ""
         end
@@ -119,12 +123,8 @@ defmodule BDS.Git do
              project_dir,
              ["log", "--date=short", "--format=%H%x09%an%x09%ad%x09%s", branch],
              opts
-           ) do
-      remote_log =
-        case run_git(project_dir, ["log", "--format=%H", "origin/#{branch}"], opts) do
-          {:ok, output} -> output
-          {:error, {:git_failed, _message}} -> ""
-        end
+           ),
+         {:ok, remote_log} <- remote_history_log(project_dir, branch, opts) do
 
       local_commits = parse_history_log(local_log)
       remote_hashes = MapSet.new(parse_remote_history(remote_log))
@@ -166,8 +166,8 @@ defmodule BDS.Git do
         {:ok, output} ->
           {:ok, %{updated: true, output: output}}
 
-        {:error, {:git_failed, message}} ->
-          structured_git_error(project_dir, :fetch, message, opts)
+        {:error, reason} ->
+          structured_git_error(project_dir, :fetch, reason, opts)
       end
     end
   end
@@ -244,14 +244,20 @@ defmodule BDS.Git do
            }}
 
         {:ok, upstream_branch} ->
-          {:ok,
-           %{
-             local_branch: local_branch,
-             upstream_branch: upstream_branch,
-             has_upstream: true,
-             ahead: revision_count(project_dir, "#{upstream_branch}..HEAD", opts),
-             behind: revision_count(project_dir, "HEAD..#{upstream_branch}", opts)
-           }}
+          with {:ok, ahead} <- revision_count(project_dir, "#{upstream_branch}..HEAD", opts),
+               {:ok, behind} <- revision_count(project_dir, "HEAD..#{upstream_branch}", opts) do
+            {:ok,
+             %{
+               local_branch: local_branch,
+               upstream_branch: upstream_branch,
+               has_upstream: true,
+               ahead: ahead,
+               behind: behind
+             }}
+          end
+
+        {:error, _reason} = error ->
+          error
       end
     end
   end
@@ -304,6 +310,15 @@ defmodule BDS.Git do
     case run_git(project_dir, ["remote", "get-url", "origin"], opts) do
       {:ok, output} -> {:ok, blank_to_nil(output)}
       {:error, {:git_failed, _message}} -> {:ok, nil}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp remote_history_log(project_dir, branch, opts) do
+    case run_git(project_dir, ["log", "--format=%H", "origin/#{branch}"], opts) do
+      {:ok, output} -> {:ok, output}
+      {:error, {:git_failed, _message}} -> {:ok, ""}
+      {:error, _reason} = error -> error
     end
   end
 
@@ -311,6 +326,7 @@ defmodule BDS.Git do
     case run_git(project_dir, ["lfs", "ls-files"], opts) do
       {:ok, _output} -> {:ok, true}
       {:error, {:git_failed, _message}} -> {:ok, false}
+      {:error, _reason} = error -> error
     end
   end
 
@@ -332,25 +348,53 @@ defmodule BDS.Git do
   end
 
   defp run_git(project_dir, args, opts) do
-    runner = Keyword.get(opts, :runner, &system_runner/3)
+    timeout_ms = git_timeout_ms(args, opts)
+    command_opts = command_opts(project_dir, timeout_ms)
+    command = git_command(opts)
+    command_args = git_command_args(args, opts)
 
-    case runner.("git", args, command_opts(project_dir)) do
+    result =
+      case Keyword.fetch(opts, :runner) do
+        {:ok, runner} -> run_runner_with_timeout(runner, command, command_args, command_opts)
+        :error -> system_runner(command, command_args, command_opts)
+      end
+
+    case result do
+      {:timeout, output} -> {:error, timeout_error(args, timeout_ms, output)}
       {output, 0} -> {:ok, String.trim_trailing(output)}
       {output, _status} -> {:error, {:git_failed, String.trim(output)}}
     end
   end
 
   defp system_runner(command, args, opts) do
-    env = opts |> Keyword.get(:env, %{}) |> Enum.to_list()
     cwd = Keyword.fetch!(opts, :cd)
-    System.cmd(command, args, cd: cwd, env: env, stderr_to_stdout: true)
+    timeout_ms = Keyword.fetch!(opts, :timeout_ms)
+    executable = System.find_executable(command) || raise "missing executable: #{command}"
+
+    port =
+      Port.open(
+        {:spawn_executable, executable},
+        [
+          :binary,
+          :stderr_to_stdout,
+          :exit_status,
+          :use_stdio,
+          :hide,
+          {:cd, cwd},
+          {:env, port_env(opts |> Keyword.get(:env, %{}))},
+          {:args, args}
+        ]
+      )
+
+    receive_port_result(port, [], timeout_ms)
   end
 
-  defp command_opts(project_dir) do
+  defp command_opts(project_dir, timeout_ms) do
     ssh_command = "ssh -oBatchMode=yes"
 
     [
       cd: project_dir,
+      timeout_ms: timeout_ms,
       env: %{
         "GIT_TERMINAL_PROMPT" => "0",
         "GCM_INTERACTIVE" => "never",
@@ -367,6 +411,7 @@ defmodule BDS.Git do
          ) do
       {:ok, output} -> {:ok, blank_to_nil(output)}
       {:error, {:git_failed, _message}} -> {:ok, nil}
+      {:error, _reason} = error -> error
     end
   end
 
@@ -465,8 +510,151 @@ defmodule BDS.Git do
 
   defp revision_count(project_dir, revision_range, opts) do
     case run_git(project_dir, ["rev-list", "--count", revision_range], opts) do
-      {:ok, output} -> parse_count(output)
-      {:error, {:git_failed, _message}} -> 0
+      {:ok, output} -> {:ok, parse_count(output)}
+      {:error, {:git_failed, _message}} -> {:ok, 0}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp run_runner_with_timeout(runner, command, args, opts) do
+    timeout_ms = Keyword.fetch!(opts, :timeout_ms)
+    task = Task.async(fn -> runner.(command, args, opts) end)
+
+    case Task.yield(task, timeout_ms) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} -> result
+      nil -> {:timeout, ""}
+    end
+  end
+
+  defp receive_port_result(port, output, timeout_ms) do
+    receive do
+      {^port, {:data, data}} ->
+        receive_port_result(port, [data | output], timeout_ms)
+
+      {^port, {:exit_status, status}} ->
+        {iodata_to_output(output), status}
+    after
+      timeout_ms ->
+        {:timeout, terminate_port(port, output)}
+    end
+  end
+
+  defp terminate_port(port, output) do
+    os_pid = port_os_pid(port)
+    safe_port_close(port)
+
+    output = drain_port_messages(port, output, 25)
+    maybe_kill_os_process(os_pid)
+
+    drain_port_messages(port, output, 25)
+    |> iodata_to_output()
+  end
+
+  defp drain_port_messages(port, output, timeout_ms) do
+    receive do
+      {^port, {:data, data}} -> drain_port_messages(port, [data | output], timeout_ms)
+      {^port, {:exit_status, _status}} -> output
+    after
+      timeout_ms -> output
+    end
+  end
+
+  defp safe_port_close(port) do
+    Port.close(port)
+  catch
+    :error, _reason -> :ok
+  end
+
+  defp port_os_pid(port) do
+    case Port.info(port, :os_pid) do
+      {:os_pid, os_pid} when is_integer(os_pid) -> os_pid
+      _other -> nil
+    end
+  end
+
+  defp maybe_kill_os_process(nil), do: :ok
+
+  defp maybe_kill_os_process(os_pid) when is_integer(os_pid) do
+    if os_process_alive?(os_pid) do
+      System.cmd("kill", ["-TERM", Integer.to_string(os_pid)], stderr_to_stdout: true)
+
+      if os_process_alive?(os_pid) do
+        System.cmd("kill", ["-KILL", Integer.to_string(os_pid)], stderr_to_stdout: true)
+      end
+    end
+
+    :ok
+  end
+
+  defp os_process_alive?(os_pid) when is_integer(os_pid) do
+    {_output, exit_code} =
+      System.cmd("kill", ["-0", Integer.to_string(os_pid)], stderr_to_stdout: true)
+
+    exit_code == 0
+  end
+
+  defp iodata_to_output(output) do
+    output
+    |> Enum.reverse()
+    |> IO.iodata_to_binary()
+  end
+
+  defp port_env(env) do
+    Enum.map(env, fn {key, value} ->
+      {String.to_charlist(to_string(key)), String.to_charlist(to_string(value))}
+    end)
+  end
+
+  defp git_timeout_ms(args, opts) do
+    Keyword.get(opts, :timeout_ms) ||
+      if(network_git_command?(args),
+        do: git_timeout_config(:network_timeout_ms, @default_network_timeout_ms),
+        else: git_timeout_config(:local_timeout_ms, @default_local_timeout_ms)
+      )
+  end
+
+  defp git_command(opts), do: Keyword.get(opts, :command, "git")
+
+  defp git_command_args(args, opts) do
+    Keyword.get(opts, :command_args, []) ++ args
+  end
+
+  defp git_timeout_config(key, default) do
+    :bds
+    |> Application.get_env(:git, [])
+    |> Keyword.get(key, default)
+  end
+
+  defp network_git_command?([operation | _rest]), do: operation in ["fetch", "pull", "push"]
+
+  defp timeout_error(args, timeout_ms, output) do
+    operation = git_operation(args)
+
+    %{
+      kind: :timeout,
+      operation: operation,
+      timeout_ms: timeout_ms,
+      message: "Git #{operation} timed out after #{timeout_ms}ms",
+      output: String.trim(output)
+    }
+  end
+
+  defp git_operation([operation | _rest]) do
+    case operation do
+      "add" -> :add
+      "commit" -> :commit
+      "diff" -> :diff
+      "fetch" -> :fetch
+      "log" -> :log
+      "lfs" -> :lfs
+      "pull" -> :pull
+      "push" -> :push
+      "remote" -> :remote
+      "rev-list" -> :rev_list
+      "rev-parse" -> :rev_parse
+      "show" -> :show
+      "status" -> :status
+      _other -> :git
     end
   end
 
@@ -482,10 +670,17 @@ defmodule BDS.Git do
   defp category_for_path("templates/" <> _rest), do: :templates
   defp category_for_path(_path), do: nil
 
-  defp structured_git_error(project_dir, _operation, message, opts) do
+  defp structured_git_error(_project_dir, _operation, %{} = error, _opts), do: {:error, error}
+
+  defp structured_git_error(project_dir, operation, {:git_failed, message}, opts) do
+    structured_git_error(project_dir, operation, message, opts)
+  end
+
+  defp structured_git_error(project_dir, _operation, message, opts) when is_binary(message) do
     provider =
       case remote_url(project_dir, opts) do
         {:ok, remote} -> provider_info(remote)
+        {:error, _reason} -> nil
       end
 
     if auth_error?(message) do

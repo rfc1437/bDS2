@@ -414,7 +414,18 @@ cleanup can trap exits locally. Keep the state bookkeeping identical
 **Acceptance.** A test worker with `trap_exit` observes `:shutdown` and runs
 its cleanup before dying; cancelled tasks still free a concurrency slot.
 
-### TD-10: Timeouts for external `git` commands
+### TD-10: Timeouts for external `git` commands ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.Git` now applies config-driven timeout budgets
+to every shell-out (`config :bds, :git` with `:local_timeout_ms` defaulting to
+15s and `:network_timeout_ms` defaulting to 120s for fetch/pull/push). The
+default runner no longer uses unbounded `System.cmd/3`; it launches the child
+through `Port.open/2`, collects stdout/stderr, and on timeout closes the port
+and explicitly terminates the OS process if it is still alive. Timeout results
+surface as structured `%{kind: :timeout, operation:, timeout_ms:, message:}`
+errors, while existing structured auth guidance is preserved. Acceptance proof
+now includes a bounded runner-stub timeout test and a real-process cleanup test
+that launches `sleep`, times out, and asserts the spawned PID is gone.
 
 **Context.** `BDS.Git` shells out via `System.cmd`, which has **no timeout**.
 `GIT_TERMINAL_PROMPT=0` and SSH BatchMode prevent interactive hangs, but a

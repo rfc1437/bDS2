@@ -212,8 +212,72 @@ defmodule BDS.GitTest do
     assert is_binary(error.guidance)
   end
 
+  test "fetch returns a structured timeout error when a runner exceeds the deadline", %{
+    project: project
+  } do
+    with_git_timeouts(20, 20, fn ->
+      runner = fn _command, _args, _opts ->
+        Process.sleep(100)
+        {"", 0}
+      end
+
+      assert {:error, error} = Git.fetch(project.id, runner: runner)
+      assert %{kind: :timeout, operation: :fetch, timeout_ms: 20, message: _message} = error
+      assert error.message =~ "timed out"
+    end)
+  end
+
+  test "default runner kills the spawned git process when fetch times out", %{
+    project: project,
+    temp_root: temp_root
+  } do
+    pid_file = Path.join(temp_root, "git-timeout.pid")
+    sleep_executable = System.find_executable("sleep") || raise "missing sleep executable"
+    shell_executable = System.find_executable("sh") || raise "missing sh executable"
+    shell_script = "echo \"$$\" > \"#{pid_file}\"; exec \"#{sleep_executable}\" 2"
+
+    with_git_timeouts(50, 50, fn ->
+      assert {:error, error} =
+               Git.fetch(project.id,
+                 command: shell_executable,
+                 command_args: ["-c", shell_script]
+               )
+
+      assert %{kind: :timeout, operation: :fetch} = error
+
+      pid = pid_file |> File.read!() |> String.trim() |> String.to_integer()
+      refute os_process_alive?(pid)
+    end)
+  end
+
   defp fake_runner(handler) do
     fn command, args, opts -> handler.(command, args, opts) end
+  end
+
+  defp with_git_timeouts(local_timeout_ms, network_timeout_ms, fun) do
+    original = Application.get_env(:bds, :git)
+
+    Application.put_env(:bds, :git,
+      local_timeout_ms: local_timeout_ms,
+      network_timeout_ms: network_timeout_ms
+    )
+
+    try do
+      fun.()
+    after
+      if original == nil do
+        Application.delete_env(:bds, :git)
+      else
+        Application.put_env(:bds, :git, original)
+      end
+    end
+  end
+
+  defp os_process_alive?(pid) when is_integer(pid) do
+    {_output, exit_code} =
+      System.cmd("kill", ["-0", Integer.to_string(pid)], stderr_to_stdout: true)
+
+    exit_code == 0
   end
 
   defp init_git_repo!(project_dir, message) do

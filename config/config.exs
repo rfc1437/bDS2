@@ -78,6 +78,10 @@ config :bds, :chat,
   stream_emit_interval_ms: 100,
   await_timeout_margin_ms: 5_000
 
+config :bds, :git,
+  local_timeout_ms: 15_000,
+  network_timeout_ms: 120_000
+
 config :bds, :embeddings,
   backend: BDS.Embeddings.Backends.Neural,
   model_id: "Xenova/multilingual-e5-small",
