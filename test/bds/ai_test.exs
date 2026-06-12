@@ -279,6 +279,24 @@ defmodule BDS.AITest do
     end
   end
 
+  defmodule ShutdownAwareBlockingRuntime do
+    def generate(endpoint, request, opts) do
+      Process.flag(:trap_exit, true)
+
+      test_pid = Keyword.fetch!(opts, :test_pid)
+      send(test_pid, {:blocking_runtime_started, endpoint, request, self()})
+
+      receive do
+        {:EXIT, _from, :shutdown} ->
+          send(test_pid, :blocking_runtime_shutdown)
+          exit(:shutdown)
+      after
+        5_000 ->
+          {:ok, %{content: "too late", usage: %{input_tokens: 1, output_tokens: 1}}}
+      end
+    end
+  end
+
   # Always returns another tool call and never a final answer, so a chat would
   # loop forever if the round count were not bounded.
   defmodule LoopingToolRuntime do
@@ -1767,6 +1785,64 @@ defmodule BDS.AITest do
 
     assert :ok = BDS.AI.cancel_chat(conversation.id)
     assert {:error, :cancelled} = Task.await(task)
+
+    messages = BDS.AI.list_chat_messages(conversation.id)
+    assert Enum.map(messages, & &1.role) == [:user]
+  end
+
+  @tag :chat_timeout
+  test "send_chat_message times out a stalled chat round and keeps persisted state consistent" do
+    original_chat_config = Application.get_env(:bds, :chat, [])
+    original_http_config = Application.get_env(:bds, BDS.AI.HttpClient, [])
+
+    Application.put_env(
+      :bds,
+      :chat,
+      original_chat_config
+      |> Keyword.put(:max_tool_rounds, 1)
+      |> Keyword.put(:await_timeout_margin_ms, 25)
+    )
+
+    Application.put_env(
+      :bds,
+      BDS.AI.HttpClient,
+      original_http_config
+      |> Keyword.put(:connect_timeout_ms, 50)
+      |> Keyword.put(:receive_timeout_ms, 50)
+    )
+
+    on_exit(fn ->
+      Application.put_env(:bds, :chat, original_chat_config)
+      Application.put_env(:bds, BDS.AI.HttpClient, original_http_config)
+    end)
+
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{
+                 url: "https://api.example.test/v1",
+                 api_key: "online-secret",
+                 model: "gpt-4o-mini"
+               },
+               secret_backend: FakeSecretBackend
+             )
+
+    assert {:ok, conversation} = BDS.AI.start_chat(%{model: "gpt-4o-mini"})
+
+    started_at = System.monotonic_time(:millisecond)
+
+    assert {:error, :chat_timeout} =
+             BDS.AI.send_chat_message(conversation.id, "Please wait forever",
+               runtime: ShutdownAwareBlockingRuntime,
+               test_pid: self(),
+               secret_backend: FakeSecretBackend
+             )
+
+    elapsed_ms = System.monotonic_time(:millisecond) - started_at
+
+    assert elapsed_ms < 1_000
+    assert_receive {:blocking_runtime_started, _endpoint, %{operation: :chat}, _pid}, 500
+    assert_receive :blocking_runtime_shutdown, 500
 
     messages = BDS.AI.list_chat_messages(conversation.id)
     assert Enum.map(messages, & &1.role) == [:user]

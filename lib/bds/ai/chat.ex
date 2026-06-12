@@ -27,6 +27,7 @@ defmodule BDS.AI.Chat do
   @title_max_output_tokens 256
   @chat_title_max_length 30
   @chat_max_tool_rounds 10
+  @chat_await_timeout_margin_ms 5_000
   @default_context_window 128_000
 
   @spec start_chat(map()) :: {:ok, map()} | {:error, Ecto.Changeset.t()}
@@ -208,7 +209,7 @@ defmodule BDS.AI.Chat do
       send(task.pid, :sandbox_ready)
 
       try do
-        await_chat_task(task)
+        await_chat_task(task, chat_await_timeout_ms())
       after
         InFlight.unregister(conversation.id)
       end
@@ -756,9 +757,20 @@ defmodule BDS.AI.Chat do
   # BoundedToolLoop: the tool-calling round count is capped by
   # config.chat_max_tool_rounds (falling back to the built-in default).
   defp chat_max_tool_rounds do
+    chat_config(:max_tool_rounds, @chat_max_tool_rounds)
+  end
+
+  defp chat_await_timeout_ms do
+    per_request_timeout_ms = BDS.AI.HttpClient.request_timeout_ms()
+
+    per_request_timeout_ms * (chat_max_tool_rounds() + 1) +
+      chat_config(:await_timeout_margin_ms, @chat_await_timeout_margin_ms)
+  end
+
+  defp chat_config(key, default) do
     :bds
     |> Application.get_env(:chat, [])
-    |> Keyword.get(:max_tool_rounds, @chat_max_tool_rounds)
+    |> Keyword.get(key, default)
   end
 
   defp chat_system_prompt(project_id, tools) do
@@ -853,7 +865,7 @@ defmodule BDS.AI.Chat do
     :ok
   end
 
-  defp await_chat_task(task) do
+  defp await_chat_task(task, timeout_ms) do
     ref = task.ref
 
     receive do
@@ -879,6 +891,10 @@ defmodule BDS.AI.Chat do
           _other ->
             {:error, :cancelled}
         end
+    after
+      timeout_ms ->
+        _ = Task.shutdown(task, 100)
+        {:error, :chat_timeout}
     end
   end
 

@@ -1,5 +1,5 @@
 defmodule BDS.WxrParserTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias BDS.WxrParser
 
@@ -101,6 +101,8 @@ defmodule BDS.WxrParserTest do
       </channel>
     </rss>
     """
+
+    _warmup = WxrParser.parse_xml(sample_wxr_xml())
 
     atom_count_before = :erlang.system_info(:atom_count)
     parsed = WxrParser.parse_xml(xml)

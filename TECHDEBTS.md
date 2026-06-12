@@ -312,7 +312,20 @@ airplane mode / local model / toast.
 events arrive before the final `{:ok, reply}`; tool-call rounds still work;
 cancellation mid-stream (TD-07) aborts the HTTP request.
 
-### TD-07: Bound the chat await chain; end-to-end timeout & cancellation
+### TD-07: Bound the chat await chain; end-to-end timeout & cancellation ✅ DONE (2026-06-12)
+
+**Status: implemented.** `BDS.AI.Chat.send_chat_message/3` no longer waits
+unboundedly on the supervised chat task: `await_chat_task/2` now applies a
+global deadline derived from the configured per-request HTTP budget and the
+bounded tool loop (`BDS.AI.HttpClient.request_timeout_ms() *
+(chat_max_tool_rounds + 1) + config :bds, :chat, :await_timeout_margin_ms`). On
+deadline expiry it returns `{:error, :chat_timeout}` and shuts the task down via
+`Task.shutdown/2`, so the caller is released even if the runtime wedges.
+`config/config.exs` now exposes `:await_timeout_margin_ms` under `:chat`. The
+acceptance proof is a shutdown-aware blocking runtime test that asserts the
+timeout result, verifies the task receives shutdown, and confirms the
+conversation persists only the user message on timeout; existing cancellation
+and streaming tests remain green.
 
 **Context.** `BDS.AI.Chat.send_chat_message/3` blocks the caller (a LiveView
 process) on a hand-rolled `await_chat_task/1` — a raw `receive` with **no

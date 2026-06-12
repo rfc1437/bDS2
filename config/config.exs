@@ -70,10 +70,13 @@ config :bds, :scripting,
 # streaming: chat completions use SSE when the provider supports it (set to
 # false for OpenAI-compatible servers that reject the "stream" flag).
 # stream_emit_interval_ms throttles how often streamed content reaches the UI.
+# await_timeout_margin_ms is added on top of the per-request HTTP budget across
+# the bounded tool-call loop, so the caller never waits forever.
 config :bds, :chat,
   max_tool_rounds: 10,
   streaming: true,
-  stream_emit_interval_ms: 100
+  stream_emit_interval_ms: 100,
+  await_timeout_margin_ms: 5_000
 
 config :bds, :embeddings,
   backend: BDS.Embeddings.Backends.Neural,

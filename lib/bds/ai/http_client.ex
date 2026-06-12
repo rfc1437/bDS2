@@ -25,6 +25,14 @@ defmodule BDS.AI.HttpClient do
   @default_get_max_retries 2
   @default_retry_delay_ms 500
 
+  @spec request_timeout_ms() :: pos_integer()
+  def request_timeout_ms do
+    max(
+      config(:connect_timeout_ms, @default_connect_timeout_ms),
+      config(:receive_timeout_ms, @default_receive_timeout_ms)
+    )
+  end
+
   @spec get(String.t(), %{String.t() => String.t()}) ::
           {:ok, %{status: non_neg_integer(), headers: map(), body: binary()}} | {:error, term()}
   def get(url, headers) when is_binary(url) and is_map(headers) do
