@@ -664,7 +664,16 @@ user projects.
 **Acceptance.** CRLF fixture parses; round-trip property tests pass; golden
 serialization fixtures unchanged (if keeping custom serializer).
 
-### TD-17: Language detection via `paasaa` (optional, low priority)
+### TD-17: Language detection via `paasaa` (optional, low priority) ✅ DONE (2026-06-12)
+
+**Status: implemented without adding `paasaa`.** The originally reported
+misclassifications are not reproducible on the current code: the existing
+detector already classifies the relevant umlaut-free German and accent-free
+French fixtures correctly through its language-hint fallback, and new focused
+tests now lock that behavior down directly. Because the acceptance cases are now
+satisfied and the current implementation keeps dependency weight lower, the
+project does not add `paasaa` at this time. Revisit only if broader real-world
+fixtures start failing.
 
 **Context.** `Search.detect_language/1` uses diacritic regexes + tiny word
 lists; German text without umlauts (common in short posts) falls through to

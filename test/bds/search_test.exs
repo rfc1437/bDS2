@@ -553,6 +553,15 @@ defmodule BDS.SearchTest do
     assert Enum.uniq(languages) == languages
   end
 
+  test "detect_language classifies umlaut-free German text as German" do
+    assert BDS.Search.detect_language("Der Fluss fliesst ruhig am Morgen entlang der alten Bruecke") ==
+             "de"
+  end
+
+  test "detect_language classifies accent-free French text as French" do
+    assert BDS.Search.detect_language("Je cours au parc chaque matin avant le travail") == "fr"
+  end
+
   test "search_posts finds translation text in multiple languages after reindex", %{
     project: project
   } do
