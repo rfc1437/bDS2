@@ -10,9 +10,7 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
     http_client = Keyword.get(opts, :http_client, HttpClient)
     url = models_url(endpoint.url)
 
-    headers =
-      %{"accept" => "application/json"}
-      |> maybe_put_auth(endpoint.api_key)
+    headers = request_headers(endpoint.api_key, false)
 
     with {:ok, response} <- http_client.get(url, headers),
          200 <- response.status do
@@ -26,21 +24,8 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
   def generate(endpoint, request, opts) when is_map(endpoint) and is_map(request) do
     url = completions_url(endpoint.url)
 
-    headers =
-      %{
-        "content-type" => "application/json",
-        "accept" => "application/json"
-      }
-      |> maybe_put_auth(endpoint.api_key)
-
-    payload =
-      %{
-        "model" => request.model,
-        "messages" => request.messages,
-        "max_tokens" => request.max_output_tokens
-      }
-      |> maybe_disable_thinking(request.model)
-      |> maybe_put_tools(Map.get(request, :tools, []))
+    headers = request_headers(endpoint.api_key, true)
+    payload = base_payload(request)
 
     if stream?(request, opts) do
       generate_streaming(url, headers, payload, request, Keyword.fetch!(opts, :on_stream))
@@ -50,11 +35,9 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
   end
 
   defp generate_blocking(url, headers, payload, request) do
-    payload_json = Jason.encode!(payload)
+    payload_json = encode_payload(payload)
 
-    Logger.debug(
-      "AI OpenAI-compatible request operation=#{inspect(Map.get(request, :operation))} model=#{inspect(request.model)} url=#{url} tools=#{payload |> Map.get("tools", []) |> length()} payload_size=#{byte_size(payload_json)}"
-    )
+    log_request(:blocking, url, request, payload, payload_json)
 
     case HttpClient.post(url, headers, payload_json) do
       {:ok, %{status: 200, body: body}} ->
@@ -78,15 +61,12 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
         result
 
       {:ok, %{status: status, body: body}} ->
-        Logger.error(
-          "AI OpenAI-compatible HTTP error status=#{status} body=#{String.slice(body, 0, 2000)}"
-        )
-
-        {:error, %{kind: :http_error, status: status, body: body}}
+        log_http_status_error("AI OpenAI-compatible", status, body)
+        http_status_error(status, body)
 
       {:error, reason} ->
-        Logger.error("AI OpenAI-compatible HTTP request failed: #{inspect(reason)}")
-        {:error, %{kind: :http_error, reason: reason}}
+        log_http_request_error("AI OpenAI-compatible", reason)
+        http_request_error(reason)
     end
   end
 
@@ -95,15 +75,9 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
   # snapshots to `on_stream` as they arrive. The assembled message goes
   # through the same normalization as the blocking path.
   defp generate_streaming(url, headers, payload, request, on_stream) do
-    payload_json =
-      payload
-      |> Map.put("stream", true)
-      |> Map.put("stream_options", %{"include_usage" => true})
-      |> Jason.encode!()
+    payload_json = payload |> streaming_payload() |> encode_payload()
 
-    Logger.debug(
-      "AI OpenAI-compatible streaming request operation=#{inspect(Map.get(request, :operation))} model=#{inspect(request.model)} url=#{url} payload_size=#{byte_size(payload_json)}"
-    )
+    log_request(:streaming, url, request, payload, payload_json)
 
     sse = SSE.new(on_stream, emit_interval_ms: stream_emit_interval_ms())
 
@@ -127,15 +101,12 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
         end
 
       {:ok, %{status: status, body: body}, _sse} ->
-        Logger.error(
-          "AI OpenAI-compatible streaming HTTP error status=#{status} body=#{String.slice(body, 0, 2000)}"
-        )
-
-        {:error, %{kind: :http_error, status: status, body: body}}
+        log_http_status_error("AI OpenAI-compatible streaming", status, body)
+        http_status_error(status, body)
 
       {:error, reason} ->
-        Logger.error("AI OpenAI-compatible streaming request failed: #{inspect(reason)}")
-        {:error, %{kind: :http_error, reason: reason}}
+        log_http_request_error("AI OpenAI-compatible streaming", reason)
+        http_request_error(reason)
     end
   end
 
@@ -235,6 +206,58 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
       {:error, reason} -> {:error, %{kind: :invalid_json_response, reason: reason}}
     end
   end
+
+  defp request_headers(api_key, include_content_type?) do
+    %{"accept" => "application/json"}
+    |> maybe_put_content_type(include_content_type?)
+    |> maybe_put_auth(api_key)
+  end
+
+  defp maybe_put_content_type(headers, true),
+    do: Map.put(headers, "content-type", "application/json")
+
+  defp maybe_put_content_type(headers, false), do: headers
+
+  defp base_payload(request) do
+    %{
+      "model" => request.model,
+      "messages" => request.messages,
+      "max_tokens" => request.max_output_tokens
+    }
+    |> maybe_disable_thinking(request.model)
+    |> maybe_put_tools(Map.get(request, :tools, []))
+  end
+
+  defp streaming_payload(payload) do
+    payload
+    |> Map.put("stream", true)
+    |> Map.put("stream_options", %{"include_usage" => true})
+  end
+
+  defp encode_payload(payload), do: Jason.encode!(payload)
+
+  defp log_request(mode, url, request, payload, payload_json) do
+    tools_segment =
+      case mode do
+        :blocking -> " tools=#{payload |> Map.get("tools", []) |> length()}"
+        :streaming -> ""
+      end
+
+    Logger.debug(
+      "AI OpenAI-compatible#{if mode == :streaming, do: " streaming", else: ""} request operation=#{inspect(Map.get(request, :operation))} model=#{inspect(request.model)} url=#{url}#{tools_segment} payload_size=#{byte_size(payload_json)}"
+    )
+  end
+
+  defp log_http_status_error(prefix, status, body) do
+    Logger.error("#{prefix} HTTP error status=#{status} body=#{String.slice(body, 0, 2000)}")
+  end
+
+  defp log_http_request_error(prefix, reason) do
+    Logger.error("#{prefix} request failed: #{inspect(reason)}")
+  end
+
+  defp http_status_error(status, body), do: {:error, %{kind: :http_error, status: status, body: body}}
+  defp http_request_error(reason), do: {:error, %{kind: :http_error, reason: reason}}
 
   defp maybe_put_auth(headers, nil), do: headers
   defp maybe_put_auth(headers, ""), do: headers

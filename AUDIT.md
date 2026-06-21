@@ -30,6 +30,7 @@ after each item.
 - [x] `mcp/server.ex`
 - [x] `ai/chat_tools.ex`
 - [x] `ai/chat.ex`
+- [x] `ai/openai_compatible_runtime.ex`
 
 ---
 

@@ -1,6 +1,13 @@
 defmodule BDS.AI.ChatStreamingTest do
   use ExUnit.Case, async: false
 
+  defmodule FakeSecretBackend do
+    def encrypt(value), do: {:ok, "enc:" <> value}
+
+    def decrypt("enc:" <> value), do: {:ok, value}
+    def decrypt(_other), do: {:error, :invalid_ciphertext}
+  end
+
   defmodule StreamingChatPlug do
     import Plug.Conn
 
@@ -119,7 +126,8 @@ defmodule BDS.AI.ChatStreamingTest do
 
     assert {:ok, reply} =
              BDS.AI.send_chat_message(conversation_id, "tell me a story",
-               event_target: self()
+               event_target: self(),
+               secret_backend: FakeSecretBackend
              )
 
     assert reply.assistant_message.content == "Once upon a time"
@@ -148,7 +156,10 @@ defmodule BDS.AI.ChatStreamingTest do
 
     task =
       Task.async(fn ->
-        BDS.AI.send_chat_message(conversation_id, "stream forever", event_target: test_pid)
+        BDS.AI.send_chat_message(conversation_id, "stream forever",
+          event_target: test_pid,
+          secret_backend: FakeSecretBackend
+        )
       end)
 
     # Wait until tokens are actually flowing before cancelling.
@@ -167,7 +178,7 @@ defmodule BDS.AI.ChatStreamingTest do
                url: "http://127.0.0.1:#{port}/v1",
                api_key: "sk-stream",
                model: "stream-model"
-             })
+             }, secret_backend: FakeSecretBackend)
 
     assert :ok = BDS.AI.put_model_preference(:chat, "stream-model")
     assert :ok = BDS.AI.set_airplane_mode(false)
