@@ -31,19 +31,13 @@ defmodule BDS.Generation.Validation do
         published_route_posts,
         generated_file_updated_at
       ) do
-    Enum.map(published_route_posts, fn post ->
-      relative_path = BDS.Generation.Paths.post_output_path(post)
-
-      %{
-        post_url_path: relative_path_to_url_path(relative_path),
-        post_file_path:
-          source_full_path(
-            project_data_dir,
-            Map.get(post, :translation_file_path) || post.file_path
-          ),
-        generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
-      }
-    end)
+    build_timestamp_checks(
+      project_data_dir,
+      published_route_posts,
+      generated_file_updated_at,
+      &BDS.Generation.Paths.post_output_path/1,
+      fn post -> Map.get(post, :translation_file_path) || post.file_path end
+    )
   end
 
   @spec build_language_post_timestamp_checks(String.t(), String.t(), [map()], map()) :: [map()]
@@ -53,12 +47,28 @@ defmodule BDS.Generation.Validation do
         published_posts,
         generated_file_updated_at
       ) do
-    Enum.map(published_posts, fn post ->
-      relative_path = BDS.Generation.Paths.post_output_path(post, language)
+    build_timestamp_checks(
+      project_data_dir,
+      published_posts,
+      generated_file_updated_at,
+      fn post -> BDS.Generation.Paths.post_output_path(post, language) end,
+      & &1.file_path
+    )
+  end
+
+  defp build_timestamp_checks(
+         project_data_dir,
+         posts,
+         generated_file_updated_at,
+         relative_path_fun,
+         source_file_fun
+       ) do
+    Enum.map(posts, fn post ->
+      relative_path = relative_path_fun.(post)
 
       %{
         post_url_path: relative_path_to_url_path(relative_path),
-        post_file_path: source_full_path(project_data_dir, post.file_path),
+        post_file_path: source_full_path(project_data_dir, source_file_fun.(post)),
         generated_updated_at_ms: Map.get(generated_file_updated_at, relative_path, 0)
       }
     end)

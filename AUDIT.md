@@ -20,6 +20,7 @@ after each item.
 - [x] `rendering/template_selection.ex`
 - [x] `rendering/metadata.ex`
 - [x] `rendering/links_and_languages.ex`
+- [x] `generation/validation.ex`
 
 ---
 
