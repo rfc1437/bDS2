@@ -16,6 +16,22 @@ defmodule BDS.MCP.Tools do
   alias BDS.Templates
 
   @proposal_ttl_app_ms 30 * 60 * 1000
+  @tools [
+    {"check_term", true},
+    {"search_posts", true},
+    {"count_posts", true},
+    {"read_post_by_slug", true},
+    {"get_post_translations", true},
+    {"get_media_translations", true},
+    {"upsert_media_translation", false},
+    {"draft_post", false},
+    {"propose_script", false},
+    {"propose_template", false},
+    {"propose_media_metadata", false},
+    {"propose_post_metadata", false},
+    {"accept_proposal", false},
+    {"discard_proposal", false}
+  ]
 
   @typedoc "Tool descriptor returned by `list/0`."
   @type descriptor :: %{
@@ -28,22 +44,7 @@ defmodule BDS.MCP.Tools do
 
   @spec list() :: [descriptor()]
   def list do
-    [
-      tool("check_term", true),
-      tool("search_posts", true),
-      tool("count_posts", true),
-      tool("read_post_by_slug", true),
-      tool("get_post_translations", true),
-      tool("get_media_translations", true),
-      tool("upsert_media_translation", false),
-      tool("draft_post", false),
-      tool("propose_script", false),
-      tool("propose_template", false),
-      tool("propose_media_metadata", false),
-      tool("propose_post_metadata", false),
-      tool("accept_proposal", false),
-      tool("discard_proposal", false)
-    ]
+    Enum.map(@tools, fn {name, read_only} -> tool(name, read_only) end)
   end
 
   @spec call(String.t(), map()) :: {:ok, term()} | {:error, term()}
@@ -97,12 +98,12 @@ defmodule BDS.MCP.Tools do
   end
 
   defp tool_metadata("check_term") do
-    %{
-      title: "Check Term",
-      description:
-        "Check whether a term exists as a category, tag, or both. Returns post counts for each. Use before search_posts or count_posts when unsure whether a term is a category or tag.",
-      input_schema: object_schema(%{"term" => string_schema("The term to look up")}, ["term"])
-    }
+    single_string_arg_tool_metadata(
+      "Check Term",
+      "Check whether a term exists as a category, tag, or both. Returns post counts for each. Use before search_posts or count_posts when unsure whether a term is a category or tag.",
+      "term",
+      "The term to look up"
+    )
   end
 
   defp tool_metadata("search_posts") do
@@ -150,21 +151,21 @@ defmodule BDS.MCP.Tools do
   end
 
   defp tool_metadata("get_post_translations") do
-    %{
-      title: "Get Post Translations",
-      description:
-        "List all translations available for a blog post, including language, title, excerpt, content, and status.",
-      input_schema: object_schema(%{"postId" => string_schema("The post ID")}, ["postId"])
-    }
+    single_string_arg_tool_metadata(
+      "Get Post Translations",
+      "List all translations available for a blog post, including language, title, excerpt, content, and status.",
+      "postId",
+      "The post ID"
+    )
   end
 
   defp tool_metadata("get_media_translations") do
-    %{
-      title: "Get Media Translations",
-      description:
-        "List all available translations for media metadata, including language, title, alt text, and captions.",
-      input_schema: object_schema(%{"mediaId" => string_schema("The media ID")}, ["mediaId"])
-    }
+    single_string_arg_tool_metadata(
+      "Get Media Translations",
+      "List all available translations for media metadata, including language, title, alt text, and captions.",
+      "mediaId",
+      "The media ID"
+    )
   end
 
   defp tool_metadata("upsert_media_translation") do
@@ -276,20 +277,28 @@ defmodule BDS.MCP.Tools do
   end
 
   defp tool_metadata("accept_proposal") do
-    %{
-      title: "Accept Proposal",
-      description: "Accept a pending proposal and apply or publish its changes.",
-      input_schema:
-        object_schema(%{"proposalId" => string_schema("The proposal ID")}, ["proposalId"])
-    }
+    single_string_arg_tool_metadata(
+      "Accept Proposal",
+      "Accept a pending proposal and apply or publish its changes.",
+      "proposalId",
+      "The proposal ID"
+    )
   end
 
   defp tool_metadata("discard_proposal") do
+    single_string_arg_tool_metadata(
+      "Discard Proposal",
+      "Discard a pending proposal and remove any temporary draft artifacts.",
+      "proposalId",
+      "The proposal ID"
+    )
+  end
+
+  defp single_string_arg_tool_metadata(title, description, field, field_description) do
     %{
-      title: "Discard Proposal",
-      description: "Discard a pending proposal and remove any temporary draft artifacts.",
-      input_schema:
-        object_schema(%{"proposalId" => string_schema("The proposal ID")}, ["proposalId"])
+      title: title,
+      description: description,
+      input_schema: object_schema(%{field => string_schema(field_description)}, [field])
     }
   end
 
