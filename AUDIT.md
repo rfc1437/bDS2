@@ -34,6 +34,7 @@ after each item.
 - [x] `ai/one_shot.ex`
 - [x] `ai/secret_key.ex`
 - [x] `ai/secret_backend.ex`
+- [x] `scripting/capabilities/util.ex`
 
 ---
 
