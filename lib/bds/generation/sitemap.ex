@@ -26,12 +26,14 @@ defmodule BDS.Generation.Sitemap do
 
     urls =
       [
-        url_entry(
-          Paths.url_for_path(plan.base_url, "/"),
+        build_url_entry(
+          plan.base_url,
+          "/",
           latest_post_updated_at,
           "daily",
           "1.0",
-          build_hreflang_links(plan.base_url, "/", plan.language, all_languages)
+          plan.language,
+          all_languages
         )
       ] ++
         Enum.map(
@@ -39,35 +41,41 @@ defmodule BDS.Generation.Sitemap do
           fn page_number ->
             page_path = "/page/#{page_number}"
 
-            url_entry(
-              Paths.url_for_path(plan.base_url, page_path),
+            build_url_entry(
+              plan.base_url,
+              page_path,
               latest_post_updated_at,
               "daily",
               "0.9",
-              build_hreflang_links(plan.base_url, page_path, plan.language, all_languages)
+              plan.language,
+              all_languages
             )
           end
         ) ++
         Enum.map(translatable_posts, fn post ->
           post_path = Paths.relative_path_to_url_path(Paths.post_output_path(post))
 
-          url_entry(
-            Paths.url_for_path(plan.base_url, post_path),
+          build_url_entry(
+            plan.base_url,
+            post_path,
             unix_ms_to_iso8601(post.updated_at),
             "monthly",
             "0.8",
-            build_hreflang_links(plan.base_url, post_path, plan.language, all_languages)
+            plan.language,
+            all_languages
           )
         end) ++
         Enum.map(do_not_translate_posts, fn post ->
           post_path = Paths.relative_path_to_url_path(Paths.post_output_path(post))
 
-          url_entry(
-            Paths.url_for_path(plan.base_url, post_path),
+          build_url_entry(
+            plan.base_url,
+            post_path,
             unix_ms_to_iso8601(post.updated_at),
             "monthly",
             "0.8",
-            build_hreflang_links(plan.base_url, post_path, plan.language, [plan.language])
+            plan.language,
+            [plan.language]
           )
         end) ++
         Enum.flat_map(translatable_posts ++ do_not_translate_posts, fn post ->
@@ -80,12 +88,14 @@ defmodule BDS.Generation.Sitemap do
                 else: all_languages
 
             [
-              url_entry(
-                Paths.url_for_path(plan.base_url, page_path),
+              build_url_entry(
+                plan.base_url,
+                page_path,
                 unix_ms_to_iso8601(post.updated_at),
                 "weekly",
                 "0.7",
-                build_hreflang_links(plan.base_url, page_path, plan.language, languages)
+                plan.language,
+                languages
               )
             ]
           else
@@ -95,12 +105,14 @@ defmodule BDS.Generation.Sitemap do
         Enum.map(Enum.sort_by(post_index.posts_by_year, &elem(&1, 0), :desc), fn {year, _posts} ->
           year_path = "/#{year}"
 
-          url_entry(
-            Paths.url_for_path(plan.base_url, year_path),
+          build_url_entry(
+            plan.base_url,
+            year_path,
             latest_post_updated_at,
             "monthly",
             "0.5",
-            build_hreflang_links(plan.base_url, year_path, plan.language, all_languages)
+            plan.language,
+            all_languages
           )
         end) ++
         Enum.map(
@@ -108,12 +120,14 @@ defmodule BDS.Generation.Sitemap do
           fn {year_month, _posts} ->
             month_path = "/#{year_month}"
 
-            url_entry(
-              Paths.url_for_path(plan.base_url, month_path),
+            build_url_entry(
+              plan.base_url,
+              month_path,
               latest_post_updated_at,
               "monthly",
               "0.5",
-              build_hreflang_links(plan.base_url, month_path, plan.language, all_languages)
+              plan.language,
+              all_languages
             )
           end
         ) ++
@@ -122,35 +136,41 @@ defmodule BDS.Generation.Sitemap do
           fn {year_month_day, _posts} ->
             day_path = "/#{year_month_day}"
 
-            url_entry(
-              Paths.url_for_path(plan.base_url, day_path),
+            build_url_entry(
+              plan.base_url,
+              day_path,
               latest_post_updated_at,
               "monthly",
               "0.4",
-              build_hreflang_links(plan.base_url, day_path, plan.language, all_languages)
+              plan.language,
+              all_languages
             )
           end
         ) ++
         Enum.map(Enum.sort_by(post_index.posts_by_category, &elem(&1, 0)), fn {category, _posts} ->
           category_path = "/category/#{Paths.archive_route_segment(category)}"
 
-          url_entry(
-            Paths.url_for_path(plan.base_url, category_path),
+          build_url_entry(
+            plan.base_url,
+            category_path,
             latest_post_updated_at,
             "weekly",
             "0.6",
-            build_hreflang_links(plan.base_url, category_path, plan.language, all_languages)
+            plan.language,
+            all_languages
           )
         end) ++
         Enum.map(Enum.sort_by(post_index.posts_by_tag, &elem(&1, 0)), fn {tag, _posts} ->
           tag_path = "/tag/#{Paths.archive_route_segment(tag)}"
 
-          url_entry(
-            Paths.url_for_path(plan.base_url, tag_path),
+          build_url_entry(
+            plan.base_url,
+            tag_path,
             latest_post_updated_at,
             "weekly",
             "0.6",
-            build_hreflang_links(plan.base_url, tag_path, plan.language, all_languages)
+            plan.language,
+            all_languages
           )
         end)
 
@@ -272,6 +292,16 @@ defmodule BDS.Generation.Sitemap do
       [
         "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"#{xml_escape(Paths.url_for_path(base_url, url_path))}\" />"
       ]
+  end
+
+  defp build_url_entry(base_url, url_path, lastmod, changefreq, priority, main_language, languages) do
+    url_entry(
+      Paths.url_for_path(base_url, url_path),
+      lastmod,
+      changefreq,
+      priority,
+      build_hreflang_links(base_url, url_path, main_language, languages)
+    )
   end
 
   defp url_entry(loc, lastmod, changefreq, priority, hreflang_links) do

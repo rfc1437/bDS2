@@ -22,6 +22,7 @@ after each item.
 - [x] `rendering/links_and_languages.ex`
 - [x] `generation/validation.ex`
 - [x] `generation/outputs.ex`
+- [x] `generation/sitemap.ex`
 
 ---
 
