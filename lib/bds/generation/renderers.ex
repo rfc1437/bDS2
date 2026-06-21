@@ -47,25 +47,7 @@ defmodule BDS.Generation.Renderers do
   @spec render_archive_page(map(), String.t(), [map()], String.t() | nil, String.t(), map()) ::
           String.t()
   def render_archive_page(plan, title, posts, language, kind, pagination) do
-    fallback = fn ->
-      items =
-        posts
-        |> Enum.map(fn post -> ["<li>", post.title, "</li>"] end)
-        |> IO.iodata_to_binary()
-
-      [
-        "<html><body data-kind=\"",
-        kind,
-        "\" data-language=\"",
-        to_string(language),
-        "\"><h1>",
-        title,
-        "</h1><ul>",
-        items,
-        "</ul></body></html>"
-      ]
-      |> IO.iodata_to_binary()
-    end
+    fallback = fn -> render_inline_list_page(title, posts, language, kind) end
 
     render_list_output(
       plan,
@@ -92,23 +74,7 @@ defmodule BDS.Generation.Renderers do
   @spec render_date_archive_page(map(), String.t(), map(), [map()], String.t() | nil, map()) ::
           String.t()
   def render_date_archive_page(plan, label, archive_context, posts, language, pagination) do
-    fallback = fn ->
-      items =
-        posts
-        |> Enum.map(fn post -> ["<li>", post.title, "</li>"] end)
-        |> IO.iodata_to_binary()
-
-      [
-        "<html><body data-kind=\"date\" data-language=\"",
-        to_string(language),
-        "\"><h1>",
-        label,
-        "</h1><ul>",
-        items,
-        "</ul></body></html>"
-      ]
-      |> IO.iodata_to_binary()
-    end
+    fallback = fn -> render_inline_list_page(label, posts, language, "date") end
 
     render_list_output(
       plan,
@@ -124,10 +90,7 @@ defmodule BDS.Generation.Renderers do
   @doc "Try the project's post template; on error, fall back to the inline `fallback` thunk."
   @spec render_post_output(String.t(), String.t() | nil, map(), (-> String.t())) :: String.t()
   def render_post_output(project_id, template_slug, assigns, fallback) do
-    case Rendering.render_post_page(project_id, template_slug, assigns) do
-      {:ok, rendered} -> rendered
-      {:error, _reason} -> fallback.()
-    end
+    render_with_fallback(fn -> Rendering.render_post_page(project_id, template_slug, assigns) end, fallback)
   end
 
   @doc "Render a list/archive page through the project template, falling back to inline."
@@ -151,30 +114,34 @@ defmodule BDS.Generation.Renderers do
         fallback
       )
       when is_binary(project_id) do
-    case Rendering.render_list_page(project_id, %{
-           language: language,
-           language_prefix: Paths.language_prefix(language, main_language),
-           page_title: page_title,
-           posts: posts,
-           archive_context: archive_context,
-           pagination: pagination
-         }) do
-      {:ok, rendered} -> rendered
-      {:error, _reason} -> fallback.()
-    end
+    render_with_fallback(
+      fn ->
+        Rendering.render_list_page(project_id, %{
+          language: language,
+          language_prefix: Paths.language_prefix(language, main_language),
+          page_title: page_title,
+          posts: posts,
+          archive_context: archive_context,
+          pagination: pagination
+        })
+      end,
+      fallback
+    )
   end
 
   @doc "Render the project's 404 page via its template, falling back to a static page."
   @spec render_not_found_output(map(), String.t() | nil) :: String.t()
   def render_not_found_output(%{project_id: project_id, language: main_language}, language)
       when is_binary(project_id) do
-    case Rendering.render_not_found_page(project_id, %{
-           language: language,
-           language_prefix: Paths.language_prefix(language, main_language)
-         }) do
-      {:ok, rendered} -> rendered
-      {:error, _reason} -> render_not_found_page(language)
-    end
+    render_with_fallback(
+      fn ->
+        Rendering.render_not_found_page(project_id, %{
+          language: language,
+          language_prefix: Paths.language_prefix(language, main_language)
+        })
+      end,
+      fn -> render_not_found_page(language) end
+    )
   end
 
   @doc "Static fallback HTML for a 404 page."
@@ -225,6 +192,33 @@ defmodule BDS.Generation.Renderers do
           {:error, _reason} -> ""
         end
     end
+  end
+
+  defp render_with_fallback(render_fun, fallback) do
+    case render_fun.() do
+      {:ok, rendered} -> rendered
+      {:error, _reason} -> fallback.()
+    end
+  end
+
+  defp render_inline_list_page(title, posts, language, kind) do
+    items =
+      posts
+      |> Enum.map(fn post -> ["<li>", post.title, "</li>"] end)
+      |> IO.iodata_to_binary()
+
+    [
+      "<html><body data-kind=\"",
+      kind,
+      "\" data-language=\"",
+      to_string(language),
+      "\"><h1>",
+      title,
+      "</h1><ul>",
+      items,
+      "</ul></body></html>"
+    ]
+    |> IO.iodata_to_binary()
   end
 
   defp parse_frontmatter_body(contents) do

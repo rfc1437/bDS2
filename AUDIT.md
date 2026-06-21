@@ -25,6 +25,7 @@ after each item.
 - [x] `generation/sitemap.ex`
 - [x] `generation/data.ex`
 - [x] `generation/paths.ex`
+- [x] `generation/renderers.ex`
 
 ---
 
