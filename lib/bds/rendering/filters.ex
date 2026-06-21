@@ -85,29 +85,10 @@ defmodule BDS.Rendering.Filters do
 
       case String.downcase(macro_name) do
         "youtube" ->
-          render_macro_template(
-            "macros/youtube",
-            %{
-              "id" => Map.get(params, "id", ""),
-              "title" =>
-                default_macro_title(
-                  Map.get(params, "title"),
-                  language,
-                  "YouTube video"
-                )
-            },
-            context
-          )
+          render_video_macro("youtube", params, language, "YouTube video", context)
 
         "vimeo" ->
-          render_macro_template(
-            "macros/vimeo",
-            %{
-              "id" => Map.get(params, "id", ""),
-              "title" => default_macro_title(Map.get(params, "title"), language, "Vimeo video")
-            },
-            context
-          )
+          render_video_macro("vimeo", params, language, "Vimeo video", context)
 
         "gallery" ->
           render_gallery_macro(context, params, post_id)
@@ -313,61 +294,15 @@ defmodule BDS.Rendering.Filters do
 
   # ── Built-in macro renderers ───────────────────────────────────────────────
 
-  defp render_gallery_macro(context, params, post_id) when is_binary(post_id) do
-    columns = normalize_columns(Map.get(params, "columns", "3"), 3, 1, 6)
-    caption = Map.get(params, "caption")
+  defp render_gallery_macro(context, params, post_id) do
+    normalized_post_id = if is_binary(post_id), do: post_id, else: ""
+    items = if is_binary(post_id), do: gallery_items(post_id), else: []
 
-    items =
-      post_id
-      |> linked_media_images()
-      |> Enum.map(fn media ->
-        %{
-          "media_path" => "/#{media.file_path}",
-          "title" => media.title || media.original_name,
-          "alt" => media.alt || media.title || media.original_name,
-          "group_name" => post_id
-        }
-      end)
-
-    render_macro_template(
-      "macros/gallery",
-      %{
-        "columns" => columns,
-        "post_id" => post_id,
-        "items" => items,
-        "caption" => caption,
-        "empty_label" =>
-          BDS.Gettext.lgettext(
-            Access.get(context, "language") || "en",
-            "render",
-            "No images"
-          )
-      },
-      context
-    )
-  end
-
-  defp render_gallery_macro(context, params, _post_id) do
-    render_macro_template(
-      "macros/gallery",
-      %{
-        "columns" => normalize_columns(Map.get(params, "columns", "3"), 3, 1, 6),
-        "post_id" => "",
-        "items" => [],
-        "caption" => Map.get(params, "caption"),
-        "empty_label" =>
-          BDS.Gettext.lgettext(
-            Access.get(context, "language") || "en",
-            "render",
-            "No images"
-          )
-      },
-      context
-    )
+    render_gallery_template(context, params, normalized_post_id, items)
   end
 
   defp render_photo_archive_macro(context, params) do
-    language = Access.get(context, "language") || "en"
+    language = macro_language(context)
     project_id = project_id_from_context(context)
 
     months =
@@ -390,7 +325,7 @@ defmodule BDS.Rendering.Filters do
   end
 
   defp render_tag_cloud_macro(context, params) do
-    language = Access.get(context, "language") || "en"
+    language = macro_language(context)
     project_id = project_id_from_context(context)
 
     {words_json, width, height} =
@@ -412,6 +347,44 @@ defmodule BDS.Rendering.Filters do
       },
       context
     )
+  end
+
+  defp render_video_macro(kind, params, language, translation, context) do
+    render_macro_template(
+      "macros/#{kind}",
+      %{
+        "id" => Map.get(params, "id", ""),
+        "title" => default_macro_title(Map.get(params, "title"), language, translation)
+      },
+      context
+    )
+  end
+
+  defp render_gallery_template(context, params, post_id, items) do
+    render_macro_template(
+      "macros/gallery",
+      %{
+        "columns" => normalize_columns(Map.get(params, "columns", "3"), 3, 1, 6),
+        "post_id" => post_id,
+        "items" => items,
+        "caption" => Map.get(params, "caption"),
+        "empty_label" => BDS.Gettext.lgettext(macro_language(context), "render", "No images")
+      },
+      context
+    )
+  end
+
+  defp gallery_items(post_id) do
+    post_id
+    |> linked_media_images()
+    |> Enum.map(fn media ->
+      %{
+        "media_path" => "/#{media.file_path}",
+        "title" => media.title || media.original_name,
+        "alt" => media.alt || media.title || media.original_name,
+        "group_name" => post_id
+      }
+    end)
   end
 
   # ── Data queries for macros ────────────────────────────────────────────────
@@ -555,6 +528,8 @@ defmodule BDS.Rendering.Filters do
   end
 
   # ── Helpers ────────────────────────────────────────────────────────────────
+
+  defp macro_language(context), do: Access.get(context, "language") || "en"
 
   defp project_id_from_context(context) do
     post = Access.get(context, "post") || %{}
