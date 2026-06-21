@@ -13,6 +13,7 @@ after each item.
 ## Progress
 
 - [x] `rendering/labels.ex`
+- [x] `rendering/liquid_parser.ex` (verified Liquex does not expose a built-in filter/operator subset validator; keeping current implementation)
 
 ---
 
