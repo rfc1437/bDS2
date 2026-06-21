@@ -42,6 +42,7 @@ after each item.
 - [x] `bounded_atoms.ex` O(1) allow-lists
 - [x] `scripting/job_store.ex`
 - [x] `desktop/server.ex`
+- [x] `desktop/shell_live/code_entity_editor.ex`
 
 ---
 
