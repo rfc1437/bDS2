@@ -16,6 +16,7 @@ after each item.
 - [x] `rendering/liquid_parser.ex` (verified Liquex does not expose a built-in filter/operator subset validator; keeping current implementation)
 - [x] `rendering/filters.ex`
 - [x] `rendering/post_rendering.ex`
+- [x] `rendering/list_archive.ex`
 
 ---
 

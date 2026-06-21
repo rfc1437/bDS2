@@ -55,34 +55,22 @@ defmodule BDS.Rendering.ListArchive do
 
     %{
       language: language,
-      language_prefix:
-        Map.get(
-          assigns,
-          :language_prefix,
-          Map.get(
-            assigns,
-            "language_prefix",
-            LinksAndLanguages.language_prefix(language, main_language)
-          )
-        ),
+      language_prefix: assign_override(
+        assigns,
+        :language_prefix,
+        "language_prefix",
+        LinksAndLanguages.language_prefix(language, main_language)
+      ),
       page_title: MapUtils.attr(assigns, :page_title),
       posts: posts,
-      pico_stylesheet_href:
-        Map.get(
-          assigns,
-          :pico_stylesheet_href,
-          Map.get(
-            assigns,
-            "pico_stylesheet_href",
-            RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
-          )
-        ),
+      pico_stylesheet_href: assign_override(
+        assigns,
+        :pico_stylesheet_href,
+        "pico_stylesheet_href",
+        RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
+      ),
       html_theme_attribute:
-        Map.get(
-          assigns,
-          :html_theme_attribute,
-          Map.get(assigns, "html_theme_attribute")
-        ),
+        assign_override(assigns, :html_theme_attribute, "html_theme_attribute", nil),
       blog_languages: RenderMetadata.blog_languages(metadata, language),
       alternate_links: [],
       menu_items: RenderMetadata.menu_items(project_id),
@@ -126,58 +114,36 @@ defmodule BDS.Rendering.ListArchive do
     %{
       page_title: MapUtils.attr(assigns, :page_title, "404"),
       language: language,
-      language_prefix:
-        Map.get(
-          assigns,
-          :language_prefix,
-          Map.get(
-            assigns,
-            "language_prefix",
-            LinksAndLanguages.language_prefix(language, main_language)
-          )
-        ),
-      pico_stylesheet_href:
-        Map.get(
-          assigns,
-          :pico_stylesheet_href,
-          Map.get(
-            assigns,
-            "pico_stylesheet_href",
-            RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
-          )
-        ),
+      language_prefix: assign_override(
+        assigns,
+        :language_prefix,
+        "language_prefix",
+        LinksAndLanguages.language_prefix(language, main_language)
+      ),
+      pico_stylesheet_href: assign_override(
+        assigns,
+        :pico_stylesheet_href,
+        "pico_stylesheet_href",
+        RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
+      ),
       html_theme_attribute:
-        Map.get(
-          assigns,
-          :html_theme_attribute,
-          Map.get(assigns, "html_theme_attribute")
-        ),
+        assign_override(assigns, :html_theme_attribute, "html_theme_attribute", nil),
       blog_languages: RenderMetadata.blog_languages(metadata, language),
       menu_items: RenderMetadata.menu_items(project_id),
       alternate_links: [],
       not_found_message:
-        Map.get(
+        assign_override(
           assigns,
           :not_found_message,
-          Map.get(
-            assigns,
-            "not_found_message",
-            BDS.Gettext.lgettext(
-              language,
-              "render",
-              "The requested preview page could not be found."
-            )
-          )
+          "not_found_message",
+          BDS.Gettext.lgettext(language, "render", "The requested preview page could not be found.")
         ),
       not_found_back_label:
-        Map.get(
+        assign_override(
           assigns,
           :not_found_back_label,
-          Map.get(
-            assigns,
-            "not_found_back_label",
-            BDS.Gettext.lgettext(language, "render", "Back to preview home")
-          )
+          "not_found_back_label",
+          BDS.Gettext.lgettext(language, "render", "Back to preview home")
         ),
       labels: Labels.for_language(language)
     }
@@ -215,28 +181,23 @@ defmodule BDS.Rendering.ListArchive do
             template_context
           ),
         raw_content: raw_content,
-        excerpt: MapUtils.attr(post, :excerpt, Map.get(post_record || %{}, :excerpt)),
-        author: MapUtils.attr(post, :author, Map.get(post_record || %{}, :author)),
-        language:
-          Map.get(
-            post,
-            :language,
-            Map.get(post_record || %{}, :language)
-          ),
+        excerpt: MapUtils.attr(post, :excerpt, record_value(post_record, :excerpt)),
+        author: MapUtils.attr(post, :author, record_value(post_record, :author)),
+        language: Map.get(post, :language, record_value(post_record, :language)),
         published_at:
-          MapUtils.attr(post, :published_at, Map.get(post_record || %{}, :published_at)),
-        created_at: MapUtils.attr(post, :created_at, Map.get(post_record || %{}, :created_at)),
-        updated_at: MapUtils.attr(post, :updated_at, Map.get(post_record || %{}, :updated_at)),
-        tags: MapUtils.attr(post, :tags, Map.get(post_record || %{}, :tags, [])) || [],
+          MapUtils.attr(post, :published_at, record_value(post_record, :published_at)),
+        created_at: MapUtils.attr(post, :created_at, record_value(post_record, :created_at)),
+        updated_at: MapUtils.attr(post, :updated_at, record_value(post_record, :updated_at)),
+        tags: MapUtils.attr(post, :tags, record_list(post_record, :tags)) || [],
         categories:
-          MapUtils.attr(post, :categories, Map.get(post_record || %{}, :categories, [])) || [],
+          MapUtils.attr(post, :categories, record_list(post_record, :categories)) || [],
         template_slug:
-          MapUtils.attr(post, :template_slug, Map.get(post_record || %{}, :template_slug)),
+          MapUtils.attr(post, :template_slug, record_value(post_record, :template_slug)),
         do_not_translate:
           MapUtils.attr(
             post,
             :do_not_translate,
-            Map.get(post_record || %{}, :do_not_translate, false)
+            record_value(post_record, :do_not_translate, false)
           ),
         href: MapUtils.attr(post, :href),
         show_title: true,
@@ -349,4 +310,14 @@ defmodule BDS.Rendering.ListArchive do
     do: RenderMetadata.calendar_initial_month(post)
 
   defp calendar_initial_month_from_posts([]), do: nil
+
+  defp assign_override(assigns, atom_key, string_key, default) do
+    Map.get(assigns, atom_key, Map.get(assigns, string_key, default))
+  end
+
+  defp record_value(post_record, key, default \\ nil) do
+    Map.get(post_record || %{}, key, default)
+  end
+
+  defp record_list(post_record, key), do: record_value(post_record, key, []) || []
 end
