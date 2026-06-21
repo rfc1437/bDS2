@@ -175,11 +175,11 @@ defmodule BDS.ImportAnalysis do
       resolution: if(status == "conflict", do: "ignore", else: nil),
       existing_id: existing && existing.id,
       existing_title: existing && existing.title,
-      author: blank_to_nil(wxr_post.creator),
-      excerpt: blank_to_nil(wxr_post.excerpt),
+      author: BDS.MapUtils.blank_to_nil(wxr_post.creator),
+      excerpt: BDS.MapUtils.blank_to_nil(wxr_post.excerpt),
       categories: wxr_post.categories,
       tags: wxr_post.tags,
-      wp_status: blank_to_nil(wxr_post.status),
+      wp_status: BDS.MapUtils.blank_to_nil(wxr_post.status),
       content_markdown: content_markdown,
       content_checksum: content_checksum,
       content_preview: String.slice(content_markdown, 0, 200),
@@ -236,7 +236,7 @@ defmodule BDS.ImportAnalysis do
       existing_id: existing && existing.id,
       existing_title: existing && existing.title,
       mime_type: wxr_media.mime_type,
-      description: blank_to_nil(wxr_media.description),
+      description: BDS.MapUtils.blank_to_nil(wxr_media.description),
       parent_wp_id: wxr_media.parent_id,
       source_file: source_file,
       checksum: checksum,
@@ -546,7 +546,4 @@ defmodule BDS.ImportAnalysis do
     end)
   end
 
-  defp blank_to_nil(nil), do: nil
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(value), do: value
 end

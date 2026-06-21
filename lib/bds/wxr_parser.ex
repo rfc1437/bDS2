@@ -329,9 +329,9 @@ defmodule BDS.WxrParser do
       slug: item.post_name,
       content: item.content,
       excerpt: item.excerpt,
-      pub_date: blank_to_nil(item.pub_date),
-      post_date: blank_to_nil(item.post_date),
-      post_modified: blank_to_nil(item.post_modified),
+      pub_date: BDS.MapUtils.blank_to_nil(item.pub_date),
+      post_date: BDS.MapUtils.blank_to_nil(item.post_date),
+      post_modified: BDS.MapUtils.blank_to_nil(item.post_modified),
       creator: item.creator,
       status: item.status,
       post_type: item.post_type,
@@ -342,7 +342,7 @@ defmodule BDS.WxrParser do
 
   defp parse_media_item(item) do
     attachment_url = item.attachment_url
-    filename = attachment_url |> Path.basename() |> blank_to_nil() || ""
+    filename = attachment_url |> Path.basename() |> BDS.MapUtils.blank_to_nil() || ""
 
     %{
       wp_id: parse_integer(item.post_id),
@@ -350,7 +350,7 @@ defmodule BDS.WxrParser do
       url: attachment_url,
       filename: filename,
       relative_path: relative_upload_path(attachment_url),
-      pub_date: blank_to_nil(item.pub_date),
+      pub_date: BDS.MapUtils.blank_to_nil(item.pub_date),
       parent_id: parse_integer(item.post_parent),
       mime_type: MIME.from_path(filename),
       description: item.content
@@ -373,6 +373,4 @@ defmodule BDS.WxrParser do
     end
   end
 
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(value), do: value
 end

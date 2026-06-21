@@ -327,7 +327,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       |> assign(:taxonomy_edit, %{
         type: type,
         name: name,
-        value: mapped_to |> to_string() |> blank_to_nil()
+        value: mapped_to |> to_string() |> BDS.MapUtils.blank_to_nil()
       })
       |> build_data()
 
@@ -1451,6 +1451,4 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
 
   defp present?(value), do: value not in [nil, ""]
   defp blank?(value), do: value in [nil, ""]
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(value), do: value
 end
