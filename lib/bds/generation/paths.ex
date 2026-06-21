@@ -17,13 +17,9 @@ defmodule BDS.Generation.Paths do
     month = month |> Integer.to_string() |> String.pad_leading(2, "0")
     day = day |> Integer.to_string() |> String.pad_leading(2, "0")
 
-    path_parts = [year, month, day, post.slug, "index.html"]
-
-    case language do
-      nil -> Path.join(path_parts)
-      "" -> Path.join(path_parts)
-      value -> Path.join([value | path_parts])
-    end
+    language
+    |> maybe_prepend_language([year, month, day, post.slug, "index.html"])
+    |> Path.join()
   end
 
   @spec paginated_archive_paths(language(), [String.t()], non_neg_integer(), pos_integer()) ::
@@ -46,22 +42,15 @@ defmodule BDS.Generation.Paths do
   end
 
   @spec root_output_path(language(), pos_integer()) :: String.t()
-  def root_output_path(nil, 1), do: "index.html"
-  def root_output_path("", 1), do: "index.html"
-  def root_output_path(route_language, 1), do: Path.join(route_language, "index.html")
-
-  def root_output_path(nil, page_number),
-    do: Path.join(["page", Integer.to_string(page_number), "index.html"])
-
-  def root_output_path("", page_number), do: root_output_path(nil, page_number)
-
   def root_output_path(route_language, page_number),
-    do: Path.join([route_language, "page", Integer.to_string(page_number), "index.html"])
+    do:
+      route_language
+      |> maybe_prepend_language(root_output_path_segments(page_number))
+      |> Path.join()
 
   @spec page_output_path(String.t(), language()) :: String.t()
-  def page_output_path(slug, nil), do: Path.join([slug, "index.html"])
-  def page_output_path(slug, ""), do: page_output_path(slug, nil)
-  def page_output_path(slug, language), do: Path.join([language, slug, "index.html"])
+  def page_output_path(slug, language),
+    do: language |> maybe_prepend_language([slug, "index.html"]) |> Path.join()
 
   @spec pagination_for_page(
           pos_integer(),
@@ -102,21 +91,11 @@ defmodule BDS.Generation.Paths do
     do: archive_href(route_language, segments, page_number)
 
   @spec root_page_href(language(), integer()) :: String.t()
-  def root_page_href(route_language, page_number) when page_number <= 1 do
-    case route_language do
-      nil -> "/"
-      "" -> "/"
-      language -> "/#{language}/"
-    end
-  end
+  def root_page_href(route_language, page_number) when page_number <= 1,
+    do: language_route_prefix(route_language) <> "/"
 
   def root_page_href(route_language, page_number) do
-    base =
-      case route_language do
-        nil -> ""
-        "" -> ""
-        language -> "/#{language}"
-      end
+    base = language_route_prefix(route_language)
 
     "#{base}/page/#{page_number}/"
   end
@@ -160,13 +139,8 @@ defmodule BDS.Generation.Paths do
   end
 
   @spec archive_path(language(), [String.t()]) :: String.t()
-  def archive_path(nil, segments), do: Path.join(segments ++ ["index.html"])
-  def archive_path("", segments), do: Path.join(segments ++ ["index.html"])
-
-  def archive_path(language, segments) do
-    prefix = if language in [nil, ""], do: [], else: [language]
-    Path.join(prefix ++ segments ++ ["index.html"])
-  end
+  def archive_path(language, segments),
+    do: language |> maybe_prepend_language(segments ++ ["index.html"]) |> Path.join()
 
   @spec archive_route_segment(any()) :: String.t()
   def archive_route_segment(nil), do: ""
@@ -270,6 +244,15 @@ defmodule BDS.Generation.Paths do
 
   @spec truthy_flag?(term()) :: boolean()
   def truthy_flag?(value), do: value not in [false, nil]
+
+  defp root_output_path_segments(1), do: ["index.html"]
+  defp root_output_path_segments(page_number), do: ["page", Integer.to_string(page_number), "index.html"]
+
+  defp maybe_prepend_language(language, segments) when language in [nil, ""], do: segments
+  defp maybe_prepend_language(language, segments), do: [language | segments]
+
+  defp language_route_prefix(language) when language in [nil, ""], do: ""
+  defp language_route_prefix(language), do: "/#{language}"
 
   @doc "Returns the local-time `{year, month, day}` for a unix-ms-or-binary timestamp."
   @spec local_date_parts!(term()) :: {integer(), integer(), integer()}
