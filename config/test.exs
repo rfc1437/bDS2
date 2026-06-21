@@ -5,7 +5,10 @@ config :bds, BDS.Repo,
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 5,
   journal_mode: :wal,
-  busy_timeout: 15_000
+  # Desktop/LiveView tests can leave short-lived reader/writer processes
+  # draining after assertions. Give SQLite more time to wait out those locks
+  # during serialized suite runs instead of failing the next test setup.
+  busy_timeout: 60_000
 
 config :logger, level: :warning
 

@@ -16,7 +16,11 @@ Enum.each(["LC_ALL", "LC_MESSAGES", "LANG"], fn variable ->
   System.put_env(variable, "en_US.UTF-8")
 end)
 
-ExUnit.start()
+# The test suite spins up long-lived LiveView, Bandit, and desktop automation
+# processes against a single SQLite database. Running files concurrently causes
+# intermittent `Database busy` failures in otherwise passing tests, so the
+# default suite runs serially.
+ExUnit.start(max_cases: 1)
 
 ExUnit.after_suite(fn _results ->
   File.rm_rf(cache_root)
