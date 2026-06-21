@@ -41,15 +41,8 @@ defmodule BDS.Rendering.LinksAndLanguages do
   def canonical_media_path_by_source_path(project_id) do
     Repo.all(from media in MediaAsset, where: media.project_id == ^project_id)
     |> Enum.reduce(%{}, fn media, acc ->
-      datetime = Persistence.from_unix_ms!(media.created_at)
-
       source_key =
-        Path.join([
-          "media",
-          Integer.to_string(datetime.year),
-          String.pad_leading(Integer.to_string(datetime.month), 2, "0"),
-          media.original_name
-        ])
+        Path.join(["media" | year_month_path_parts(media.created_at)] ++ [media.original_name])
         |> String.downcase()
 
       Map.put(acc, source_key, Path.join("/", media.file_path))
@@ -57,24 +50,8 @@ defmodule BDS.Rendering.LinksAndLanguages do
   end
 
   @spec post_path(map(), String.t() | nil) :: String.t()
-  def post_path(post, language_prefix)
-      when is_binary(language_prefix) and language_prefix != "" do
-    String.trim_trailing(language_prefix, "/") <> post_path(post, nil)
-  end
-
-  def post_path(post, ""), do: post_path(post, nil)
-
-  def post_path(post, nil) do
-    datetime = Persistence.from_unix_ms!(post.created_at)
-
-    Path.join([
-      "/",
-      Integer.to_string(datetime.year),
-      String.pad_leading(Integer.to_string(datetime.month), 2, "0"),
-      String.pad_leading(Integer.to_string(datetime.day), 2, "0"),
-      post.slug
-    ]) <> "/"
-  end
+  def post_path(post, language_prefix),
+    do: normalize_language_prefix(language_prefix) <> base_post_path(post)
 
   @spec post_path(map(), String.t() | nil, String.t()) :: String.t()
   def post_path(post, language, main_language) do
@@ -136,4 +113,30 @@ defmodule BDS.Rendering.LinksAndLanguages do
     |> String.split("-", parts: 2)
     |> hd()
   end
+
+  defp base_post_path(post) do
+    "/" <> Path.join(post_date_path_parts(post.created_at) ++ [post.slug]) <> "/"
+  end
+
+  defp post_date_path_parts(created_at) do
+    datetime = Persistence.from_unix_ms!(created_at)
+    year_month_path_parts(datetime) ++ [pad2(datetime.day)]
+  end
+
+  defp year_month_path_parts(created_at) when is_integer(created_at) do
+    created_at
+    |> Persistence.from_unix_ms!()
+    |> year_month_path_parts()
+  end
+
+  defp year_month_path_parts(%DateTime{} = datetime) do
+    [Integer.to_string(datetime.year), pad2(datetime.month)]
+  end
+
+  defp normalize_language_prefix(prefix) when is_binary(prefix) and prefix != "",
+    do: String.trim_trailing(prefix, "/")
+
+  defp normalize_language_prefix(_prefix), do: ""
+
+  defp pad2(value), do: value |> Integer.to_string() |> String.pad_leading(2, "0")
 end
