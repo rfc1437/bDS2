@@ -41,6 +41,7 @@ after each item.
 - [x] `ui/registry.ex` O(1) lookups (verified keep: compile-time caching would freeze localized labels)
 - [x] `bounded_atoms.ex` O(1) allow-lists
 - [x] `scripting/job_store.ex`
+- [x] `desktop/server.ex`
 
 ---
 
