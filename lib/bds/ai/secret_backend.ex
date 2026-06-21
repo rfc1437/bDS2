@@ -41,10 +41,7 @@ defmodule BDS.AI.SecretBackend do
   @spec decrypt(String.t()) :: {:ok, String.t()} | {:error, term()}
   def decrypt(encoded) when is_binary(encoded) do
     with {:ok, key} <- secret_key() do
-      case decrypt_with(encoded, key) do
-        {:ok, plaintext} -> {:ok, plaintext}
-        {:error, :invalid_ciphertext} -> decrypt_legacy(encoded)
-      end
+      decrypt_with_fallback(encoded, key)
     end
   end
 
@@ -77,6 +74,13 @@ defmodule BDS.AI.SecretBackend do
       @legacy_repo_key,
       :crypto.hash(:sha256, Atom.to_string(node()) <> ":bds:ai")
     ]
+  end
+
+  defp decrypt_with_fallback(encoded, key) do
+    case decrypt_with(encoded, key) do
+      {:ok, _plaintext} = ok -> ok
+      {:error, :invalid_ciphertext} -> decrypt_legacy(encoded)
+    end
   end
 
   defp decrypt_with(encoded, key) do
