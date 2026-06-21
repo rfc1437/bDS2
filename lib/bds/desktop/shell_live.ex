@@ -7,7 +7,7 @@ defmodule BDS.Desktop.ShellLive do
 
   alias BDS.{AI, Blogmark, BoundedAtoms, Metadata}
   alias BDS.CliSync.Watcher
-  alias BDS.Desktop.{ExternalLinks, FilePicker, FolderPicker, ShellData, UILocale}
+  alias BDS.Desktop.{FilePicker, FolderPicker, ShellData, UILocale}
 
   alias BDS.Desktop.ShellLive.{
     Bridges,
@@ -1326,12 +1326,12 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp handle_socket_menu_action(socket, :view_on_github) do
-    OS.launch_default_browser(ExternalLinks.github_url())
+    OS.launch_default_browser("https://github.com/rfc1437/bDS2")
     socket
   end
 
   defp handle_socket_menu_action(socket, :report_issue) do
-    OS.launch_default_browser(ExternalLinks.github_issues_url())
+    OS.launch_default_browser("https://github.com/rfc1437/bDS2/issues")
     socket
   end
 

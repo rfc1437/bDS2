@@ -44,6 +44,7 @@ after each item.
 - [x] `desktop/server.ex`
 - [x] `desktop/shell_live/code_entity_editor.ex`
 - [x] `scripting/runtime.ex`
+- [x] `desktop/external_links.ex`
 
 ---
 

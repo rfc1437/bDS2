@@ -2,7 +2,7 @@ defmodule BDS.Desktop.MenuBar do
   @moduledoc false
 
   use BDS.Desktop.MenuCompat
-  alias BDS.Desktop.{ExternalLinks, ShellData, Shutdown, UILocale}
+  alias BDS.Desktop.{ShellData, Shutdown, UILocale}
   alias BDS.UI.Commands
   alias BDS.UI.MenuBar, as: ShellMenuBar
   alias Desktop.OS
@@ -59,7 +59,7 @@ defmodule BDS.Desktop.MenuBar do
   end
 
   def handle_event("view_on_github", menu) do
-    OS.launch_default_browser(ExternalLinks.github_url())
+    OS.launch_default_browser("https://github.com/rfc1437/bDS2")
     {:noreply, menu}
   end
 
@@ -78,7 +78,7 @@ defmodule BDS.Desktop.MenuBar do
   end
 
   def handle_event("report_issue", menu) do
-    OS.launch_default_browser(ExternalLinks.github_issues_url())
+    OS.launch_default_browser("https://github.com/rfc1437/bDS2/issues")
     {:noreply, menu}
   end
 

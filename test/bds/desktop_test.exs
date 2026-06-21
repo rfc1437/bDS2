@@ -169,13 +169,6 @@ defmodule BDS.DesktopTest do
     assert_receive :quit_requested
   end
 
-  test "desktop external links point at the bDS2 GitHub project and issue tracker" do
-    assert BDS.Desktop.ExternalLinks.github_url() == "https://github.com/rfc1437/bDS2"
-
-    assert BDS.Desktop.ExternalLinks.github_issues_url() ==
-             "https://github.com/rfc1437/bDS2/issues"
-  end
-
   test "icon menu quit requests app-owned shutdown" do
     previous_module = Application.get_env(:bds, :desktop_shutdown_module)
     previous_pid = Application.get_env(:bds, :desktop_shutdown_test_pid)
