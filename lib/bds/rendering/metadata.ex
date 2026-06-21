@@ -14,6 +14,11 @@ defmodule BDS.Rendering.Metadata do
   alias BDS.Posts.Translation
   alias BDS.Tags.Tag
 
+  @menu_item_path_segments %{
+    page: [],
+    category_archive: ["category"]
+  }
+
   @spec project_metadata(String.t()) :: map()
   def project_metadata(project_id) do
     {:ok, metadata} = ProjectMetadata.get_project_metadata(project_id)
@@ -23,17 +28,19 @@ defmodule BDS.Rendering.Metadata do
   @spec menu_items(String.t()) :: [map()]
   def menu_items(project_id) do
     {:ok, %{items: items}} = Menu.get_menu(project_id)
-    Enum.map(items, &to_template_menu_item/1)
+    template_menu_items(items)
   end
 
   @spec menu_items_from_raw([map()]) :: [map()]
   def menu_items_from_raw(items) when is_list(items) do
-    Enum.map(items, &to_template_menu_item/1)
+    template_menu_items(items)
   end
+
+  defp template_menu_items(items), do: Enum.map(items, &to_template_menu_item/1)
 
   defp to_template_menu_item(item) do
     kind = Map.get(item, :kind)
-    children = Enum.map(Map.get(item, :children, []), &to_template_menu_item/1)
+    children = template_menu_items(Map.get(item, :children, []))
 
     %{
       title: Map.get(item, :label, ""),
@@ -46,13 +53,13 @@ defmodule BDS.Rendering.Metadata do
 
   defp menu_item_href(%{kind: :home}), do: "/"
 
-  defp menu_item_href(%{kind: :page, slug: slug}) when is_binary(slug) and slug != "",
-    do: "/#{URI.encode(slug)}/"
+  defp menu_item_href(%{kind: kind, slug: slug}) when is_binary(slug) and slug != "" do
+    case Map.get(@menu_item_path_segments, kind) do
+      nil -> "#"
+      path_segments -> "/" <> Path.join(path_segments ++ [URI.encode(slug)]) <> "/"
+    end
+  end
 
-  defp menu_item_href(%{kind: :category_archive, slug: slug}) when is_binary(slug) and slug != "",
-    do: "/category/#{URI.encode(slug)}/"
-
-  defp menu_item_href(%{kind: :submenu}), do: "#"
   defp menu_item_href(_item), do: "#"
 
   @spec blog_languages(map(), String.t()) :: [map()]

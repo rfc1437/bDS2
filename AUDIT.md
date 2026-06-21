@@ -18,6 +18,7 @@ after each item.
 - [x] `rendering/post_rendering.ex`
 - [x] `rendering/list_archive.ex`
 - [x] `rendering/template_selection.ex`
+- [x] `rendering/metadata.ex`
 
 ---
 
