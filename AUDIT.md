@@ -29,6 +29,7 @@ after each item.
 - [x] `mcp/tools.ex`
 - [x] `mcp/server.ex`
 - [x] `ai/chat_tools.ex`
+- [x] `ai/chat.ex`
 
 ---
 

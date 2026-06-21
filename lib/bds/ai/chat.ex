@@ -578,47 +578,22 @@ defmodule BDS.AI.Chat do
            runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, generate_opts),
          {:ok, assistant_message} <- persist_assistant_response(conversation.id, response),
          :ok <- touch_conversation(conversation.id) do
-      if is_binary(Map.get(response, :content)) and String.trim(Map.get(response, :content)) != "" do
-        notify_chat_event(
-          opts,
-          {:chat_streaming_content, conversation.id, Map.get(response, :content)}
-        )
-      end
+      notify_assistant_content(response, conversation.id, opts)
 
-      tool_calls = decode_tool_calls(Map.get(response, :tool_calls))
-
-      Enum.each(tool_calls, fn tool_call ->
-        notify_chat_event(opts, {:chat_tool_call, conversation.id, tool_call})
-      end)
-
-      cond do
-        tool_calls != [] and tools != [] ->
-          with {:ok, tool_messages} <-
-                 execute_tool_calls(conversation.id, tool_calls, project_id, opts),
-               updated_messages <- load_chat_messages(conversation.id),
-               {:ok, reply} <-
-                 chat_round(
-                   Repo.get!(ChatConversation, conversation.id),
-                   updated_messages,
-                   endpoint,
-                   model,
-                   project_id,
-                   tools,
-                   runtime,
-                   opts,
-                   rounds_left - 1
-                 ) do
-            {:ok, Map.put(reply, :tool_messages, tool_messages)}
-          end
-
-        true ->
-          {:ok,
-           %{
-             conversation: format_conversation(Repo.get!(ChatConversation, conversation.id)),
-             assistant_message: format_chat_message(assistant_message),
-             tool_messages: []
-           }}
-      end
+      response
+      |> Map.get(:tool_calls)
+      |> decode_tool_calls()
+      |> continue_chat_round(
+        conversation.id,
+        assistant_message,
+        endpoint,
+        model,
+        project_id,
+        tools,
+        runtime,
+        opts,
+        rounds_left
+      )
     end
   end
 
@@ -671,6 +646,63 @@ defmodule BDS.AI.Chat do
       end)
 
     {:ok, tool_messages}
+  end
+
+  defp continue_chat_round(
+         tool_calls,
+         conversation_id,
+         assistant_message,
+         endpoint,
+         model,
+         project_id,
+         tools,
+         runtime,
+         opts,
+         rounds_left
+       ) do
+    Enum.each(tool_calls, fn tool_call ->
+      notify_chat_event(opts, {:chat_tool_call, conversation_id, tool_call})
+    end)
+
+    if tool_calls != [] and tools != [] do
+      with {:ok, tool_messages} <- execute_tool_calls(conversation_id, tool_calls, project_id, opts),
+           updated_messages <- load_chat_messages(conversation_id),
+           {:ok, reply} <-
+             chat_round(
+               Repo.get!(ChatConversation, conversation_id),
+               updated_messages,
+               endpoint,
+               model,
+               project_id,
+               tools,
+               runtime,
+               opts,
+               rounds_left - 1
+             ) do
+        {:ok, Map.put(reply, :tool_messages, tool_messages)}
+      end
+    else
+      final_chat_reply(conversation_id, assistant_message)
+    end
+  end
+
+  defp final_chat_reply(conversation_id, assistant_message) do
+    {:ok,
+     %{
+       conversation: format_conversation(Repo.get!(ChatConversation, conversation_id)),
+       assistant_message: format_chat_message(assistant_message),
+       tool_messages: []
+     }}
+  end
+
+  defp notify_assistant_content(response, conversation_id, opts) do
+    content = Map.get(response, :content)
+
+    if is_binary(content) and String.trim(content) != "" do
+      notify_chat_event(opts, {:chat_streaming_content, conversation_id, content})
+    end
+
+    :ok
   end
 
   defp build_chat_request(conversation, messages, model, project_id, tools) do
