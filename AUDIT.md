@@ -28,6 +28,7 @@ after each item.
 - [x] `generation/renderers.ex`
 - [x] `mcp/tools.ex`
 - [x] `mcp/server.ex`
+- [x] `ai/chat_tools.ex`
 
 ---
 

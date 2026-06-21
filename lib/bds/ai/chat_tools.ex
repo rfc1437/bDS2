@@ -59,16 +59,7 @@ defmodule BDS.AI.ChatTools do
   def execute("search_posts", arguments, project_id) do
     project_id = project_id || active_project_id()
     filters = search_filters(arguments)
-
-    {:ok, result} = Search.search_posts(project_id, arguments["query"] || "", filters)
-
-    %{
-      posts: Enum.map(result.posts, &Queries.post_summary/1),
-      total: result.total,
-      offset: result.offset,
-      limit: result.limit,
-      has_more: result.offset + result.limit < result.total
-    }
+    search_result(project_id, arguments["query"] || "", filters, &Queries.post_summary/1)
   end
 
   def execute("read_post_by_slug", arguments, project_id) do
@@ -83,13 +74,9 @@ defmodule BDS.AI.ChatTools do
   def execute("read_post", arguments, project_id) do
     project_id = project_id || active_project_id()
 
-    case Repo.get_by(Post,
-           id: arguments["postId"] || arguments["post_id"],
-           project_id: project_id
-         ) do
-      %Post{} = post -> %{post: Queries.post_detail(post)}
-      nil -> %{success: false, error: "not_found"}
-    end
+    with_post(arguments, project_id, %{success: false, error: "not_found"}, fn post ->
+      %{post: Queries.post_detail(post)}
+    end)
   end
 
   def execute("list_posts", arguments, project_id) do
@@ -98,21 +85,12 @@ defmodule BDS.AI.ChatTools do
     offset = normalize_offset(arguments["offset"])
     filters = search_filters(arguments) |> Map.merge(%{limit: limit, offset: offset})
 
-    {:ok, result} = Search.search_posts(project_id, "", filters)
-
-    %{
-      posts:
-        Enum.map(result.posts, fn post ->
-          post
-          |> Queries.post_summary()
-          |> Map.put("url", "/posts/#{post.slug}")
-          |> Map.put("updated_at", post.updated_at)
-        end),
-      total: result.total,
-      offset: result.offset,
-      limit: result.limit,
-      has_more: result.offset + result.limit < result.total
-    }
+    search_result(project_id, "", filters, fn post ->
+      post
+      |> Queries.post_summary()
+      |> Map.put("url", "/posts/#{post.slug}")
+      |> Map.put("updated_at", post.updated_at)
+    end)
   end
 
   def execute("list_media", arguments, project_id) do
@@ -138,13 +116,9 @@ defmodule BDS.AI.ChatTools do
   def execute("get_media", arguments, project_id) do
     project_id = project_id || active_project_id()
 
-    case Repo.get_by(Media,
-           id: arguments["mediaId"] || arguments["media_id"],
-           project_id: project_id
-         ) do
-      %Media{} = media -> %{media: media_summary(media)}
-      nil -> %{success: false, error: "not_found"}
-    end
+    with_media(arguments, project_id, %{success: false, error: "not_found"}, fn media ->
+      %{media: media_summary(media)}
+    end)
   end
 
   def execute("view_image", arguments, project_id) do
@@ -235,51 +209,33 @@ defmodule BDS.AI.ChatTools do
   def execute("get_post_backlinks", arguments, project_id) do
     project_id = project_id || active_project_id()
 
-    case Repo.get_by(Post,
-           id: arguments["postId"] || arguments["post_id"],
-           project_id: project_id
-         ) do
-      %Post{} = post ->
-        %{success: true, post_id: post.id, linked_by: Queries.linked_posts(post.id, :incoming)}
-
-      nil ->
-        %{success: false, error: "not_found"}
-    end
+    with_post(arguments, project_id, %{success: false, error: "not_found"}, fn post ->
+      %{success: true, post_id: post.id, linked_by: Queries.linked_posts(post.id, :incoming)}
+    end)
   end
 
   def execute("get_post_outlinks", arguments, project_id) do
     project_id = project_id || active_project_id()
 
-    case Repo.get_by(Post,
-           id: arguments["postId"] || arguments["post_id"],
-           project_id: project_id
-         ) do
-      %Post{} = post ->
-        %{success: true, post_id: post.id, links_to: Queries.linked_posts(post.id, :outgoing)}
-
-      nil ->
-        %{success: false, error: "not_found"}
-    end
+    with_post(arguments, project_id, %{success: false, error: "not_found"}, fn post ->
+      %{success: true, post_id: post.id, links_to: Queries.linked_posts(post.id, :outgoing)}
+    end)
   end
 
   def execute("get_post_media", arguments, project_id) do
     project_id = project_id || active_project_id()
-    post_id = arguments["postId"] || arguments["post_id"]
 
-    case Repo.get_by(Post, id: post_id, project_id: project_id) do
-      %Post{} = post -> %{success: true, post_id: post.id, media: post_media(project_id, post.id)}
-      nil -> %{success: false, error: "not_found"}
-    end
+    with_post(arguments, project_id, %{success: false, error: "not_found"}, fn post ->
+      %{success: true, post_id: post.id, media: post_media(project_id, post.id)}
+    end)
   end
 
   def execute("get_media_posts", arguments, project_id) do
     project_id = project_id || active_project_id()
-    media_id = arguments["mediaId"] || arguments["media_id"]
 
-    case Repo.get_by(Media, id: media_id, project_id: project_id) do
-      %Media{} = media -> %{success: true, media_id: media.id, posts: media_posts(media.id)}
-      nil -> %{success: false, error: "not_found"}
-    end
+    with_media(arguments, project_id, %{success: false, error: "not_found"}, fn media ->
+      %{success: true, media_id: media.id, posts: media_posts(media.id)}
+    end)
   end
 
   def execute("render_table", arguments, _project_id) do
@@ -1005,6 +961,38 @@ defmodule BDS.AI.ChatTools do
     {:ok, result} = Search.search_posts(project_id, "", filters)
 
     result
+  end
+
+  defp search_result(project_id, query, filters, mapper) do
+    {:ok, result} = Search.search_posts(project_id, query, filters)
+
+    %{
+      posts: Enum.map(result.posts, mapper),
+      total: result.total,
+      offset: result.offset,
+      limit: result.limit,
+      has_more: result.offset + result.limit < result.total
+    }
+  end
+
+  defp with_post(arguments, project_id, not_found_result, success_fun) do
+    case Repo.get_by(Post,
+           id: arguments["postId"] || arguments["post_id"],
+           project_id: project_id
+         ) do
+      %Post{} = post -> success_fun.(post)
+      nil -> not_found_result
+    end
+  end
+
+  defp with_media(arguments, project_id, not_found_result, success_fun) do
+    case Repo.get_by(Media,
+           id: arguments["mediaId"] || arguments["media_id"],
+           project_id: project_id
+         ) do
+      %Media{} = media -> success_fun.(media)
+      nil -> not_found_result
+    end
   end
 
   defp maybe_put(map, _key, nil), do: map
