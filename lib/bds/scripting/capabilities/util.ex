@@ -273,65 +273,39 @@ defmodule BDS.Scripting.Capabilities.Util do
 
   @spec zero_or_one_arg((term() -> term())) :: (list(), tuple() -> {list(), tuple()})
   def zero_or_one_arg(callback) when is_function(callback, 1) do
-    fn args, state ->
-      decoded_args = :luerl.decode_list(args, state)
-      value = callback.(normalize_input(decoded_args))
-      :luerl.encode_list([sanitize(value)], state)
-    end
+    luerl_callback(callback, fn decoded_args -> [normalize_input(decoded_args)] end)
   end
 
   @spec one_arg((term() -> term())) :: (list(), tuple() -> {list(), tuple()})
   def one_arg(callback) when is_function(callback, 1) do
-    fn args, state ->
-      decoded_args = :luerl.decode_list(args, state)
-
-      value =
-        case decoded_args do
-          [first | _rest] -> callback.(normalize_input(first))
-          [] -> callback.(nil)
-        end
-
-      :luerl.encode_list([sanitize(value)], state)
-    end
+    luerl_callback(callback, &normalized_callback_args(&1, 1))
   end
 
   @spec two_arg((term(), term() -> term())) :: (list(), tuple() -> {list(), tuple()})
   def two_arg(callback) when is_function(callback, 2) do
-    fn args, state ->
-      decoded_args = :luerl.decode_list(args, state)
-
-      value =
-        case decoded_args do
-          [first, second | _rest] -> callback.(normalize_input(first), normalize_input(second))
-          [first] -> callback.(normalize_input(first), nil)
-          [] -> callback.(nil, nil)
-        end
-
-      :luerl.encode_list([sanitize(value)], state)
-    end
+    luerl_callback(callback, &normalized_callback_args(&1, 2))
   end
 
   @spec three_arg((term(), term(), term() -> term())) :: (list(), tuple() -> {list(), tuple()})
   def three_arg(callback) when is_function(callback, 3) do
+    luerl_callback(callback, &normalized_callback_args(&1, 3))
+  end
+
+  defp luerl_callback(callback, argument_builder) do
     fn args, state ->
       decoded_args = :luerl.decode_list(args, state)
-
-      value =
-        case decoded_args do
-          [first, second, third | _rest] ->
-            callback.(normalize_input(first), normalize_input(second), normalize_input(third))
-
-          [first, second] ->
-            callback.(normalize_input(first), normalize_input(second), nil)
-
-          [first] ->
-            callback.(normalize_input(first), nil, nil)
-
-          [] ->
-            callback.(nil, nil, nil)
-        end
-
+      value = apply(callback, argument_builder.(decoded_args))
       :luerl.encode_list([sanitize(value)], state)
     end
   end
+
+  defp normalized_callback_args(decoded_args, count) do
+    decoded_args
+    |> Enum.map(&normalize_input/1)
+    |> Enum.take(count)
+    |> pad_callback_args(count)
+  end
+
+  defp pad_callback_args(args, count),
+    do: args ++ List.duplicate(nil, max(count - length(args), 0))
 end
