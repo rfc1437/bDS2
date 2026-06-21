@@ -35,6 +35,7 @@ after each item.
 - [x] `ai/secret_key.ex`
 - [x] `ai/secret_backend.ex`
 - [x] `scripting/capabilities/util.ex`
+- [x] `desktop/automation.ex` (verified keep: current module is an external-process automation harness; replacing it with `Desktop.Window` primitives would not be a local simplification)
 - [x] `desktop/shell_live/sidebar_events.ex`
 
 ---
