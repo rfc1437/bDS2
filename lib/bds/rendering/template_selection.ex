@@ -70,40 +70,39 @@ defmodule BDS.Rendering.TemplateSelection do
     end
   end
 
-  defp select_template(project_id, kind, slug) when is_binary(slug) and slug != "" do
-    Repo.one(
-      from template in Template,
-        where:
-          template.project_id == ^project_id and template.kind == ^kind and
-            template.status == :published and
-            template.enabled == true and template.slug == ^slug,
-        limit: 1
-    )
+  defp select_template(project_id, kind, slug) do
+    project_id
+    |> published_template_query(kind)
+    |> select_template_scope(kind, slug)
+    |> Repo.one()
   end
 
-  defp select_template(project_id, :post, nil) do
+  defp published_template_query(project_id, kind) do
+    from template in Template,
+      where:
+        template.project_id == ^project_id and template.kind == ^kind and
+          template.status == :published and
+          template.enabled == true
+  end
+
+  defp select_template_scope(query, _kind, slug) when is_binary(slug) and slug != "" do
+    from template in query,
+      where: template.slug == ^slug,
+      limit: 1
+  end
+
+  defp select_template_scope(query, :post, nil) do
     default_slug = StarterTemplates.default_slug(:post)
 
-    Repo.one(
-      from template in Template,
-        where:
-          template.project_id == ^project_id and template.kind == :post and
-            template.status == :published and
-            template.enabled == true and template.slug == ^default_slug,
-        limit: 1
-    )
+    from template in query,
+      where: template.slug == ^default_slug,
+      limit: 1
   end
 
-  defp select_template(project_id, kind, nil) do
-    Repo.one(
-      from template in Template,
-        where:
-          template.project_id == ^project_id and template.kind == ^kind and
-            template.status == :published and
-            template.enabled == true,
-        order_by: [desc: template.created_at, desc: template.slug],
-        limit: 1
-    )
+  defp select_template_scope(query, _kind, nil) do
+    from template in query,
+      order_by: [desc: template.created_at, desc: template.slug],
+      limit: 1
   end
 
   defp published_template_body(%Template{content: content}) when is_binary(content),
