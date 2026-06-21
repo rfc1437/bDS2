@@ -26,8 +26,8 @@ defmodule BDS.Rendering.PostRendering do
     post_record = Map.get(assigns, :_post_record) || load_post_record(assigns)
     canonical_post = canonical_post_record(post_record)
     post_id = canonical_post_id(post_record, assigns)
-    post_categories = Map.get(post_record || %{}, :categories, []) || []
-    post_tags = Map.get(post_record || %{}, :tags, []) || []
+    post_categories = record_list(post_record, :categories)
+    post_tags = record_list(post_record, :tags)
 
     canonical_post_paths =
       LinksAndLanguages.canonical_post_path_by_slug(project_id, main_language)
@@ -58,38 +58,26 @@ defmodule BDS.Rendering.PostRendering do
 
     %{
       language: language,
-      language_prefix:
-        Map.get(
-          assigns,
-          :language_prefix,
-          Map.get(
-            assigns,
-            "language_prefix",
-            LinksAndLanguages.language_prefix(language, main_language)
-          )
-        ),
+      language_prefix: assign_override(
+        assigns,
+        :language_prefix,
+        "language_prefix",
+        LinksAndLanguages.language_prefix(language, main_language)
+      ),
       page_title:
         Map.get(
           assigns,
           :page_title,
           MapUtils.attr(assigns, :title)
         ),
-      pico_stylesheet_href:
-        Map.get(
-          assigns,
-          :pico_stylesheet_href,
-          Map.get(
-            assigns,
-            "pico_stylesheet_href",
-            RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
-          )
-        ),
+      pico_stylesheet_href: assign_override(
+        assigns,
+        :pico_stylesheet_href,
+        "pico_stylesheet_href",
+        RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
+      ),
       html_theme_attribute:
-        Map.get(
-          assigns,
-          :html_theme_attribute,
-          Map.get(assigns, "html_theme_attribute")
-        ),
+        assign_override(assigns, :html_theme_attribute, "html_theme_attribute", nil),
       blog_languages: RenderMetadata.blog_languages(metadata, language),
       alternate_links: RenderMetadata.alternate_links(canonical_post, project_id, main_language),
       menu_items: RenderMetadata.menu_items(project_id),
@@ -211,33 +199,33 @@ defmodule BDS.Rendering.PostRendering do
       title: MapUtils.attr(assigns, :title),
       content: MapUtils.attr(assigns, :content),
       raw_content: MapUtils.attr(assigns, :raw_content),
-      project_id: MapUtils.attr(assigns, :project_id) || Map.get(post_record || %{}, :project_id),
+      project_id: MapUtils.attr(assigns, :project_id) || record_value(post_record, :project_id),
       excerpt:
         Map.get(
           assigns,
           :excerpt,
-          Map.get(post_record || %{}, :excerpt)
+          record_value(post_record, :excerpt)
         ),
-      author: Map.get(post_record || %{}, :author),
+      author: record_value(post_record, :author),
       language:
         Map.get(
           assigns,
           :language,
-          Map.get(post_record || %{}, :language)
+          record_value(post_record, :language)
         ),
       show_title: true,
-      published_at: Map.get(post_record || %{}, :published_at),
-      created_at: Map.get(post_record || %{}, :created_at),
-      updated_at: Map.get(post_record || %{}, :updated_at),
-      tags: Map.get(post_record || %{}, :tags, []) || [],
-      categories: Map.get(post_record || %{}, :categories, []) || [],
+      published_at: record_value(post_record, :published_at),
+      created_at: record_value(post_record, :created_at),
+      updated_at: record_value(post_record, :updated_at),
+      tags: record_list(post_record, :tags),
+      categories: record_list(post_record, :categories),
       template_slug:
         Map.get(
           post_record || %{},
           :template_slug,
           MapUtils.attr(assigns, :template_slug)
         ),
-      do_not_translate: Map.get(post_record || %{}, :do_not_translate, false),
+      do_not_translate: record_value(post_record, :do_not_translate, false),
       linked_media: linked_media_images(assigns),
       outgoing_links: outgoing_links,
       incoming_links: incoming_links
@@ -287,4 +275,14 @@ defmodule BDS.Rendering.PostRendering do
       []
     end
   end
+
+  defp assign_override(assigns, atom_key, string_key, default) do
+    Map.get(assigns, atom_key, Map.get(assigns, string_key, default))
+  end
+
+  defp record_value(post_record, key, default \\ nil) do
+    Map.get(post_record || %{}, key, default)
+  end
+
+  defp record_list(post_record, key), do: record_value(post_record, key, []) || []
 end
