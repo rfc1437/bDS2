@@ -31,6 +31,7 @@ after each item.
 - [x] `ai/chat_tools.ex`
 - [x] `ai/chat.ex`
 - [x] `ai/openai_compatible_runtime.ex`
+- [x] `ai/one_shot.ex`
 
 ---
 

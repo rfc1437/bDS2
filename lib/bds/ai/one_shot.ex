@@ -167,28 +167,13 @@ defmodule BDS.AI.OneShot do
     end
   end
 
-  defp run_one_shot(:analyze_image = operation, payload, opts, formatter) do
-    runtime = Keyword.get(opts, :runtime, OpenAICompatibleRuntime)
-
-    with {:ok, endpoint, model, mode} <- Runtime.resolve_target(operation, opts),
-         :ok <- Runtime.validate_target(operation, model, mode),
-         {:ok, payload} <- resolve_image_data_url(payload),
-         request <- build_one_shot_request(operation, payload, model, opts),
-         {:ok, response} <-
-           runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts),
-         {:ok, json} <- extract_json_response(response),
-         usage <- Chat.normalize_usage(response.usage),
-         {:ok, result} <- formatter.(json, usage) do
-      {:ok, result}
-    end
-  end
-
   defp run_one_shot(operation, payload, opts, formatter) do
     runtime = Keyword.get(opts, :runtime, OpenAICompatibleRuntime)
 
     with {:ok, endpoint, model, mode} <- Runtime.resolve_target(operation, opts),
          :ok <- Runtime.validate_target(operation, model, mode),
-         request <- build_one_shot_request(operation, payload, model, opts),
+         {:ok, prepared_payload} <- prepare_one_shot_payload(operation, payload),
+         request <- build_one_shot_request(operation, prepared_payload, model, opts),
          {:ok, response} <-
            runtime.generate(Runtime.endpoint_with_model(endpoint, model), request, opts),
          {:ok, json} <- extract_json_response(response),
@@ -197,6 +182,9 @@ defmodule BDS.AI.OneShot do
       {:ok, result}
     end
   end
+
+  defp prepare_one_shot_payload(:analyze_image, payload), do: resolve_image_data_url(payload)
+  defp prepare_one_shot_payload(_operation, payload), do: {:ok, payload}
 
   defp build_one_shot_request(operation, payload, model, opts) do
     language = Keyword.get(opts, :language)
