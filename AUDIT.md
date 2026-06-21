@@ -21,6 +21,7 @@ after each item.
 - [x] `rendering/metadata.ex`
 - [x] `rendering/links_and_languages.ex`
 - [x] `generation/validation.ex`
+- [x] `generation/outputs.ex`
 
 ---
 

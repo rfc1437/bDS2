@@ -51,114 +51,102 @@ defmodule BDS.Generation.Outputs do
 
   @spec core_route_paths(map(), [map()], String.t() | nil) :: [String.t()]
   def core_route_paths(plan, published_list_posts, route_language) do
-    if :core in plan.sections do
+    section_route_paths(plan, :core, fn ->
       root_route_paths(route_language, length(published_list_posts), plan.max_posts_per_page)
-    else
-      []
-    end
+    end)
   end
 
   @spec page_route_paths(map(), [map()], String.t() | nil) :: [String.t()]
   def page_route_paths(plan, route_posts, route_language) do
-    if :core in plan.sections do
+    section_route_paths(plan, :core, fn ->
       route_posts
       |> Enum.filter(&("page" in (&1.categories || [])))
       |> Enum.map(&page_output_path(&1.slug, route_language))
-    else
-      []
-    end
+    end)
   end
 
   @spec single_route_paths(map(), [map()], String.t() | nil) :: [String.t()]
   def single_route_paths(plan, route_posts, route_language) do
-    if :single in plan.sections do
+    section_route_paths(plan, :single, fn ->
       Enum.map(route_posts, &route_post_output_path(&1, route_language))
-    else
-      []
-    end
+    end)
   end
 
   @spec category_route_paths(map(), map(), String.t() | nil) :: [String.t()]
   def category_route_paths(plan, posts_by_category, route_language) do
-    if :category in plan.sections do
-      Enum.flat_map(posts_by_category, fn {category, posts} ->
-        post_count = length(posts)
-
-        paginated_archive_paths(
-          route_language,
-          ["category", archive_route_segment(category)],
-          post_count,
-          plan.max_posts_per_page
-        )
-      end)
-    else
-      []
-    end
+    section_route_paths(plan, :category, fn ->
+      archive_collection_route_paths(
+        posts_by_category,
+        route_language,
+        plan.max_posts_per_page,
+        fn category -> ["category", archive_route_segment(category)] end
+      )
+    end)
   end
 
   @spec tag_route_paths(map(), map(), String.t() | nil) :: [String.t()]
   def tag_route_paths(plan, posts_by_tag, route_language) do
-    if :tag in plan.sections do
-      Enum.flat_map(posts_by_tag, fn {tag, posts} ->
-        post_count = length(posts)
-
-        paginated_archive_paths(
-          route_language,
-          ["tag", archive_route_segment(tag)],
-          post_count,
-          plan.max_posts_per_page
-        )
-      end)
-    else
-      []
-    end
+    section_route_paths(plan, :tag, fn ->
+      archive_collection_route_paths(
+        posts_by_tag,
+        route_language,
+        plan.max_posts_per_page,
+        fn tag -> ["tag", archive_route_segment(tag)] end
+      )
+    end)
   end
 
   @spec date_route_paths(map(), map(), String.t() | nil) :: [String.t()]
   def date_route_paths(plan, post_index, route_language) do
-    if :date in plan.sections do
+    section_route_paths(plan, :date, fn ->
       year_paths =
-        Enum.flat_map(post_index.posts_by_year, fn {year, posts} ->
-          post_count = length(posts)
-
-          paginated_archive_paths(
-            route_language,
-            [Integer.to_string(year)],
-            post_count,
-            plan.max_posts_per_page
-          )
-        end)
+        archive_collection_route_paths(
+          post_index.posts_by_year,
+          route_language,
+          plan.max_posts_per_page,
+          fn year -> [Integer.to_string(year)] end
+        )
 
       month_paths =
-        Enum.flat_map(post_index.posts_by_year_month, fn {year_month, posts} ->
-          [year, month] = String.split(year_month, "/", parts: 2)
-          post_count = length(posts)
-
-          paginated_archive_paths(
-            route_language,
-            [year, month],
-            post_count,
-            plan.max_posts_per_page
-          )
-        end)
+        archive_collection_route_paths(
+          post_index.posts_by_year_month,
+          route_language,
+          plan.max_posts_per_page,
+          fn year_month -> String.split(year_month, "/", parts: 2) end
+        )
 
       day_paths =
-        Enum.flat_map(post_index.posts_by_year_month_day, fn {year_month_day, posts} ->
-          [year, month, day] = String.split(year_month_day, "/", parts: 3)
-          post_count = length(posts)
-
-          paginated_archive_paths(
-            route_language,
-            [year, month, day],
-            post_count,
-            plan.max_posts_per_page
-          )
-        end)
+        archive_collection_route_paths(
+          post_index.posts_by_year_month_day,
+          route_language,
+          plan.max_posts_per_page,
+          fn year_month_day -> String.split(year_month_day, "/", parts: 3) end
+        )
 
       year_paths ++ month_paths ++ day_paths
-    else
-      []
-    end
+    end)
+  end
+
+  defp section_route_paths(plan, section, builder) do
+    if section in plan.sections, do: builder.(), else: []
+  end
+
+  defp archive_collection_route_paths(
+         collections,
+         route_language,
+         max_posts_per_page,
+         segment_builder
+       ) do
+    Enum.flat_map(collections, fn {key, posts} ->
+      post_count = length(posts)
+
+      paginated_archive_paths(
+        route_language,
+        segment_builder.(key),
+        post_count,
+        max_posts_per_page
+      )
+    end)
   end
 
   @spec build_archive_outputs(map(), map(), map()) :: [{String.t(), iodata()}]
