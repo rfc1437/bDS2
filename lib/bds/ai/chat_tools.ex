@@ -942,13 +942,16 @@ defmodule BDS.AI.ChatTools do
 
   defp search_filters(arguments) do
     %{}
-    |> maybe_put(:category, arguments["category"])
-    |> maybe_put(:tags, arguments["tags"])
-    |> maybe_put(:language, arguments["language"])
-    |> maybe_put(:missing_translation_language, arguments["missingTranslationLanguage"])
-    |> maybe_put(:year, arguments["year"])
-    |> maybe_put(:month, arguments["month"])
-    |> maybe_put(:status, BDS.BoundedAtoms.post_status(arguments["status"]))
+    |> BDS.MapUtils.maybe_put(:category, BDS.MapUtils.blank_to_nil(arguments["category"]))
+    |> BDS.MapUtils.maybe_put(:tags, BDS.MapUtils.blank_to_nil(arguments["tags"]))
+    |> BDS.MapUtils.maybe_put(:language, BDS.MapUtils.blank_to_nil(arguments["language"]))
+    |> BDS.MapUtils.maybe_put(
+      :missing_translation_language,
+      BDS.MapUtils.blank_to_nil(arguments["missingTranslationLanguage"])
+    )
+    |> BDS.MapUtils.maybe_put(:year, arguments["year"])
+    |> BDS.MapUtils.maybe_put(:month, arguments["month"])
+    |> BDS.MapUtils.maybe_put(:status, BDS.BoundedAtoms.post_status(arguments["status"]))
     |> Map.put(:offset, normalize_offset(arguments["offset"]))
     |> Map.put(:limit, normalize_limit(arguments["limit"]))
   end
@@ -995,10 +998,6 @@ defmodule BDS.AI.ChatTools do
     end
   end
 
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, _key, ""), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
-
   defp counted_terms(project_id, field) do
     Repo.all(
       from post in Post, where: post.project_id == ^project_id, select: field(post, ^field)
@@ -1012,7 +1011,11 @@ defmodule BDS.AI.ChatTools do
 
   defp metadata_attrs(arguments, keys) do
     Enum.reduce(keys, %{}, fn key, acc ->
-      maybe_put(acc, BDS.MapUtils.safe_atomize_key(key), arguments[key])
+      BDS.MapUtils.maybe_put(
+        acc,
+        BDS.MapUtils.safe_atomize_key(key),
+        BDS.MapUtils.blank_to_nil(arguments[key])
+      )
     end)
   end
 

@@ -266,8 +266,11 @@ defmodule BDS.Tags do
       |> Enum.sort_by(&String.downcase(&1.name))
       |> Enum.map(fn tag ->
         %{"name" => tag.name}
-        |> maybe_put("color", tag.color)
-        |> maybe_put("postTemplateSlug", tag.post_template_slug)
+        |> BDS.MapUtils.maybe_put("color", BDS.MapUtils.blank_to_nil(tag.color))
+        |> BDS.MapUtils.maybe_put(
+          "postTemplateSlug",
+          BDS.MapUtils.blank_to_nil(tag.post_template_slug)
+        )
       end)
 
     Persistence.atomic_write(path, Jason.encode!(payload, pretty: true))
@@ -385,9 +388,5 @@ defmodule BDS.Tags do
     Enum.each(post_ids, &Posts.rewrite_published_post/1)
     :ok
   end
-
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, _key, ""), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
 end

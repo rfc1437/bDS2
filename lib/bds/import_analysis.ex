@@ -264,7 +264,7 @@ defmodule BDS.ImportAnalysis do
       status: item.status
     }
 
-    maybe_put(base, :resolution, item.resolution)
+    BDS.MapUtils.maybe_put(base, :resolution, item.resolution)
   end
 
   defp summary_item(item) do
@@ -276,7 +276,7 @@ defmodule BDS.ImportAnalysis do
       status: item.status
     }
 
-    maybe_put(base, :resolution, item.resolution)
+    BDS.MapUtils.maybe_put(base, :resolution, item.resolution)
   end
 
   defp summarize_post_items(items) do
@@ -545,9 +545,6 @@ defmodule BDS.ImportAnalysis do
       "[[#{inner}]]"
     end)
   end
-
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil

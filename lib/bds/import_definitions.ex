@@ -40,10 +40,13 @@ defmodule BDS.ImportDefinitions do
       %ImportDefinition{} = definition ->
         updates =
           %{}
-          |> maybe_put(:name, BDS.MapUtils.attr(attrs, :name))
-          |> maybe_put(:wxr_file_path, BDS.MapUtils.attr(attrs, :wxr_file_path))
-          |> maybe_put(:uploads_folder_path, BDS.MapUtils.attr(attrs, :uploads_folder_path))
-          |> maybe_put(
+          |> BDS.MapUtils.maybe_put(:name, BDS.MapUtils.attr(attrs, :name))
+          |> BDS.MapUtils.maybe_put(:wxr_file_path, BDS.MapUtils.attr(attrs, :wxr_file_path))
+          |> BDS.MapUtils.maybe_put(
+            :uploads_folder_path,
+            BDS.MapUtils.attr(attrs, :uploads_folder_path)
+          )
+          |> BDS.MapUtils.maybe_put(
             :last_analysis_result,
             normalize_analysis_result(BDS.MapUtils.attr(attrs, :last_analysis_result))
           )
@@ -85,9 +88,6 @@ defmodule BDS.ImportDefinitions do
         select: %{id: definition.id, title: definition.name, updated_at: definition.updated_at}
     )
   end
-
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   alias BDS.MapUtils
 

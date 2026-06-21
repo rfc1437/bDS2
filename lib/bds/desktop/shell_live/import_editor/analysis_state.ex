@@ -160,7 +160,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
                 wxr_file_path: analysis_state.file_path,
                 last_analysis_result: report
               }
-              |> maybe_put(:name, suggested_definition_name(report))
+              |> BDS.MapUtils.maybe_put(:name, suggested_definition_name(report))
 
             case ImportDefinitions.update_definition(definition_id, attrs) do
               {:ok, _definition} ->
@@ -273,10 +273,6 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
   def suggested_definition_name(report) do
     get_in(report, [:site_info, :url]) || get_in(report, [:site_info, :title])
   end
-
-  @spec maybe_put(term(), term(), term()) :: term()
-  def maybe_put(map, _key, nil), do: map
-  def maybe_put(map, key, value), do: Map.put(map, key, value)
 
   @spec allow_repo_sandbox(term()) :: term()
   def allow_repo_sandbox(pid) when is_pid(pid) do

@@ -45,6 +45,7 @@ after each item.
 - [x] `desktop/shell_live/code_entity_editor.ex`
 - [x] `scripting/runtime.ex`
 - [x] `desktop/external_links.ex`
+- [x] `MapUtils.maybe_put/3` replacements
 - [x] `desktop/error_html.ex` (verified keep: still required by Phoenix `render_errors` wiring)
 - [x] `desktop/health_controller.ex` (verified keep: current Phoenix route wiring still expects a controller module)
 - [x] `desktop/folder_picker.ex` (verified keep: no equivalent `Desktop.OS` picker primitive exists to inline onto)

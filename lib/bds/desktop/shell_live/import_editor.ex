@@ -693,7 +693,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
             wxr_file_path: analysis_state.file_path,
             last_analysis_result: report
           }
-          |> maybe_put(:name, AnalysisState.suggested_definition_name(report))
+              |> BDS.MapUtils.maybe_put(:name, AnalysisState.suggested_definition_name(report))
 
         case ImportDefinitions.update_definition(definition_id, attrs) do
           {:ok, _definition} ->
@@ -1453,7 +1453,4 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   defp blank?(value), do: value in [nil, ""]
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
-
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 end
