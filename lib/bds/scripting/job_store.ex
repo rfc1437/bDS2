@@ -1,36 +1,50 @@
 defmodule BDS.Scripting.JobStore do
   @moduledoc false
 
-  use GenServer
+  use Agent
 
-  @spec start_link(term()) :: GenServer.on_start()
+  @spec start_link(term()) :: Agent.on_start()
   def start_link(_opts) do
-    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+    Agent.start_link(fn -> %{jobs: %{}, runners: %{}} end, name: __MODULE__)
   end
 
   @spec put_job(map()) :: :ok
   def put_job(job) when is_map(job) do
-    GenServer.call(__MODULE__, {:put_job, job})
+    update_state(fn %{jobs: jobs} = state ->
+      %{state | jobs: Map.put(jobs, job.id, job)}
+    end)
   end
 
   @spec update_job(String.t(), map()) :: :ok
   def update_job(job_id, attrs) when is_binary(job_id) and is_map(attrs) do
-    GenServer.call(__MODULE__, {:update_job, job_id, attrs})
+    update_state(fn %{jobs: jobs} = state ->
+      next_jobs =
+        Map.update(jobs, job_id, nil, fn
+          nil -> nil
+          job -> Map.merge(job, attrs)
+        end)
+
+      %{state | jobs: next_jobs}
+    end)
   end
 
   @spec attach_runner(String.t(), pid()) :: :ok
   def attach_runner(job_id, pid) when is_binary(job_id) and is_pid(pid) do
-    GenServer.call(__MODULE__, {:attach_runner, job_id, pid})
+    update_state(fn %{runners: runners} = state ->
+      %{state | runners: Map.put(runners, job_id, pid)}
+    end)
   end
 
   @spec detach_runner(String.t()) :: :ok
   def detach_runner(job_id) when is_binary(job_id) do
-    GenServer.call(__MODULE__, {:detach_runner, job_id})
+    update_state(fn %{runners: runners} = state ->
+      %{state | runners: Map.delete(runners, job_id)}
+    end)
   end
 
   @spec fetch_job(String.t()) :: map() | nil
   def fetch_job(job_id) when is_binary(job_id) do
-    GenServer.call(__MODULE__, {:fetch_job, job_id})
+    get_state(&Map.get(&1.jobs, job_id))
   end
 
   @spec fetch_job!(String.t()) :: map()
@@ -43,44 +57,9 @@ defmodule BDS.Scripting.JobStore do
 
   @spec runner_for(String.t()) :: pid() | nil
   def runner_for(job_id) when is_binary(job_id) do
-    GenServer.call(__MODULE__, {:runner_for, job_id})
+    get_state(&Map.get(&1.runners, job_id))
   end
 
-  @impl true
-  def init(_state) do
-    {:ok, %{jobs: %{}, runners: %{}}}
-  end
-
-  @impl true
-  def handle_call({:put_job, %{id: job_id} = job}, _from, state) do
-    next_state = put_in(state, [:jobs, job_id], job)
-    {:reply, :ok, next_state}
-  end
-
-  def handle_call({:update_job, job_id, attrs}, _from, state) do
-    next_state =
-      update_in(state, [:jobs, job_id], fn
-        nil -> nil
-        job -> Map.merge(job, attrs)
-      end)
-
-    {:reply, :ok, next_state}
-  end
-
-  def handle_call({:attach_runner, job_id, pid}, _from, state) do
-    next_state = put_in(state, [:runners, job_id], pid)
-    {:reply, :ok, next_state}
-  end
-
-  def handle_call({:detach_runner, job_id}, _from, state) do
-    {:reply, :ok, %{state | runners: Map.delete(state.runners, job_id)}}
-  end
-
-  def handle_call({:fetch_job, job_id}, _from, state) do
-    {:reply, Map.get(state.jobs, job_id), state}
-  end
-
-  def handle_call({:runner_for, job_id}, _from, state) do
-    {:reply, Map.get(state.runners, job_id), state}
-  end
+  defp get_state(fun), do: Agent.get(__MODULE__, fun)
+  defp update_state(fun), do: Agent.update(__MODULE__, fun)
 end
