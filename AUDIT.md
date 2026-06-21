@@ -23,6 +23,7 @@ after each item.
 - [x] `generation/validation.ex`
 - [x] `generation/outputs.ex`
 - [x] `generation/sitemap.ex`
+- [x] `generation/data.ex`
 
 ---
 

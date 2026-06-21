@@ -223,54 +223,11 @@ defmodule BDS.Generation.Data do
   end
 
   defp published_post_snapshot(project_data_dir, %Post{} = post) do
-    cond do
-      is_binary(post.file_path) and post.file_path != "" ->
-        project_data_dir
-        |> Path.join(post.file_path)
-        |> read_post_snapshot(post)
-
-      post.status == :published ->
-        post
-
-      true ->
-        nil
-    end
+    published_snapshot(project_data_dir, post.file_path, post, &read_post_snapshot/2)
   end
 
   defp read_post_snapshot(full_path, %Post{} = fallback_post) do
-    case File.read(full_path) do
-      {:ok, contents} ->
-        {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
-
-        %Post{
-          fallback_post
-          | id: DocumentFields.get(fields, "id", fallback_post.id),
-            title: DocumentFields.get(fields, "title", fallback_post.title) || "",
-            slug: DocumentFields.fetch!(fields, "slug"),
-            excerpt: Map.get(fields, "excerpt"),
-            content: nil,
-            status: :published,
-            author: Map.get(fields, "author"),
-            language: Map.get(fields, "language", fallback_post.language),
-            do_not_translate:
-              DocumentFields.get(
-                fields,
-                "doNotTranslate",
-                fallback_post.do_not_translate || false
-              ),
-            template_slug:
-              DocumentFields.get(fields, "templateSlug", fallback_post.template_slug),
-            created_at: DocumentFields.get(fields, "createdAt", fallback_post.created_at),
-            updated_at: DocumentFields.get(fields, "updatedAt", fallback_post.updated_at),
-            published_at: DocumentFields.get(fields, "publishedAt", fallback_post.published_at),
-            file_path: fallback_post.file_path,
-            tags: Map.get(fields, "tags", fallback_post.tags || []),
-            categories: Map.get(fields, "categories", fallback_post.categories || [])
-        }
-
-      {:error, _reason} ->
-        if fallback_post.status == :published, do: fallback_post, else: nil
-    end
+    read_snapshot(full_path, fallback_post, &build_post_snapshot/2)
   end
 
   defp build_generation_route_posts(
@@ -324,44 +281,79 @@ defmodule BDS.Generation.Data do
   end
 
   defp published_translation_snapshot(project_data_dir, %Translation{} = translation) do
-    cond do
-      is_binary(translation.file_path) and translation.file_path != "" ->
-        project_data_dir
-        |> Path.join(translation.file_path)
-        |> read_translation_snapshot(translation)
-
-      translation.status == :published ->
-        translation
-
-      true ->
-        nil
-    end
+    published_snapshot(
+      project_data_dir,
+      translation.file_path,
+      translation,
+      &read_translation_snapshot/2
+    )
   end
 
   defp read_translation_snapshot(full_path, %Translation{} = fallback_translation) do
+    read_snapshot(full_path, fallback_translation, &build_translation_snapshot/2)
+  end
+
+  defp read_snapshot(full_path, fallback_record, builder) do
     case File.read(full_path) do
       {:ok, contents} ->
         {:ok, %{fields: fields}} = Frontmatter.parse_document(contents)
-
-        %Translation{
-          fallback_translation
-          | id: DocumentFields.get(fields, "id", fallback_translation.id),
-            translation_for: DocumentFields.fetch!(fields, "translationFor"),
-            language: DocumentFields.fetch!(fields, "language"),
-            title: DocumentFields.get(fields, "title", fallback_translation.title) || "",
-            excerpt: Map.get(fields, "excerpt", fallback_translation.excerpt),
-            content: nil,
-            status: :published,
-            created_at: DocumentFields.get(fields, "createdAt", fallback_translation.created_at),
-            updated_at: DocumentFields.get(fields, "updatedAt", fallback_translation.updated_at),
-            published_at:
-              DocumentFields.get(fields, "publishedAt", fallback_translation.published_at),
-            file_path: fallback_translation.file_path
-        }
+        builder.(fields, fallback_record)
 
       {:error, _reason} ->
-        if fallback_translation.status == :published, do: fallback_translation, else: nil
+        if fallback_record.status == :published, do: fallback_record, else: nil
     end
+  end
+
+  defp published_snapshot(project_data_dir, file_path, fallback_record, reader)
+       when is_binary(file_path) and file_path != "" do
+    project_data_dir
+    |> Path.join(file_path)
+    |> reader.(fallback_record)
+  end
+
+  defp published_snapshot(_project_data_dir, _file_path, %{status: :published} = fallback_record, _reader),
+    do: fallback_record
+
+  defp published_snapshot(_project_data_dir, _file_path, _fallback_record, _reader), do: nil
+
+  defp build_post_snapshot(fields, %Post{} = fallback_post) do
+    %Post{
+      fallback_post
+      | id: DocumentFields.get(fields, "id", fallback_post.id),
+        title: DocumentFields.get(fields, "title", fallback_post.title) || "",
+        slug: DocumentFields.fetch!(fields, "slug"),
+        excerpt: Map.get(fields, "excerpt"),
+        content: nil,
+        status: :published,
+        author: Map.get(fields, "author"),
+        language: Map.get(fields, "language", fallback_post.language),
+        do_not_translate:
+          DocumentFields.get(fields, "doNotTranslate", fallback_post.do_not_translate || false),
+        template_slug: DocumentFields.get(fields, "templateSlug", fallback_post.template_slug),
+        created_at: DocumentFields.get(fields, "createdAt", fallback_post.created_at),
+        updated_at: DocumentFields.get(fields, "updatedAt", fallback_post.updated_at),
+        published_at: DocumentFields.get(fields, "publishedAt", fallback_post.published_at),
+        file_path: fallback_post.file_path,
+        tags: Map.get(fields, "tags", fallback_post.tags || []),
+        categories: Map.get(fields, "categories", fallback_post.categories || [])
+    }
+  end
+
+  defp build_translation_snapshot(fields, %Translation{} = fallback_translation) do
+    %Translation{
+      fallback_translation
+      | id: DocumentFields.get(fields, "id", fallback_translation.id),
+        translation_for: DocumentFields.fetch!(fields, "translationFor"),
+        language: DocumentFields.fetch!(fields, "language"),
+        title: DocumentFields.get(fields, "title", fallback_translation.title) || "",
+        excerpt: Map.get(fields, "excerpt", fallback_translation.excerpt),
+        content: nil,
+        status: :published,
+        created_at: DocumentFields.get(fields, "createdAt", fallback_translation.created_at),
+        updated_at: DocumentFields.get(fields, "updatedAt", fallback_translation.updated_at),
+        published_at: DocumentFields.get(fields, "publishedAt", fallback_translation.published_at),
+        file_path: fallback_translation.file_path
+    }
   end
 
   defp build_published_translation_variant(post, translation) do
