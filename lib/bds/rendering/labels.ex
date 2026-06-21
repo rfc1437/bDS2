@@ -39,52 +39,24 @@ defmodule BDS.Rendering.Labels do
   @spec month_name(integer() | nil, String.t()) :: String.t() | nil
   def month_name(nil, _language), do: nil
 
-  def month_name(1, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "January") end)
-  end
-
-  def month_name(2, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "February") end)
-  end
-
-  def month_name(3, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "March") end)
-  end
-
-  def month_name(4, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "April") end)
-  end
-
-  def month_name(5, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "May") end)
-  end
-
-  def month_name(6, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "June") end)
-  end
-
-  def month_name(7, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "July") end)
-  end
-
-  def month_name(8, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "August") end)
-  end
-
-  def month_name(9, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "September") end)
-  end
-
-  def month_name(10, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "October") end)
-  end
-
-  def month_name(11, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "November") end)
-  end
-
-  def month_name(12, language) do
-    Gettext.with_locale(BDS.Gettext, language, fn -> dgettext("render", "December") end)
+  def month_name(month, language) when month in 1..12 do
+    Gettext.with_locale(BDS.Gettext, language, fn ->
+      [
+        dgettext("render", "January"),
+        dgettext("render", "February"),
+        dgettext("render", "March"),
+        dgettext("render", "April"),
+        dgettext("render", "May"),
+        dgettext("render", "June"),
+        dgettext("render", "July"),
+        dgettext("render", "August"),
+        dgettext("render", "September"),
+        dgettext("render", "October"),
+        dgettext("render", "November"),
+        dgettext("render", "December")
+      ]
+      |> Enum.at(month - 1)
+    end)
   end
 
   def month_name(_month, _language), do: nil
