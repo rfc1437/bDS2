@@ -105,11 +105,7 @@ defmodule BDS.AI.SecretKey do
         keychain_create()
 
       {:error, reason} ->
-        Logger.warning(
-          "AI secret key: macOS Keychain unavailable (#{inspect(reason)}); falling back to the key file"
-        )
-
-        resolve_file()
+        fallback_to_key_file("AI secret key: macOS Keychain unavailable", inspect(reason))
     end
   end
 
@@ -157,12 +153,10 @@ defmodule BDS.AI.SecretKey do
         {:ok, key}
 
       {output, status} ->
-        Logger.warning(
-          "AI secret key: could not store the key in the Keychain " <>
-            "(status #{status}: #{String.trim(output)}); falling back to the key file"
+        fallback_to_key_file(
+          "AI secret key: could not store the key in the Keychain",
+          "status #{status}: #{String.trim(output)}"
         )
-
-        resolve_file()
     end
   end
 
@@ -229,5 +223,10 @@ defmodule BDS.AI.SecretKey do
 
   defp config(key, default) do
     Application.get_env(:bds, __MODULE__, []) |> Keyword.get(key, default)
+  end
+
+  defp fallback_to_key_file(prefix, detail) do
+    Logger.warning(prefix <> " (" <> detail <> "); falling back to the key file")
+    resolve_file()
   end
 end
