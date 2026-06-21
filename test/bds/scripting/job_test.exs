@@ -2,7 +2,7 @@ defmodule BDS.Scripting.JobTest do
   use ExUnit.Case, async: false
 
   defmodule FakeRuntime do
-    @behaviour BDS.Scripting.Runtime
+    @behaviour BDS.Scripting.Lua
 
     @impl true
     def validate(_source), do: :ok
@@ -19,7 +19,7 @@ defmodule BDS.Scripting.JobTest do
   end
 
   defmodule BlockingRuntime do
-    @behaviour BDS.Scripting.Runtime
+    @behaviour BDS.Scripting.Lua
 
     @impl true
     def validate(_source), do: :ok
@@ -37,7 +37,7 @@ defmodule BDS.Scripting.JobTest do
   end
 
   defmodule ShutdownAwareRuntime do
-    @behaviour BDS.Scripting.Runtime
+    @behaviour BDS.Scripting.Lua
 
     @impl true
     def validate(_source), do: :ok

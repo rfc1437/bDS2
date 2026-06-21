@@ -6,7 +6,7 @@ defmodule BDS.Scripting do
   require Logger
 
   alias BDS.Scripting.Capabilities
-  alias BDS.Scripting.Runtime
+  alias BDS.Scripting.Lua
 
   @type job_status :: :queued | :running | :completed | :failed | :cancelled
   @type job_snapshot :: %{
@@ -31,7 +31,7 @@ defmodule BDS.Scripting do
     runtime().validate(source)
   end
 
-  @spec execute(String.t(), String.t(), [term()], [Runtime.execution_option()]) ::
+  @spec execute(String.t(), String.t(), [term()], [Lua.execution_option()]) ::
           {:ok, term()} | {:error, term()}
   def execute(source, entrypoint, args \\ [], opts \\ [])
       when is_binary(source) and is_binary(entrypoint) and is_list(args) and is_list(opts) do
@@ -39,7 +39,7 @@ defmodule BDS.Scripting do
   end
 
   @spec execute_project_script(String.t(), String.t(), String.t(), [term()], [
-          Runtime.execution_option()
+          Lua.execution_option()
         ]) ::
           {:ok, term()} | {:error, term()}
   def execute_project_script(project_id, source, entrypoint, args \\ [], opts \\ [])
@@ -75,7 +75,7 @@ defmodule BDS.Scripting do
     end
   end
 
-  @spec start_job(String.t(), String.t(), [term()], [Runtime.execution_option()]) ::
+  @spec start_job(String.t(), String.t(), [term()], [Lua.execution_option()]) ::
           {:ok, job_snapshot()} | {:error, term()}
   def start_job(source, entrypoint, args \\ [], opts \\ [])
       when is_binary(source) and is_binary(entrypoint) and is_list(args) and is_list(opts) do

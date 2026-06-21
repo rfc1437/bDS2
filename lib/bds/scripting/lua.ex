@@ -6,7 +6,23 @@ defmodule BDS.Scripting.Lua do
   and opt-in.
   """
 
-  @behaviour BDS.Scripting.Runtime
+  @type source :: String.t()
+  @type entrypoint :: String.t()
+  @type args :: [term()]
+  @type progress_event :: map()
+  @type progress_callback :: (progress_event() -> any())
+  @type execution_option ::
+          {:timeout, non_neg_integer() | :infinity}
+          | {:max_reductions, pos_integer() | :none}
+          | {:spawn_opts, [term()]}
+          | {:on_progress, progress_callback()}
+          | {:capabilities, map()}
+
+  @callback validate(source()) :: :ok | {:error, term()}
+  @callback execute(source(), entrypoint(), args(), [execution_option()]) ::
+              {:ok, term()} | {:error, term()}
+
+  @behaviour __MODULE__
 
   @type lua_state :: tuple()
   @type runtime_result :: {:ok, term(), lua_state} | {:error, term()}
