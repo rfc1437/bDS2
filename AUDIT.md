@@ -45,6 +45,14 @@ after each item.
 - [x] `desktop/shell_live/code_entity_editor.ex`
 - [x] `scripting/runtime.ex`
 - [x] `desktop/external_links.ex`
+- [x] `desktop/error_html.ex` (verified keep: still required by Phoenix `render_errors` wiring)
+- [x] `desktop/health_controller.ex` (verified keep: current Phoenix route wiring still expects a controller module)
+- [x] `desktop/folder_picker.ex` (verified keep: no equivalent `Desktop.OS` picker primitive exists to inline onto)
+- [x] `desktop/file_picker.ex` (verified keep: no equivalent `Desktop.OS` picker primitive exists to inline onto)
+- [x] `desktop/deep_link.ex` (verified keep: this is an active GenServer bridge for OS URL events, not a trivial wrapper)
+- [x] `desktop/overlay.ex` (verified keep: this is a real overlay state/transform module, not a one-function shim)
+- [x] `rebuild.ex` (verified keep: shared `Task.async_stream` helper remains clearer than duplicating the concurrency options at call sites)
+- [x] `starter_templates.ex` (verified keep: shared starter-template path/default helpers remain clearer than inlining across rendering/template code)
 
 ---
 
