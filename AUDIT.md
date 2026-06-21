@@ -35,6 +35,7 @@ after each item.
 - [x] `ai/secret_key.ex`
 - [x] `ai/secret_backend.ex`
 - [x] `scripting/capabilities/util.ex`
+- [x] `desktop/shell_live/sidebar_events.ex`
 
 ---
 
