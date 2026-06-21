@@ -38,6 +38,8 @@ after each item.
 - [x] `desktop/automation.ex` (verified keep: current module is an external-process automation harness; replacing it with `Desktop.Window` primitives would not be a local simplification)
 - [x] `desktop/shell_live/sidebar_events.ex`
 - [x] `MapUtils.attr/2` replacements
+- [x] `ui/registry.ex` O(1) lookups (verified keep: compile-time caching would freeze localized labels)
+- [x] `bounded_atoms.ex` O(1) allow-lists
 
 ---
 

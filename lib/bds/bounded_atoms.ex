@@ -67,6 +67,8 @@ defmodule BDS.BoundedAtoms do
                     %{id: id} -> [id]
                   end)
                 end)
+  @sidebar_view_ids Enum.map(Registry.sidebar_views(), & &1.id)
+  @editor_route_ids Enum.map(Registry.editor_routes(), & &1.id)
 
   def atom(value, allowed, fallback \\ nil)
 
@@ -101,13 +103,9 @@ defmodule BDS.BoundedAtoms do
     Enum.find(allowed, fallback, &(Atom.to_string(&1) == value))
   end
 
-  defp sidebar_views do
-    Enum.map(Registry.sidebar_views(), & &1.id)
-  end
+  defp sidebar_views, do: @sidebar_view_ids
 
-  defp editor_routes do
-    Enum.map(Registry.editor_routes(), & &1.id)
-  end
+  defp editor_routes, do: @editor_route_ids
 
   defp normalize_menu_kind("category-archive"), do: "category_archive"
   defp normalize_menu_kind(value), do: value
