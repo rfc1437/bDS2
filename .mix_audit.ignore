@@ -2,8 +2,3 @@
 # ecto_sqlite3 0.24.x can move to decimal 3.x, but that line is currently
 # unsatisfiable alongside the app's Bumblebee dependency.
 GHSA-rhv4-8758-jx7v
-
-# GHSA-52mm-h59v-f3c7 has no patched Earmark release available on Hex at the
-# time of validation. The repo is pinned to the latest 1.4.x release and needs
-# a future migration off Earmark rather than a direct patched upgrade.
-GHSA-52mm-h59v-f3c7

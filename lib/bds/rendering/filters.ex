@@ -180,9 +180,12 @@ defmodule BDS.Rendering.Filters do
   end
 
   defp render_markdown_html(markdown) do
-    case Earmark.as_html(markdown) do
-      {:ok, html, _messages} -> html
-      {:error, html, _messages} -> html
+    # Macros above inject raw HTML (gallery, video embeds), so the render path
+    # must pass HTML through untouched. unsafe: true matches the prior Earmark
+    # no-escape behavior.
+    case MDEx.to_html(markdown, render: [unsafe: true]) do
+      {:ok, html} -> html
+      {:error, _reason} -> markdown
     end
   end
 

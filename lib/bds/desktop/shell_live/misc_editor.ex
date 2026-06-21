@@ -279,9 +279,9 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   @spec markdown_html(String.t()) :: Phoenix.HTML.safe()
   def markdown_html(content) do
     html =
-      case Earmark.as_html(content || "", escape: true) do
-        {:ok, rendered, _messages} -> rendered
-        {:error, rendered, _messages} -> rendered
+      case MDEx.to_html(content || "") do
+        {:ok, rendered} -> rendered
+        {:error, _reason} -> ""
       end
 
     raw(html)

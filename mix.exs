@@ -32,7 +32,7 @@ defmodule BDS.MixProject do
       {:ecto_sqlite3, "~> 0.21"},
       {:luerl, "~> 1.5"},
       {:jason, "~> 1.4"},
-      {:earmark, "~> 1.4"},
+      {:mdex, "~> 0.13"},
       {:liquex, "~> 0.13.1"},
       {:plug, "~> 1.18"},
       {:bandit, "~> 1.5"},
