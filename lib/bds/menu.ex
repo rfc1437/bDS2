@@ -1,6 +1,8 @@
 defmodule BDS.Menu do
   @moduledoc false
 
+  import BDS.MapUtils, only: [attr: 2]
+
   alias BDS.Persistence
   alias BDS.Projects
 
@@ -263,11 +265,4 @@ defmodule BDS.Menu do
     |> String.replace(~s("), "&quot;")
   end
 
-  defp attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
-  end
 end

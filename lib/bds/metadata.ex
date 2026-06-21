@@ -1,6 +1,8 @@
 defmodule BDS.Metadata do
   @moduledoc false
 
+  import BDS.MapUtils, only: [attr: 2, attr: 3]
+
   require Logger
 
   alias BDS.Embeddings
@@ -674,19 +676,4 @@ defmodule BDS.Metadata do
   defp maybe_backfill_embeddings(result, _project_id, _previous_state, _project_metadata),
     do: result
 
-  defp attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
-  end
-
-  defp attr(attrs, key, default) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> default
-    end
-  end
 end

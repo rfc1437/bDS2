@@ -37,6 +37,7 @@ after each item.
 - [x] `scripting/capabilities/util.ex`
 - [x] `desktop/automation.ex` (verified keep: current module is an external-process automation harness; replacing it with `Desktop.Window` primitives would not be a local simplification)
 - [x] `desktop/shell_live/sidebar_events.ex`
+- [x] `MapUtils.attr/2` replacements
 
 ---
 

@@ -3,6 +3,7 @@ defmodule BDS.Projects do
 
   import Ecto.Query
 
+  alias BDS.MapUtils
   alias BDS.Metadata
   alias BDS.Persistence
   alias BDS.Projects.Project
@@ -151,8 +152,8 @@ defmodule BDS.Projects do
   @spec create_project(attrs()) :: {:ok, Project.t()} | {:error, term()}
   def create_project(attrs) do
     now = Persistence.now_ms()
-    name = attr(attrs, :name) || ""
-    slug = unique_slug(attr(attrs, :slug) || Slug.slugify(name))
+    name = MapUtils.attr(attrs, :name) || ""
+    slug = unique_slug(MapUtils.attr(attrs, :slug) || Slug.slugify(name))
 
     retry_create_project(fn ->
       Repo.transaction(fn ->
@@ -162,8 +163,8 @@ defmodule BDS.Projects do
             id: Ecto.UUID.generate(),
             name: name,
             slug: slug,
-            description: attr(attrs, :description),
-            data_path: attr(attrs, :data_path),
+            description: MapUtils.attr(attrs, :description),
+            data_path: MapUtils.attr(attrs, :data_path),
             created_at: now,
             updated_at: now,
             is_active: false
@@ -391,11 +392,4 @@ defmodule BDS.Projects do
     File.write(path, Jason.encode!(registry))
   end
 
-  defp attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
-  end
 end

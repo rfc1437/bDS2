@@ -373,8 +373,8 @@ defmodule BDS.Tasks do
       status: status,
       progress: nil,
       message: nil,
-      group_id: attr(attrs, :group_id),
-      group_name: attr(attrs, :group_name),
+      group_id: BDS.MapUtils.attr(attrs, :group_id),
+      group_name: BDS.MapUtils.attr(attrs, :group_name),
       created_at: DateTime.utc_now(),
       started_at: nil,
       finished_at: nil,
@@ -570,11 +570,4 @@ defmodule BDS.Tasks do
     |> Keyword.get(:finished_task_ttl_ms, @default_finished_task_ttl_ms)
   end
 
-  defp attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
-  end
 end

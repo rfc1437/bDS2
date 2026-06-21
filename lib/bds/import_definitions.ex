@@ -16,11 +16,12 @@ defmodule BDS.ImportDefinitions do
     %ImportDefinition{}
     |> ImportDefinition.changeset(%{
       id: Ecto.UUID.generate(),
-      project_id: attr(attrs, :project_id),
-      name: attr(attrs, :name) || "",
-      wxr_file_path: attr(attrs, :wxr_file_path),
-      uploads_folder_path: attr(attrs, :uploads_folder_path),
-      last_analysis_result: normalize_analysis_result(attr(attrs, :last_analysis_result)),
+      project_id: BDS.MapUtils.attr(attrs, :project_id),
+      name: BDS.MapUtils.attr(attrs, :name) || "",
+      wxr_file_path: BDS.MapUtils.attr(attrs, :wxr_file_path),
+      uploads_folder_path: BDS.MapUtils.attr(attrs, :uploads_folder_path),
+      last_analysis_result:
+        normalize_analysis_result(BDS.MapUtils.attr(attrs, :last_analysis_result)),
       created_at: now,
       updated_at: now
     })
@@ -39,12 +40,12 @@ defmodule BDS.ImportDefinitions do
       %ImportDefinition{} = definition ->
         updates =
           %{}
-          |> maybe_put(:name, attr(attrs, :name))
-          |> maybe_put(:wxr_file_path, attr(attrs, :wxr_file_path))
-          |> maybe_put(:uploads_folder_path, attr(attrs, :uploads_folder_path))
+          |> maybe_put(:name, BDS.MapUtils.attr(attrs, :name))
+          |> maybe_put(:wxr_file_path, BDS.MapUtils.attr(attrs, :wxr_file_path))
+          |> maybe_put(:uploads_folder_path, BDS.MapUtils.attr(attrs, :uploads_folder_path))
           |> maybe_put(
             :last_analysis_result,
-            normalize_analysis_result(attr(attrs, :last_analysis_result))
+            normalize_analysis_result(BDS.MapUtils.attr(attrs, :last_analysis_result))
           )
           |> Map.put(:updated_at, Persistence.now_ms())
 
@@ -84,8 +85,6 @@ defmodule BDS.ImportDefinitions do
         select: %{id: definition.id, title: definition.name, updated_at: definition.updated_at}
     )
   end
-
-  defp attr(attrs, key), do: Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)

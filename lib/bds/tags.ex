@@ -3,6 +3,7 @@ defmodule BDS.Tags do
 
   import Ecto.Query
 
+  alias BDS.MapUtils
   alias BDS.Persistence
   alias BDS.Posts
   alias BDS.Posts.Post
@@ -16,8 +17,8 @@ defmodule BDS.Tags do
 
   @spec create_tag(attrs()) :: tag_result()
   def create_tag(attrs) do
-    project_id = attr(attrs, :project_id)
-    name = attr(attrs, :name) |> to_string() |> String.trim()
+    project_id = MapUtils.attr(attrs, :project_id)
+    name = MapUtils.attr(attrs, :name) |> to_string() |> String.trim()
 
     with :ok <- validate_unique_name(project_id, name) do
       now = Persistence.now_ms()
@@ -27,8 +28,8 @@ defmodule BDS.Tags do
         id: Ecto.UUID.generate(),
         project_id: project_id,
         name: name,
-        color: attr(attrs, :color),
-        post_template_slug: attr(attrs, :post_template_slug),
+        color: MapUtils.attr(attrs, :color),
+        post_template_slug: MapUtils.attr(attrs, :post_template_slug),
         created_at: now,
         updated_at: now
       })
@@ -115,8 +116,8 @@ defmodule BDS.Tags do
 
       tag ->
         updates = %{
-          color: attr(attrs, :color),
-          post_template_slug: attr(attrs, :post_template_slug),
+          color: MapUtils.attr(attrs, :color),
+          post_template_slug: MapUtils.attr(attrs, :post_template_slug),
           updated_at: Persistence.now_ms()
         }
 
@@ -389,11 +390,4 @@ defmodule BDS.Tags do
   defp maybe_put(map, _key, ""), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  defp attr(attrs, key) do
-    cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
-      Map.has_key?(attrs, Atom.to_string(key)) -> Map.get(attrs, Atom.to_string(key))
-      true -> nil
-    end
-  end
 end
