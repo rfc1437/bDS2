@@ -27,6 +27,7 @@ after each item.
 - [x] `generation/paths.ex`
 - [x] `generation/renderers.ex`
 - [x] `mcp/tools.ex`
+- [x] `mcp/server.ex`
 
 ---
 

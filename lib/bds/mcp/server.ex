@@ -145,13 +145,8 @@ defmodule BDS.MCP.Server do
   defp dispatch_http_request({:ok, %{method: "POST", target: target} = request}) do
     case URI.parse(target) do
       %URI{path: "/mcp"} ->
-        case GenServer.call(__MODULE__, {:http_request, request}, 5_000) do
-          {:ok, status, body} ->
-            http_response(status, Jason.encode!(body), "application/json", request.headers)
-
-          {:error, status, body} ->
-            http_response(status, body, "text/plain", request.headers)
-        end
+        GenServer.call(__MODULE__, {:http_request, request}, 5_000)
+        |> encode_http_response(request.headers)
 
       _other ->
         http_error_response(404, request.headers)
@@ -287,17 +282,21 @@ defmodule BDS.MCP.Server do
     ]
   end
 
-  defp http_response(status, body, content_type, headers) do
-    reason =
-      case status do
-        200 -> "OK"
-        204 -> "No Content"
-        400 -> "Bad Request"
-        403 -> "Forbidden"
-        404 -> "Not Found"
-        _other -> "Internal Server Error"
-      end
+  defp encode_http_response({:ok, status, body}, headers),
+    do: json_http_response(status, body, headers)
 
+  defp encode_http_response({:error, status, body}, headers),
+    do: text_http_response(status, body, headers)
+
+  defp json_http_response(status, body, headers) do
+    http_response(status, Jason.encode!(body), "application/json", headers)
+  end
+
+  defp text_http_response(status, body, headers) do
+    http_response(status, body, "text/plain", headers)
+  end
+
+  defp http_response(status, body, content_type, headers) do
     header_lines =
       [
         {"content-type", content_type <> "; charset=utf-8"},
@@ -311,7 +310,7 @@ defmodule BDS.MCP.Server do
       "HTTP/1.1 ",
       Integer.to_string(status),
       " ",
-      reason,
+      http_reason_phrase(status),
       "\r\n",
       header_lines,
       "\r\n",
@@ -319,6 +318,13 @@ defmodule BDS.MCP.Server do
     ]
     |> IO.iodata_to_binary()
   end
+
+  defp http_reason_phrase(200), do: "OK"
+  defp http_reason_phrase(204), do: "No Content"
+  defp http_reason_phrase(400), do: "Bad Request"
+  defp http_reason_phrase(403), do: "Forbidden"
+  defp http_reason_phrase(404), do: "Not Found"
+  defp http_reason_phrase(_status), do: "Internal Server Error"
 
   defp http_error_response(status, headers \\ %{}),
     do: http_response(status, reason_body(status), "text/plain", headers)
