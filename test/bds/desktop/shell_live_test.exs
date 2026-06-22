@@ -5465,6 +5465,18 @@ defmodule BDS.Desktop.ShellLiveTest do
     refute html =~ ~r/<img\b/
   end
 
+  test "chat editor renders GFM markdown and escapes raw HTML" do
+    {:safe, html} =
+      BDS.Desktop.ShellLive.ChatEditor.markdown_html(
+        "~~old~~ value\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n<script>alert(1)</script>"
+      )
+
+    assert html =~ "<del>old</del>"
+    assert html =~ "<table>"
+    refute html =~ "<script>"
+    assert html =~ "&lt;script&gt;"
+  end
+
   test "chat editor renders chart inline surfaces from render_chart tool calls" do
     assert {:ok, conversation} = AI.start_chat(%{title: "Chart Chat", model: "gpt-4.1"})
 

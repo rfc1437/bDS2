@@ -35,9 +35,11 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
   end
 
   defp generate_blocking(url, headers, payload, request) do
-    payload_json = encode_payload(payload)
+    payload_json = Jason.encode!(payload)
 
-    log_request(:blocking, url, request, payload, payload_json)
+    Logger.debug(
+      "AI OpenAI-compatible request operation=#{inspect(Map.get(request, :operation))} model=#{inspect(request.model)} url=#{url} tools=#{payload |> Map.get("tools", []) |> length()} payload_size=#{byte_size(payload_json)}"
+    )
 
     case HttpClient.post(url, headers, payload_json) do
       {:ok, %{status: 200, body: body}} ->
@@ -75,9 +77,11 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
   # snapshots to `on_stream` as they arrive. The assembled message goes
   # through the same normalization as the blocking path.
   defp generate_streaming(url, headers, payload, request, on_stream) do
-    payload_json = payload |> streaming_payload() |> encode_payload()
+    payload_json = payload |> streaming_payload() |> Jason.encode!()
 
-    log_request(:streaming, url, request, payload, payload_json)
+    Logger.debug(
+      "AI OpenAI-compatible streaming request operation=#{inspect(Map.get(request, :operation))} model=#{inspect(request.model)} url=#{url} payload_size=#{byte_size(payload_json)}"
+    )
 
     sse = SSE.new(on_stream, emit_interval_ms: stream_emit_interval_ms())
 
@@ -232,20 +236,6 @@ defmodule BDS.AI.OpenAICompatibleRuntime do
     payload
     |> Map.put("stream", true)
     |> Map.put("stream_options", %{"include_usage" => true})
-  end
-
-  defp encode_payload(payload), do: Jason.encode!(payload)
-
-  defp log_request(mode, url, request, payload, payload_json) do
-    tools_segment =
-      case mode do
-        :blocking -> " tools=#{payload |> Map.get("tools", []) |> length()}"
-        :streaming -> ""
-      end
-
-    Logger.debug(
-      "AI OpenAI-compatible#{if mode == :streaming, do: " streaming", else: ""} request operation=#{inspect(Map.get(request, :operation))} model=#{inspect(request.model)} url=#{url}#{tools_segment} payload_size=#{byte_size(payload_json)}"
-    )
   end
 
   defp log_http_status_error(prefix, status, body) do

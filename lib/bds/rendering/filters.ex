@@ -180,10 +180,13 @@ defmodule BDS.Rendering.Filters do
   end
 
   defp render_markdown_html(markdown) do
-    # Macros above inject raw HTML (gallery, video embeds), so the render path
-    # must pass HTML through untouched. unsafe: true matches the prior Earmark
-    # no-escape behavior.
-    case MDEx.to_html(markdown, render: [unsafe: true]) do
+    # Match Earmark's defaults: GFM tables, strikethrough and bare-URL autolinks
+    # were all on. Macros above inject raw HTML (gallery, video embeds), so
+    # unsafe: true keeps that HTML untouched as Earmark's no-escape path did.
+    case MDEx.to_html(markdown,
+           extension: [table: true, strikethrough: true, autolink: true],
+           render: [unsafe: true]
+         ) do
       {:ok, html} -> html
       {:error, _reason} -> markdown
     end

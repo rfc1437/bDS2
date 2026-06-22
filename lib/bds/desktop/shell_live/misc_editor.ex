@@ -278,8 +278,13 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
 
   @spec markdown_html(String.t()) :: Phoenix.HTML.safe()
   def markdown_html(content) do
+    # Match Earmark's defaults (GFM tables, strikethrough, autolinks); escape
+    # raw HTML to text rather than rendering it, as the old escape: true did.
     html =
-      case MDEx.to_html(content || "") do
+      case MDEx.to_html(content || "",
+             extension: [table: true, strikethrough: true, autolink: true],
+             render: [escape: true]
+           ) do
         {:ok, rendered} -> rendered
         {:error, _reason} -> ""
       end

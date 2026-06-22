@@ -171,6 +171,37 @@ defmodule BDS.GalleryPipelineTest do
       assert result =~ "tag-cloud-empty"
     end
 
+    test "renders GFM tables, strikethrough and autolinks like Earmark did", %{
+      project: project,
+      post: post
+    } do
+      {:ok, metadata} = BDS.Metadata.get_project_metadata(project.id)
+      language = metadata.main_language || "en"
+      template_context = BDS.Rendering.TemplateSelection.template_render_context(project.id)
+
+      markdown = """
+      | A | B |
+      |---|---|
+      | 1 | 2 |
+
+      ~~gone~~ and visit https://example.com now
+      """
+
+      result =
+        BDS.Rendering.Filters.render_markdown(
+          markdown,
+          %{},
+          %{},
+          language,
+          template_context,
+          post.id
+        )
+
+      assert result =~ "<table>"
+      assert result =~ "<del>gone</del>"
+      assert result =~ ~s(<a href="https://example.com">)
+    end
+
     test "[[photo_archive]] renders without media", %{project: project, post: post} do
       {:ok, metadata} = BDS.Metadata.get_project_metadata(project.id)
       language = metadata.main_language || "en"
