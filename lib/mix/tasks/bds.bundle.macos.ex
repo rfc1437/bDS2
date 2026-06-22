@@ -10,6 +10,16 @@ defmodule Mix.Tasks.Bds.Bundle.Macos do
   with `--regen-icon`), assembles the bundle, relocates the wxWidgets dylibs so it
   runs on a clean Mac, ad-hoc codesigns it, and (with `--register`) registers the
   `bds2://` URL scheme via LaunchServices.
+
+  ## Standalone is a hard requirement
+
+  The produced `.app` MUST be fully self-contained: no Mach-O inside it may
+  reference a Homebrew/local path (`/opt/homebrew`, `/usr/local`). Every external
+  dylib reachable from the release's NIFs is copied into `Contents/Frameworks`
+  and rewritten to `@loader_path`-relative install names. The build runs
+  `BDS.MacBundle.verify_standalone/1` after relocation and **fails** if any
+  external reference survives — so a bundle that would break on a Mac without
+  Homebrew never ships.
   """
 
   use Mix.Task

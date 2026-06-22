@@ -1,16 +1,32 @@
 defmodule BDS.MacBundle.Dylibs do
   @moduledoc """
-  Makes the bundled Elixir release self-contained on macOS by relocating the
-  non-system dynamic libraries the wxWidgets NIF (`wxe_driver.so`) links against.
+  Makes the bundled Elixir release **fully self-contained** on macOS: after
+  `bundle/3` runs, no Mach-O binary in the `.app` references a Homebrew/local
+  (`/opt/homebrew`, `/usr/local`) path, so the app launches on a clean Mac with
+  no Homebrew installed.
 
-  Erlang's `:wx` driver is built against the wxWidgets dylibs of whatever host
-  produced the OTP install (typically Homebrew under `/opt/homebrew`), so a
-  release copied to a clean Mac would fail to load `:wx`. We copy every external
-  dylib (and its transitive deps) into `Contents/Frameworks/`, then rewrite the
-  install names with `install_name_tool` to `@executable_path/../Frameworks/...`.
+  Erlang NIFs (`wxe_driver.so`, `crypto.so`, …) are built against whatever
+  produced the host OTP install — typically Homebrew. We walk every Mach-O in
+  the release, copy the transitive closure of external dylibs into
+  `Contents/Frameworks/`, and rewrite every external install name to a
+  `@loader_path`-relative one.
+
+  Two robustness points the previous (per-NIF, exact-path) version missed:
+
+    * **Spelling-independent rewriting.** The same physical dylib is referenced
+      under different absolute spellings — a NIF links the symlink name
+      (`.../opt/wxwidgets@3.2/lib/libwx_..._core-3.2.dylib`) while inter-library
+      deps link the versioned name (`.../Cellar/.../libwx_..._core-3.2.0.4.3.dylib`).
+      We rewrite by *basename* (`relink_changes/2`), so every spelling of an
+      external dep is caught regardless of how it was written.
+
+    * **Inode dedup via symlinks.** Those two names are one file. We copy the
+      real bytes once and make the other name a symlink to it, so dyld loads a
+      single image — otherwise both copies load and you get duplicate
+      Objective-C class / wx event-table registrations.
 
   The `otool`/`install_name_tool` parsing and argument building are pure so they
-  can be unit-tested; `bundle/2` performs the actual filesystem + tool work.
+  can be unit-tested; `bundle/3` performs the actual filesystem + tool work.
   """
 
   # Homebrew prefixes whose libraries must be copied into the bundle. Anything
@@ -55,62 +71,134 @@ defmodule BDS.MacBundle.Dylibs do
   end
 
   @doc """
-  Copy every external dylib reachable from `nif_path` into `frameworks_dir` and
-  rewrite all install names (in the NIF and the copied dylibs) to point inside
-  the bundle. Returns `{:ok, copied_paths}`.
-
-  References are made `@loader_path`-relative so they resolve against the binary
-  that triggers the load — independent of where the host process executable
-  lives (the release runs `beam.smp`, not the bundle launcher) and without any
-  `DYLD_*` env reliance:
-
-    * the NIF references each dylib as `<nif_loader_prefix>/<basename>`, where
-      `nif_loader_prefix` is the `@loader_path/../…/Frameworks` path from the
-      NIF's directory to `frameworks_dir`;
-    * the copied dylibs live together, so they reference each other (and their
-      own id) as `@loader_path/<basename>`.
+  Extract the `LC_RPATH` search paths from `otool -l` output. Used to find and
+  strip Homebrew/local rpaths — an `@rpath` dep would otherwise resolve outside
+  the bundle, breaking standalone even though `otool -L` looks clean.
   """
-  @spec bundle(String.t(), String.t(), String.t()) ::
+  @spec parse_rpaths(String.t()) :: [String.t()]
+  def parse_rpaths(output) when is_binary(output) do
+    output
+    |> String.split("\n")
+    |> Enum.reduce({false, []}, fn line, {in_rpath?, acc} ->
+      line = String.trim(line)
+
+      cond do
+        line == "cmd LC_RPATH" ->
+          {true, acc}
+
+        in_rpath? and String.starts_with?(line, "path ") ->
+          path =
+            line
+            |> String.replace_prefix("path ", "")
+            |> String.replace(~r/\s+\(offset \d+\)$/, "")
+
+          {false, [path | acc]}
+
+        true ->
+          {in_rpath?, acc}
+      end
+    end)
+    |> elem(1)
+    |> Enum.reverse()
+  end
+
+  @doc """
+  Build `{old, new}` rewrites for a binary's `otool -L` dependency list: every
+  external dep becomes `<prefix>/<basename>`. System (`/usr/lib`, `/System`) and
+  already-relocatable (`@rpath`/`@loader_path`/`@executable_path`) deps are
+  dropped. Rewriting by basename — not by the exact source path — is what makes
+  this catch every absolute spelling of the same library.
+  """
+  @spec relink_changes([String.t()], String.t()) :: [{String.t(), String.t()}]
+  def relink_changes(deps, prefix) when is_list(deps) do
+    deps
+    |> Enum.filter(&external?/1)
+    |> Enum.map(fn dep -> {dep, prefix <> "/" <> Path.basename(dep)} end)
+  end
+
+  @doc """
+  Relocate every external dylib reachable from `nifs` into `frameworks_dir` and
+  rewrite all install names so the bundle is self-contained.
+
+  `nifs` is the list of Mach-O binaries in the release that may link external
+  libs (NIFs, `beam.smp`, …). `prefix_for` maps a NIF to its `@loader_path`-based
+  prefix to `frameworks_dir` (the NIF runs from `beam.smp`, so references are
+  `@loader_path`-relative to the NIF's own location, independent of `DYLD_*`).
+
+  Copied dylibs share `frameworks_dir`, so they reference each other (and their
+  own id) as `@loader_path/<basename>`. Returns `{:ok, real_copies}`.
+  """
+  @spec bundle([String.t()], String.t(), (String.t() -> String.t())) ::
           {:ok, [String.t()]} | {:error, term()}
-  def bundle(nif_path, frameworks_dir, nif_loader_prefix) do
+  def bundle(nifs, frameworks_dir, prefix_for) when is_function(prefix_for, 1) do
     File.mkdir_p!(frameworks_dir)
 
-    with {:ok, {_seen, externals}} <- collect(nif_path, %{}, []) do
-      externals = Enum.reverse(externals)
+    with {:ok, externals} <- collect(nifs, %{}) do
+      reals = materialize(externals, frameworks_dir)
 
-      {physical, logical_entries, _inode_map} =
-        externals
-        |> Enum.reduce({[], [], %{}}, fn src, {phys_acc, log_acc, inode_map} ->
-          dest = Path.join(frameworks_dir, Path.basename(src))
-
-          if File.exists?(dest) do
-            {phys_acc, [{src, dest} | log_acc], inode_map}
-          else
-            ino = file_inode(src)
-
-            case Map.get(inode_map, ino) do
-              nil ->
-                File.cp!(src, dest)
-                File.chmod!(dest, 0o644)
-                {[{src, dest} | phys_acc], [{src, dest} | log_acc],
-                 Map.put(inode_map, ino, dest)}
-
-              existing_dest ->
-                # Same inode already copied under a different name.
-                # Point this logical entry to the physical copy.
-                {phys_acc, [{src, existing_dest} | log_acc], inode_map}
-            end
-          end
-        end)
-
-      copied = Enum.reverse(logical_entries)
-      physical = Enum.reverse(physical)
-
-      with :ok <- rewrite(nif_path, copied, nif_loader_prefix),
-           :ok <- rewrite_each(physical) do
-        {:ok, Enum.map(physical, &elem(&1, 1))}
+      with :ok <- relink_each(reals, fn _real -> "@loader_path" end, set_id: true),
+           :ok <- relink_each(nifs, prefix_for, set_id: false) do
+        {:ok, reals}
       end
     end
+  end
+
+  # Transitive closure of external deps, keyed by basename (one source path per
+  # basename — different absolute spellings of the same leaf collapse here).
+  defp collect(binaries, acc) do
+    Enum.reduce_while(binaries, {:ok, acc}, fn bin, {:ok, acc} ->
+      case otool(bin) do
+        {:ok, deps} ->
+          deps
+          |> Enum.filter(&external?/1)
+          |> Enum.reduce_while({:ok, acc}, fn dep, {:ok, acc} ->
+            base = Path.basename(dep)
+
+            if Map.has_key?(acc, base) do
+              {:cont, {:ok, acc}}
+            else
+              case collect([dep], Map.put(acc, base, dep)) do
+                {:ok, _} = ok -> {:cont, ok}
+                error -> {:halt, error}
+              end
+            end
+          end)
+          |> case do
+            {:ok, _} = ok -> {:cont, ok}
+            error -> {:halt, error}
+          end
+
+        error ->
+          {:halt, error}
+      end
+    end)
+  end
+
+  # Copy each external once (deduped by device+inode, which follows symlinks to
+  # the real file); additional basenames for the same file become symlinks so
+  # dyld loads a single image. Returns the real (non-symlink) copies.
+  # ponytail: basename collisions between *different* libraries would clobber;
+  # never happens for our deps — add content hashing if it ever does.
+  defp materialize(externals, frameworks_dir) do
+    {_seen, reals} =
+      Enum.reduce(externals, {%{}, []}, fn {base, src}, {seen, reals} ->
+        dest = Path.join(frameworks_dir, base)
+        inode = file_inode(src)
+
+        case Map.get(seen, inode) do
+          nil ->
+            File.cp!(src, dest)
+            File.chmod!(dest, 0o644)
+            {Map.put(seen, inode, base), [dest | reals]}
+
+          canonical ->
+            _ = File.rm(dest)
+            File.ln_s!(canonical, dest)
+            {seen, reals}
+        end
+      end)
+
+    Enum.reverse(reals)
   end
 
   defp file_inode(path) do
@@ -118,56 +206,59 @@ defmodule BDS.MacBundle.Dylibs do
     {stat.major_device, stat.inode}
   end
 
-  # Depth-first transitive collection of external dependency paths. Returns
-  # `{:ok, {seen, acc}}` where `seen` is a plain map used as a set (a MapSet's
-  # opaque internals trip dialyzer when threaded through the recursion) and
-  # `acc` is the reverse-discovery-order path list.
-  defp collect(binary, seen, acc) do
-    case otool(binary) do
-      {:ok, deps} ->
-        deps
-        |> Enum.filter(&external?/1)
-        |> Enum.reduce_while({:ok, {seen, acc}}, fn dep, {:ok, {seen_acc, list_acc}} ->
-          if Map.has_key?(seen_acc, dep) do
-            {:cont, {:ok, {seen_acc, list_acc}}}
-          else
-            seen_acc = Map.put(seen_acc, dep, true)
-            case collect(dep, seen_acc, [dep | list_acc]) do
-              {:ok, _} = ok -> {:cont, ok}
-              error -> {:halt, error}
-            end
-          end
-        end)
-      error ->
-        error
-    end
-  end
+  defp relink_each(binaries, prefix_for, opts) do
+    set_id? = Keyword.fetch!(opts, :set_id)
 
-  defp rewrite(binary, copied, prefix) do
-    changes =
-      Enum.map(copied, fn {src, dest} ->
-        {src, prefix <> "/" <> Path.basename(dest)}
-      end)
-
-    case change_args(binary, changes) do
-      [] -> :ok
-      args -> run("install_name_tool", args)
-    end
-  end
-
-  # Copied dylibs share Frameworks/, so they reference each other (and their own
-  # id) relative to their own location with @loader_path.
-  defp rewrite_each(copied) do
-    Enum.reduce_while(copied, :ok, fn {_src, dest}, _acc ->
-      base = Path.basename(dest)
-
-      with :ok <- run("install_name_tool", id_args(dest, "@loader_path/" <> base)),
-           :ok <- rewrite(dest, copied, "@loader_path") do
+    Enum.reduce_while(binaries, :ok, fn binary, :ok ->
+      with :ok <- maybe_set_id(binary, set_id?),
+           :ok <- relink(binary, prefix_for.(binary)) do
         {:cont, :ok}
       else
         error -> {:halt, error}
       end
     end)
+  end
+
+  defp maybe_set_id(_binary, false), do: :ok
+
+  defp maybe_set_id(binary, true) do
+    run("install_name_tool", id_args(binary, "@loader_path/" <> Path.basename(binary)))
+  end
+
+  defp relink(binary, prefix) do
+    with {:ok, deps} <- otool(binary),
+         :ok <- apply_changes(binary, change_args(binary, relink_changes(deps, prefix))) do
+      strip_external_rpaths(binary)
+    end
+  end
+
+  defp apply_changes(_binary, []), do: :ok
+  defp apply_changes(_binary, args), do: run("install_name_tool", args)
+
+  # Drop any LC_RPATH pointing at Homebrew/local. Such an rpath lets an
+  # @rpath/ dep resolve outside the bundle, so leaving it would break standalone.
+  defp strip_external_rpaths(binary) do
+    case rpaths(binary) do
+      {:ok, paths} ->
+        paths
+        |> Enum.filter(&external?/1)
+        |> Enum.reduce_while(:ok, fn rpath, :ok ->
+          case run("install_name_tool", ["-delete_rpath", rpath, binary]) do
+            :ok -> {:cont, :ok}
+            error -> {:halt, error}
+          end
+        end)
+
+      error ->
+        error
+    end
+  end
+
+  defp rpaths(path) do
+    case System.cmd("otool", ["-l", path], stderr_to_stdout: true) do
+      {out, 0} -> {:ok, parse_rpaths(out)}
+      {out, status} -> {:error, {:otool_failed, status, out}}
+    end
   end
 
   defp otool(path) do

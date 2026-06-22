@@ -145,6 +145,58 @@ defmodule BDS.MacBundleTest do
     end
   end
 
+  describe "Dylibs.relink_changes/2" do
+    test "rewrites every external dep to <prefix>/<basename>, independent of source spelling" do
+      deps = [
+        # opt/symlink spelling (as a NIF references it)
+        "/opt/homebrew/opt/wxwidgets@3.2/lib/libwx_osx_cocoau_core-3.2.dylib",
+        # Cellar/versioned spelling (as inter-lib deps reference the same file)
+        "/opt/homebrew/Cellar/wxwidgets@3.2/3.2.10/lib/libwx_baseu-3.2.0.4.3.dylib",
+        "/usr/local/lib/libpcre2-32.0.dylib",
+        # left untouched: macOS-provided and already-relocatable
+        "/usr/lib/libSystem.B.dylib",
+        "@rpath/libalready.dylib"
+      ]
+
+      assert Dylibs.relink_changes(deps, "@loader_path") == [
+               {"/opt/homebrew/opt/wxwidgets@3.2/lib/libwx_osx_cocoau_core-3.2.dylib",
+                "@loader_path/libwx_osx_cocoau_core-3.2.dylib"},
+               {"/opt/homebrew/Cellar/wxwidgets@3.2/3.2.10/lib/libwx_baseu-3.2.0.4.3.dylib",
+                "@loader_path/libwx_baseu-3.2.0.4.3.dylib"},
+               {"/usr/local/lib/libpcre2-32.0.dylib", "@loader_path/libpcre2-32.0.dylib"}
+             ]
+    end
+
+    test "honors a NIF-relative loader prefix" do
+      assert Dylibs.relink_changes(["/opt/homebrew/lib/libfoo.dylib"], "@loader_path/../../Frameworks") ==
+               [{"/opt/homebrew/lib/libfoo.dylib", "@loader_path/../../Frameworks/libfoo.dylib"}]
+    end
+  end
+
+  describe "Dylibs.parse_rpaths/1" do
+    test "extracts LC_RPATH paths from otool -l output, ignoring other load commands" do
+      output = """
+      Load command 12
+                cmd LC_LOAD_DYLIB
+            cmdsize 56
+               name /usr/lib/libSystem.B.dylib (offset 24)
+      Load command 13
+                cmd LC_RPATH
+            cmdsize 48
+               path /opt/homebrew/Cellar/jpeg-turbo/3.1.4.1/lib (offset 12)
+      Load command 14
+                cmd LC_RPATH
+            cmdsize 32
+               path @loader_path/../lib (offset 12)
+      """
+
+      assert Dylibs.parse_rpaths(output) == [
+               "/opt/homebrew/Cellar/jpeg-turbo/3.1.4.1/lib",
+               "@loader_path/../lib"
+             ]
+    end
+  end
+
   describe "Dylibs install_name_tool arg builders" do
     test "id_args/2" do
       assert Dylibs.id_args("/Frameworks/libfoo.dylib", "@rpath/libfoo.dylib") ==
@@ -171,6 +223,53 @@ defmodule BDS.MacBundleTest do
 
     test "change_args/2 with no changes is an empty list (no-op, do not invoke the tool)" do
       assert Dylibs.change_args("/app/MacOS/bds2", []) == []
+    end
+  end
+
+  describe "Dylibs.bundle/3 + MacBundle.verify_standalone/1 (real otool/install_name_tool)" do
+    @describetag :macos_tools
+
+    test "relocates the wx NIF's dylibs and leaves zero Homebrew/local references" do
+      src_nif = Path.join(to_string(:code.priv_dir(:wx)), "wxe_driver.so")
+
+      # Only meaningful when the host's wx NIF links Homebrew dylibs (the normal
+      # macOS+Homebrew dev setup). Skip otherwise so a non-Homebrew host passes.
+      {out, 0} = System.cmd("otool", ["-L", src_nif])
+      external = out |> Dylibs.parse_otool() |> Enum.filter(&Dylibs.external?/1)
+
+      if external == [] do
+        :ok
+      else
+        tmp = Path.join(System.tmp_dir!(), "bds-relink-#{System.unique_integer([:positive])}")
+        on_exit(fn -> File.rm_rf!(tmp) end)
+
+        nif_dir = Path.join(tmp, "rel/lib/wx-2.4/priv")
+        File.mkdir_p!(nif_dir)
+        File.cp!(src_nif, Path.join(nif_dir, "wxe_driver.so"))
+
+        frameworks = Path.join(tmp, "Frameworks")
+        nifs = MacBundle.macho_files(Path.join(tmp, "rel"))
+
+        prefix_for = fn nif ->
+          "@loader_path/" <> MacBundle.relative_up(Path.dirname(nif), frameworks)
+        end
+
+        assert {:ok, reals} = Dylibs.bundle(nifs, frameworks, prefix_for)
+        assert reals != []
+
+        # Hard requirement: nothing in the tree still points at Homebrew/local.
+        assert MacBundle.verify_standalone(tmp) == :ok
+
+        # Same physical lib referenced under two names (e.g. core-3.2.dylib and
+        # core-3.2.0.4.3.dylib) collapses to one real file + a symlink, so dyld
+        # loads a single image — no duplicate Objective-C classes.
+        symlinks =
+          frameworks
+          |> File.ls!()
+          |> Enum.filter(&(File.lstat!(Path.join(frameworks, &1)).type == :symlink))
+
+        assert symlinks != [], "expected symlink dedup for versioned dylib names"
+      end
     end
   end
 

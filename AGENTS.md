@@ -102,6 +102,19 @@ This document provides context and best practices for GitHub Copilot when workin
 
 ---
 
+## ⚠️ MANDATORY: macOS Bundle Must Be Fully Standalone
+
+**The built `BDS2.app` MUST run on a Mac without Homebrew.**
+
+- No Mach-O inside the `.app` may reference a Homebrew/local path (`/opt/homebrew`, `/usr/local`)
+- Every external dylib reachable from the release's NIFs must be copied into `Contents/Frameworks` and rewritten to `@loader_path`-relative install names (`BDS.MacBundle.Dylibs`)
+- The same physical dylib referenced under multiple names must be deduped (one real file + symlinks) so dyld loads a single image — duplicate images cause duplicate Objective-C class / wx event-table registrations
+- `BDS.MacBundle.verify_standalone/1` runs after relocation and fails the build if any external reference remains — do not weaken or bypass this gate
+
+> **The bundle must be self-contained. No outside references. No exceptions.**
+
+---
+
 ## ⚠️ MANDATORY: Proper I18N for UI and Rendering Text
 
 **All user-facing text MUST follow proper i18n patterns.**

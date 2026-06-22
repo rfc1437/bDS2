@@ -96,14 +96,6 @@ defmodule BDS.MacBundle do
     end
   end
 
-  @doc "Locate wxWidgets NIFs (`wxe_driver.so`) inside a release tree."
-  @spec wx_nif_paths(String.t()) :: [String.t()]
-  def wx_nif_paths(release_dir) do
-    release_dir
-    |> Path.join("lib/wx-*/priv/wxe_driver.so")
-    |> Path.wildcard()
-  end
-
   defp write_launcher(path) do
     with :ok <- File.write(path, launcher()) do
       File.chmod(path, 0o755)
@@ -121,19 +113,45 @@ defmodule BDS.MacBundle do
   defp relocate_dylibs(release_dir, opts) do
     app = Path.join(opts[:output_dir], @app_dir_name)
     frameworks = Path.join(app, "Contents/Frameworks")
-    nifs = wx_nif_paths(Path.join(app, "Contents/Resources/rel"))
+    rel = Path.join(app, "Contents/Resources/rel")
 
-    if nifs == [] do
-      {:error, {:wx_nif_not_found, release_dir}}
-    else
-      Enum.reduce_while(nifs, :ok, fn nif, :ok ->
-        prefix = "@loader_path/" <> relative_up(Path.dirname(nif), frameworks)
+    # Every loose Mach-O in the release (NIFs, beam.smp, …) may link a Homebrew
+    # dylib, so relocate the closure reachable from all of them — not just wx.
+    case macho_files(rel) do
+      [] ->
+        {:error, {:no_release_binaries, release_dir}}
 
-        case Dylibs.bundle(nif, frameworks, prefix) do
-          {:ok, _copied} -> {:cont, :ok}
-          error -> {:halt, error}
+      nifs ->
+        prefix_for = fn nif -> "@loader_path/" <> relative_up(Path.dirname(nif), frameworks) end
+
+        with {:ok, _copied} <- Dylibs.bundle(nifs, frameworks, prefix_for) do
+          verify_standalone(app)
         end
+    end
+  end
+
+  @doc """
+  Fail the build unless the bundle is self-contained: no Mach-O under the `.app`
+  may reference a Homebrew/local (`/opt/homebrew`, `/usr/local`) path. This is a
+  hard requirement — the app must run on a Mac without Homebrew installed.
+  """
+  @spec verify_standalone(String.t()) :: :ok | {:error, {:external_refs, [{String.t(), String.t()}]}}
+  def verify_standalone(app) do
+    offenders =
+      app
+      |> macho_files()
+      |> Enum.flat_map(fn file ->
+        external_refs(file, ["-L"], &Dylibs.parse_otool/1) ++
+          external_refs(file, ["-l"], &Dylibs.parse_rpaths/1)
       end)
+
+    if offenders == [], do: :ok, else: {:error, {:external_refs, offenders}}
+  end
+
+  defp external_refs(file, otool_args, parse) do
+    case System.cmd("otool", otool_args ++ [file], stderr_to_stdout: true) do
+      {out, 0} -> out |> parse.() |> Enum.filter(&Dylibs.external?/1) |> Enum.map(&{file, &1})
+      _ -> []
     end
   end
 
