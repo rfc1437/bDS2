@@ -168,7 +168,10 @@ defmodule BDS.MacBundleTest do
     end
 
     test "honors a NIF-relative loader prefix" do
-      assert Dylibs.relink_changes(["/opt/homebrew/lib/libfoo.dylib"], "@loader_path/../../Frameworks") ==
+      assert Dylibs.relink_changes(
+               ["/opt/homebrew/lib/libfoo.dylib"],
+               "@loader_path/../../Frameworks"
+             ) ==
                [{"/opt/homebrew/lib/libfoo.dylib", "@loader_path/../../Frameworks/libfoo.dylib"}]
     end
   end
@@ -299,6 +302,10 @@ defmodule BDS.MacBundleTest do
   end
 
   describe "MacBundle.assemble/1" do
+    # assemble/1 compiles the native arm64 launcher with `cc -arch arm64`, so it
+    # needs the macOS toolchain (the only platform that builds the .app anyway).
+    @describetag :macos_tools
+
     setup do
       tmp = Path.join(System.tmp_dir!(), "bds-macbundle-#{System.unique_integer([:positive])}")
       release = Path.join(tmp, "rel")
@@ -344,14 +351,15 @@ defmodule BDS.MacBundleTest do
       assert File.read!(Path.join(app, "Contents/PkgInfo")) == "APPL????"
     end
 
-    test "installs an executable launcher that execs the release", %{app: app} do
+    test "installs an executable, arm64-only Mach-O launcher", %{app: app} do
       launcher = Path.join(app, "Contents/MacOS/bds2")
       assert File.exists?(launcher)
       %File.Stat{mode: mode} = File.stat!(launcher)
       assert (mode &&& 0o111) != 0, "launcher must be executable"
-      script = File.read!(launcher)
-      assert script =~ "Resources/rel"
-      assert script =~ "bin/bds"
+      # Must be a native arm64 Mach-O, not a script — a script has no Mach-O
+      # slices so LaunchServices advertises x86_64 and offers Rosetta.
+      {archs, 0} = System.cmd("lipo", ["-archs", launcher])
+      assert String.trim(archs) == "arm64"
     end
 
     test "copies the release tree and the icon into Resources", %{app: app} do

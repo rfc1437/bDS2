@@ -26,6 +26,11 @@
     <string><%= min_system %></string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <!-- Main executable is a shell script (no Mach-O slices), so LaunchServices
+         otherwise advertises x86_64 and offers Rosetta. All embedded binaries are
+         arm64; force native execution so the OS never translates the app. -->
+    <key>LSRequiresNativeExecution</key>
+    <true/>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.developer-tools</string>
     <key>CFBundleURLTypes</key>

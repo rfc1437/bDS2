@@ -12,7 +12,7 @@ defmodule BDS.MacBundle do
 
       BDS2.app/Contents/
         Info.plist  PkgInfo
-        MacOS/bds2                 # launcher script (execs the release)
+        MacOS/bds2                 # native arm64 launcher (execs the release)
         Resources/AppIcon.icns
         Resources/rel/             # the mix release (ERTS bundled)
         Frameworks/                # relocated wx + transitive dylibs
@@ -43,18 +43,6 @@ defmodule BDS.MacBundle do
     ]
 
     EEx.eval_file(template_path("Info.plist.eex"), assigns)
-  end
-
-  @doc "Render the `Contents/MacOS` launcher shell script."
-  @spec launcher(keyword()) :: String.t()
-  def launcher(opts \\ []) do
-    assigns = [
-      identifier: Keyword.get(opts, :identifier, @identifier),
-      name: Keyword.get(opts, :name, @display_name),
-      release_name: Keyword.get(opts, :release_name, @release_name)
-    ]
-
-    EEx.eval_file(template_path("launcher.sh.eex"), assigns)
   end
 
   @doc """
@@ -96,9 +84,19 @@ defmodule BDS.MacBundle do
     end
   end
 
+  # The main executable must be a real arm64 Mach-O, not a shell script — a
+  # script has no Mach-O slices, so LaunchServices advertises x86_64 and offers
+  # Rosetta. Compile the native stub (launcher.c) in its place.
   defp write_launcher(path) do
-    with :ok <- File.write(path, launcher()) do
-      File.chmod(path, 0o755)
+    src = template_path("launcher.c")
+
+    case System.cmd(
+           "cc",
+           ["-arch", "arm64", "-O2", ~s(-DBDS_RELEASE_NAME="#{@release_name}"), "-o", path, src],
+           stderr_to_stdout: true
+         ) do
+      {_, 0} -> File.chmod(path, 0o755)
+      {out, code} -> {:error, "launcher compile failed (#{code}): #{out}"}
     end
   end
 
@@ -135,7 +133,8 @@ defmodule BDS.MacBundle do
   may reference a Homebrew/local (`/opt/homebrew`, `/usr/local`) path. This is a
   hard requirement — the app must run on a Mac without Homebrew installed.
   """
-  @spec verify_standalone(String.t()) :: :ok | {:error, {:external_refs, [{String.t(), String.t()}]}}
+  @spec verify_standalone(String.t()) ::
+          :ok | {:error, {:external_refs, [{String.t(), String.t()}]}}
   def verify_standalone(app) do
     offenders =
       app
