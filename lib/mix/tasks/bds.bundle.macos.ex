@@ -52,8 +52,9 @@ defmodule Mix.Tasks.Bds.Bundle.Macos do
     Mix.Task.run("app.config")
 
     version = opts[:version] || Mix.Project.config()[:version]
-    env_name = Atom.to_string(Mix.env())
-    release_dir = opts[:app_release] || Path.expand("_build/#{env_name}/rel/bds", File.cwd!())
+    # ponytail: bundle always ships the prod release; ignore Mix.env() so a stale
+    # dev release can't be bundled by forgetting MIX_ENV=prod. Override with --app-release.
+    release_dir = opts[:app_release] || Path.expand("_build/prod/rel/bds", File.cwd!())
     output_dir = opts[:output] || Path.expand("dist/macos", File.cwd!())
 
     unless File.dir?(release_dir) do
