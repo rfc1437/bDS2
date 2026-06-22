@@ -96,13 +96,12 @@ defmodule BDS.MacBundle do
     end
   end
 
-  @doc "Locate the wxWidgets NIF (`wxe_driver.so`) inside a release tree."
-  @spec wx_nif_path(String.t()) :: String.t() | nil
-  def wx_nif_path(release_dir) do
+  @doc "Locate wxWidgets NIFs (`wxe_driver.so`) inside a release tree."
+  @spec wx_nif_paths(String.t()) :: [String.t()]
+  def wx_nif_paths(release_dir) do
     release_dir
     |> Path.join("lib/wx-*/priv/wxe_driver.so")
     |> Path.wildcard()
-    |> List.first()
   end
 
   defp write_launcher(path) do
@@ -122,18 +121,19 @@ defmodule BDS.MacBundle do
   defp relocate_dylibs(release_dir, opts) do
     app = Path.join(opts[:output_dir], @app_dir_name)
     frameworks = Path.join(app, "Contents/Frameworks")
+    nifs = wx_nif_paths(Path.join(app, "Contents/Resources/rel"))
 
-    case wx_nif_path(Path.join(app, "Contents/Resources/rel")) do
-      nil ->
-        {:error, {:wx_nif_not_found, release_dir}}
-
-      nif ->
+    if nifs == [] do
+      {:error, {:wx_nif_not_found, release_dir}}
+    else
+      Enum.reduce_while(nifs, :ok, fn nif, :ok ->
         prefix = "@loader_path/" <> relative_up(Path.dirname(nif), frameworks)
 
         case Dylibs.bundle(nif, frameworks, prefix) do
-          {:ok, _copied} -> :ok
-          error -> error
+          {:ok, _copied} -> {:cont, :ok}
+          error -> {:halt, error}
         end
+      end)
     end
   end
 
