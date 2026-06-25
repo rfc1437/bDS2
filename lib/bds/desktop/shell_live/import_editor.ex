@@ -6,6 +6,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
   alias BDS.{AI, ImportAnalysis, ImportDefinitions, ImportExecution}
   alias BDS.Desktop.{FilePicker, FolderPicker, ShellData}
   alias BDS.Desktop.ShellLive.Notify
+  require Logger
 
   alias BDS.Desktop.ShellLive.ImportEditor.{
     AnalysisState,
@@ -1417,7 +1418,9 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
       try do
         Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), pid)
       rescue
-        _error -> :ok
+        error ->
+          Logger.debug("swallowed import_editor allow_repo_sandbox error: #{inspect(error)}")
+          :ok
       end
     else
       :ok

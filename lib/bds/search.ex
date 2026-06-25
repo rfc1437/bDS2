@@ -116,24 +116,9 @@ defmodule BDS.Search do
   end
 
   defp search_posts_blank(project_id, filters) do
-    base = from(post in Post, where: post.project_id == ^project_id)
-    filtered = apply_post_filters(base, filters)
-    total = count_query(filtered)
-
-    posts =
-      filtered
-      |> order_by([p], desc: p.created_at)
-      |> limit(^filters.limit)
-      |> offset(^filters.offset)
-      |> Repo.all()
-
-    {:ok,
-     %{
-       posts: posts,
-       total: total,
-       offset: filters.offset,
-       limit: filters.limit
-     }}
+    Post
+    |> blank_search_query(project_id, filters, &apply_post_filters/2)
+    |> paginate_search(filters, :posts, &order_by(&1, [p], desc: p.created_at))
   end
 
   defp search_posts_fts(project_id, query_text, filters) do
@@ -146,29 +131,9 @@ defmodule BDS.Search do
         select: %{post_id: f.post_id, fts_rowid: fragment("rowid")}
       )
 
-    base =
-      Post
-      |> with_cte("fts_results", as: ^fts_subquery)
-      |> join(:inner, [p], fts in "fts_results", on: fts.post_id == p.id)
-      |> where([p], p.project_id == ^project_id)
-
-    filtered = apply_post_filters(base, filters)
-    total = count_query(filtered)
-
-    posts =
-      filtered
-      |> order_by([_, fts], fts.fts_rowid)
-      |> limit(^filters.limit)
-      |> offset(^filters.offset)
-      |> Repo.all()
-
-    {:ok,
-     %{
-       posts: posts,
-       total: total,
-       offset: filters.offset,
-       limit: filters.limit
-     }}
+    Post
+    |> fts_search_query(project_id, filters, fts_subquery, :post_id, &apply_post_filters/2)
+    |> paginate_search(filters, :posts, &order_by(&1, [_, fts], fts.fts_rowid))
   end
 
   @spec search_media(String.t(), String.t() | nil, search_filters()) ::
@@ -190,24 +155,9 @@ defmodule BDS.Search do
   end
 
   defp search_media_blank(project_id, filters) do
-    base = from(media in Media, where: media.project_id == ^project_id)
-    filtered = apply_media_filters(base, filters)
-    total = count_query(filtered)
-
-    media_items =
-      filtered
-      |> order_by([m], desc: m.created_at)
-      |> limit(^filters.limit)
-      |> offset(^filters.offset)
-      |> Repo.all()
-
-    {:ok,
-     %{
-       media: media_items,
-       total: total,
-       offset: filters.offset,
-       limit: filters.limit
-     }}
+    Media
+    |> blank_search_query(project_id, filters, &apply_media_filters/2)
+    |> paginate_search(filters, :media, &order_by(&1, [m], desc: m.created_at))
   end
 
   defp search_media_fts(project_id, query_text, filters) do
@@ -220,25 +170,38 @@ defmodule BDS.Search do
         select: %{media_id: f.media_id, fts_rowid: fragment("rowid")}
       )
 
-    base =
-      Media
-      |> with_cte("fts_results", as: ^fts_subquery)
-      |> join(:inner, [m], fts in "fts_results", on: fts.media_id == m.id)
-      |> where([m], m.project_id == ^project_id)
+    Media
+    |> fts_search_query(project_id, filters, fts_subquery, :media_id, &apply_media_filters/2)
+    |> paginate_search(filters, :media, &order_by(&1, [_, fts], fts.fts_rowid))
+  end
 
-    filtered = apply_media_filters(base, filters)
-    total = count_query(filtered)
+  defp blank_search_query(schema, project_id, filters, apply_filters) do
+    schema
+    |> where([entity], field(entity, :project_id) == ^project_id)
+    |> apply_filters.(filters)
+  end
 
-    media_items =
-      filtered
-      |> order_by([_, fts], fts.fts_rowid)
+  defp fts_search_query(schema, project_id, filters, fts_subquery, join_key, apply_filters) do
+    schema
+    |> with_cte("fts_results", as: ^fts_subquery)
+    |> join(:inner, [entity], fts in "fts_results", on: field(fts, ^join_key) == entity.id)
+    |> where([entity], field(entity, :project_id) == ^project_id)
+    |> apply_filters.(filters)
+  end
+
+  defp paginate_search(query, filters, result_key, order_query) do
+    total = count_query(query)
+
+    items =
+      query
+      |> order_query.()
       |> limit(^filters.limit)
       |> offset(^filters.offset)
       |> Repo.all()
 
     {:ok,
      %{
-       media: media_items,
+       result_key => items,
        total: total,
        offset: filters.offset,
        limit: filters.limit

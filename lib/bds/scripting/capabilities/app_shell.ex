@@ -5,6 +5,7 @@ defmodule BDS.Scripting.Capabilities.AppShell do
 
   alias BDS.Desktop.FolderPicker
   alias BDS.Desktop.MenuBar
+  require Logger
 
   @compiled_env Application.compile_env(:bds, :current_env, Mix.env())
 
@@ -139,7 +140,9 @@ defmodule BDS.Scripting.Capabilities.AppShell do
 
     nil
   rescue
-    _error -> nil
+    error ->
+      Logger.debug("swallowed app_shell trigger_menu_action error: #{inspect(error)}")
+      nil
   end
 
   def test_mode? do

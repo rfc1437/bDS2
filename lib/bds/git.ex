@@ -2,6 +2,7 @@ defmodule BDS.Git do
   @moduledoc false
 
   alias BDS.Projects
+  require Logger
 
   @default_local_timeout_ms 15_000
   @default_network_timeout_ms 120_000
@@ -562,7 +563,9 @@ defmodule BDS.Git do
   defp safe_port_close(port) do
     Port.close(port)
   catch
-    :error, _reason -> :ok
+    :error, reason ->
+      Logger.debug("swallowed git safe_port_close error: #{inspect(reason)}")
+      :ok
   end
 
   defp port_os_pid(port) do

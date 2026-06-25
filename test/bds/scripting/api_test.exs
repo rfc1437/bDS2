@@ -310,14 +310,26 @@ defmodule BDS.Scripting.ApiTest do
 
     assert {:ok, _published_template} = BDS.Templates.publish_template(template.id)
 
-    assert {:ok, running_task} =
-             BDS.Tasks.register_external_task("preview build", %{
-               group_id: "generation",
-               group_name: "Generation"
-             })
+    runner = self()
+
+    assert {:ok, _running_task} =
+             BDS.Tasks.submit_task(
+               "preview build",
+               fn report ->
+                 report.(0.5, "halfway")
+                 send(runner, {:task_started, self()})
+
+                 receive do
+                   :release_task -> {:ok, :done}
+                 end
+               end,
+               %{group_id: "generation", group_name: "Generation"}
+             )
+
+    assert_receive {:task_started, task_pid}, 1_000
 
     on_exit(fn ->
-      _ = BDS.Tasks.complete_task(running_task.id)
+      send(task_pid, :release_task)
     end)
 
     source =

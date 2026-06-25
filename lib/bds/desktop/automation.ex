@@ -2,6 +2,7 @@ defmodule BDS.Desktop.Automation do
   @moduledoc false
 
   use GenServer
+  require Logger
 
   @ready_timeout 60_000
   @request_timeout 30_000
@@ -13,7 +14,9 @@ defmodule BDS.Desktop.Automation do
   def stop_session(session) do
     GenServer.stop(session, :normal, @request_timeout)
   catch
-    :exit, _reason -> :ok
+    :exit, reason ->
+      Logger.debug("swallowed desktop automation stop_session exit: #{inspect(reason)}")
+      :ok
   end
 
   def snapshot(session) do
@@ -220,7 +223,12 @@ defmodule BDS.Desktop.Automation do
   defp safe_driver_request(state, payload) do
     driver_request(state, payload)
   rescue
-    _error -> :ok
+    error ->
+      Logger.debug(
+        "swallowed desktop automation safe_driver_request error: #{inspect(error)} payload=#{inspect(payload)}"
+      )
+
+      :ok
   end
 
   defp shutdown_driver(state) do
@@ -368,7 +376,9 @@ defmodule BDS.Desktop.Automation do
   defp safe_close_port(port) do
     Port.close(port)
   catch
-    :error, _reason -> :ok
+    :error, reason ->
+      Logger.debug("swallowed desktop automation safe_close_port error: #{inspect(reason)}")
+      :ok
   end
 
   defp normalize_simple_reply("ok"), do: :ok

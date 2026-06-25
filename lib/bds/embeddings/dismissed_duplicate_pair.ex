@@ -7,6 +7,15 @@ defmodule BDS.Embeddings.DismissedDuplicatePair do
   @primary_key {:id, :string, autogenerate: false}
   @foreign_key_type :string
 
+  @type t :: %__MODULE__{
+          id: String.t() | nil,
+          project_id: String.t() | nil,
+          project: term(),
+          post_id_a: String.t() | nil,
+          post_id_b: String.t() | nil,
+          dismissed_at: integer() | nil
+        }
+
   schema "dismissed_duplicate_pairs" do
     belongs_to :project, BDS.Projects.Project, type: :string
     field :post_id_a, :string

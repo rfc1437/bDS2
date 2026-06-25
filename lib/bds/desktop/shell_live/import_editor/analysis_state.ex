@@ -3,6 +3,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
 
   alias BDS.{ImportAnalysis, ImportDefinitions, Metadata}
   alias BDS.Desktop.{FilePicker, FolderPicker}
+  require Logger
   use Gettext, backend: BDS.Gettext
 
   @spec change_definition(term(), term(), term()) :: term()
@@ -280,7 +281,12 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
       try do
         Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), pid)
       rescue
-        _error -> :ok
+        error ->
+          Logger.debug(
+            "swallowed import_editor analysis_state allow_repo_sandbox error: #{inspect(error)}"
+          )
+
+          :ok
       end
     else
       :ok

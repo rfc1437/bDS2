@@ -1,7 +1,15 @@
 defmodule BDS.AI do
   @moduledoc """
-  Public interface for AI features — endpoint configuration, secret management,
-  model catalog access, and dispatching chat and one-shot inference requests.
+  Stable public interface for AI features.
+
+  This facade owns the app-level AI state that other modules are expected to
+  depend on directly: endpoint configuration, secret management, airplane-mode
+  gating, and per-feature model preferences, alongside model catalog access and
+  dispatching chat and one-shot inference requests.
+
+  `BDS.AI.Catalog`, `BDS.AI.OneShot`, and `BDS.AI.Chat` are internal
+  implementation modules behind this boundary. Callers should treat `BDS.AI` as
+  the durable surface for AI behavior and configuration.
   """
 
   alias BDS.AI.Catalog

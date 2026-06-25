@@ -996,7 +996,9 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
       try do
         Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, self(), pid)
       rescue
-        _error -> :ok
+        error ->
+          Logger.debug("swallowed chat_editor allow_repo_sandbox error: #{inspect(error)}")
+          :ok
       end
     else
       :ok

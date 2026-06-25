@@ -23,6 +23,7 @@ defmodule BDS.Embeddings.Index do
 
   alias BDS.Projects
   alias BDS.ProgressReporter
+  require Logger
 
   @neighbor_limit 21
   @debounce_ms 5_000
@@ -345,7 +346,12 @@ defmodule BDS.Embeddings.Index do
     write_meta(index_path, dim, labels)
     :ok
   rescue
-    _exception -> :ok
+    exception ->
+      Logger.debug(
+        "swallowed embeddings index persist error for #{project_id}: #{inspect(exception)}"
+      )
+
+      :ok
   end
 
   defp write_meta(index_path, dim, labels) do
@@ -385,7 +391,12 @@ defmodule BDS.Embeddings.Index do
       _other -> :error
     end
   rescue
-    _exception -> :error
+    exception ->
+      Logger.debug(
+        "swallowed embeddings index load_from_disk error for #{project_id}: #{inspect(exception)}"
+      )
+
+      :error
   end
 
   defp read_meta(index_path) do

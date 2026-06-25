@@ -426,35 +426,12 @@ defmodule BDS.UI.Sidebar do
 
   defp maybe_where_all_tags(query, []), do: query
 
-  defp maybe_where_all_tags(query, tags) do
-    Enum.reduce(tags, query, fn tag, q ->
-      where(
-        q,
-        [p],
-        fragment(
-          "EXISTS (SELECT 1 FROM json_each(?) WHERE lower(value) = lower(?))",
-          p.tags,
-          ^tag
-        )
-      )
-    end)
-  end
+  defp maybe_where_all_tags(query, tags), do: where_all_in_json_array(query, tags, :tags)
 
   defp maybe_where_all_categories(query, []), do: query
 
-  defp maybe_where_all_categories(query, categories) do
-    Enum.reduce(categories, query, fn category, q ->
-      where(
-        q,
-        [p],
-        fragment(
-          "EXISTS (SELECT 1 FROM json_each(?) WHERE lower(value) = lower(?) AND lower(value) != 'page')",
-          p.categories,
-          ^category
-        )
-      )
-    end)
-  end
+  defp maybe_where_all_categories(query, categories),
+    do: where_all_in_json_array(query, categories, :categories, true)
 
   defp base_year_month_counts(project_id, pages?) do
     is_page = if pages?, do: 1, else: 0
@@ -692,17 +669,32 @@ defmodule BDS.UI.Sidebar do
 
   defp maybe_where_all_media_tags(query, []), do: query
 
-  defp maybe_where_all_media_tags(query, tags) do
-    Enum.reduce(tags, query, fn tag, q ->
-      where(
-        q,
-        [m],
-        fragment(
-          "EXISTS (SELECT 1 FROM json_each(?) WHERE lower(value) = lower(?))",
-          m.tags,
-          ^tag
+  defp maybe_where_all_media_tags(query, tags),
+    do: where_all_in_json_array(query, tags, :tags)
+
+  defp where_all_in_json_array(query, items, field_atom, exclude_page? \\ false) do
+    Enum.reduce(items, query, fn item, q ->
+      if exclude_page? do
+        where(
+          q,
+          [x],
+          fragment(
+            "EXISTS (SELECT 1 FROM json_each(?) WHERE lower(value) = lower(?) AND lower(value) != 'page')",
+            field(x, ^field_atom),
+            ^item
+          )
         )
-      )
+      else
+        where(
+          q,
+          [x],
+          fragment(
+            "EXISTS (SELECT 1 FROM json_each(?) WHERE lower(value) = lower(?))",
+            field(x, ^field_atom),
+            ^item
+          )
+        )
+      end
     end)
   end
 

@@ -5,6 +5,7 @@ defmodule BDS.Desktop.Shutdown do
   alias Desktop.Wx
   alias Desktop.Window
 
+  require Logger
   require Record
 
   Record.defrecordp(:wx, Record.extract(:wx, from_lib: "wx/include/wx.hrl"))
@@ -25,9 +26,13 @@ defmodule BDS.Desktop.Shutdown do
 
     :ok
   rescue
-    _error -> :ok
+    error ->
+      Logger.debug("swallowed shutdown install_handlers error: #{inspect(error)}")
+      :ok
   catch
-    :exit, _reason -> :ok
+    :exit, reason ->
+      Logger.debug("swallowed shutdown install_handlers exit: #{inspect(reason)}")
+      :ok
   end
 
   @spec request_quit() :: :ok
@@ -102,9 +107,13 @@ defmodule BDS.Desktop.Shutdown do
     fun.()
     :ok
   rescue
-    _error -> :ok
+    error ->
+      Logger.debug("swallowed shutdown persist_step error: #{inspect(error)}")
+      :ok
   catch
-    :exit, _reason -> :ok
+    :exit, reason ->
+      Logger.debug("swallowed shutdown persist_step exit: #{inspect(reason)}")
+      :ok
   end
 
   # heart, when present, would relaunch the app after we kill the BEAM, so it
@@ -120,9 +129,13 @@ defmodule BDS.Desktop.Shutdown do
       _ -> :ok
     end
   rescue
-    _error -> :ok
+    error ->
+      Logger.debug("swallowed shutdown kill_heart error: #{inspect(error)}")
+      :ok
   catch
-    :exit, _reason -> :ok
+    :exit, reason ->
+      Logger.debug("swallowed shutdown kill_heart exit: #{inspect(reason)}")
+      :ok
   end
 
   defp kill_beam do
@@ -133,9 +146,13 @@ defmodule BDS.Desktop.Shutdown do
     os_kill_fun().(os_pid)
     :ok
   rescue
-    _error -> :ok
+    error ->
+      Logger.debug("swallowed shutdown os_kill error: #{inspect(error)}")
+      :ok
   catch
-    :exit, _reason -> :ok
+    :exit, reason ->
+      Logger.debug("swallowed shutdown os_kill exit: #{inspect(reason)}")
+      :ok
   end
 
   defp os_kill_fun do
@@ -158,9 +175,13 @@ defmodule BDS.Desktop.Shutdown do
 
     :ok
   rescue
-    _error -> :ok
+    error ->
+      Logger.debug("swallowed shutdown maybe_hide_window error: #{inspect(error)}")
+      :ok
   catch
-    :exit, _reason -> :ok
+    :exit, reason ->
+      Logger.debug("swallowed shutdown maybe_hide_window exit: #{inspect(reason)}")
+      :ok
   end
 
   @doc false

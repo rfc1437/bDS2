@@ -3,65 +3,67 @@ defmodule BDS.Tasks do
 
   use GenServer
 
+  @type task_id :: String.t()
+  @type task_attrs :: map()
+  @type task_info :: map()
+  @type status_snapshot :: map()
+  @type progress_reporter :: (number(), String.t() | nil -> any())
+  @type task_work :: (progress_reporter() -> term())
+
   @default_max_concurrent 3
   @default_progress_throttle_ms 250
   @default_recent_finished_limit 10
   @default_finished_task_ttl_ms :timer.hours(1)
   @topic "tasks"
 
+  @spec start_link(term()) :: GenServer.on_start()
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
+  @spec topic() :: String.t()
   def topic, do: @topic
 
+  @spec submit_task(String.t(), task_work()) :: {:ok, task_info()}
+  @spec submit_task(String.t(), task_work(), task_attrs()) :: {:ok, task_info()}
   def submit_task(name, work, attrs \\ %{})
       when is_binary(name) and is_function(work, 1) and is_map(attrs) do
     GenServer.call(__MODULE__, {:submit_task, name, work, attrs})
   end
 
+  @spec get_task(task_id()) :: task_info() | nil
   def get_task(task_id) when is_binary(task_id) do
     GenServer.call(__MODULE__, {:get_task, task_id})
   end
 
+  @spec status_snapshot() :: status_snapshot()
   def status_snapshot do
     GenServer.call(__MODULE__, :status_snapshot)
   end
 
+  @spec list_tasks() :: [task_info()]
   def list_tasks do
     GenServer.call(__MODULE__, :list_tasks)
   end
 
+  @spec list_running_tasks() :: [task_info()]
   def list_running_tasks do
     GenServer.call(__MODULE__, :list_running_tasks)
   end
 
+  @spec clear_completed() :: :ok
   def clear_completed do
     GenServer.call(__MODULE__, :clear_completed)
   end
 
+  @spec clear_finished() :: :ok
   def clear_finished do
     GenServer.call(__MODULE__, :clear_finished)
   end
 
+  @spec cancel_task(task_id()) :: :ok | {:error, :not_found | :not_running}
   def cancel_task(task_id) when is_binary(task_id) do
     GenServer.call(__MODULE__, {:cancel_task, task_id})
-  end
-
-  def register_external_task(name, attrs \\ %{}) when is_binary(name) and is_map(attrs) do
-    GenServer.call(__MODULE__, {:register_external_task, name, attrs})
-  end
-
-  def report_progress(task_id, value, message) when is_binary(task_id) do
-    GenServer.call(__MODULE__, {:report_progress, task_id, value, message})
-  end
-
-  def complete_task(task_id) when is_binary(task_id) do
-    GenServer.call(__MODULE__, {:complete_task, task_id})
-  end
-
-  def fail_task(task_id, error_message) when is_binary(task_id) do
-    GenServer.call(__MODULE__, {:fail_task, task_id, error_message})
   end
 
   @impl true
@@ -161,48 +163,6 @@ defmodule BDS.Tasks do
       true ->
         {:reply, {:error, :not_running}, state}
     end
-  end
-
-  def handle_call({:register_external_task, name, attrs}, _from, state) do
-    task = new_task(name, :running, attrs) |> Map.put(:started_at, DateTime.utc_now())
-    next_state = put_in(state, [:tasks, task.id], task)
-    {:reply, {:ok, public_task(task)}, next_state}
-  end
-
-  def handle_call({:report_progress, task_id, value, message}, _from, state) do
-    {:reply, :ok, maybe_report_progress(state, task_id, value, message)}
-  end
-
-  def handle_call({:complete_task, task_id}, _from, state) do
-    next_state =
-      state
-      |> update_task(task_id, %{
-        status: :completed,
-        progress: 1.0,
-        finished_at: DateTime.utc_now()
-      })
-      |> start_queued_tasks()
-      |> schedule_finished_task_eviction()
-
-    broadcast_terminal_task(next_state.tasks[task_id])
-
-    {:reply, :ok, next_state}
-  end
-
-  def handle_call({:fail_task, task_id, error_message}, _from, state) do
-    next_state =
-      state
-      |> update_task(task_id, %{
-        status: :failed,
-        message: error_message,
-        finished_at: DateTime.utc_now()
-      })
-      |> start_queued_tasks()
-      |> schedule_finished_task_eviction()
-
-    broadcast_terminal_task(next_state.tasks[task_id])
-
-    {:reply, :ok, next_state}
   end
 
   @impl true

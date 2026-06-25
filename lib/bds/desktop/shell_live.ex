@@ -13,6 +13,7 @@ defmodule BDS.Desktop.ShellLive do
     Bridges,
     ChatEditor,
     GalleryImport,
+    GitHandler,
     ImportEditor,
     MediaEditor,
     MenuEditor,
@@ -22,6 +23,7 @@ defmodule BDS.Desktop.ShellLive do
     SettingsEditor,
     SidebarDelete,
     TagsEditor,
+    TabActions,
     TemplateEditor
   }
 
@@ -34,13 +36,14 @@ defmodule BDS.Desktop.ShellLive do
   alias BDS.Desktop.ShellLive.{
     ChatSurface,
     Layout,
-    PanelRenderer,
     SessionUtil,
     ShellCommandRunner,
     SidebarCreate,
+    SocketState,
     TabHelpers,
     TaskLocalization,
-    TitlebarMenu
+    TitlebarMenu,
+    UrlState
   }
 
   import TaskLocalization,
@@ -64,8 +67,6 @@ defmodule BDS.Desktop.ShellLive do
   @refresh_interval 1_500
 
   def refresh_interval, do: @refresh_interval
-
-  @output_entry_limit 20
   @sidebar_filter_events [
     "toggle_sidebar_filters",
     "toggle_sidebar_archive",
@@ -180,7 +181,7 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:panel_git_entries, [])
      |> assign(:auto_save_timers, %{})
      |> reload_shell(workbench)
-     |> apply_url_params(params)
+      |> UrlState.apply_params(params)
      |> tap(&sync_menu_bar_locale/1)}
   end
 
@@ -208,7 +209,7 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply,
      socket
      |> refresh_sidebar(workbench)
-     |> push_url_state()}
+      |> UrlState.push()}
   end
 
   def handle_event("select_panel_tab", %{"tab" => tab}, socket) do
@@ -241,17 +242,18 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event(event, _params, socket) when event in @git_action_events do
-    {:noreply, run_git_action(socket, event)}
+    {:noreply, GitHandler.run_action(socket, event)}
   end
 
   def handle_event("git_commit", params, socket) do
     message = params |> get_in(["git", "message"]) |> to_string() |> String.trim()
-    {:noreply, commit_git(socket, message)}
+
+    {:noreply, GitHandler.commit(socket, message)}
   end
 
   def handle_event("git_initialize", params, socket) do
-    remote_url = params |> get_in(["git", "remote_url"]) |> normalize_git_remote_url()
-    {:noreply, initialize_git(socket, remote_url)}
+    remote_url = params |> get_in(["git", "remote_url"]) |> GitHandler.normalize_remote_url()
+    {:noreply, GitHandler.initialize(socket, remote_url)}
   end
 
   def handle_event("create_sidebar_item", %{"kind" => kind}, socket) do
@@ -270,7 +272,7 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event("select_tab", %{"type" => type, "id" => id}, socket) do
-    socket = auto_save_current_post(socket)
+    socket = TabActions.auto_save_current_post(socket)
 
     workbench =
       Workbench.open_tab(
@@ -286,11 +288,11 @@ defmodule BDS.Desktop.ShellLive do
      socket
      |> assign(:tab_meta, tab_meta)
      |> refresh_layout(workbench)
-     |> push_url_state()}
+     |> UrlState.push()}
   end
 
   def handle_event("close_tab", %{"type" => type, "id" => id}, socket) do
-    socket = auto_save_current_post(socket)
+    socket = TabActions.auto_save_current_post(socket)
 
     type_atom = BoundedAtoms.editor_route(type, :post)
     workbench = Workbench.close_tab(socket.assigns.workbench, type_atom, id)
@@ -300,7 +302,7 @@ defmodule BDS.Desktop.ShellLive do
      socket
      |> assign(:tab_meta, tab_meta)
      |> refresh_layout(workbench)
-     |> push_url_state()}
+      |> UrlState.push()}
   end
 
   def handle_event(
@@ -722,167 +724,9 @@ defmodule BDS.Desktop.ShellLive do
     index(assigns)
   end
 
-  defp refresh_layout(socket, workbench) do
-    git_badge_count = socket.assigns[:git_badge_count] || 0
-    activity_buttons = Workbench.activity_buttons(workbench, git_badge_count)
+  defp refresh_layout(socket, workbench), do: SocketState.refresh_layout(socket, workbench)
 
-    task_status =
-      socket.assigns[:task_status] || %{running_task_message: nil, running_task_overflow: nil}
-
-    dashboard = socket.assigns[:dashboard] || BDS.UI.Dashboard.empty_snapshot()
-    page_language = socket.assigns[:page_language] || ShellData.ui_language()
-    offline_mode = Map.get(socket.assigns, :offline_mode, true)
-    sidebar_data = socket.assigns[:sidebar_data] || %{}
-    current_tab = current_tab(workbench)
-    prev_tab = socket.assigns[:current_tab]
-
-    prev_panel_tab =
-      case socket.assigns[:workbench] do
-        %Workbench{panel: %{active_tab: tab}} -> tab
-        _ -> nil
-      end
-
-    socket =
-      socket
-      |> assign(:workbench, workbench)
-      |> assign(:activity_buttons, activity_buttons)
-      |> assign(
-        :sidebar_header,
-        active_sidebar_label(activity_buttons, workbench.active_view, sidebar_data)
-      )
-      |> assign(:panel_tabs, ShellData.panel_tabs(workbench))
-      |> assign(:current_tab, current_tab)
-      |> assign(:editor_meta, ShellData.editor_meta(task_status))
-      |> assign(
-        :status,
-        ShellData.status_bar(workbench, task_status, dashboard,
-          ui_language: page_language,
-          offline_mode: offline_mode
-        )
-      )
-
-    if panel_data_stale?(current_tab, prev_tab, workbench.panel.active_tab, prev_panel_tab) do
-      refresh_panel_data(socket)
-    else
-      socket
-    end
-  end
-
-  defp panel_data_stale?(current_tab, prev_tab, panel_tab, prev_panel_tab) do
-    current_tab != prev_tab or panel_tab != prev_panel_tab
-  end
-
-  defp refresh_panel_data(socket) do
-    panel_tab = socket.assigns.workbench.panel.active_tab
-
-    socket
-    |> assign(
-      :panel_post_links,
-      if(panel_tab == :post_links,
-        do: PanelRenderer.fetch_post_link_entries(socket.assigns),
-        else: socket.assigns[:panel_post_links] || %{backlinks: [], outlinks: []}
-      )
-    )
-    |> assign(
-      :panel_git_entries,
-      if(panel_tab == :git_log,
-        do: PanelRenderer.fetch_git_log_entries(socket.assigns),
-        else: socket.assigns[:panel_git_entries] || []
-      )
-    )
-  end
-
-  defp push_url_state(socket) do
-    workbench = socket.assigns.workbench
-
-    params =
-      %{}
-      |> put_url_view(workbench.active_view)
-      |> put_url_tab(workbench.active_tab)
-
-    query = URI.encode_query(params)
-    path = if query == "", do: "/", else: "/?" <> query
-
-    push_event(socket, "url-state", %{path: path})
-  end
-
-  defp put_url_view(params, :posts), do: params
-  defp put_url_view(params, view), do: Map.put(params, "view", Atom.to_string(view))
-
-  defp put_url_tab(params, nil), do: params
-
-  defp put_url_tab(params, {type, id}),
-    do: Map.put(params, "tab", Atom.to_string(type) <> ":" <> id)
-
-  defp apply_url_params(socket, params) when is_map(params) and map_size(params) > 0 do
-    workbench = socket.assigns.workbench
-
-    workbench = apply_url_view(workbench, Map.get(params, "view"))
-    workbench = apply_url_tab(workbench, Map.get(params, "tab"))
-
-    if workbench == socket.assigns.workbench do
-      socket
-    else
-      tab_meta = TabHelpers.sync_tab_meta(workbench, socket.assigns[:tab_meta] || %{})
-
-      socket
-      |> assign(:tab_meta, tab_meta)
-      |> refresh_sidebar(workbench)
-    end
-  end
-
-  defp apply_url_params(socket, _params), do: socket
-
-  defp apply_url_view(workbench, nil), do: workbench
-
-  defp apply_url_view(workbench, view_str) do
-    view = BoundedAtoms.sidebar_view(view_str, nil)
-
-    if view && view != workbench.active_view do
-      Workbench.click_activity(workbench, view)
-    else
-      workbench
-    end
-  end
-
-  defp apply_url_tab(workbench, nil), do: workbench
-
-  defp apply_url_tab(workbench, tab_str) do
-    case String.split(tab_str, ":", parts: 2) do
-      [type_str, id] ->
-        type = BoundedAtoms.editor_route(type_str, nil)
-
-        if type && workbench.active_tab != {type, id} do
-          Workbench.open_tab(workbench, type, id, :preview)
-        else
-          workbench
-        end
-
-      _ ->
-        workbench
-    end
-  end
-
-  defp refresh_sidebar(socket, workbench) do
-    project_id = (socket.assigns[:projects] || %{})[:active_project_id]
-    active_view_id = Atom.to_string(workbench.active_view)
-
-    sidebar_data =
-      case ShellData.sidebar_view(
-             project_id,
-             active_view_id,
-             ShellSidebarState.current_filters(socket, active_view_id)
-           ) do
-        {:ok, data} -> data
-        {:error, :not_ready} -> BDS.UI.Sidebar.view(nil, active_view_id, %{})
-      end
-
-    sidebar_data = ShellSidebarState.merge_ui_state(socket, active_view_id, sidebar_data)
-
-    socket
-    |> assign(:sidebar_data, sidebar_data)
-    |> refresh_layout(workbench)
-  end
+  defp refresh_sidebar(socket, workbench), do: SocketState.refresh_sidebar(socket, workbench)
 
   defp refresh_content(socket, workbench) do
     projects =
@@ -971,12 +815,6 @@ defmodule BDS.Desktop.ShellLive do
   defp activity_label("Source Control"), do: dgettext("ui", "Git")
   defp activity_label(label), do: label
 
-  defp active_sidebar_label(activity_buttons, active_view, sidebar_data) do
-    Enum.find_value(activity_buttons, Map.get(sidebar_data, :title, ""), fn button ->
-      if button.id == active_view, do: activity_label(button.label), else: nil
-    end)
-  end
-
   defp sidebar_header_label(label), do: label
 
   defp timeline_height(entry, entries) do
@@ -986,12 +824,6 @@ defmodule BDS.Desktop.ShellLive do
       |> Enum.max(fn -> 1 end)
 
     max(4, (entry.count || 0) / max_count * 100)
-  end
-
-  defp current_tab(%{active_tab: nil}), do: nil
-
-  defp current_tab(%{tabs: tabs, active_tab: {type, id}}) do
-    Enum.find(tabs, &(&1.type == type and &1.id == id))
   end
 
   defp create_sidebar_item(socket, kind),
@@ -1097,124 +929,10 @@ defmodule BDS.Desktop.ShellLive do
     socket
     |> assign(:tab_meta, tab_meta)
     |> refresh_layout(workbench)
-    |> push_url_state()
-  end
-
-  defp run_git_action(socket, event) do
-    project_id = current_project_id(socket)
-
-    {label, result} =
-      case event do
-        "git_fetch" -> {dgettext("ui", "Fetch"), git_call(project_id, &BDS.Git.fetch/1)}
-        "git_pull" -> {dgettext("ui", "Pull"), git_call(project_id, &BDS.Git.pull/1)}
-        "git_push" -> {dgettext("ui", "Push"), git_call(project_id, &BDS.Git.push/1)}
-        "git_prune_lfs" -> {dgettext("ui", "Prune LFS"), prune_lfs(project_id)}
-      end
-
-    socket
-    |> append_git_result(label, result)
-    |> refresh_sidebar(socket.assigns.workbench)
-  end
-
-  defp commit_git(socket, "") do
-    socket
-    |> append_output_entry(
-      dgettext("ui", "Commit"),
-      dgettext("ui", "Commit message is required"),
-      nil,
-      "error"
-    )
-    |> refresh_sidebar(socket.assigns.workbench)
-  end
-
-  defp commit_git(socket, message) do
-    case git_call(current_project_id(socket), &BDS.Git.commit_all(&1, message)) do
-      {:ok, _result} ->
-        workbench = close_git_diff_tabs(socket.assigns.workbench)
-        tab_meta = TabHelpers.sync_tab_meta(workbench, socket.assigns[:tab_meta] || %{})
-
-        socket
-        |> assign(:tab_meta, tab_meta)
-        |> append_output_entry(dgettext("ui", "Commit"), message)
-        |> refresh_sidebar(workbench)
-        |> push_url_state()
-
-      {:error, reason} ->
-        socket
-        |> append_output_entry(dgettext("ui", "Commit"), format_git_error(reason), nil, "error")
-        |> refresh_sidebar(socket.assigns.workbench)
-    end
-  end
-
-  defp initialize_git(socket, remote_url) do
-    project_id = current_project_id(socket)
-
-    case git_call(project_id, &BDS.Git.initialize_repo/1) do
-      {:ok, _repo} ->
-        _ = maybe_set_git_remote(project_id, remote_url)
-
-        socket
-        |> append_output_entry(
-          dgettext("ui", "Initialize Git"),
-          dgettext("ui", "Repository initialized")
-        )
-        |> refresh_sidebar(socket.assigns.workbench)
-
-      {:error, reason} ->
-        socket
-        |> append_output_entry(
-          dgettext("ui", "Initialize Git"),
-          format_git_error(reason),
-          nil,
-          "error"
-        )
-        |> refresh_sidebar(socket.assigns.workbench)
-    end
-  end
-
-  defp git_call(nil, _fun), do: {:error, :no_project}
-  defp git_call("default", _fun), do: {:error, :no_project}
-  defp git_call(project_id, fun) when is_binary(project_id), do: fun.(project_id)
-
-  defp prune_lfs(nil), do: {:error, :no_project}
-  defp prune_lfs("default"), do: {:error, :no_project}
-
-  defp prune_lfs(project_id) when is_binary(project_id),
-    do: BDS.Git.prune_lfs_cache(project_id, 10)
-
-  defp maybe_set_git_remote(_project_id, nil), do: :ok
-
-  defp maybe_set_git_remote(project_id, remote_url),
-    do: BDS.Git.set_remote(project_id, remote_url)
-
-  defp append_git_result(socket, label, {:ok, _result}) do
-    append_output_entry(socket, label, dgettext("ui", "Done"))
-  end
-
-  defp append_git_result(socket, label, {:error, reason}) do
-    append_output_entry(socket, label, format_git_error(reason), nil, "error")
-  end
-
-  defp format_git_error(:no_project), do: dgettext("ui", "No active project")
-  defp format_git_error(%{message: message}) when is_binary(message), do: message
-  defp format_git_error(%{guidance: guidance}) when is_binary(guidance), do: guidance
-  defp format_git_error({:git_failed, message}) when is_binary(message), do: message
-  defp format_git_error(reason), do: inspect(reason)
-
-  defp close_git_diff_tabs(workbench) do
-    workbench.tabs
-    |> Enum.filter(&(&1.type == :git_diff))
-    |> Enum.reduce(workbench, fn tab, wb -> Workbench.close_tab(wb, :git_diff, tab.id) end)
+    |> UrlState.push()
   end
 
   defp current_project_id(socket), do: (socket.assigns[:projects] || %{})[:active_project_id]
-
-  defp normalize_git_remote_url(value) do
-    case value |> to_string() |> String.trim() do
-      "" -> nil
-      url -> url
-    end
-  end
 
   defp sidebar_create_action(view), do: SidebarCreate.action(view)
 
@@ -1258,7 +976,7 @@ defmodule BDS.Desktop.ShellLive do
             |> assign(:sidebar_filters_by_view, %{})
             |> append_output_entry(title, message_fun.(project))
             |> reload_shell(Workbench.new())
-            |> push_url_state()
+            |> UrlState.push()
 
           {:error, reason} ->
             socket
@@ -1268,11 +986,8 @@ defmodule BDS.Desktop.ShellLive do
     end
   end
 
-  defp append_output_entry(socket, title, message, details \\ nil, level \\ "info") do
-    entry = %{title: title, message: message, details: details, level: level}
-    entries = [entry | socket.assigns.output_entries] |> Enum.take(@output_entry_limit)
-    assign(socket, :output_entries, entries)
-  end
+  defp append_output_entry(socket, title, message, details \\ nil, level \\ "info"),
+    do: SocketState.append_output_entry(socket, title, message, details, level)
 
   defp handle_native_menu_action(socket, action) do
     case BoundedAtoms.menu_action(action) do
@@ -1293,7 +1008,7 @@ defmodule BDS.Desktop.ShellLive do
         socket
         |> assign(:tab_meta, tab_meta)
         |> refresh_sidebar(workbench)
-        |> push_url_state()
+        |> UrlState.push()
 
       MapSet.member?(@socket_menu_actions, action) ->
         handle_socket_menu_action(socket, action)
@@ -1317,8 +1032,10 @@ defmodule BDS.Desktop.ShellLive do
 
   defp handle_socket_menu_action(socket, :new_post), do: create_sidebar_item(socket, "post")
   defp handle_socket_menu_action(socket, :import_media), do: create_sidebar_item(socket, "media")
-  defp handle_socket_menu_action(socket, :save), do: save_current_tab(socket)
-  defp handle_socket_menu_action(socket, :publish_selected), do: publish_current_tab(socket)
+
+  defp handle_socket_menu_action(socket, :save), do: TabActions.save_current_tab(socket)
+
+  defp handle_socket_menu_action(socket, :publish_selected), do: TabActions.publish_current_tab(socket)
 
   defp handle_socket_menu_action(socket, :quit) do
     Shutdown.request_quit()
@@ -1346,62 +1063,6 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp shell_command?(action), do: not is_nil(shell_command_atom(action))
-
-  defp auto_save_current_post(
-         %{assigns: %{current_tab: %{type: :post, id: post_id}, workbench: workbench}} = socket
-       ) do
-    if Workbench.dirty?(workbench, :post, post_id) do
-      send_update(PostEditor, id: "post-editor-#{post_id}", action: :save)
-    end
-
-    socket
-  end
-
-  defp auto_save_current_post(socket), do: socket
-
-  defp save_current_tab(%{assigns: %{current_tab: %{type: :post, id: post_id}}} = socket) do
-    send_update(PostEditor, id: "post-editor-#{post_id}", action: :save)
-    socket
-  end
-
-  defp save_current_tab(%{assigns: %{current_tab: %{type: :media, id: media_id}}} = socket) do
-    send_update(MediaEditor, id: "media-editor-#{media_id}", action: :save)
-    socket
-  end
-
-  defp save_current_tab(%{assigns: %{current_tab: %{type: :settings}}} = socket) do
-    send_update(SettingsEditor, id: "settings-editor", action: :save_project)
-    socket
-  end
-
-  defp save_current_tab(%{assigns: %{current_tab: %{type: :menu_editor}}} = socket) do
-    send_update(MenuEditor, id: "menu-editor", action: :save)
-    socket
-  end
-
-  defp save_current_tab(%{assigns: %{current_tab: %{type: :tags}}} = socket) do
-    send_update(TagsEditor, id: "tags-editor", action: :save)
-    socket
-  end
-
-  defp save_current_tab(%{assigns: %{current_tab: %{type: :scripts, id: script_id}}} = socket) do
-    send_update(ScriptEditor, id: "script-editor-#{script_id}", action: :save)
-    socket
-  end
-
-  defp save_current_tab(%{assigns: %{current_tab: %{type: :templates, id: template_id}}} = socket) do
-    send_update(TemplateEditor, id: "template-editor-#{template_id}", action: :save)
-    socket
-  end
-
-  defp save_current_tab(socket), do: refresh_layout(socket, socket.assigns.workbench)
-
-  defp publish_current_tab(%{assigns: %{current_tab: %{type: :post, id: post_id}}} = socket) do
-    send_update(PostEditor, id: "post-editor-#{post_id}", action: :publish)
-    socket
-  end
-
-  defp publish_current_tab(socket), do: refresh_layout(socket, socket.assigns.workbench)
 
   defp apply_shell_command(socket, action, params \\ %{}),
     do: ShellCommandRunner.execute(socket, action, params, shell_command_callbacks())

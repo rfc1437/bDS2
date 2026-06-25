@@ -4,6 +4,7 @@ defmodule BDS.Desktop.MainWindow do
   use GenServer
 
   alias Desktop.Window
+  require Logger
 
   @window_id __MODULE__
   @server_name BDS.Desktop.MainWindow.Watcher
@@ -22,7 +23,9 @@ defmodule BDS.Desktop.MainWindow do
   def persist_now(timeout \\ 100) do
     GenServer.call(@server_name, :persist_bounds_now, timeout)
   catch
-    :exit, _reason -> :ok
+    :exit, reason ->
+      Logger.debug("swallowed main_window persist_now exit: #{inspect(reason)}")
+      :ok
   end
 
   def window_options(extra_opts \\ []) do
@@ -169,10 +172,17 @@ defmodule BDS.Desktop.MainWindow do
         end
       end)
     rescue
-      ErlangError -> nil
-      FunctionClauseError -> nil
+      error in ErlangError ->
+        Logger.debug("swallowed main_window restore_bounds error: #{inspect(error)}")
+        nil
+
+      error in FunctionClauseError ->
+        Logger.debug("swallowed main_window restore_bounds error: #{inspect(error)}")
+        nil
     catch
-      :exit, _reason -> nil
+      :exit, reason ->
+        Logger.debug("swallowed main_window restore_bounds exit: #{inspect(reason)}")
+        nil
     end
   end
 

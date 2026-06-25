@@ -2,11 +2,14 @@ defmodule BDS.TasksTest do
   use ExUnit.Case, async: false
 
   setup do
+    cleanup_task_server()
+
     original = Application.get_env(:bds, :tasks, [])
     Application.put_env(:bds, :tasks, max_concurrent: 3, progress_throttle_ms: 250)
     :ok = BDS.Tasks.clear_finished()
 
     on_exit(fn ->
+      cleanup_task_server()
       Application.put_env(:bds, :tasks, original)
       _ = BDS.Tasks.clear_finished()
     end)
@@ -131,74 +134,129 @@ defmodule BDS.TasksTest do
   end
 
   test "progress reports within 250ms throttle window are silently dropped" do
-    assert {:ok, task} = BDS.Tasks.register_external_task("fast progress")
+    runner = self()
 
-    assert :ok = BDS.Tasks.report_progress(task.id, 0.25, "quarter")
+    assert {:ok, task} =
+             BDS.Tasks.submit_task("fast progress", fn report ->
+               send(runner, {:started, "fast progress", self()})
+               report.(0.25, "quarter")
+               report.(0.5, "half")
+
+               receive do
+                 :release -> {:ok, :done}
+               end
+             end)
+
+    {"fast progress", worker_pid} = receive_started()
+
     assert wait_for_task(task.id, &(&1.progress == 0.25)).progress == 0.25
 
-    assert :ok = BDS.Tasks.report_progress(task.id, 0.5, "half")
-    assert task_id = task.id
     # The 250ms throttle has not elapsed, so progress stays at 0.25.
-    assert wait_for_task(task_id, & &1.progress == 0.25).progress == 0.25
+    assert wait_for_task(task.id, &(&1.progress == 0.25)).progress == 0.25
 
-    on_exit(fn -> BDS.Tasks.complete_task(task.id) end)
+    send(worker_pid, :release)
+    assert wait_for_task(task.id, &(&1.status == :completed)).status == :completed
   end
 
   test "progress report with value 1.0 bypasses the throttle" do
-    assert {:ok, task} = BDS.Tasks.register_external_task("completion progress")
+    runner = self()
 
-    assert :ok = BDS.Tasks.report_progress(task.id, 0.25, "quarter")
+    assert {:ok, task} =
+             BDS.Tasks.submit_task("completion progress", fn report ->
+               send(runner, {:started, "completion progress", self()})
+               report.(0.25, "quarter")
+               report.(1.0, "done")
+
+               receive do
+                 :release -> {:ok, :done}
+               end
+             end)
+
+    {"completion progress", worker_pid} = receive_started()
 
     # A completion report (1.0) must go through even if throttled.
-    assert :ok = BDS.Tasks.report_progress(task.id, 1.0, "done")
-
     assert wait_for_task(task.id, &(&1.progress == 1.0)).progress == 1.0
     assert wait_for_task(task.id, &(&1.message == "done")).message == "done"
 
-    on_exit(fn -> BDS.Tasks.complete_task(task.id) end)
+    send(worker_pid, :release)
+    assert wait_for_task(task.id, &(&1.status == :completed)).status == :completed
   end
 
-  test "external tasks are registered as running and can report progress and complete" do
+  test "submitted tasks are registered as running and can report progress and complete" do
     assert {:ok, task} =
-             BDS.Tasks.register_external_task("preview build", %{
+             BDS.Tasks.submit_task(
+               "preview build",
+               fn report ->
+                 report.(0.5, "halfway")
+
+                 receive do
+                   :release -> {:ok, :done}
+                 end
+               end,
+               %{
                group_id: "generation",
                group_name: "Generation"
-             })
+               }
+             )
 
-    assert task.status == :running
+    assert task.status == :pending
     assert task.group_id == "generation"
     assert task.group_name == "Generation"
-
-    assert :ok = BDS.Tasks.report_progress(task.id, 0.5, "halfway")
 
     progressed = wait_for_task(task.id, &(&1.progress == 0.5 and &1.message == "halfway"))
     assert progressed.status == :running
 
-    assert :ok = BDS.Tasks.complete_task(task.id)
+    task_state = :sys.get_state(BDS.Tasks)
+    %{pid: worker_pid} = task_state.running[task.id]
+    send(worker_pid, :release)
 
     assert wait_for_task(task.id, &(&1.status == :completed and &1.progress == 1.0)).status ==
              :completed
   end
 
   test "status_snapshot exposes active task details for the desktop shell" do
+    runner = self()
+
     assert {:ok, first} =
-             BDS.Tasks.register_external_task("preview build", %{
-               group_id: "generation",
-               group_name: "Generation"
-             })
+             BDS.Tasks.submit_task(
+               "preview build",
+               fn report ->
+                 send(runner, {:started, "preview build", self()})
+                 report.(0.5, "halfway")
+
+                 receive do
+                   :release -> {:ok, :done}
+                 end
+               end,
+               %{group_id: "generation", group_name: "Generation"}
+             )
 
     assert {:ok, second} =
-             BDS.Tasks.register_external_task("reindex text", %{
-               group_id: "search",
-               group_name: "Search"
-             })
+             BDS.Tasks.submit_task(
+               "reindex text",
+               fn _report ->
+                 send(runner, {:started, "reindex text", self()})
+
+                 receive do
+                   :release -> {:ok, :done}
+                 end
+               end,
+               %{group_id: "search", group_name: "Search"}
+             )
 
     on_exit(fn ->
-      _ = BDS.Tasks.complete_task(first.id)
-      _ = BDS.Tasks.complete_task(second.id)
+      task_state = :sys.get_state(BDS.Tasks)
+
+      Enum.each([first.id, second.id], fn task_id ->
+        case task_state.running[task_id] do
+          %{pid: pid} -> send(pid, :release)
+          nil -> :ok
+        end
+      end)
     end)
 
-    assert :ok = BDS.Tasks.report_progress(first.id, 0.5, "halfway")
+    _ = receive_started()
+    _ = receive_started()
 
     snapshot = BDS.Tasks.status_snapshot()
 
@@ -250,12 +308,23 @@ defmodule BDS.TasksTest do
       finished_task_ttl_ms: 1
     )
 
-    assert {:ok, task} = BDS.Tasks.register_external_task("short lived")
-    assert {:ok, running} = BDS.Tasks.register_external_task("still running")
+    runner = self()
 
-    on_exit(fn -> _ = BDS.Tasks.complete_task(running.id) end)
+    assert {:ok, task} = BDS.Tasks.submit_task("short lived", fn _report -> {:ok, :done} end)
 
-    assert :ok = BDS.Tasks.complete_task(task.id)
+    assert {:ok, running} =
+             BDS.Tasks.submit_task("still running", fn _report ->
+               send(runner, {:started, "still running", self()})
+
+               receive do
+                 :release -> {:ok, :done}
+               end
+             end)
+
+    {"still running", worker_pid} = receive_started()
+
+    on_exit(fn -> send(worker_pid, :release) end)
+
     assert wait_for_task(task.id, &(&1.status == :completed)).status == :completed
 
     Process.sleep(20)
@@ -273,15 +342,15 @@ defmodule BDS.TasksTest do
       finished_task_ttl_ms: 50
     )
 
-    assert {:ok, first} = BDS.Tasks.register_external_task("first finished")
-    assert {:ok, second} = BDS.Tasks.register_external_task("second finished")
+    assert {:ok, first} = BDS.Tasks.submit_task("first finished", fn _report -> {:ok, :done} end)
+    assert {:ok, second} = BDS.Tasks.submit_task("second finished", fn _report -> {:ok, :done} end)
 
-    assert :ok = BDS.Tasks.complete_task(first.id)
+    assert wait_for_task(first.id, &(&1.status == :completed)).status == :completed
     first_timer = :sys.get_state(BDS.Tasks).finished_task_eviction_timer
     assert is_reference(first_timer)
     assert is_integer(Process.read_timer(first_timer))
 
-    assert :ok = BDS.Tasks.complete_task(second.id)
+    assert wait_for_task(second.id, &(&1.status == :completed)).status == :completed
     second_timer = :sys.get_state(BDS.Tasks).finished_task_eviction_timer
 
     assert second_timer == first_timer
@@ -334,6 +403,36 @@ defmodule BDS.TasksTest do
 
   defp wait_for_task(_task_id, _predicate, 0) do
     flunk("task did not reach expected state")
+  end
+
+  defp cleanup_task_server do
+    BDS.Tasks.list_tasks()
+    |> Enum.filter(&(&1.status in [:pending, :running]))
+    |> Enum.each(fn task ->
+      _ = BDS.Tasks.cancel_task(task.id)
+    end)
+
+    wait_until(fn ->
+      BDS.Tasks.list_tasks()
+      |> Enum.all?(&(&1.status not in [:pending, :running]))
+    end)
+
+    :ok = BDS.Tasks.clear_finished()
+  end
+
+  defp wait_until(predicate, attempts \\ 100)
+
+  defp wait_until(predicate, attempts) when attempts > 0 do
+    if predicate.() do
+      :ok
+    else
+      Process.sleep(20)
+      wait_until(predicate, attempts - 1)
+    end
+  end
+
+  defp wait_until(_predicate, 0) do
+    flunk("condition was not met")
   end
 
 end

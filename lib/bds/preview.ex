@@ -2,6 +2,7 @@ defmodule BDS.Preview do
   @moduledoc false
 
   use GenServer
+  require Logger
 
   alias BDS.Posts
   alias BDS.Posts.Translation
@@ -446,7 +447,9 @@ defmodule BDS.Preview do
     try do
       Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, owner_pid, self())
     rescue
-      _error -> :ok
+      error ->
+        Logger.debug("swallowed preview maybe_allow_repo error: #{inspect(error)}")
+        :ok
     end
   end
 

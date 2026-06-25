@@ -2,6 +2,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
   @moduledoc false
 
   alias BDS.{Metadata, Tags}
+  require Logger
 
   @spec field_key(term()) :: term()
   def field_key(:tags), do: "tags"
@@ -91,7 +92,9 @@ defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
       :ok
     end
   rescue
-    _error -> :ok
+    error ->
+      Logger.warning("swallowed list_values ensure_list_value error: #{inspect(error)}")
+      :ok
   end
 
   @spec csv_to_list(term()) :: term()

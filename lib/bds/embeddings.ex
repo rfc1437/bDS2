@@ -4,6 +4,13 @@ defmodule BDS.Embeddings do
   import Ecto.Query
   require Logger
 
+  @type project_id :: String.t()
+  @type post_id :: String.t()
+  @type progress_opts :: keyword()
+  @type similarity_map :: %{optional(post_id()) => float()}
+  @type indexed_posts_result :: {:ok, [post_id()]} | {:error, term()}
+  @type duplicate_pair_ids :: [{post_id(), post_id()}]
+
   alias BDS.Persistence
   alias BDS.Embeddings.DismissedDuplicatePair
   alias BDS.Embeddings.Index
@@ -18,11 +25,19 @@ defmodule BDS.Embeddings do
   @exact_match_score 0.999999
   @key_batch_size 199
 
+  @spec model_id() :: term()
   def model_id, do: configured_backend().model_info().model_id
+
+  @spec dimensions() :: pos_integer()
   def dimensions, do: configured_backend().model_info().dimensions
+
+  @spec index_path(project_id()) :: String.t()
   def index_path(project_id), do: Index.path(project_id)
+
+  @spec reindex_all(project_id()) :: indexed_posts_result()
   def reindex_all(project_id), do: rebuild_project(project_id)
 
+  @spec refresh_snapshot(project_id()) :: :ok
   def refresh_snapshot(project_id) when is_binary(project_id) do
     if enabled_for_project?(project_id) do
       :ok = rebuild_snapshot(project_id)
@@ -31,6 +46,8 @@ defmodule BDS.Embeddings do
     :ok
   end
 
+  @spec get_indexing_progress(project_id()) ::
+          {:ok, %{indexed: non_neg_integer(), total: non_neg_integer()}}
   def get_indexing_progress(project_id) when is_binary(project_id) do
     indexed =
       Repo.one(
@@ -49,6 +66,7 @@ defmodule BDS.Embeddings do
     {:ok, %{indexed: indexed, total: total}}
   end
 
+  @spec sync_post(Post.t() | post_id()) :: :ok
   def sync_post(%Post{} = post) do
     if enabled_for_project?(post.project_id) do
       sync_post_if_enabled(post, refresh_index: true)
@@ -64,6 +82,7 @@ defmodule BDS.Embeddings do
     end
   end
 
+  @spec repair_posts(project_id(), [post_id()]) :: indexed_posts_result()
   def repair_posts(project_id, post_ids) when is_binary(project_id) and is_list(post_ids) do
     if enabled_for_project?(project_id) do
       post_ids = Enum.uniq(post_ids)
@@ -91,6 +110,8 @@ defmodule BDS.Embeddings do
     end
   end
 
+  @spec rebuild_project(project_id()) :: indexed_posts_result()
+  @spec rebuild_project(project_id(), progress_opts()) :: indexed_posts_result()
   def rebuild_project(project_id, opts \\ [])
 
   def rebuild_project(project_id, opts) when is_binary(project_id) and is_list(opts) do
@@ -130,6 +151,7 @@ defmodule BDS.Embeddings do
     end
   end
 
+  @spec diff_reports(project_id()) :: [map()]
   def diff_reports(project_id) when is_binary(project_id) do
     if enabled_for_project?(project_id) do
       keys_by_post =
@@ -347,6 +369,7 @@ defmodule BDS.Embeddings do
     end)
   end
 
+  @spec remove_post(post_id()) :: :ok
   def remove_post(post_id) when is_binary(post_id) do
     project_id =
       case Repo.get_by(Key, post_id: post_id) do
@@ -369,6 +392,7 @@ defmodule BDS.Embeddings do
     :ok
   end
 
+  @spec index_unindexed(project_id()) :: indexed_posts_result()
   def index_unindexed(project_id) when is_binary(project_id) do
     if enabled_for_project?(project_id) do
       posts =
@@ -398,6 +422,8 @@ defmodule BDS.Embeddings do
     end
   end
 
+  @spec find_similar(post_id()) :: {:ok, [map()]}
+  @spec find_similar(post_id(), pos_integer()) :: {:ok, [map()]}
   def find_similar(post_id, limit \\ 5) when is_binary(post_id) and is_integer(limit) do
     case source_post_and_vector(post_id) do
       {:disabled, _project_id} ->
@@ -431,6 +457,7 @@ defmodule BDS.Embeddings do
     end
   end
 
+  @spec compute_similarities(post_id(), [post_id()]) :: {:ok, similarity_map()}
   def compute_similarities(source_post_id, target_post_ids)
       when is_binary(source_post_id) and is_list(target_post_ids) do
     case source_post_and_vector(source_post_id) do
@@ -468,6 +495,7 @@ defmodule BDS.Embeddings do
     end
   end
 
+  @spec suggest_tags(post_id(), term()) :: {:ok, [String.t()]}
   def suggest_tags(post_id, _input_text) when is_binary(post_id) do
     with {:ok, _post} <- fetch_post(post_id),
          {:ok, similar} <- find_similar(post_id, 10) do
@@ -497,6 +525,8 @@ defmodule BDS.Embeddings do
     end
   end
 
+  @spec find_duplicates(project_id()) :: {:ok, [map()]}
+  @spec find_duplicates(project_id(), progress_opts()) :: {:ok, [map()]}
   def find_duplicates(project_id, opts \\ []) when is_binary(project_id) do
     if enabled_for_project?(project_id) do
       on_progress = progress_callback(opts)
@@ -521,6 +551,8 @@ defmodule BDS.Embeddings do
     end
   end
 
+  @spec dismiss_duplicate_pair(post_id(), post_id()) ::
+      {:ok, DismissedDuplicatePair.t()} | {:error, :not_found}
   def dismiss_duplicate_pair(post_id_a, post_id_b)
       when is_binary(post_id_a) and is_binary(post_id_b) do
     with {:ok, post_a} <- fetch_post(post_id_a),
@@ -552,6 +584,8 @@ defmodule BDS.Embeddings do
     end
   end
 
+  @spec dismiss_duplicate_pairs(duplicate_pair_ids()) ::
+    {:ok, [DismissedDuplicatePair.t()]} | {:error, term()}
   def dismiss_duplicate_pairs(pair_ids) when is_list(pair_ids) do
     pair_ids
     |> Enum.filter(fn

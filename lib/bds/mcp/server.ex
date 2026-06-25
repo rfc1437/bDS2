@@ -2,6 +2,7 @@ defmodule BDS.MCP.Server do
   @moduledoc false
 
   use GenServer
+  require Logger
 
   @host "127.0.0.1"
   @server_name "Blogging Desktop Server"
@@ -336,7 +337,9 @@ defmodule BDS.MCP.Server do
     try do
       Ecto.Adapters.SQL.Sandbox.allow(BDS.Repo, owner_pid, self())
     rescue
-      _error -> :ok
+      error ->
+        Logger.debug("swallowed MCP server maybe_allow_repo error: #{inspect(error)}")
+        :ok
     end
   end
 

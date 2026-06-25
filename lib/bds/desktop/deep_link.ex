@@ -66,7 +66,9 @@ defmodule BDS.Desktop.DeepLink do
       try do
         Desktop.Env.subscribe()
       catch
-        :exit, _reason -> :ok
+        :exit, reason ->
+          Logger.debug("swallowed deep_link Desktop.Env.subscribe exit: #{inspect(reason)}")
+          :ok
       end
     end
 

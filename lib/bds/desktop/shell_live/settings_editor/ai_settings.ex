@@ -5,6 +5,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
 
   alias BDS.AI
   alias BDS.Desktop.ShellLive.SettingsEditor.EditorSettings
+  require Logger
   use Gettext, backend: BDS.Gettext
 
   @spec ai_form(term()) :: term()
@@ -171,7 +172,9 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
   defp safe_endpoint(kind) do
     case AI.get_endpoint(kind) do
       {:ok, ep} -> ep
-      _error -> nil
+      error ->
+        Logger.debug("swallowed AI settings safe_endpoint error: #{inspect(error)}")
+        nil
     end
   end
 
