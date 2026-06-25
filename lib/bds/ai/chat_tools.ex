@@ -4,6 +4,8 @@ defmodule BDS.AI.ChatTools do
   import Ecto.Query
 
   alias BDS.AI.Chat
+  alias BDS.AI.ChatToolQueryHelpers, as: QueryHelpers
+  alias BDS.AI.ChatToolSchemas, as: Schemas
   alias BDS.Media, as: MediaContext
   alias BDS.Media.Media
   alias BDS.MCP.Queries
@@ -12,7 +14,6 @@ defmodule BDS.AI.ChatTools do
   alias BDS.Posts.PostMedia
   alias BDS.Projects.Project
   alias BDS.Repo
-  alias BDS.Search
 
   @spec execute(String.t(), map(), String.t() | nil) :: map()
   def execute("blog_stats", _arguments, project_id) do
@@ -58,8 +59,14 @@ defmodule BDS.AI.ChatTools do
 
   def execute("search_posts", arguments, project_id) do
     project_id = project_id || active_project_id()
-    filters = search_filters(arguments)
-    search_result(project_id, arguments["query"] || "", filters, &Queries.post_summary/1)
+    filters = QueryHelpers.search_filters(arguments)
+
+    QueryHelpers.search_result(
+      project_id,
+      arguments["query"] || "",
+      filters,
+      &Queries.post_summary/1
+    )
   end
 
   def execute("read_post_by_slug", arguments, project_id) do
@@ -81,11 +88,11 @@ defmodule BDS.AI.ChatTools do
 
   def execute("list_posts", arguments, project_id) do
     project_id = project_id || active_project_id()
-    limit = normalize_limit(arguments["limit"])
-    offset = normalize_offset(arguments["offset"])
-    filters = search_filters(arguments) |> Map.merge(%{limit: limit, offset: offset})
+    limit = QueryHelpers.normalize_limit(arguments["limit"])
+    offset = QueryHelpers.normalize_offset(arguments["offset"])
+    filters = QueryHelpers.search_filters(arguments) |> Map.merge(%{limit: limit, offset: offset})
 
-    search_result(project_id, "", filters, fn post ->
+    QueryHelpers.search_result(project_id, "", filters, fn post ->
       post
       |> Queries.post_summary()
       |> Map.put("url", "/posts/#{post.slug}")
@@ -95,7 +102,7 @@ defmodule BDS.AI.ChatTools do
 
   def execute("list_media", arguments, project_id) do
     project_id = project_id || active_project_id()
-    limit = normalize_limit(arguments["limit"])
+    limit = QueryHelpers.normalize_limit(arguments["limit"])
 
     Repo.all(
       from(media in Media,
@@ -194,7 +201,7 @@ defmodule BDS.AI.ChatTools do
   def execute("count_posts", arguments, project_id) do
     project_id = project_id || active_project_id()
     group_by = List.wrap(arguments["groupBy"] || arguments["group_by"]) |> Enum.map(&to_string/1)
-    result = search_all_counted_posts(project_id, arguments)
+    result = QueryHelpers.search_all_counted_posts(project_id, arguments)
 
     groups =
       result.posts
@@ -321,7 +328,7 @@ defmodule BDS.AI.ChatTools do
             %{
               name: "blog_stats",
               spec:
-                tool_spec("blog_stats", "Return aggregate blog statistics", %{
+                Schemas.tool_spec("blog_stats", "Return aggregate blog statistics", %{
                   "type" => "object",
                   "properties" => %{}
                 })
@@ -329,7 +336,7 @@ defmodule BDS.AI.ChatTools do
             %{
               name: "get_blog_stats",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "get_blog_stats",
                   "Get comprehensive blog statistics: total posts, media count, unique tag count, and unique category count. Use this first when you need to understand the scope of the data.",
                   %{"type" => "object", "properties" => %{}}
@@ -338,7 +345,7 @@ defmodule BDS.AI.ChatTools do
             %{
               name: "check_term",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "check_term",
                   "Check whether a term exists as a category, tag, or both. Returns post counts for each. Use before search_posts or list_posts when unsure whether a term is a category or tag.",
                   %{
@@ -351,16 +358,16 @@ defmodule BDS.AI.ChatTools do
             %{
               name: "search_posts",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "search_posts",
                   "Search blog posts using full-text search. Can filter by category, tags, language, missing translation language, year, month, or status. Returns paginated concrete post data with titles, slugs, tags, categories, backlinks, and links_to.",
-                  post_search_schema(true)
+                  Schemas.post_search_schema(true)
                 )
             },
             %{
               name: "read_post",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "read_post",
                   "Read full content and metadata of a specific blog post by ID. Includes backlinks, links_to, tags, categories, excerpt, status, language, and available languages.",
                   %{
@@ -373,7 +380,7 @@ defmodule BDS.AI.ChatTools do
             %{
               name: "read_post_by_slug",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "read_post_by_slug",
                   "Read full content and metadata of a specific blog post by slug. Includes backlinks, links_to, tags, categories, excerpt, status, language, and available languages.",
                   %{
@@ -386,37 +393,37 @@ defmodule BDS.AI.ChatTools do
             %{
               name: "list_posts",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "list_posts",
                   "List blog posts with optional filtering by status, category, tags, language, year, or month. Returns paginated concrete post data with titles, slugs, URLs, statuses, tags, categories, backlinks, and links_to. Use for recent, latest, top, or title-list requests.",
-                  post_search_schema(false)
+                  Schemas.post_search_schema(false)
                 )
             },
             %{
               name: "get_media",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "get_media",
                   "Get information about a specific media file by ID, including title, alt text, caption, tags, filename, MIME type, dimensions, and update time.",
-                  media_id_schema()
+                  Schemas.media_id_schema()
                 )
             },
             %{
               name: "list_media",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "list_media",
                   "List concrete media data in the active project, including titles, filenames, MIME types, and update times.",
-                  limit_schema()
+                  Schemas.limit_schema()
                 )
             },
             %{
               name: "view_image",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "view_image",
                   "View an image thumbnail as a local data URL for visual inspection. Only works with image media files.",
-                  media_id_schema(%{
+                  Schemas.media_id_schema(%{
                     "size" => %{"type" => "string", "enum" => ["small", "medium", "large"]}
                   })
                 )
@@ -424,25 +431,25 @@ defmodule BDS.AI.ChatTools do
             %{
               name: "update_post_metadata",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "update_post_metadata",
                   "Update metadata for a blog post: title, excerpt, tags, or categories. Does not update post body content.",
-                  update_post_metadata_schema()
+                  Schemas.update_post_metadata_schema()
                 )
             },
             %{
               name: "update_media_metadata",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "update_media_metadata",
                   "Update metadata for a media file: title, alt text, caption, or tags.",
-                  update_media_metadata_schema()
+                  Schemas.update_media_metadata_schema()
                 )
             },
             %{
               name: "list_tags",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "list_tags",
                   "List all tags used across blog posts with post counts.",
                   %{
@@ -454,7 +461,7 @@ defmodule BDS.AI.ChatTools do
             %{
               name: "list_categories",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "list_categories",
                   "List all categories used across blog posts with post counts.",
                   %{"type" => "object", "properties" => %{}}
@@ -463,46 +470,46 @@ defmodule BDS.AI.ChatTools do
             %{
               name: "count_posts",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "count_posts",
                   "Count posts grouped by dimensions such as year, month, tag, category, or status. Use for analytics, distributions, and heat maps without transferring full post content.",
-                  count_posts_schema()
+                  Schemas.count_posts_schema()
                 )
             },
             %{
               name: "get_post_backlinks",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "get_post_backlinks",
                   "Get all posts that link to a specific post.",
-                  post_id_schema()
+                  Schemas.post_id_schema()
                 )
             },
             %{
               name: "get_post_outlinks",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "get_post_outlinks",
                   "Get all posts that a specific post links to.",
-                  post_id_schema()
+                  Schemas.post_id_schema()
                 )
             },
             %{
               name: "get_post_media",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "get_post_media",
                   "Get media files linked to a specific post.",
-                  post_id_schema()
+                  Schemas.post_id_schema()
                 )
             },
             %{
               name: "get_media_posts",
               spec:
-                tool_spec(
+                Schemas.tool_spec(
                   "get_media_posts",
                   "Get posts that use a specific media file.",
-                  media_id_schema()
+                  Schemas.media_id_schema()
                 )
             }
           ]
@@ -515,467 +522,79 @@ defmodule BDS.AI.ChatTools do
           %{
             name: "render_card",
             spec:
-              tool_spec(
+              Schemas.tool_spec(
                 "render_card",
                 "Render an information card in the chat UI. Use this for displaying a summary, highlight, or actionable item.",
-                render_card_schema()
+                Schemas.render_card_schema()
               )
           },
           %{
             name: "render_table",
             spec:
-              tool_spec(
+              Schemas.tool_spec(
                 "render_table",
                 "Render a data table in the chat UI. Use this when the user asks for tabular data, comparisons, or structured information.",
-                render_table_schema()
+                Schemas.render_table_schema()
               )
           },
           %{
             name: "render_chart",
             spec:
-              tool_spec(
+              Schemas.tool_spec(
                 "render_chart",
                 "Render an interactive chart in the chat UI. Use this when the user asks for a chart, graph, or data visualization. Supports bar, stacked-bar, line, area, pie, donut, and heatmap charts. Use stacked-bar for multi-segment bars and heatmap for grid/matrix visualizations.",
-                render_chart_schema()
+                Schemas.render_chart_schema()
               )
           },
           %{
             name: "render_form",
             spec:
-              tool_spec(
+              Schemas.tool_spec(
                 "render_form",
                 "Render an interactive form in the chat UI. Use this when you need to collect structured input from the user.",
-                render_form_schema()
+                Schemas.render_form_schema()
               )
           },
           %{
             name: "render_metric",
             spec:
-              tool_spec(
+              Schemas.tool_spec(
                 "render_metric",
                 "Render a single metric/KPI display in the chat UI. Use this for showing a single important value with a label.",
-                render_metric_schema()
+                Schemas.render_metric_schema()
               )
           },
           %{
             name: "render_list",
             spec:
-              tool_spec(
+              Schemas.tool_spec(
                 "render_list",
                 "Render a list of items in the chat UI. Use this for displaying bullet-point style lists, checklists, or simple enumerations.",
-                render_list_schema()
+                Schemas.render_list_schema()
               )
           },
           %{
             name: "render_tabs",
             spec:
-              tool_spec(
+              Schemas.tool_spec(
                 "render_tabs",
                 "Render a tabbed interface in the chat UI. Use this to organize information into multiple tabs that the user can switch between.",
-                render_tabs_schema()
+                Schemas.render_tabs_schema()
               )
           },
           %{
             name: "render_mindmap",
             spec:
-              tool_spec(
+              Schemas.tool_spec(
                 "render_mindmap",
                 "Render a mind map diagram in the chat UI. Use this when the user asks for a mind map, concept map, topic tree, brainstorming diagram, or hierarchical overview of ideas.",
-                render_mindmap_schema()
+                Schemas.render_mindmap_schema()
               )
           }
         ]
     else
       []
     end
-  end
-
-  defp tool_spec(name, description, parameters) do
-    %{
-      "type" => "function",
-      "function" => %{
-        "name" => name,
-        "description" => description,
-        "parameters" => parameters
-      }
-    }
-  end
-
-  defp limit_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "limit" => %{"type" => "integer", "minimum" => 1, "maximum" => 50}
-      }
-    }
-  end
-
-  defp post_search_schema(require_query) do
-    schema = %{
-      "type" => "object",
-      "properties" => %{
-        "query" => %{"type" => "string"},
-        "status" => %{"type" => "string", "enum" => ["draft", "published", "archived"]},
-        "category" => %{"type" => "string"},
-        "tags" => %{"type" => "array", "items" => %{"type" => "string"}},
-        "language" => %{"type" => "string"},
-        "missingTranslationLanguage" => %{"type" => "string"},
-        "year" => %{"type" => "integer"},
-        "month" => %{"type" => "integer", "minimum" => 1, "maximum" => 12},
-        "limit" => %{"type" => "integer", "minimum" => 1, "maximum" => 50},
-        "offset" => %{"type" => "integer", "minimum" => 0}
-      }
-    }
-
-    if require_query, do: Map.put(schema, "required", ["query"]), else: schema
-  end
-
-  defp count_posts_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "groupBy" => %{
-          "type" => "array",
-          "items" => %{
-            "type" => "string",
-            "enum" => ["year", "month", "tag", "category", "status"]
-          }
-        },
-        "year" => %{"type" => "integer"},
-        "month" => %{"type" => "integer", "minimum" => 1, "maximum" => 12},
-        "status" => %{"type" => "string", "enum" => ["draft", "published", "archived"]},
-        "category" => %{"type" => "string"},
-        "tags" => %{"type" => "array", "items" => %{"type" => "string"}}
-      },
-      "required" => ["groupBy"]
-    }
-  end
-
-  defp post_id_schema do
-    %{
-      "type" => "object",
-      "properties" => %{"postId" => %{"type" => "string"}},
-      "required" => ["postId"]
-    }
-  end
-
-  defp media_id_schema(extra_properties \\ %{}) do
-    %{
-      "type" => "object",
-      "properties" => Map.merge(%{"mediaId" => %{"type" => "string"}}, extra_properties),
-      "required" => ["mediaId"]
-    }
-  end
-
-  defp update_post_metadata_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "postId" => %{"type" => "string"},
-        "title" => %{"type" => "string"},
-        "excerpt" => %{"type" => "string"},
-        "tags" => %{"type" => "array", "items" => %{"type" => "string"}},
-        "categories" => %{"type" => "array", "items" => %{"type" => "string"}}
-      },
-      "required" => ["postId"]
-    }
-  end
-
-  defp update_media_metadata_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "mediaId" => %{"type" => "string"},
-        "title" => %{"type" => "string"},
-        "alt" => %{"type" => "string"},
-        "caption" => %{"type" => "string"},
-        "tags" => %{"type" => "array", "items" => %{"type" => "string"}}
-      },
-      "required" => ["mediaId"]
-    }
-  end
-
-  defp render_table_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "title" => %{"type" => "string", "description" => "Optional table title"},
-        "columns" => %{
-          "type" => "array",
-          "items" => %{"type" => "string"},
-          "description" => "Column header names"
-        },
-        "rows" => %{
-          "type" => "array",
-          "items" => %{"type" => "array", "items" => %{"type" => "string"}},
-          "description" => "Table rows, each row is an array of cell values"
-        }
-      }
-    }
-  end
-
-  defp render_chart_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "chartType" => %{
-          "type" => "string",
-          "enum" => ["bar", "stacked-bar", "line", "area", "pie", "donut", "heatmap"],
-          "description" =>
-            "The type of chart to render. Use stacked-bar for multi-segment bars. Use heatmap for grid/matrix visualizations."
-        },
-        "title" => %{"type" => "string", "description" => "Optional chart title"},
-        "series" => %{
-          "type" => "array",
-          "description" => "Array of data points.",
-          "items" => %{
-            "type" => "object",
-            "properties" => %{
-              "label" => %{"type" => "string", "description" => "Data point label"},
-              "value" => %{"type" => "number", "description" => "Data point value"},
-              "segments" => %{
-                "type" => "array",
-                "description" =>
-                  "Segments within this data point. Required for stacked-bar and heatmap charts.",
-                "items" => %{
-                  "type" => "object",
-                  "properties" => %{
-                    "label" => %{"type" => "string"},
-                    "value" => %{"type" => "number"}
-                  },
-                  "required" => ["label", "value"]
-                }
-              }
-            },
-            "required" => ["label"]
-          }
-        }
-      },
-      "required" => ["chartType", "series"]
-    }
-  end
-
-  defp render_form_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "title" => %{"type" => "string", "description" => "Optional form title"},
-        "fields" => %{
-          "type" => "array",
-          "description" => "Form fields to display",
-          "items" => %{
-            "type" => "object",
-            "properties" => %{
-              "key" => %{"type" => "string", "description" => "Field identifier"},
-              "label" => %{"type" => "string", "description" => "Field label shown to user"},
-              "inputType" => %{
-                "type" => "string",
-                "enum" => ["text", "textarea", "select", "checkbox", "date", "number"],
-                "description" => "Type of input control"
-              },
-              "placeholder" => %{"type" => "string", "description" => "Placeholder text"},
-              "defaultValue" => %{"type" => "string", "description" => "Default value"},
-              "options" => %{
-                "type" => "array",
-                "description" => "Options for select fields",
-                "items" => %{
-                  "type" => "object",
-                  "properties" => %{
-                    "label" => %{"type" => "string"},
-                    "value" => %{"type" => "string"}
-                  }
-                }
-              },
-              "required" => %{"type" => "boolean", "description" => "Whether the field is required"}
-            },
-            "required" => ["key", "label", "inputType"]
-          }
-        },
-        "submitLabel" => %{"type" => "string", "description" => "Label for the submit button"},
-        "submitAction" => %{"type" => "string", "description" => "Action to dispatch on submit"}
-      }
-    }
-  end
-
-  defp render_card_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "title" => %{"type" => "string", "description" => "Card title"},
-        "subtitle" => %{"type" => "string", "description" => "Optional subtitle"},
-        "body" => %{"type" => "string", "description" => "Card body text (supports markdown)"},
-        "actions" => %{
-          "type" => "array",
-          "description" => "Optional action buttons on the card",
-          "items" => %{
-            "type" => "object",
-            "properties" => %{
-              "label" => %{"type" => "string", "description" => "Button label"},
-              "action" => %{"type" => "string", "description" => "Action name to dispatch"},
-              "payload" => %{
-                "type" => "object",
-                "description" => "Optional action payload"
-              }
-            },
-            "required" => ["label", "action"]
-          }
-        }
-      }
-    }
-  end
-
-  defp render_metric_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "label" => %{"type" => "string", "description" => "Metric label"},
-        "value" => %{"type" => "string", "description" => "Metric value (displayed prominently)"}
-      }
-    }
-  end
-
-  defp render_list_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "title" => %{"type" => "string", "description" => "Optional list title"},
-        "items" => %{
-          "type" => "array",
-          "items" => %{"type" => "string"},
-          "description" => "List items"
-        }
-      }
-    }
-  end
-
-  defp render_tabs_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "title" => %{"type" => "string", "description" => "Optional tabs title"},
-        "tabs" => %{
-          "type" => "array",
-          "description" => "Array of tabs",
-          "items" => %{
-            "type" => "object",
-            "properties" => %{
-              "label" => %{"type" => "string", "description" => "Tab label"},
-              "content" => %{
-                "type" => "array",
-                "description" => "Content items within the tab",
-                "items" => %{
-                  "type" => "object",
-                  "properties" => %{
-                    "type" => %{
-                      "type" => "string",
-                      "enum" => ["text", "metric", "list", "chart", "table"],
-                      "description" => "Content type"
-                    },
-                    "text" => %{"type" => "string", "description" => "Text content (for type text)"},
-                    "label" => %{"type" => "string", "description" => "Label (for type metric)"},
-                    "value" => %{"type" => "string", "description" => "Display value (for type metric)"},
-                    "title" => %{"type" => "string", "description" => "Title (for type list, chart, or table)"},
-                    "items" => %{
-                      "type" => "array", "items" => %{"type" => "string"},
-                      "description" => "Items (for type list)"
-                    },
-                    "chartType" => %{
-                      "type" => "string",
-                      "enum" => ["bar", "stacked-bar", "line", "area", "pie", "donut", "heatmap"],
-                      "description" => "Chart type (for type chart)"
-                    },
-                    "series" => %{
-                      "type" => "array",
-                      "description" => "Data series (for type chart)"
-                    },
-                    "columns" => %{
-                      "type" => "array", "items" => %{"type" => "string"},
-                      "description" => "Column headers (for type table)"
-                    },
-                    "rows" => %{
-                      "type" => "array", "items" => %{"type" => "array", "items" => %{"type" => "string"}},
-                      "description" => "Table rows (for type table)"
-                    }
-                  },
-                  "required" => ["type"]
-                }
-              }
-            },
-            "required" => ["label", "content"]
-          }
-        }
-      }
-    }
-  end
-
-  defp render_mindmap_schema do
-    %{
-      "type" => "object",
-      "properties" => %{
-        "title" => %{"type" => "string", "description" => "Optional mind map title"},
-        "nodes" => %{
-          "type" => "array",
-          "description" => "Flat array of nodes. The first node is the root. Each node references children by ID.",
-          "items" => %{
-            "type" => "object",
-            "properties" => %{
-              "id" => %{"type" => "string", "description" => "Unique node identifier"},
-              "label" => %{"type" => "string", "description" => "Node label text"},
-              "children" => %{
-                "type" => "array",
-                "items" => %{"type" => "string"},
-                "description" => "IDs of child nodes"
-              }
-            },
-            "required" => ["id", "label"]
-          }
-        }
-      }
-    }
-  end
-
-  defp normalize_limit(value) when is_integer(value) and value > 0 and value <= 50, do: value
-  defp normalize_limit(_value), do: 10
-
-  defp normalize_offset(value) when is_integer(value) and value >= 0, do: value
-  defp normalize_offset(_value), do: 0
-
-  defp search_filters(arguments) do
-    %{}
-    |> BDS.MapUtils.maybe_put(:category, BDS.MapUtils.blank_to_nil(arguments["category"]))
-    |> BDS.MapUtils.maybe_put(:tags, BDS.MapUtils.blank_to_nil(arguments["tags"]))
-    |> BDS.MapUtils.maybe_put(:language, BDS.MapUtils.blank_to_nil(arguments["language"]))
-    |> BDS.MapUtils.maybe_put(
-      :missing_translation_language,
-      BDS.MapUtils.blank_to_nil(arguments["missingTranslationLanguage"])
-    )
-    |> BDS.MapUtils.maybe_put(:year, arguments["year"])
-    |> BDS.MapUtils.maybe_put(:month, arguments["month"])
-    |> BDS.MapUtils.maybe_put(:status, BDS.BoundedAtoms.post_status(arguments["status"]))
-    |> Map.put(:offset, normalize_offset(arguments["offset"]))
-    |> Map.put(:limit, normalize_limit(arguments["limit"]))
-  end
-
-  defp search_all_counted_posts(project_id, arguments) do
-    filters = search_filters(arguments) |> Map.put(:offset, 0) |> Map.put(:limit, 1)
-    {:ok, %{total: total}} = Search.search_posts(project_id, "", filters)
-
-    filters = Map.put(filters, :limit, max(total, 1))
-    {:ok, result} = Search.search_posts(project_id, "", filters)
-
-    result
-  end
-
-  defp search_result(project_id, query, filters, mapper) do
-    {:ok, result} = Search.search_posts(project_id, query, filters)
-
-    %{
-      posts: Enum.map(result.posts, mapper),
-      total: result.total,
-      offset: result.offset,
-      limit: result.limit,
-      has_more: result.offset + result.limit < result.total
-    }
   end
 
   defp with_post(arguments, project_id, not_found_result, success_fun) do
