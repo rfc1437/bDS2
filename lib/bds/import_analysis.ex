@@ -423,13 +423,14 @@ defmodule BDS.ImportAnalysis do
   end
 
   defp parse_macro_params(raw_params) do
-    Regex.scan(@param_regex, raw_params)
-    |> Enum.map(fn captures ->
-      key = Enum.at(captures, 1)
-      value = Enum.at(captures, 2) || Enum.at(captures, 3) || Enum.at(captures, 4) || ""
+    @param_regex
+    |> Regex.scan(raw_params)
+    |> Map.new(fn [_full, key | value_groups] ->
+      # Exactly one of the quoted/unquoted value groups participates (the others
+      # are "" or dropped by Regex.scan); an empty quoted value falls back to "".
+      value = value_groups |> Enum.reject(&(&1 == "")) |> List.last() |> Kernel.||("")
       {key, value}
     end)
-    |> Map.new()
   end
 
   defp serialize_params(params) when params == %{}, do: ""

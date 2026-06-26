@@ -1,5 +1,12 @@
 defmodule BDS.Posts do
-  @moduledoc false
+  @moduledoc """
+  Context for blog posts and their translations: create, update, publish, and
+  discard changes, plus editor-body resolution.
+
+  Published posts keep their body on the filesystem rather than in the database,
+  so `editor_body/1` reads from the post's file when no in-memory content is
+  present. Changes are kept in sync with the filesystem and the embeddings index.
+  """
 
   import Ecto.Query
   import BDS.MapUtils, only: [attr: 2, maybe_put: 3]

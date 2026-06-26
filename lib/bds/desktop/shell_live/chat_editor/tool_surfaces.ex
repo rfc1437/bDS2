@@ -303,6 +303,5 @@ defmodule BDS.Desktop.ShellLive.ChatEditor.ToolSurfaces do
 
   defp map_value(_map, _key, default), do: default
 
-  defp truthy?(value) when value in [true, "true", 1, "1", "on"], do: true
-  defp truthy?(_value), do: false
+  defp truthy?(value), do: BDS.Values.truthy?(value)
 end

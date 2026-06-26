@@ -1452,6 +1452,6 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
     Map.get(item, :resolution) in ["overwrite", "merge"]
   end
 
-  defp present?(value), do: value not in [nil, ""]
-  defp blank?(value), do: value in [nil, ""]
+  defp present?(value), do: BDS.Values.present?(value)
+  defp blank?(value), do: BDS.Values.blank?(value)
 end

@@ -90,12 +90,10 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   end
 
   def handle_event("send_chat_editor_message", _params, socket) do
-    Logger.info("CHAT send_chat_editor_message called, input=#{inspect(socket.assigns.input)}")
     {:noreply, do_send_message(socket)}
   end
 
   def handle_event("abort_chat_editor_message", _params, socket) do
-    Logger.info("CHAT abort_chat_editor_message called")
     {:noreply, do_abort_message(socket)}
   end
 
@@ -581,8 +579,7 @@ defmodule BDS.Desktop.ShellLive.ChatEditor do
   def chart_width(_max_value, _value), do: 0
 
   @spec truthy?(term()) :: boolean()
-  def truthy?(value) when value in [true, "true", 1, "1", "on"], do: true
-  def truthy?(_value), do: false
+  def truthy?(value), do: BDS.Values.truthy?(value)
 
   # ── HEEx components ───────────────────────────────────────────────────────
 

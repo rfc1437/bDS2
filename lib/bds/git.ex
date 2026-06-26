@@ -1,5 +1,12 @@
 defmodule BDS.Git do
-  @moduledoc false
+  @moduledoc """
+  Git operations for a project's repository: initialize, inspect status and
+  diffs, browse history, and run network actions (fetch/pull/push) with
+  Git LFS support.
+
+  Local and network operations use separate timeouts; network calls are gated by
+  the app's offline mode at the call sites that invoke them.
+  """
 
   alias BDS.Projects
   require Logger

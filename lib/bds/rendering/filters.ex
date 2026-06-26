@@ -238,24 +238,25 @@ defmodule BDS.Rendering.Filters do
         path_part |> String.replace(~r/\.html?$/i, "")
 
       match = Regex.run(~r|^/?post/([a-z0-9-]+(?:\.html?)?)$|i, path_part) ->
-        slug = match |> Enum.at(1) |> String.replace(~r/\.html?$/i, "")
-        Map.get(canonical_post_paths, slug)
+        slug_from_match(match, canonical_post_paths)
 
       match = Regex.run(~r|^/?post/\d{4}/\d{1,2}/([a-z0-9-]+(?:\.html?)?)$|i, path_part) ->
-        slug = match |> Enum.at(1) |> String.replace(~r/\.html?$/i, "")
-        Map.get(canonical_post_paths, slug)
+        slug_from_match(match, canonical_post_paths)
 
       match = Regex.run(~r|^/?posts/([a-z0-9-]+(?:\.html?)?)$|i, path_part) ->
-        slug = match |> Enum.at(1) |> String.replace(~r/\.html?$/i, "")
-        Map.get(canonical_post_paths, slug)
+        slug_from_match(match, canonical_post_paths)
 
       match = Regex.run(~r|^/?posts/\d{4}/\d{1,2}/([a-z0-9-]+(?:\.html?)?)$|i, path_part) ->
-        slug = match |> Enum.at(1) |> String.replace(~r/\.html?$/i, "")
-        Map.get(canonical_post_paths, slug)
+        slug_from_match(match, canonical_post_paths)
 
       true ->
         nil
     end
+  end
+
+  defp slug_from_match([_full, captured], canonical_post_paths) do
+    slug = String.replace(captured, ~r/\.html?$/i, "")
+    Map.get(canonical_post_paths, slug)
   end
 
   defp normalize_media_src(raw_src, canonical_media_paths) do

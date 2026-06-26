@@ -1125,5 +1125,5 @@ defmodule BDS.UI.Sidebar do
 
   defp media_size_label(_size), do: "0 B"
 
-  defp present?(value), do: value not in [nil, ""]
+  defp present?(value), do: BDS.Values.present?(value)
 end

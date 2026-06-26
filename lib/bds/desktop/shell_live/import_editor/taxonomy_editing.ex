@@ -284,5 +284,5 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.TaxonomyEditing do
   def maybe_put_option(opts, _key, nil), do: opts
   def maybe_put_option(opts, key, value), do: Keyword.put(opts, key, value)
 
-  defp present?(value), do: value not in [nil, ""]
+  defp present?(value), do: BDS.Values.present?(value)
 end

@@ -310,5 +310,5 @@ defmodule BDS.Desktop.ShellLive.ImportEditor.AnalysisState do
   @spec translate_phase(term()) :: term()
   def translate_phase(other), do: other
 
-  defp present?(value), do: value not in [nil, ""]
+  defp present?(value), do: BDS.Values.present?(value)
 end

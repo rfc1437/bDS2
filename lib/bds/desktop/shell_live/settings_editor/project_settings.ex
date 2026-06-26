@@ -94,7 +94,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ProjectSettings do
     }
   end
 
-  defp truthy?(value), do: value in [true, "true", "on", "1", 1]
+  defp truthy?(value), do: BDS.Values.truthy?(value)
 
   defp parse_integer(nil, fallback), do: fallback
   defp parse_integer(value, _fallback) when is_integer(value), do: value

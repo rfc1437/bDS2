@@ -347,8 +347,10 @@ defmodule BDS.Embeddings.Index do
     :ok
   rescue
     exception ->
-      Logger.debug(
-        "swallowed embeddings index persist error for #{project_id}: #{inspect(exception)}"
+      # Logged at :error (not :debug) so a real persist failure — or a programmer
+      # bug surfacing as an exception — is visible; next reindex retries the save.
+      Logger.error(
+        "embeddings index persist failed for #{project_id}: #{inspect(exception)}"
       )
 
       :ok
@@ -392,8 +394,8 @@ defmodule BDS.Embeddings.Index do
     end
   rescue
     exception ->
-      Logger.debug(
-        "swallowed embeddings index load_from_disk error for #{project_id}: #{inspect(exception)}"
+      Logger.error(
+        "embeddings index load_from_disk failed for #{project_id}: #{inspect(exception)}"
       )
 
       :error

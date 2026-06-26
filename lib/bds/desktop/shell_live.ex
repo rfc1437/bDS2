@@ -18,6 +18,7 @@ defmodule BDS.Desktop.ShellLive do
     MediaEditor,
     MenuEditor,
     MiscEditor,
+    NativeMenuEvents,
     OverlayManager,
     ScriptEditor,
     SettingsEditor,
@@ -80,6 +81,8 @@ defmodule BDS.Desktop.ShellLive do
   ]
 
   @git_action_events ["git_fetch", "git_pull", "git_push", "git_prune_lfs"]
+
+  @native_menu_events NativeMenuEvents.events()
 
   @layout_menu_actions MapSet.new([
                          :toggle_sidebar,
@@ -524,31 +527,8 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, reload_shell(socket, SessionUtil.restore_workbench_session(session_payload))}
   end
 
-  def handle_event("native_menu_action", %{"action" => action}, socket) do
-    {:noreply, handle_native_menu_action(socket, action)}
-  end
-
-  def handle_event("titlebar_menu_keydown", %{"key" => key}, socket) do
-    {:noreply, TitlebarMenu.handle_keydown(socket, key, &handle_native_menu_action/2)}
-  end
-
-  def handle_event("toggle_titlebar_menu", %{"group" => group}, socket) do
-    {:noreply, TitlebarMenu.toggle(socket, group)}
-  end
-
-  def handle_event("hover_titlebar_menu", %{"group" => group}, socket) do
-    {:noreply, TitlebarMenu.hover(socket, group)}
-  end
-
-  def handle_event("close_titlebar_menu", _params, socket) do
-    {:noreply, TitlebarMenu.close(socket)}
-  end
-
-  def handle_event("titlebar_menu_action", %{"action" => action}, socket) do
-    {:noreply,
-     socket
-     |> TitlebarMenu.close()
-     |> handle_native_menu_action(action)}
+  def handle_event(event, params, socket) when event in @native_menu_events do
+    NativeMenuEvents.handle(event, params, socket, &handle_native_menu_action/2)
   end
 
   @impl true

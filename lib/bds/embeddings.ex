@@ -1,5 +1,11 @@
 defmodule BDS.Embeddings do
-  @moduledoc false
+  @moduledoc """
+  Context for post embeddings: build and refresh the per-project vector index,
+  sync individual posts, report indexing progress, and compute similarity.
+
+  The backing index is persisted to disk and rebuilt on demand; a failed persist
+  is retried by the next reindex.
+  """
 
   import Ecto.Query
   require Logger

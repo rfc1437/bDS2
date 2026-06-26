@@ -107,5 +107,5 @@ defmodule BDS.AI.Runtime do
     end
   end
 
-  defp blank?(value), do: value in [nil, ""]
+  defp blank?(value), do: BDS.Values.blank?(value)
 end

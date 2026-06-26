@@ -77,7 +77,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.EditorSettings do
     }
   end
 
-  defp truthy?(value), do: value in [true, "true", "on", "1", 1]
+  defp truthy?(value), do: BDS.Values.truthy?(value)
   defp boolean_string(true), do: "true"
   defp boolean_string(false), do: "false"
 end

@@ -187,7 +187,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.ManagedCategories do
     end)
   end
 
-  defp truthy?(value), do: value in [true, "true", "on", "1", 1]
+  defp truthy?(value), do: BDS.Values.truthy?(value)
 
   defp blank_to_nil(nil), do: nil
 

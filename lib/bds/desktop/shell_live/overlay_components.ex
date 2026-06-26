@@ -7,11 +7,16 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   import Ecto.Query
   require Logger
 
-  alias BDS.{I18n, Media, Metadata, Posts, Repo}
+  alias BDS.{I18n, Media, Metadata, Posts, Repo, Slug, Strings}
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Media.Translation, as: MediaTranslation
   alias BDS.Posts.{Post, PostMedia, Translation}
   alias BDS.Tags.Tag
+
+  # Expected data/DB exceptions for the overlay fallbacks below. Narrowed (not a
+  # broad `rescue error ->`) so programmer bugs (MatchError, FunctionClauseError)
+  # surface unmodified instead of being swallowed into a fallback value.
+  @overlay_rescue [Ecto.NoResultsError, Ecto.QueryError, DBConnection.ConnectionError]
 
   embed_templates("overlay_html/*")
 
@@ -71,8 +76,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     {:ok, metadata} = Metadata.get_project_metadata(project_id)
     metadata
   rescue
-    error ->
-      log_overlay_warning("project metadata", error)
+    error in @overlay_rescue ->
+      log_overlay_error("project metadata", error)
       %{main_language: "en", blog_languages: []}
   end
 
@@ -140,8 +145,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
         select: pm.media_id
     )
   rescue
-    error ->
-      log_overlay_warning("post media ids for #{post_id}", error)
+    error in @overlay_rescue ->
+      log_overlay_error("post media ids for #{post_id}", error)
       []
   end
 
@@ -155,8 +160,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     )
     |> Map.new(fn {language, status} -> {language, Atom.to_string(status || :draft)} end)
   rescue
-    error ->
-      log_overlay_warning("post translations for #{post_id}", error)
+    error in @overlay_rescue ->
+      log_overlay_error("post translations for #{post_id}", error)
       %{}
   end
 
@@ -168,8 +173,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
     )
     |> Map.new(fn {language, status} -> {language, status} end)
   rescue
-    error ->
-      log_overlay_warning("media translations for #{media_id}", error)
+    error in @overlay_rescue ->
+      log_overlay_error("media translations for #{media_id}", error)
       %{}
   end
 
@@ -188,8 +193,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       _other -> metadata.main_language || "en"
     end
   rescue
-    error ->
-      log_overlay_warning("post source language for #{post_id}", error)
+    error in @overlay_rescue ->
+      log_overlay_error("post source language for #{post_id}", error)
       metadata.main_language || "en"
   end
 
@@ -199,21 +204,16 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       _other -> metadata.main_language || "en"
     end
   rescue
-    error ->
-      log_overlay_warning("media source language for #{media_id}", error)
+    error in @overlay_rescue ->
+      log_overlay_error("media source language for #{media_id}", error)
       metadata.main_language || "en"
   end
 
   defp source_language(_tab, metadata), do: metadata.main_language || "en"
 
   defp language_names do
-    %{
-      "en" => "English",
-      "de" => "Deutsch",
-      "fr" => "Francais",
-      "it" => "Italiano",
-      "es" => "Espanol"
-    }
+    I18n.supported_languages()
+    |> Enum.into(%{}, fn language -> {language.code, I18n.language_name(language.code)} end)
   end
 
   defp language_flags do
@@ -244,7 +244,7 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
           %{
             key: "slug",
             label: BDS.Gettext.lgettext(page_language, "ui", "Slug"),
-            current_value: post.slug || slugify(post.title || title),
+            current_value: post.slug || Slug.slugify(post.title || title),
             suggested_value: "",
             locked: post.status == :published,
             loading: true
@@ -255,8 +255,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
         []
     end
   rescue
-    error ->
-      log_overlay_warning("post AI fields for #{post_id}", error)
+    error in @overlay_rescue ->
+      log_overlay_error("post AI fields for #{post_id}", error)
       []
   end
 
@@ -294,8 +294,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
         []
     end
   rescue
-    error ->
-      log_overlay_warning("media AI fields for #{media_id}", error)
+    error in @overlay_rescue ->
+      log_overlay_error("media AI fields for #{media_id}", error)
       []
   end
 
@@ -326,8 +326,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       reference_list: reference_list
     }
   rescue
-    error ->
-      log_overlay_warning("delete media details for #{media_id}", error)
+    error in @overlay_rescue ->
+      log_overlay_error("delete media details for #{media_id}", error)
 
       %{
         title: BDS.Gettext.lgettext(page_language, "ui", "Delete Media"),
@@ -349,8 +349,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       reference_list: []
     }
   rescue
-    error ->
-      log_overlay_warning("delete tag details", error)
+    error in @overlay_rescue ->
+      log_overlay_error("delete tag details", error)
 
       %{
         title: BDS.Gettext.lgettext(page_language, "ui", "Delete Tag"),
@@ -388,8 +388,8 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
       message: BDS.Gettext.lgettext(page_language, "ui", "Cannot be undone.")
     }
   rescue
-    error ->
-      log_overlay_warning("merge tag details for project #{project_id}", error)
+    error in @overlay_rescue ->
+      log_overlay_error("merge tag details for project #{project_id}", error)
 
       %{
         target: "tag",
@@ -402,20 +402,10 @@ defmodule BDS.Desktop.ShellLive.OverlayComponents do
   defp canonical_post_url(post) do
     timestamp = post.published_at || post.updated_at || System.system_time(:millisecond)
     date = DateTime.from_unix!(timestamp, :millisecond)
-    "/#{date.year}/#{pad2(date.month)}/#{pad2(date.day)}/#{post.slug || post.id}"
+    "/#{date.year}/#{Strings.pad2(date.month)}/#{Strings.pad2(date.day)}/#{post.slug || post.id}"
   end
 
-  defp pad2(value), do: value |> Integer.to_string() |> String.pad_leading(2, "0")
-
-  defp slugify(value) do
-    value
-    |> to_string()
-    |> String.downcase()
-    |> String.replace(~r/[^a-z0-9]+/u, "-")
-    |> String.trim("-")
-  end
-
-  defp log_overlay_warning(context, error) do
-    Logger.warning("overlay component fallback for #{context}: #{Exception.message(error)}")
+  defp log_overlay_error(context, error) do
+    Logger.error("overlay component fallback for #{context}: #{Exception.message(error)}")
   end
 end

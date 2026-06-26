@@ -1,5 +1,11 @@
 defmodule BDS.AI.Chat do
-  @moduledoc false
+  @moduledoc """
+  Context for AI chat conversations: start, list, fetch, and delete
+  conversations, persist surface state, and resolve the effective chat model.
+
+  Automatic AI activity is gated by the app's airplane (offline) mode; callers
+  must respect that gating before invoking model-backed operations.
+  """
 
   import Ecto.Query
   require Logger
@@ -935,5 +941,5 @@ defmodule BDS.AI.Chat do
   defp encode_nullable(nil), do: nil
   defp encode_nullable(value), do: Jason.encode!(value)
 
-  defp blank?(value), do: value in [nil, ""]
+  defp blank?(value), do: BDS.Values.blank?(value)
 end

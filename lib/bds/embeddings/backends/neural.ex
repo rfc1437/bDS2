@@ -108,7 +108,10 @@ defmodule BDS.Embeddings.Backends.Neural do
         {:reply, error, state}
     end
   rescue
-    exception ->
+    # Only genuine Nx/serving runtime errors become {:error, _}. Programmer bugs
+    # (MatchError, FunctionClauseError, …) are not caught here so they crash the
+    # supervised GenServer and surface unmodified instead of being repackaged.
+    exception in [ArgumentError, RuntimeError] ->
       {:reply, {:error, Exception.message(exception)}, state}
   end
 

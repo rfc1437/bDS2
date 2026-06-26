@@ -1,5 +1,11 @@
 defmodule BDS.Media do
-  @moduledoc false
+  @moduledoc """
+  Context for media assets and their translations: import, update, replace, and
+  delete media, and manage per-language metadata translations.
+
+  Each operation keeps the database record, the media file on disk, and the
+  derived metadata in sync.
+  """
 
   import BDS.Media.FileOps,
     only: [

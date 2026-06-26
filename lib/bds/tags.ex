@@ -1,5 +1,8 @@
 defmodule BDS.Tags do
-  @moduledoc false
+  @moduledoc """
+  Context for post tags: create, list, update, rename, delete, and merge tags,
+  and keep them in sync with posts and the on-disk `tags.json`.
+  """
 
   import Ecto.Query
 

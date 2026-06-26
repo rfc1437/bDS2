@@ -1,6 +1,20 @@
 defmodule BDS.I18nTest do
   use ExUnit.Case, async: true
 
+  test "language_name/1 returns a non-empty native autonym for exactly the supported codes" do
+    codes = Enum.map(BDS.I18n.supported_languages(), & &1.code)
+
+    for code <- codes do
+      assert BDS.I18n.language_name(code) not in [nil, ""]
+    end
+
+    assert BDS.I18n.language_name("de") == "Deutsch"
+    assert BDS.I18n.language_name("fr") == "Français"
+    assert BDS.I18n.language_name("es") == "Español"
+    # Unsupported codes fall back to the resolved render locale (default "en").
+    assert BDS.I18n.language_name("pt-BR") == "English"
+  end
+
   test "supported languages, normalization, and UI locale resolution follow the spec" do
     assert Enum.map(BDS.I18n.supported_languages(), & &1.code) == ["en", "de", "fr", "it", "es"]
 

@@ -201,18 +201,15 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
 
   defp canonical_preview_path(created_at_ms, slug) do
     datetime = DateTime.from_unix!(created_at_ms, :millisecond)
-    "/#{datetime.year}/#{pad2(datetime.month)}/#{pad2(datetime.day)}/#{slug || ""}"
+    "/#{datetime.year}/#{BDS.Strings.pad2(datetime.month)}/#{BDS.Strings.pad2(datetime.day)}/#{slug || ""}"
   end
-
-  defp pad2(value), do: value |> Integer.to_string() |> String.pad_leading(2, "0")
 
   defp maybe_put_query(query, _key, false), do: query
   defp maybe_put_query(query, _key, nil), do: query
   defp maybe_put_query(query, key, value), do: Map.put(query, key, value)
 
-  def truthy?(value) when value in [true, "true", "on", 1, "1"], do: true
-  @spec truthy?(term()) :: term()
-  def truthy?(_value), do: false
+  @spec truthy?(term()) :: boolean()
+  def truthy?(value), do: BDS.Values.truthy?(value)
 
   @spec blank?(term()) :: term()
   def blank?(value), do: blank_to_nil(value) == nil

@@ -28,12 +28,27 @@ defmodule BDS.I18n do
     "ES" => "🇪🇸"
   }
 
+  # Native autonyms — a language's self-name, not translated into the UI locale.
+  @language_names %{
+    "en" => "English",
+    "de" => "Deutsch",
+    "fr" => "Français",
+    "it" => "Italiano",
+    "es" => "Español"
+  }
+
   @default_language "en"
   @default_format_locale "en-US"
 
   def supported_languages, do: @supported_languages
 
   def default_language, do: @default_language
+
+  @doc "Native autonym (self-name) for a supported language code, e.g. \"de\" -> \"Deutsch\"."
+  def language_name(language) do
+    code = resolve_render_locale(language)
+    Map.get(@language_names, code, code)
+  end
 
   def normalize_language(language) do
     language

@@ -194,5 +194,5 @@ defmodule BDS.UI.Dashboard do
     if blank?(post.title), do: post.slug || "", else: post.title
   end
 
-  defp blank?(value), do: value in [nil, ""]
+  defp blank?(value), do: BDS.Values.blank?(value)
 end

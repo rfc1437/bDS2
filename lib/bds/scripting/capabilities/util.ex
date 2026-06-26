@@ -160,7 +160,7 @@ defmodule BDS.Scripting.Capabilities.Util do
   def truthy?(value), do: value in [true, "true", 1, 1.0, "1"]
 
   @spec pad2(integer()) :: String.t()
-  def pad2(value), do: value |> Integer.to_string() |> String.pad_leading(2, "0")
+  defdelegate pad2(value), to: BDS.Strings
 
   @spec blank_to_nil(term()) :: term()
   def blank_to_nil(nil), do: nil

@@ -1,5 +1,11 @@
 defmodule BDS.Generation do
-  @moduledoc false
+  @moduledoc """
+  Context for static-site generation: plan, generate, and validate a project's
+  rendered output, apply validation results, and write generated files.
+
+  Generation is organised into sections (defaulting to `:core`) so callers can
+  regenerate a subset of the site.
+  """
 
   import Ecto.Query
 

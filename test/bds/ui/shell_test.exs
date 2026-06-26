@@ -552,7 +552,13 @@ defmodule BDS.UI.ShellTest do
              "phx-window-keydown={if(@titlebar_menu_group, do: \"titlebar_menu_keydown\")}"
 
     assert template =~ "window-titlebar-menu-group"
-    assert live_ex =~ ~s(def handle_event("titlebar_menu_keydown")
+
+    # titlebar/native menu events are routed from ShellLive to NativeMenuEvents.
+    native_menu_ex =
+      File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/native_menu_events.ex")
+
+    assert live_ex =~ "@native_menu_events"
+    assert native_menu_ex =~ ~s(def handle("titlebar_menu_keydown")
     assert live_ex =~ "titlebar_menu_item_index"
   end
 

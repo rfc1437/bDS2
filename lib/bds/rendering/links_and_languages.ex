@@ -120,7 +120,7 @@ defmodule BDS.Rendering.LinksAndLanguages do
 
   defp post_date_path_parts(created_at) do
     datetime = Persistence.from_unix_ms!(created_at)
-    year_month_path_parts(datetime) ++ [pad2(datetime.day)]
+    year_month_path_parts(datetime) ++ [BDS.Strings.pad2(datetime.day)]
   end
 
   defp year_month_path_parts(created_at) when is_integer(created_at) do
@@ -130,13 +130,11 @@ defmodule BDS.Rendering.LinksAndLanguages do
   end
 
   defp year_month_path_parts(%DateTime{} = datetime) do
-    [Integer.to_string(datetime.year), pad2(datetime.month)]
+    [Integer.to_string(datetime.year), BDS.Strings.pad2(datetime.month)]
   end
 
   defp normalize_language_prefix(prefix) when is_binary(prefix) and prefix != "",
     do: String.trim_trailing(prefix, "/")
 
   defp normalize_language_prefix(_prefix), do: ""
-
-  defp pad2(value), do: value |> Integer.to_string() |> String.pad_leading(2, "0")
 end

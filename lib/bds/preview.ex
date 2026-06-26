@@ -1,5 +1,11 @@
 defmodule BDS.Preview do
-  @moduledoc false
+  @moduledoc """
+  GenServer that runs the local, self-contained preview server for a project.
+
+  Starts/stops per-project preview rendering and serves rendered pages and draft
+  previews via `request/2` and `preview_draft/3`. Generated HTML references only
+  local, package-bundled assets — never remote CDN JS/CSS.
+  """
 
   use GenServer
   require Logger
@@ -22,10 +28,12 @@ defmodule BDS.Preview do
   @listen_retry_attempts 10
   @listen_retry_delay_ms 50
 
+  @spec start_link(term()) :: GenServer.on_start()
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
+  @spec start_preview(String.t()) :: {:ok, map()} | {:error, term()}
   def start_preview(project_id) when is_binary(project_id) do
     project = Projects.get_project!(project_id)
 
@@ -35,6 +43,7 @@ defmodule BDS.Preview do
     )
   end
 
+  @spec ensure_preview(String.t()) :: {:ok, map()} | {:error, term()}
   def ensure_preview(project_id) when is_binary(project_id) do
     project = Projects.get_project!(project_id)
 
@@ -44,6 +53,7 @@ defmodule BDS.Preview do
     )
   end
 
+  @spec base_url() :: String.t()
   def base_url do
     case :ets.whereis(@server_table) do
       :undefined -> "http://#{@host}:#{@preferred_port}"
@@ -56,10 +66,12 @@ defmodule BDS.Preview do
     end
   end
 
+  @spec stop_preview(String.t()) :: :ok | {:error, term()}
   def stop_preview(project_id) when is_binary(project_id) do
     GenServer.call(__MODULE__, {:stop_preview, project_id})
   end
 
+  @spec request(String.t(), String.t()) :: {:ok, map()} | {:error, term()}
   def request(project_id, request_path) when is_binary(project_id) and is_binary(request_path) do
     {path, query_params} = split_request_path(request_path)
 
@@ -68,6 +80,7 @@ defmodule BDS.Preview do
     end)
   end
 
+  @spec preview_draft(String.t(), String.t(), String.t()) :: {:ok, map()} | {:error, term()}
   def preview_draft(project_id, request_path, post_id)
       when is_binary(project_id) and is_binary(request_path) and is_binary(post_id) do
     {_path, query_params} = split_request_path(request_path)

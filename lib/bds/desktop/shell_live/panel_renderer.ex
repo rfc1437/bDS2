@@ -300,5 +300,5 @@ defmodule BDS.Desktop.ShellLive.PanelRenderer do
     "#{rounded}%"
   end
 
-  defp present?(value), do: value not in [nil, ""]
+  defp present?(value), do: BDS.Values.present?(value)
 end

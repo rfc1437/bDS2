@@ -227,8 +227,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.DraftManagement do
     active_language == canonical_language or not Map.has_key?(translations, active_language)
   end
 
-  defp truthy?(value) when value in [true, "true", "on", 1, "1"], do: true
-  defp truthy?(_value), do: false
+  defp truthy?(value), do: BDS.Values.truthy?(value)
 
   defp blank_to_nil(value) do
     value
