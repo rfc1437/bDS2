@@ -3,7 +3,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   use Phoenix.LiveComponent
 
-  alias BDS.{AI, Embeddings, Metadata, Posts, Preview}
+  alias BDS.{AI, Embeddings, Metadata, Posts, Preview, Tasks}
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.{EditorImageDrop, Notify}
   alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, ListValues, Persistence, PostMetadata}
@@ -127,6 +127,15 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       socket
       |> assign(Map.drop(assigns, [:action, :language]))
       |> do_translate(language)
+
+    {:ok, socket}
+  end
+
+  def update(%{action: :translation_completed, language: language} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action, :language]))
+      |> apply_translation_completed(language)
 
     {:ok, socket}
   end
@@ -808,34 +817,56 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       post_id = socket.assigns.post_id
       normalized_language = normalize_language(language, "")
       source_language = socket.assigns.canonical_language
+      project_id = socket.assigns.post.project_id
+      parent = self()
 
-      case AI.translate_post(post_id, normalized_language, source_language: source_language) do
-        {:ok, translation} ->
-          with {:ok, _saved_translation} <-
-                 Posts.upsert_post_translation(post_id, normalized_language, %{
-                   title: translation.title,
-                   excerpt: translation.excerpt,
-                   content: translation.content
-                 }) do
-            socket =
-              socket
-              |> assign(:active_language, normalized_language)
-              |> assign(:drafts, Map.delete(socket.assigns.drafts, normalized_language))
-              |> assign(:quick_actions_open?, false)
-              |> build_data()
+      {:ok, _task} =
+        Tasks.submit_task(
+          "Translate Post to #{normalized_language}",
+          fn report ->
+            report.(0.1, "Translating post to #{normalized_language}")
 
-            Notify.dirty(:post, post_id, false)
-            socket
-          else
-            {:error, reason} ->
-              notify_output(socket, dgettext("ui", "Translate"), inspect(reason), "error")
-              |> build_data()
-          end
+            with {:ok, translation} <-
+                   AI.translate_post(post_id, normalized_language,
+                     source_language: source_language
+                   ),
+                 {:ok, _saved_translation} <-
+                   Posts.upsert_post_translation(post_id, normalized_language, %{
+                     title: translation.title,
+                     excerpt: translation.excerpt,
+                     content: translation.content
+                   }) do
+              report.(1.0, "Post translation complete")
+              send(parent, {:editor_translation_completed, :post, post_id, normalized_language})
+              %{post_id: post_id, language: normalized_language}
+            else
+              {:error, reason} -> {:error, reason}
+            end
+          end,
+          %{group_id: project_id, group_name: "AI"}
+        )
 
-        {:error, reason} ->
-          notify_output(socket, dgettext("ui", "Translate"), inspect(reason), "error")
+      socket
+      |> assign(:quick_actions_open?, false)
+      |> build_data()
+    end
+  end
+
+  defp apply_translation_completed(socket, language) do
+    case Posts.get_post(socket.assigns.post_id) do
+      nil ->
+        build_data(socket)
+
+      %Post{} = post ->
+        socket =
+          socket
+          |> assign(:post, post)
+          |> assign(:active_language, language)
+          |> assign(:drafts, Map.delete(socket.assigns.drafts, language))
           |> build_data()
-      end
+
+        Notify.dirty(:post, post.id, false)
+        socket
     end
   end
 

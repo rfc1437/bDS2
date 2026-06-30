@@ -224,6 +224,14 @@ defmodule BDS.Generation do
   end
 
   def apply_validation(project_id, report) when is_binary(project_id) and is_map(report) do
+    apply_validation(project_id, report, [])
+  end
+
+  @spec apply_validation(String.t(), map(), generation_opts()) :: {:ok, map()} | {:error, term()}
+  def apply_validation(project_id, report, opts)
+      when is_binary(project_id) and is_map(report) and is_list(opts) do
+    on_progress = callback(opts)
+
     with {:ok, plan} <- plan_generation(project_id, @core_sections) do
       expected_outputs = build_outputs(plan)
       expected_output_map = Map.new(expected_outputs)
@@ -247,11 +255,19 @@ defmodule BDS.Generation do
           )
         end)
 
-      Enum.each(outputs_to_render, fn {relative_path, content} ->
+      total_to_render = length(outputs_to_render)
+      :ok = report_generation_started(on_progress, total_to_render, "validation routes")
+
+      outputs_to_render
+      |> Enum.with_index(1)
+      |> Enum.each(fn {{relative_path, content}, index} ->
         _ =
           write_generated_file(project_id, relative_path, content,
             refresh_timestamp_on_unchanged: route_html_path?(relative_path)
           )
+
+        :ok =
+          report_generation_progress(on_progress, index, total_to_render, "validation routes")
       end)
 
       {deleted_url_count, removed_empty_dir_count} =

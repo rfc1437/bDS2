@@ -262,6 +262,30 @@ defmodule BDS.Desktop.ShellCommands do
     end)
   end
 
+  defp dispatch("apply_site_validation", project, params) do
+    report = normalize_apply_validation_report(BDS.MapUtils.attr(params, :report, %{}))
+
+    queue_task(
+      project,
+      "apply_site_validation",
+      "Apply Site Validation",
+      "Generation",
+      fn report_fn ->
+        {:ok, _apply} =
+          Generation.apply_validation(project.id, report,
+            on_progress: scaled_progress_reporter(report_fn, 0.0, 0.85)
+          )
+
+        {:ok, validation} =
+          Generation.validate_site(project.id, @site_sections,
+            on_progress: scaled_progress_reporter(report_fn, 0.85, 1.0)
+          )
+
+        site_validation_result(project.id, validation)
+      end
+    )
+  end
+
   defp dispatch("metadata_diff", project, _params) do
     queue_task(project, "metadata_diff", "Metadata Diff", "Maintenance", fn report ->
       {:ok, metadata_diff} = Maintenance.metadata_diff(project.id, on_progress: report)
@@ -639,6 +663,20 @@ defmodule BDS.Desktop.ShellCommands do
   defp preview_url(server) do
     "http://#{server.host}:#{server.port}/"
   end
+
+  defp normalize_apply_validation_report(report) when is_map(report) do
+    %{
+      sitemap_path: BDS.MapUtils.attr(report, :sitemap_path),
+      sitemap_changed: BDS.MapUtils.attr(report, :sitemap_changed, false),
+      missing_url_paths: BDS.MapUtils.attr(report, :missing_url_paths, []),
+      extra_url_paths: BDS.MapUtils.attr(report, :extra_url_paths, []),
+      updated_post_url_paths: BDS.MapUtils.attr(report, :updated_post_url_paths, []),
+      expected_url_count: BDS.MapUtils.attr(report, :expected_url_count, 0),
+      existing_html_url_count: BDS.MapUtils.attr(report, :existing_html_url_count, 0)
+    }
+  end
+
+  defp normalize_apply_validation_report(_report), do: %{}
 
   defp normalize_site_validation(report) do
     %{

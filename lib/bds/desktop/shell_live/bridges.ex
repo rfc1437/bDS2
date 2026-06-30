@@ -5,7 +5,7 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   import Phoenix.LiveView, only: [connected?: 1, send_update: 2]
 
   alias BDS.Desktop.ShellData
-  alias BDS.Desktop.ShellLive.{ChatEditor, PostEditor}
+  alias BDS.Desktop.ShellLive.{ChatEditor, MediaEditor, PostEditor}
   alias BDS.Desktop.ShellLive.{CliSync, SessionUtil}
   alias BDS.UI.Workbench
 
@@ -213,6 +213,26 @@ defmodule BDS.Desktop.ShellLive.Bridges do
 
   def handle_info({:post_editor_translate, post_id, language}, socket, _callbacks) do
     send_update(PostEditor, id: "post-editor-#{post_id}", action: :translate, language: language)
+    {:noreply, socket}
+  end
+
+  def handle_info({:editor_translation_completed, :post, post_id, language}, socket, _callbacks) do
+    send_update(PostEditor,
+      id: "post-editor-#{post_id}",
+      action: :translation_completed,
+      language: language
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:editor_translation_completed, :media, media_id, language}, socket, _callbacks) do
+    send_update(MediaEditor,
+      id: "media-editor-#{media_id}",
+      action: :translation_completed,
+      language: language
+    )
+
     {:noreply, socket}
   end
 

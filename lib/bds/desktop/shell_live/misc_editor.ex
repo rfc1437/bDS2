@@ -6,7 +6,7 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   import Phoenix.HTML, only: [raw: 1]
   import Ecto.Query
 
-  alias BDS.{Embeddings, Generation, Git, HelpDocs, Posts, Repo}
+  alias BDS.{Embeddings, Git, HelpDocs, Posts, Repo}
   alias BDS.Desktop.ShellLive.Notify
   alias BDS.MapUtils
   alias BDS.Settings.Setting
@@ -77,7 +77,6 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
   def handle_event("apply_site_validation", _params, socket) do
     meta = meta(socket.assigns)
     payload = Map.get(meta, :payload, %{})
-    project_id = Map.get(meta, :project_id, socket.assigns.project_id)
 
     report = %{
       sitemap_path: Map.get(payload, :sitemap_path),
@@ -89,21 +88,8 @@ defmodule BDS.Desktop.ShellLive.MiscEditor do
       existing_html_url_count: Map.get(payload, :existing_html_url_count, 0)
     }
 
-    case Generation.apply_validation(project_id, report) do
-      {:ok, result} ->
-        notify_output(
-          dgettext("ui", "Site Validation"),
-          dgettext("ui", "Validation changes applied"),
-          inspect(result)
-        )
-
-        notify_command("validate_site")
-        {:noreply, socket}
-    end
-  rescue
-    error ->
-      notify_output(dgettext("ui", "Site Validation"), inspect(error), nil, "error")
-      {:noreply, socket}
+    notify_command("apply_site_validation", %{report: report})
+    {:noreply, socket}
   end
 
   def handle_event("fix_translation_validation", _params, socket) do

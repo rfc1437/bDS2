@@ -7,7 +7,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
   alias BDS.Desktop.{FilePicker}
   alias BDS.Desktop.ShellLive.Notify
-  alias BDS.{AI, I18n, Media}
+  alias BDS.{AI, I18n, Media, Tasks}
   alias BDS.Media.Media, as: MediaRecord
   alias BDS.Media.Translation
   alias BDS.Posts.Post
@@ -53,6 +53,17 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
       socket
       |> assign(Map.drop(assigns, [:action, :language]))
       |> do_translate(language)
+
+    {:ok, socket}
+  end
+
+  def update(%{action: :translation_completed} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action, :language]))
+      |> assign(:quick_actions_open?, false)
+      |> assign(:editing_translation, nil)
+      |> build_data()
 
     {:ok, socket}
   end
@@ -552,25 +563,34 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
       media = socket.assigns.media
       normalized_language = normalize_language(language)
       source_language = normalize_language(media.language)
+      parent = self()
 
-      case AI.translate_media(media.id, normalized_language, source_language: source_language) do
-        {:ok, translation} ->
-          case Media.upsert_media_translation(media.id, normalized_language, translation) do
-            {:ok, _saved_translation} ->
-              socket
-              |> assign(:quick_actions_open?, false)
-              |> assign(:editing_translation, nil)
-              |> build_data()
+      {:ok, _task} =
+        Tasks.submit_task(
+          "Translate Media to #{normalized_language}",
+          fn report ->
+            report.(0.1, "Translating media to #{normalized_language}")
 
-            {:error, reason} ->
-              notify_output(socket, dgettext("ui", "Translate"), inspect(reason), "error")
-              |> build_data()
-          end
+            with {:ok, translation} <-
+                   AI.translate_media(media.id, normalized_language,
+                     source_language: source_language
+                   ),
+                 {:ok, _saved_translation} <-
+                   Media.upsert_media_translation(media.id, normalized_language, translation) do
+              report.(1.0, "Media translation complete")
+              send(parent, {:editor_translation_completed, :media, media.id, normalized_language})
+              %{media_id: media.id, language: normalized_language}
+            else
+              {:error, reason} -> {:error, reason}
+            end
+          end,
+          %{group_id: media.project_id, group_name: "AI"}
+        )
 
-        {:error, reason} ->
-          notify_output(socket, dgettext("ui", "Translate"), inspect(reason), "error")
-          |> build_data()
-      end
+      socket
+      |> assign(:quick_actions_open?, false)
+      |> assign(:editing_translation, nil)
+      |> build_data()
     end
   end
 
