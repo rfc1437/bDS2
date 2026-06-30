@@ -3,7 +3,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   use Phoenix.LiveComponent
 
-  alias BDS.{AI, Metadata, Posts, Preview}
+  alias BDS.{AI, Embeddings, Metadata, Posts, Preview}
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.{EditorImageDrop, Notify}
   alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, ListValues, Persistence, PostMetadata}
@@ -12,7 +12,6 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   import DraftManagement,
     only: [
-      current_draft: 4,
       editing_canonical_language?: 3,
       normalize_language: 2,
       normalize_mode: 1,
@@ -288,6 +287,10 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     {:noreply, do_detect_language(socket)}
   end
 
+  def handle_event("focus_post_editor_tags", _params, socket) do
+    {:noreply, socket |> load_tag_semantic_suggestions() |> build_data()}
+  end
+
   def handle_event("add_post_editor_tag", %{"tag" => tag}, socket) do
     {:noreply, do_add_list_value(socket, :tags, tag)}
   end
@@ -325,6 +328,19 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     {:noreply, socket}
   end
 
+  # Semantic tag suggestions read the embeddings index (no live model call), so
+  # they work offline; suggest_tags/2 returns [] when similarity is disabled.
+  defp load_tag_semantic_suggestions(socket) do
+    case socket.assigns.post do
+      %Post{} = post ->
+        {:ok, suggestions} = Embeddings.suggest_tags(post.id, [])
+        assign(socket, :tag_semantic_suggestions, suggestions)
+
+      _other ->
+        socket
+    end
+  end
+
   defp component_current_draft(socket, post, metadata, active_language) do
     persisted = persisted_form(post, metadata, active_language)
     Map.get(socket.assigns.drafts, active_language, persisted)
@@ -344,6 +360,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
       active_language: canonical,
       drafts: %{},
       tag_query: "",
+      tag_semantic_suggestions: [],
       category_query: "",
       quick_actions_open?: false,
       mode: :markdown,
@@ -434,6 +451,11 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
               form,
               Tags.list_tags(post.project_id),
               socket.assigns.tag_query
+            ),
+          tag_semantic_suggestions:
+            Enum.reject(
+              socket.assigns.tag_semantic_suggestions || [],
+              &(&1 in tag_values(form))
             ),
           category_suggestions:
             category_suggestions(
@@ -959,7 +981,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     active_language = socket.assigns.active_language
     post = socket.assigns.post
     metadata = socket.assigns.project_metadata
-    draft = current_draft(socket.assigns, post, metadata, active_language)
+    draft = component_current_draft(socket, post, metadata, active_language)
     updated = Map.put(draft, field, value)
     assign(socket, :drafts, Map.put(socket.assigns.drafts, active_language, updated))
   end

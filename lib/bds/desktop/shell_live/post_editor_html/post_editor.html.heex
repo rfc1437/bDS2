@@ -173,8 +173,21 @@
                   value={@post_editor.tag_query}
                   placeholder={dgettext("ui", "Add tag")}
                   autocomplete="off"
+                  phx-focus="focus_post_editor_tags"
+                  phx-target={@myself}
                 />
               </div>
+
+              <%= if String.trim(@post_editor.tag_query || "") == "" and Enum.any?(@post_editor.tag_semantic_suggestions) do %>
+                <div class="tag-suggestions tag-suggestions-semantic mt-2 flex flex-col">
+                  <div class="tag-suggestion-section-label"><%= dgettext("ui", "Suggested tags") %></div>
+                  <%= for name <- @post_editor.tag_semantic_suggestions do %>
+                    <button class="tag-suggestion ai-suggested" type="button" phx-click="add_post_editor_tag" phx-value-tag={name} phx-target={@myself}>
+                      <span class="tag-suggestion-name"><%= name %></span>
+                    </button>
+                  <% end %>
+                </div>
+              <% end %>
 
               <%= if String.trim(@post_editor.tag_query || "") != "" and (Enum.any?(@post_editor.tag_suggestions) or @post_editor.tag_query_addable?) do %>
                 <div class="tag-suggestions mt-2 flex flex-col">

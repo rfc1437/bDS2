@@ -61,6 +61,7 @@ defmodule BDS.Desktop.ShellLiveTest do
         tag_chips: [%{name: "elixir", color: "#3b82f6"}],
         tag_query: "",
         tag_suggestions: [],
+        tag_semantic_suggestions: [],
         tag_query_addable?: false,
         languages: ["en", "de"],
         detect_language_enabled?: true,
@@ -2876,6 +2877,59 @@ defmodule BDS.Desktop.ShellLiveTest do
              diff.diff_reports,
              &(&1.entity_type == "embedding" and &1.entity_id == published_post.id)
            )
+  end
+
+  test "focusing the post editor tag input surfaces semantic suggestions from similar posts", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{semantic_similarity_enabled: true})
+
+    {:ok, neighbor} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Rocket Science",
+        content: "space rocket orbit mission galaxy launch trajectory",
+        tags: ["astronomy"],
+        language: "en"
+      })
+
+    assert {:ok, _published} = Posts.publish_post(neighbor.id)
+
+    {:ok, draft} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Orbital Mechanics",
+        content: "space rocket orbit mission galaxy launch propulsion",
+        language: "en"
+      })
+
+    assert {:ok, _indexed} = BDS.Embeddings.index_unindexed(project.id)
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    render_click(view, "pin_sidebar_item", %{
+      "route" => "post",
+      "id" => draft.id,
+      "title" => draft.title,
+      "subtitle" => "draft"
+    })
+
+    html =
+      view
+      |> element("[phx-focus='focus_post_editor_tags']")
+      |> render_focus()
+
+    assert html =~ "astronomy"
+
+    html =
+      view
+      |> element(".tag-suggestion.ai-suggested", "astronomy")
+      |> render_click()
+
+    # Editor must stay open and the tag must be stored.
+    assert html =~ ~s(data-testid="post-editor")
+    assert html =~ ~s(<input type="hidden" name="post_editor[tags]" value="astronomy")
   end
 
   test "post tabs render a real editor and drive save publish discard flows", %{project: project} do
