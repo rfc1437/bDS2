@@ -215,7 +215,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
       case {socket.assigns[:shell_overlay], current_tab} do
         {%{kind: :language_picker}, %{type: :post, id: post_id}} ->
           Notify.parent({:post_editor_translate, post_id, code})
-          socket
+          assign(socket, :shell_overlay, nil)
 
         {%{kind: :language_picker}, %{type: :media, id: media_id}} ->
           send_update(MediaEditor,
@@ -224,7 +224,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
             language: code
           )
 
-          socket
+          assign(socket, :shell_overlay, nil)
 
         _other ->
           socket
