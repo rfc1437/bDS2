@@ -26,6 +26,20 @@ export const MonacoEditor = {
 
       const value = this.textarea.value || "";
 
+      // ponytail: ignore the server echoing back our own last-emitted value;
+      // only a genuinely remote value (translation switch, etc.) should reset
+      // the editor. Otherwise mid-typing echoes clobber the cursor to offset 0.
+      if (value === this.lastKnownValue) {
+        return;
+      }
+
+      // While the user is actively typing, Monaco owns the content. Never let a
+      // server re-render (autosave, dirty toggle, metadata) yank it out from
+      // under the cursor — reconcile only once the editor is blurred.
+      if (this.editor.hasTextFocus()) {
+        return;
+      }
+
       if (this.editor.getValue() !== value) {
         this.isApplyingRemoteUpdate = true;
         this.editor.setValue(value);

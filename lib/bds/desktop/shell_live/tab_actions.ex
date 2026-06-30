@@ -18,7 +18,7 @@ defmodule BDS.Desktop.ShellLive.TabActions do
         %{assigns: %{current_tab: %{type: :post, id: post_id}, workbench: workbench}} = socket
       ) do
     if Workbench.dirty?(workbench, :post, post_id) do
-      Phoenix.LiveView.send_update(PostEditor, id: "post-editor-#{post_id}", action: :save)
+      Phoenix.LiveView.send_update(PostEditor, id: "post-editor-#{post_id}", action: :auto_save)
     end
 
     socket

@@ -82,6 +82,15 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     {:ok, socket}
   end
 
+  def update(%{action: :auto_save} = assigns, socket) do
+    socket =
+      socket
+      |> assign(Map.drop(assigns, [:action]))
+      |> do_save(true)
+
+    {:ok, socket}
+  end
+
   def update(%{action: :publish} = assigns, socket) do
     socket =
       socket
@@ -451,7 +460,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
     end
   end
 
-  defp do_save(socket) do
+  defp do_save(socket, keep_draft? \\ false) do
     post = socket.assigns.post
 
     case post do
@@ -468,10 +477,19 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
             refreshed_post = Posts.get_post!(post.id)
             _refreshed_form = persisted_form(refreshed_post, metadata, active_language)
 
+            # Autosave keeps the working draft so the live editor stays the source
+            # of truth; only an explicit save drops it and reloads canonical body.
+            drafts =
+              if keep_draft? do
+                socket.assigns.drafts
+              else
+                Map.delete(socket.assigns.drafts, active_language)
+              end
+
             socket =
               socket
               |> assign(:post, refreshed_post)
-              |> assign(:drafts, Map.delete(socket.assigns.drafts, active_language))
+              |> assign(:drafts, drafts)
               |> assign(:save_state, save_state_for_action(:save))
               |> assign(:dirty?, false)
               |> build_data()
