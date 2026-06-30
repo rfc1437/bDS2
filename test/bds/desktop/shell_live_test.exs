@@ -3095,6 +3095,115 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert discarded_post.title == "Updated Shell Post"
   end
 
+  test "publishing a draft post moves it to the published section in the sidebar", %{
+    project: project
+  } do
+    assert {:ok, post} =
+             Posts.create_post(%{project_id: project.id, title: "Sidebar Status Post"})
+
+    {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert sidebar_section_status_for(html, post.id) == :draft
+
+    _html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='#{post.id}']")
+      |> render_click()
+
+    _html =
+      view
+      |> element("[data-testid='post-publish-button']")
+      |> render_click()
+
+    assert Posts.get_post!(post.id).status == :published
+
+    assert sidebar_section_status_for(render(view), post.id) == :published
+  end
+
+  test "renaming a post title updates the sidebar entry on save", %{project: project} do
+    {:ok, post} =
+      Posts.create_post(%{
+        project_id: project.id,
+        title: "Original Sidebar Title",
+        content: "Initial body"
+      })
+
+    {:ok, view, html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    assert html =~ "Original Sidebar Title"
+
+    _html =
+      render_click(view, "pin_sidebar_item", %{
+        "route" => "post",
+        "id" => post.id,
+        "title" => post.title,
+        "subtitle" => "draft"
+      })
+
+    _html =
+      view
+      |> form("[data-testid='post-editor-form']", %{
+        post_editor: %{
+          title: "Renamed Sidebar Title",
+          content: "Initial body",
+          excerpt: "",
+          tags: "",
+          categories: "",
+          author: "",
+          language: "de",
+          do_not_translate: "false"
+        }
+      })
+      |> render_change()
+
+    _html = render_hook(view, "native_menu_action", %{"action" => "save"})
+
+    # Flush the send_update -> editor_tab_meta message chain so the sidebar
+    # refresh triggered by the save is applied before we inspect the markup.
+    _ = render(view)
+    html = render(view)
+    assert Posts.get_post!(post.id).title == "Renamed Sidebar Title"
+
+    assert sidebar_title_present?(html, post.id, "Renamed Sidebar Title")
+    refute sidebar_title_present?(html, post.id, "Original Sidebar Title")
+  end
+
+  defp sidebar_section_status_for(html, post_id) do
+    html
+    |> sidebar_section_blocks()
+    |> Enum.find(&String.contains?(&1, ~s(data-item-id="#{post_id}")))
+    |> case do
+      nil ->
+        nil
+
+      block ->
+        cond do
+          String.contains?(block, "status-published") -> :published
+          String.contains?(block, "status-archived") -> :archived
+          String.contains?(block, "status-draft") -> :draft
+          true -> nil
+        end
+    end
+  end
+
+  defp sidebar_title_present?(html, post_id, title) do
+    html
+    |> sidebar_section_blocks()
+    |> Enum.filter(&String.contains?(&1, ~s(data-item-id="#{post_id}")))
+    |> Enum.any?(&String.contains?(&1, title))
+  end
+
+  defp sidebar_section_blocks(html) do
+    html
+    |> String.split(~s(<section class="sidebar-section">))
+    |> Enum.drop(1)
+    |> Enum.map(fn chunk ->
+      chunk
+      |> String.split("</section>")
+      |> List.first()
+    end)
+  end
+
   defp completed_task!(task_id, attempts \\ 50)
 
   defp completed_task!(_task_id, 0), do: flunk("task did not complete in time")

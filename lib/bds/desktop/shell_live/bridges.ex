@@ -9,7 +9,7 @@ defmodule BDS.Desktop.ShellLive.Bridges do
   alias BDS.Desktop.ShellLive.{CliSync, SessionUtil}
   alias BDS.UI.Workbench
 
-  @refreshable_tab_meta_types [:import, :chat]
+  @refreshable_tab_meta_types [:import, :chat, :post, :media]
 
   @spec handle_info(tuple() | atom(), Phoenix.LiveView.Socket.t(), map()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
