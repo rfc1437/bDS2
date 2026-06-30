@@ -1,11 +1,11 @@
 #: lib/bds/rendering/labels.ex:18
 #: lib/bds/ui/sidebar.ex:288
-#: lib/bds/ui/sidebar.ex:589
+#: lib/bds/ui/sidebar.ex:566
 #, elixir-autogen, elixir-format
 msgid "Archive"
 msgstr "Archiv"
 
-#: lib/bds/rendering/labels.ex:55
+#: lib/bds/rendering/labels.ex:48
 #, elixir-autogen, elixir-format
 msgid "April"
 msgstr "Apr."
@@ -15,7 +15,7 @@ msgstr "Apr."
 msgid "Archive calendar"
 msgstr "Archiv"
 
-#: lib/bds/rendering/labels.ex:71
+#: lib/bds/rendering/labels.ex:52
 #, elixir-autogen, elixir-format
 msgid "August"
 msgstr "Aug."
@@ -35,27 +35,27 @@ msgstr "Kalenderdaten konnten nicht geladen werden."
 msgid "Close calendar"
 msgstr "Kalender schließen"
 
-#: lib/bds/rendering/labels.ex:87
+#: lib/bds/rendering/labels.ex:56
 #, elixir-autogen, elixir-format
 msgid "December"
 msgstr "Dezember"
 
-#: lib/bds/rendering/labels.ex:47
+#: lib/bds/rendering/labels.ex:46
 #, elixir-autogen, elixir-format
 msgid "February"
 msgstr "Februar"
 
-#: lib/bds/rendering/labels.ex:43
+#: lib/bds/rendering/labels.ex:45
 #, elixir-autogen, elixir-format
 msgid "January"
 msgstr "Januar"
 
-#: lib/bds/rendering/labels.ex:67
+#: lib/bds/rendering/labels.ex:51
 #, elixir-autogen, elixir-format
 msgid "July"
 msgstr "Juli"
 
-#: lib/bds/rendering/labels.ex:63
+#: lib/bds/rendering/labels.ex:50
 #, elixir-autogen, elixir-format
 msgid "June"
 msgstr "Juni"
@@ -75,22 +75,22 @@ msgstr "Verlinkt von"
 msgid "Loading calendar…"
 msgstr "Kalender wird geladen …"
 
-#: lib/bds/rendering/labels.ex:51
+#: lib/bds/rendering/labels.ex:47
 #, elixir-autogen, elixir-format
 msgid "March"
 msgstr "März"
 
-#: lib/bds/rendering/labels.ex:59
+#: lib/bds/rendering/labels.ex:49
 #, elixir-autogen, elixir-format
 msgid "May"
 msgstr "Mai"
 
-#: lib/bds/rendering/labels.ex:83
+#: lib/bds/rendering/labels.ex:55
 #, elixir-autogen, elixir-format
 msgid "November"
 msgstr "Nov."
 
-#: lib/bds/rendering/labels.ex:79
+#: lib/bds/rendering/labels.ex:54
 #, elixir-autogen, elixir-format
 msgid "October"
 msgstr "Oktober"
@@ -110,7 +110,7 @@ msgstr "Seitennummerierung"
 msgid "Search..."
 msgstr "Suchen..."
 
-#: lib/bds/rendering/labels.ex:75
+#: lib/bds/rendering/labels.ex:53
 #, elixir-autogen, elixir-format
 msgid "September"
 msgstr "Sept."

@@ -904,6 +904,59 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert html =~ ~s(data-tab-id="#{created_post.id}")
   end
 
+  test "blogmark deep link with a project_id switches to that project and imports there",
+       %{project: active} do
+    {:ok, other} =
+      Projects.create_project(%{
+        name: "Other Blog",
+        data_path: Path.join(System.tmp_dir!(), "bds-other-#{System.unique_integer([:positive])}")
+      })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    url =
+      "bds2://new-post?title=" <>
+        URI.encode_www_form("Cross Project") <>
+        "&url=" <> URI.encode_www_form("https://example.com/x") <>
+        "&project_id=" <> other.id
+
+    send(view.pid, {:blogmark_deep_link, url})
+    html = render(view)
+
+    created_post = Repo.get_by!(Post, title: "Cross Project")
+    # Imported into the link's project, not the one that was active.
+    assert created_post.project_id == other.id
+    refute created_post.project_id == active.id
+    # And the shell switched the active project to the link's target.
+    assert Projects.get_active_project().id == other.id
+    assert html =~ ~s(data-tab-id="#{created_post.id}")
+  end
+
+  test "blogmark deep link with an unknown project_id fails without importing", %{project: active} do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+    post_count_before = Repo.aggregate(Post, :count, :id)
+
+    url =
+      "bds2://new-post?title=" <>
+        URI.encode_www_form("Stale Link") <>
+        "&url=" <> URI.encode_www_form("https://example.com/s") <>
+        "&project_id=does-not-exist-00000000-0000-0000-0000-000000000000"
+
+    send(view.pid, {:blogmark_deep_link, url})
+    _html = render(view)
+
+    # No post is created, and the active project is left untouched.
+    assert Repo.aggregate(Post, :count, :id) == post_count_before
+    assert Projects.get_active_project().id == active.id
+
+    # The user is told the targeted project does not exist (error toast entry).
+    entries = :sys.get_state(view.pid).socket.assigns.output_entries
+
+    assert Enum.any?(entries, fn entry ->
+             entry.level == "error" and entry.message =~ "does not exist here"
+           end)
+  end
+
   test "settings sidebar selections expose a scroll target for the preferences editor" do
     {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 

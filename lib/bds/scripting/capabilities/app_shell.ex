@@ -20,34 +20,49 @@ defmodule BDS.Scripting.Capabilities.AppShell do
     if test_mode?() do
       true
     else
-      command = string_or_nil(text)
-
-      case :os.type() do
-        {:unix, :darwin} ->
-          match?({_output, 0}, System.cmd("pbcopy", [], input: command, stderr_to_stdout: true))
-
-        {:unix, _other} ->
-          match?(
-            {_output, 0},
-            System.cmd("xclip", ["-selection", "clipboard"],
-              input: command,
-              stderr_to_stdout: true
-            )
-          )
-
-        {:win32, _other} ->
-          match?(
-            {_output, 0},
-            System.cmd("cmd", ["/c", "clip"], input: command, stderr_to_stdout: true)
-          )
-      end
+      {executable, args} = clipboard_command()
+      pipe_to_clipboard(executable, args, string_or_nil(text) || "")
     end
   rescue
     _error -> false
   end
 
-  def blogmark_bookmarklet do
-    "javascript:(()=>{const t=encodeURIComponent(document.title||'');const u=encodeURIComponent(location.href||'');location.href='bds2://new-post?title='+t+'&url='+u;})();"
+  defp clipboard_command do
+    case :os.type() do
+      {:unix, :darwin} -> {"pbcopy", []}
+      {:win32, _other} -> {"cmd", ["/c", "clip"]}
+      {:unix, _other} -> {"xclip", ["-selection", "clipboard"]}
+    end
+  end
+
+  # System.cmd has no stdin option, so feed the clipboard tool through a Port.
+  # Closing the port signals EOF, which is what pbcopy/xclip/clip wait for.
+  defp pipe_to_clipboard(executable, args, input) do
+    case System.find_executable(executable) do
+      nil ->
+        false
+
+      path ->
+        port = Port.open({:spawn_executable, path}, [:binary, :use_stdio, args: args])
+        Port.command(port, input)
+        Port.close(port)
+        true
+    end
+  end
+
+  def blogmark_bookmarklet(opts \\ []) do
+    project_id = Keyword.get(opts, :project_id)
+
+    # Concatenate as a JS string literal (+'&project_id=...'), not raw text, so
+    # the generated bookmarklet stays valid JavaScript when a project is set.
+    project_param =
+      if is_binary(project_id) and project_id != "" do
+        "+'&project_id=" <> URI.encode_www_form(project_id) <> "'"
+      else
+        ""
+      end
+
+    "javascript:(()=>{const t=encodeURIComponent(document.title||'');const u=encodeURIComponent(location.href||'');location.href='bds2://new-post?title='+t+'&url='+u#{project_param};})();"
   end
 
   def title_bar_metrics(opts) do

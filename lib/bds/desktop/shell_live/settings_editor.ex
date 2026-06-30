@@ -57,6 +57,18 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor do
   @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   @impl true
+  def handle_event("copy_blogmark_bookmarklet", _params, socket) do
+    project_id = socket.assigns.projects.active_project_id
+    bookmarklet = BDS.Scripting.Capabilities.AppShell.blogmark_bookmarklet(project_id: project_id)
+
+    case BDS.Scripting.Capabilities.AppShell.copy_to_clipboard(bookmarklet, []) do
+      true -> Notify.output(dgettext("ui", "Blogmark Bookmarklet"), dgettext("ui", "Bookmarklet copied to clipboard"), "info")
+      _ -> Notify.output(dgettext("ui", "Blogmark Bookmarklet"), dgettext("ui", "Failed to copy bookmarklet to clipboard"), "error")
+    end
+
+    {:noreply, socket}
+  end
+
   def handle_event("change_settings_search", %{"query" => query}, socket) do
     socket =
       socket

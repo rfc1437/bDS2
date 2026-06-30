@@ -13,12 +13,12 @@ msgstr ""
 
 #: lib/bds/rendering/labels.ex:18
 #: lib/bds/ui/sidebar.ex:288
-#: lib/bds/ui/sidebar.ex:589
+#: lib/bds/ui/sidebar.ex:566
 #, elixir-autogen, elixir-format
 msgid "Archive"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:55
+#: lib/bds/rendering/labels.ex:48
 #, elixir-autogen, elixir-format
 msgid "April"
 msgstr ""
@@ -28,7 +28,7 @@ msgstr ""
 msgid "Archive calendar"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:71
+#: lib/bds/rendering/labels.ex:52
 #, elixir-autogen, elixir-format
 msgid "August"
 msgstr ""
@@ -48,27 +48,27 @@ msgstr ""
 msgid "Close calendar"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:87
+#: lib/bds/rendering/labels.ex:56
 #, elixir-autogen, elixir-format
 msgid "December"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:47
+#: lib/bds/rendering/labels.ex:46
 #, elixir-autogen, elixir-format
 msgid "February"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:43
+#: lib/bds/rendering/labels.ex:45
 #, elixir-autogen, elixir-format
 msgid "January"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:67
+#: lib/bds/rendering/labels.ex:51
 #, elixir-autogen, elixir-format
 msgid "July"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:63
+#: lib/bds/rendering/labels.ex:50
 #, elixir-autogen, elixir-format
 msgid "June"
 msgstr ""
@@ -88,22 +88,22 @@ msgstr ""
 msgid "Loading calendar…"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:51
+#: lib/bds/rendering/labels.ex:47
 #, elixir-autogen, elixir-format
 msgid "March"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:59
+#: lib/bds/rendering/labels.ex:49
 #, elixir-autogen, elixir-format
 msgid "May"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:83
+#: lib/bds/rendering/labels.ex:55
 #, elixir-autogen, elixir-format
 msgid "November"
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:79
+#: lib/bds/rendering/labels.ex:54
 #, elixir-autogen, elixir-format
 msgid "October"
 msgstr ""
@@ -123,7 +123,7 @@ msgstr ""
 msgid "Search..."
 msgstr ""
 
-#: lib/bds/rendering/labels.ex:75
+#: lib/bds/rendering/labels.ex:53
 #, elixir-autogen, elixir-format
 msgid "September"
 msgstr ""

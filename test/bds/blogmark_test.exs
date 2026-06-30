@@ -49,6 +49,50 @@ defmodule BDS.BlogmarkTest do
       assert candidate["categories"] == ["news"]
     end
 
+    test "strips credentials and the fragment from the url" do
+      url =
+        "bds2://new-post?title=T&url=" <>
+          URI.encode_www_form("https://user:pass@example.com/p?x=1#frag")
+
+      assert {:ok, candidate} = Blogmark.parse_deep_link(url)
+      assert candidate["url"] == "https://example.com/p?x=1"
+    end
+
+    test "drops a non-http(s) url so it cannot reach the post body" do
+      url = "bds2://new-post?title=Unsafe&url=" <> URI.encode_www_form("javascript:alert(1)")
+
+      assert {:ok, candidate} = Blogmark.parse_deep_link(url)
+      assert candidate["url"] == nil
+    end
+
+    test "drops an over-long url" do
+      long = "https://example.com/" <> String.duplicate("a", 2100)
+      url = "bds2://new-post?title=T&url=" <> URI.encode_www_form(long)
+
+      assert {:ok, candidate} = Blogmark.parse_deep_link(url)
+      assert candidate["url"] == nil
+    end
+
+    test "falls back to the url host when the title is blank" do
+      url = "bds2://new-post?title=&url=" <> URI.encode_www_form("https://example.com/page")
+
+      assert {:ok, candidate} = Blogmark.parse_deep_link(url)
+      assert candidate["title"] == "example.com"
+    end
+
+    test "strips control characters and caps the title length" do
+      raw_title = "A\x00B\x07C" <> String.duplicate("x", 250)
+
+      url =
+        "bds2://new-post?title=" <>
+          URI.encode_www_form(raw_title) <> "&url=https://x"
+
+      assert {:ok, candidate} = Blogmark.parse_deep_link(url)
+      refute String.contains?(candidate["title"], "\x00")
+      refute String.contains?(candidate["title"], "\x07")
+      assert String.length(candidate["title"]) == 200
+    end
+
     test "rejects an unsupported scheme" do
       assert {:error, :unsupported_scheme} =
                Blogmark.parse_deep_link("bds://new-post?title=T")
@@ -57,6 +101,21 @@ defmodule BDS.BlogmarkTest do
     test "rejects an unsupported action" do
       assert {:error, :unsupported_action} =
                Blogmark.parse_deep_link("bds2://open-thing?id=1")
+    end
+  end
+
+  describe "deep_link_project_id/1" do
+    test "returns the project_id carried by the link" do
+      assert Blogmark.deep_link_project_id("bds2://new-post?title=T&project_id=proj-7") == "proj-7"
+    end
+
+    test "returns nil when absent or blank" do
+      assert Blogmark.deep_link_project_id("bds2://new-post?title=T") == nil
+      assert Blogmark.deep_link_project_id("bds2://new-post?title=T&project_id=") == nil
+    end
+
+    test "returns nil for an unparseable link" do
+      assert Blogmark.deep_link_project_id("bds://new-post?title=T") == nil
     end
   end
 
@@ -117,6 +176,32 @@ defmodule BDS.BlogmarkTest do
 
       assert {:ok, %{post: post}} = Blogmark.receive_deep_link(project.id, url)
       assert post.categories == ["article"]
+    end
+
+    test "defaults the body to a markdown link to the bookmarked page (parity with bDS)",
+         %{project: project} do
+      url =
+        "bds2://new-post?title=" <>
+          URI.encode_www_form("Hello (World)") <>
+          "&url=" <> URI.encode_www_form("https://example.com/a")
+
+      assert {:ok, %{post: post}} = Blogmark.receive_deep_link(project.id, url)
+      assert post.content == "[Hello \\(World\\)](https://example.com/a)"
+    end
+
+    test "keeps explicit content over the default markdown link", %{project: project} do
+      url =
+        "bds2://new-post?title=T&url=https://x&content=" <> URI.encode_www_form("body text")
+
+      assert {:ok, %{post: post}} = Blogmark.receive_deep_link(project.id, url)
+      assert post.content == "body text"
+    end
+
+    test "leaves the body empty when the deep link carries no url", %{project: project} do
+      assert {:ok, %{post: post}} =
+               Blogmark.receive_deep_link(project.id, "bds2://new-post?title=Just%20A%20Title")
+
+      assert post.content in [nil, ""]
     end
 
     test "returns an error for an invalid deep link", %{project: project} do

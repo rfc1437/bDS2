@@ -55,6 +55,15 @@ This document provides context and best practices for GitHub Copilot when workin
 
 - Never leave tests failing, even if they appear unrelated to your changes
 - If a test failure is pre-existing, fix it as part of your current work
+- **Always write the full test run to a log file first, then grep that file for failures.** Never run `mix test` in the terminal and try to grep live output — the output is interleaved, truncated, and nearly impossible to parse. Pattern:
+  ```
+  mix test 2>&1 > /tmp/test_run.log
+  grep -E "FAILED|^[ ]*1\)" /tmp/test_run.log
+  grep -A 15 "^[ ]*1\)" /tmp/test_run.log   # details for the first failure
+  ```
+  Work from the log file, not from repeated terminal runs.
+
+> **Zero failing tests. No exceptions.**
 - Run the full test suite (`mix test`) before considering any task complete
 - If you cannot fix a test, explain why and propose a solution
 

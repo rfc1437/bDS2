@@ -148,6 +148,7 @@ defmodule BDS.Desktop.ShellLive do
 
     if connected do
       Phoenix.PubSub.subscribe(BDS.PubSub, Watcher.topic())
+      attach_deep_link()
       Process.send_after(self(), :refresh_task_status, @refresh_interval)
     end
 
@@ -737,30 +738,45 @@ defmodule BDS.Desktop.ShellLive do
   # create a draft post, open it in the editor, and surface transform toasts.
   defp handle_blogmark_deep_link(socket, url) do
     title = dgettext("ui", "Blogmark")
+    link_project_id = Blogmark.deep_link_project_id(url)
+    active = current_project_id(socket)
 
-    case current_project_id(socket) do
-      project_id when is_binary(project_id) ->
-        case Blogmark.receive_deep_link(project_id, url) do
-          {:ok, %{post: post, toasts: toasts, errors: errors}} ->
+    cond do
+      # A specific project was requested but does not exist in this install
+      # (e.g. a bookmarklet copied from another instance). Never guess another
+      # project — tell the user, import nothing.
+      is_binary(link_project_id) and Projects.get_project(link_project_id) == nil ->
+        append_output_entry(
+          socket,
+          title,
+          dgettext("ui", "The project this blogmark targets does not exist here."),
+          url,
+          "error"
+        )
+
+      # A specific, existing project that isn't active: switch to it first so
+      # the new post is shown in context, then import there.
+      is_binary(link_project_id) and link_project_id != active ->
+        case Projects.set_active_project(link_project_id) do
+          {:ok, _project} ->
             socket
-            |> reload_shell(socket.assigns.workbench)
-            |> open_sidebar_item(
-              %{
-                "route" => "post",
-                "id" => post.id,
-                "title" => post.title,
-                "subtitle" => post.slug
-              },
-              :pin
-            )
-            |> append_blogmark_toasts(title, toasts)
-            |> append_blogmark_errors(title, errors)
+            |> assign(:project_menu_open, false)
+            |> assign(:sidebar_filters_by_view, %{})
+            |> reload_shell(Workbench.new())
+            |> UrlState.push()
+            |> import_blogmark(link_project_id, url, title)
 
           {:error, reason} ->
             append_output_entry(socket, title, inspect(reason), url, "error")
         end
 
-      _ ->
+      # The link names the already-active project, or no project_id was given
+      # and a project is active: import into the active project.
+      is_binary(active) ->
+        import_blogmark(socket, active, url, title)
+
+      # No project_id and nothing active.
+      true ->
         append_output_entry(
           socket,
           title,
@@ -768,6 +784,28 @@ defmodule BDS.Desktop.ShellLive do
           url,
           "warning"
         )
+    end
+  end
+
+  defp import_blogmark(socket, project_id, url, title) do
+    case Blogmark.receive_deep_link(project_id, url) do
+      {:ok, %{post: post, toasts: toasts, errors: errors}} ->
+        socket
+        |> reload_shell(socket.assigns.workbench)
+        |> open_sidebar_item(
+          %{
+            "route" => "post",
+            "id" => post.id,
+            "title" => post.title,
+            "subtitle" => post.slug
+          },
+          :pin
+        )
+        |> append_blogmark_toasts(title, toasts)
+        |> append_blogmark_errors(title, errors)
+
+      {:error, reason} ->
+        append_output_entry(socket, title, inspect(reason), url, "error")
     end
   end
 
@@ -837,6 +875,14 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   defp current_project_id(socket), do: (socket.assigns[:projects] || %{})[:active_project_id]
+
+  # Register this shell with the deep-link router and drain any links queued
+  # before connect (cold start). The router is absent in headless/test runs.
+  defp attach_deep_link do
+    if Process.whereis(BDS.Desktop.DeepLink) do
+      BDS.Desktop.DeepLink.attach(self())
+    end
+  end
 
   defp sidebar_create_action(view), do: SidebarCreate.action(view)
 

@@ -12,6 +12,8 @@ config {
     transform_max_toasts_per_script: Integer = 5
     transform_max_toasts_total: Integer = 20
     transform_max_toast_length: Integer = 300
+    blogmark_max_title_length: Integer = 200
+    blogmark_max_url_length: Integer = 2048
 }
 
 enum ScriptStatus {
@@ -242,6 +244,36 @@ rule ExecuteTransform {
     for t in ordered_by(transforms, s => s.updated_at, s => s.slug, s => s.id):
         requires: t.entrypoint != ""
         ensures: TransformApplied(t, data)
+
+    @guarantee BlogmarkInputHardening
+        -- The deep link is sanitized before transforms run. Title and url have
+        -- control characters stripped and are trimmed. The url is kept only
+        -- when it is http(s) with a host, after removing any credentials and
+        -- fragment, and at most config.blogmark_max_url_length characters;
+        -- otherwise it is dropped so it can never reach the post body. The
+        -- title is capped at config.blogmark_max_title_length and falls back to
+        -- the url host when blank.
+
+    @guarantee BlogmarkDefaultBody
+        -- When the deep link supplies no content, the post body defaults to a
+        -- markdown link [title](url) to the bookmarked page, with the title
+        -- escaped, so transforms operate on the same candidate whether or not
+        -- an explicit body was provided. Explicit content always wins.
+
+    @guarantee BlogmarkProjectTargeting
+        -- A link's own project_id determines the target project. When it names a
+        -- project that exists and differs from the active one, the shell
+        -- switches to it before importing so the new post is shown in context.
+        -- When it names a project that does not exist in this install (e.g. a
+        -- bookmarklet copied from another instance) the import is refused with
+        -- an error — the post is never redirected into a different project.
+        -- With no link project_id, the active project is used; with no link
+        -- project_id and no active project the import is refused with a warning.
+
+    @guarantee BlogmarkColdStartDelivery
+        -- A deep link that arrives before the shell is connected (e.g. the
+        -- bookmarklet launching the app) is queued and replayed once a shell
+        -- attaches, so launching via a bookmarklet still creates the post.
 
     @guarantee TransformTrigger
         -- Transform scripts are triggered automatically by blogmark import.

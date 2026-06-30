@@ -98,7 +98,10 @@
             </div>
             <div class="setting-row">
               <div class="setting-info"><label class="setting-label"><%= dgettext("ui", "Blogmark Bookmarklet") %></label></div>
-              <div class="setting-control"><p class="setting-description"><%= dgettext("ui", "Bookmarklet copy support is wired through the desktop runtime and project public URL.") %></p></div>
+              <div class="setting-control">
+                <p class="setting-description"><%= dgettext("ui", "Bookmarklet copy support is wired through the desktop runtime and project public URL.") %></p>
+                <button class="secondary ui-button ui-button-secondary" type="button" phx-click="copy_blogmark_bookmarklet" phx-target={@myself}><%= dgettext("ui", "Copy Bookmarklet to Clipboard") %></button>
+              </div>
             </div>
           </form>
           <div class="setting-actions"><button class="primary ui-button ui-button-primary" type="button" phx-click="save_settings_project" phx-target={@myself}><%= dgettext("ui", "Save") %></button></div>
