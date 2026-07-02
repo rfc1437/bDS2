@@ -10,7 +10,6 @@ defmodule BDS.Tasks do
   @type progress_reporter :: (number(), String.t() | nil -> any())
   @type task_work :: (progress_reporter() -> term())
 
-  @default_max_concurrent 3
   @default_progress_throttle_ms 250
   @default_recent_finished_limit 10
   @default_finished_task_ttl_ms :timer.hours(1)
@@ -512,8 +511,15 @@ defmodule BDS.Tasks do
 
   defp max_concurrent do
     Application.get_env(:bds, :tasks, [])
-    |> Keyword.get(:max_concurrent, @default_max_concurrent)
+    |> Keyword.get(:max_concurrent, default_max_concurrent())
   end
+
+  # The original TypeScript task manager hard-capped concurrency at 3 because it
+  # ran on a single-threaded event loop. The BEAM schedules processes across
+  # every CPU core, so the default tracks the number of online schedulers
+  # (cores) instead — letting all render-site sections run in parallel. Override
+  # with `config :bds, :tasks, max_concurrent: N`.
+  defp default_max_concurrent, do: System.schedulers_online()
 
   defp progress_throttle_ms do
     Application.get_env(:bds, :tasks, [])
