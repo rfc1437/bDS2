@@ -21,6 +21,7 @@ defmodule BDS.Generation do
   import BDS.Generation.Progress
   import BDS.Generation.Outputs
   import BDS.Generation.Data
+  import BDS.Generation.Renderers, only: [build_list_posts: 3]
   import BDS.Generation.Validation
 
   alias BDS.Generation.GeneratedFileHash
@@ -227,62 +228,127 @@ defmodule BDS.Generation do
     apply_validation(project_id, report, [])
   end
 
+  @spec prepare_validation_apply(String.t(), map(), generation_opts()) ::
+          {:ok, map()} | {:error, term()}
+  def prepare_validation_apply(project_id, report, opts \\ [])
+
+  def prepare_validation_apply(project_id, report, opts)
+      when is_binary(project_id) and is_map(report) and is_list(opts) do
+    on_progress = callback(opts)
+    :ok = report_validation_progress(on_progress, 0.0, "Planning validation apply steps...")
+
+    with {:ok, apply_plan} <- validation_apply_plan(project_id, @core_sections, report) do
+      sections_to_render = validation_apply_sections_to_render(apply_plan.targeted_plan)
+      project = Projects.get_project!(project_id)
+
+      :ok = report_validation_progress(on_progress, 0.2, "Deleting extra URLs...")
+
+      {deleted_url_count, removed_empty_dir_count} =
+        delete_extra_validation_paths(
+          project_id,
+          project,
+          Map.get(report, :extra_url_paths, []),
+          on_progress
+        )
+
+      :ok =
+        report_validation_progress(
+          on_progress,
+          1.0,
+          "Validation apply prepared"
+        )
+
+      {:ok,
+       %{
+         sections_to_render: sections_to_render,
+         deleted_url_count: deleted_url_count,
+         removed_empty_dir_count: removed_empty_dir_count
+       }}
+    end
+  end
+
+  @spec apply_validation_section(String.t(), map(), section(), generation_opts()) ::
+          {:ok, map()} | {:error, term()}
+  def apply_validation_section(project_id, report, section, opts \\ [])
+
+  def apply_validation_section(project_id, report, section, opts)
+      when is_binary(project_id) and is_map(report) and section in @core_sections and
+             is_list(opts) do
+    on_progress = callback(opts)
+    :ok = report_validation_progress(on_progress, 0.0, validation_section_task_label(section))
+
+    with {:ok, apply_plan} <- validation_apply_plan(project_id, [section], report) do
+      outputs_to_render =
+        targeted_apply_outputs(apply_plan.plan, apply_plan.targeted_plan, [section])
+
+      rendered_url_count = write_validation_outputs(project_id, outputs_to_render, on_progress)
+
+      {:ok, %{section: section, rendered_url_count: rendered_url_count}}
+    end
+  end
+
+  @spec refresh_validation_ancillary_outputs(String.t(), :calendar, generation_opts()) ::
+          {:ok, map()} | {:error, term()}
+  def refresh_validation_ancillary_outputs(project_id, kind, opts \\ [])
+
+  def refresh_validation_ancillary_outputs(project_id, kind, opts)
+      when is_binary(project_id) and kind in [:calendar] and is_list(opts) do
+    on_progress = callback(opts)
+    :ok = report_validation_progress(on_progress, 0.0, ancillary_validation_task_label(kind))
+
+    with {:ok, plan} <- plan_generation(project_id, @core_sections) do
+      expected_output_map = refresh_validation_output_map(plan, kind, on_progress)
+      paths = ancillary_validation_paths(expected_output_map, kind)
+      label = ancillary_validation_progress_label(kind)
+      total = length(paths)
+
+      :ok = report_generation_started(on_progress, total, label)
+
+      paths
+      |> Enum.with_index(1)
+      |> Enum.each(fn {relative_path, index} ->
+        _ =
+          write_generated_file(
+            project_id,
+            relative_path,
+            Map.fetch!(expected_output_map, relative_path)
+          )
+
+        :ok = report_generation_progress(on_progress, index, total, label)
+      end)
+
+      {:ok, %{kind: kind, written_count: length(paths)}}
+    end
+  end
+
+  defp refresh_validation_output_map(plan, :calendar, _on_progress) do
+    data = generation_data(plan)
+    %{"calendar.json" => BDS.Generation.Sitemap.render_calendar(data.published_list_posts)}
+  end
+
   @spec apply_validation(String.t(), map(), generation_opts()) :: {:ok, map()} | {:error, term()}
   def apply_validation(project_id, report, opts)
       when is_binary(project_id) and is_map(report) and is_list(opts) do
     on_progress = callback(opts)
 
-    with {:ok, plan} <- plan_generation(project_id, @core_sections) do
-      expected_outputs = build_outputs(plan)
-      expected_output_map = Map.new(expected_outputs)
+    with {:ok, apply_plan} <- validation_apply_plan(project_id, @core_sections, report) do
+      plan = apply_plan.plan
       project = Projects.get_project!(project_id)
-      published_posts = list_published_posts(project_id)
 
-      targeted_plan =
-        build_targeted_validation_plan(
-          plan_validation_paths(report_paths(report), additional_languages(plan)),
-          published_posts
-        )
+      outputs_to_render = targeted_apply_outputs(plan, apply_plan.targeted_plan, plan.sections)
 
-      outputs_to_render =
-        expected_outputs
-        |> Enum.filter(fn {relative_path, _content} ->
-          targeted_output?(
-            relative_path,
-            targeted_plan,
-            plan.language,
-            additional_languages(plan)
-          )
-        end)
-
-      total_to_render = length(outputs_to_render)
-      :ok = report_generation_started(on_progress, total_to_render, "validation routes")
-
-      outputs_to_render
-      |> Enum.with_index(1)
-      |> Enum.each(fn {{relative_path, content}, index} ->
-        _ =
-          write_generated_file(project_id, relative_path, content,
-            refresh_timestamp_on_unchanged: route_html_path?(relative_path)
-          )
-
-        :ok =
-          report_generation_progress(on_progress, index, total_to_render, "validation routes")
-      end)
+      rendered_url_count = write_validation_outputs(project_id, outputs_to_render, on_progress)
 
       {deleted_url_count, removed_empty_dir_count} =
         delete_extra_validation_paths(project_id, project, Map.get(report, :extra_url_paths, []))
 
       if outputs_to_render != [] or deleted_url_count > 0 do
-        write_ancillary_validation_outputs(project_id, expected_output_map)
+        {:ok, _} = refresh_validation_ancillary_outputs(project_id, :calendar)
       end
 
       {:ok,
        %{
-         rendered_url_count:
-           Enum.count(outputs_to_render, fn {relative_path, _content} ->
-             route_html_path?(relative_path)
-           end),
+         rendered_url_count: rendered_url_count,
          deleted_url_count: deleted_url_count,
          removed_empty_dir_count: removed_empty_dir_count
        }}
@@ -372,7 +438,7 @@ defmodule BDS.Generation do
     :ok
   end
 
-  defp build_outputs(plan) do
+  defp build_outputs(plan, on_output \\ nil) do
     data = generation_data(plan)
     published_translations = flattened_generation_translations(data.translations_by_post)
     translations_by_post_language = translation_lookup_map(published_translations)
@@ -419,7 +485,8 @@ defmodule BDS.Generation do
         build_core_outputs(
           plan,
           data.published_list_posts,
-          localized_list_posts_by_language
+          localized_list_posts_by_language,
+          on_output
         )
       else
         []
@@ -432,7 +499,8 @@ defmodule BDS.Generation do
           plan.language,
           data.published_posts,
           translations_by_post_language,
-          localized_posts_by_language
+          localized_posts_by_language,
+          on_output
         )
       else
         []
@@ -445,14 +513,15 @@ defmodule BDS.Generation do
           plan.language,
           data.published_posts,
           translations_by_post_language,
-          localized_posts_by_language
+          localized_posts_by_language,
+          on_output
         )
       else
         []
       end
 
     archive_outputs =
-      build_archive_outputs(plan, data.post_index, localized_post_indexes)
+      build_archive_outputs(plan, data.post_index, localized_post_indexes, on_output)
 
     urls =
       (core_outputs ++ page_outputs ++ single_outputs ++ archive_outputs)
@@ -606,6 +675,346 @@ defmodule BDS.Generation do
     end
   end
 
+  defp validation_apply_plan(project_id, sections, report) do
+    with {:ok, plan} <- plan_generation(project_id, sections) do
+      published_posts = list_published_posts(project_id)
+
+      targeted_plan =
+        build_targeted_validation_plan(
+          plan_validation_paths(report_paths(report), additional_languages(plan)),
+          published_posts
+        )
+
+      {:ok, %{plan: plan, targeted_plan: targeted_plan}}
+    end
+  end
+
+  # Render ONLY the routes targeted by the validation report for the given
+  # sections, matching the old app's behaviour of filtering the render inputs
+  # rather than rendering the whole site and discarding the surplus. Falls back
+  # to a full section render only when a report path could not be classified.
+  defp targeted_apply_outputs(plan, targeted_plan, sections) do
+    if fallback_validation_section_render?(targeted_plan) do
+      Enum.filter(build_outputs(plan), fn {relative_path, _content} ->
+        path_section(relative_path) in sections
+      end)
+    else
+      render_data = validation_render_data(plan)
+
+      Enum.flat_map(sections, fn section ->
+        build_targeted_section_outputs(plan, render_data, targeted_plan, section)
+      end)
+    end
+  end
+
+  # Write the targeted outputs, streaming one progress message per rewritten URL
+  # (exactly like the old app's `Generated /url` reporting) so the task shows the
+  # actual URLs and advances by the number of URLs rewritten.
+  defp write_validation_outputs(project_id, outputs, on_progress) do
+    route_total = Enum.count(outputs, fn {relative_path, _content} -> route_html_path?(relative_path) end)
+
+    :ok = report_validation_progress(on_progress, 0.0, validation_rewrite_started_message(route_total))
+
+    {rendered, _total} =
+      Enum.reduce(outputs, {0, route_total}, fn {relative_path, content}, {rendered, total} ->
+        _ =
+          write_generated_file(project_id, relative_path, content,
+            refresh_timestamp_on_unchanged: route_html_path?(relative_path)
+          )
+
+        if route_html_path?(relative_path) do
+          rewritten = rendered + 1
+          progress = if total > 0, do: rewritten / total, else: 1.0
+
+          :ok =
+            report_validation_progress(
+              on_progress,
+              progress,
+              "Rewrote #{relative_path_to_url_path(relative_path)} (#{rewritten}/#{total})"
+            )
+
+          {rewritten, total}
+        else
+          {rendered, total}
+        end
+      end)
+
+    rendered
+  end
+
+  defp validation_rewrite_started_message(0), do: "No URLs to rewrite"
+  defp validation_rewrite_started_message(1), do: "Rewriting 1 URL..."
+  defp validation_rewrite_started_message(total), do: "Rewriting #{total} URLs..."
+
+  defp validation_render_data(plan) do
+    data = generation_data(plan)
+
+    translations_by_post_language =
+      data.translations_by_post
+      |> flattened_generation_translations()
+      |> translation_lookup_map()
+
+    translatable_posts =
+      Enum.reject(data.published_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
+
+    translatable_list_posts =
+      Enum.reject(data.published_list_posts, &truthy_flag?(Map.get(&1, :do_not_translate)))
+
+    localized_posts_by_language =
+      Map.new(additional_languages(plan), fn language ->
+        {language,
+         resolve_posts_for_language(
+           translatable_posts,
+           language,
+           translations_by_post_language,
+           plan.language
+         )}
+      end)
+
+    localized_list_posts_by_language =
+      Map.new(additional_languages(plan), fn language ->
+        {language,
+         resolve_posts_for_language(
+           translatable_list_posts,
+           language,
+           translations_by_post_language,
+           plan.language
+         )}
+      end)
+
+    localized_post_indexes =
+      Map.new(localized_list_posts_by_language, fn {language, posts} ->
+        {language, build_generation_post_index(posts)}
+      end)
+
+    %{
+      data: data,
+      translations_by_post_language: translations_by_post_language,
+      localized_posts_by_language: localized_posts_by_language,
+      localized_list_posts_by_language: localized_list_posts_by_language,
+      localized_post_indexes: localized_post_indexes
+    }
+  end
+
+  defp build_targeted_section_outputs(plan, render_data, targeted_plan, :core) do
+    data = render_data.data
+
+    main_root =
+      if targeted_plan.request_root_routes do
+        posts = build_list_posts(plan.base_url, data.published_list_posts, nil)
+        build_root_outputs(plan, plan.language, posts)
+      else
+        []
+      end
+
+    language_root =
+      Enum.flat_map(additional_languages(plan), fn language ->
+        language_plan = language_targeted_plan(targeted_plan, language)
+
+        if language_plan.request_root_routes do
+          source = Map.get(render_data.localized_list_posts_by_language, language, [])
+          prefix = route_language(plan.language, language)
+          posts = build_list_posts(plan.base_url, source, prefix)
+          build_root_outputs(plan, language, posts)
+        else
+          []
+        end
+      end)
+
+    main_page_posts =
+      Enum.filter(
+        data.published_posts,
+        &MapSet.member?(targeted_plan.requested_page_slugs, &1.slug)
+      )
+
+    localized_page_posts =
+      Map.new(additional_languages(plan), fn language ->
+        language_plan = language_targeted_plan(targeted_plan, language)
+        source = Map.get(render_data.localized_posts_by_language, language, [])
+        {language, Enum.filter(source, &MapSet.member?(language_plan.requested_page_slugs, &1.slug))}
+      end)
+
+    page_outputs =
+      build_page_outputs(
+        plan.project_id,
+        plan.language,
+        main_page_posts,
+        render_data.translations_by_post_language,
+        localized_page_posts
+      )
+
+    main_root ++ language_root ++ page_outputs
+  end
+
+  defp build_targeted_section_outputs(plan, render_data, targeted_plan, :single) do
+    data = render_data.data
+
+    main_posts =
+      filter_route_posts(data.published_posts, targeted_plan.requested_post_routes)
+
+    localized_posts =
+      Map.new(additional_languages(plan), fn language ->
+        language_plan = language_targeted_plan(targeted_plan, language)
+        source = Map.get(render_data.localized_posts_by_language, language, [])
+        {language, filter_route_posts(source, language_plan.requested_post_routes)}
+      end)
+
+    build_single_outputs(
+      plan.project_id,
+      plan.language,
+      main_posts,
+      render_data.translations_by_post_language,
+      localized_posts
+    )
+  end
+
+  defp build_targeted_section_outputs(plan, render_data, targeted_plan, :category) do
+    build_targeted_archive_outputs(plan, render_data, targeted_plan, fn plan_arg,
+                                                                        index,
+                                                                        language_plan,
+                                                                        languages ->
+      build_category_outputs(
+        plan_arg,
+        filter_collection_by_segment(index.posts_by_category, language_plan.requested_category_slugs),
+        languages
+      )
+    end)
+  end
+
+  defp build_targeted_section_outputs(plan, render_data, targeted_plan, :tag) do
+    build_targeted_archive_outputs(plan, render_data, targeted_plan, fn plan_arg,
+                                                                        index,
+                                                                        language_plan,
+                                                                        languages ->
+      build_tag_outputs(
+        plan_arg,
+        filter_collection_by_segment(index.posts_by_tag, language_plan.requested_tag_slugs),
+        languages
+      )
+    end)
+  end
+
+  defp build_targeted_section_outputs(plan, render_data, targeted_plan, :date) do
+    build_targeted_archive_outputs(plan, render_data, targeted_plan, fn plan_arg,
+                                                                        index,
+                                                                        language_plan,
+                                                                        languages ->
+      build_date_outputs(plan_arg, filter_date_index(index, language_plan), languages)
+    end)
+  end
+
+  defp build_targeted_archive_outputs(plan, render_data, targeted_plan, builder) do
+    main_outputs = builder.(plan, render_data.data.post_index, targeted_plan, [plan.language])
+
+    language_outputs =
+      Enum.flat_map(additional_languages(plan), fn language ->
+        language_plan = language_targeted_plan(targeted_plan, language)
+        index = Map.get(render_data.localized_post_indexes, language, empty_generation_post_index())
+        builder.(plan, index, language_plan, [language])
+      end)
+
+    main_outputs ++ language_outputs
+  end
+
+  defp language_targeted_plan(targeted_plan, language) do
+    Map.get(targeted_plan.language_plans, language, empty_validation_path_plan())
+  end
+
+  defp filter_route_posts(posts, route_keys) do
+    Enum.filter(posts, fn post ->
+      {year, month, day} = local_date_parts!(post.created_at)
+      MapSet.member?(route_keys, route_key(year, month, day, post.slug))
+    end)
+  end
+
+  defp filter_collection_by_segment(collection, segment_slugs) do
+    collection
+    |> Enum.filter(fn {key, _posts} ->
+      MapSet.member?(segment_slugs, archive_route_segment(key))
+    end)
+    |> Map.new()
+  end
+
+  defp filter_date_index(index, language_plan) do
+    %{
+      posts_by_year: filter_map_by_keys(index.posts_by_year, language_plan.requested_years),
+      posts_by_year_month:
+        filter_map_by_keys(index.posts_by_year_month, language_plan.requested_year_months),
+      posts_by_year_month_day:
+        filter_map_by_keys(index.posts_by_year_month_day, language_plan.requested_year_month_days)
+    }
+  end
+
+  defp filter_map_by_keys(map, keys) do
+    map
+    |> Enum.filter(fn {key, _value} -> MapSet.member?(keys, key) end)
+    |> Map.new()
+  end
+
+  defp empty_generation_post_index do
+    %{
+      posts_by_category: %{},
+      posts_by_tag: %{},
+      posts_by_year: %{},
+      posts_by_year_month: %{},
+      posts_by_year_month_day: %{}
+    }
+  end
+
+  defp validation_apply_sections_to_render(targeted_plan) do
+    if fallback_validation_section_render?(targeted_plan) do
+      [:category, :tag, :date, :core, :single]
+    else
+      targeted_plan
+      |> validation_apply_section_plans()
+      |> Enum.reduce([], &append_validation_apply_sections/2)
+    end
+  end
+
+  defp fallback_validation_section_render?(%{requires_fallback_section_render: true}), do: true
+
+  defp fallback_validation_section_render?(%{language_plans: language_plans}) do
+    Enum.any?(Map.values(language_plans), &fallback_validation_section_render?/1)
+  end
+
+  defp validation_apply_section_plans(targeted_plan) do
+    [targeted_plan | Map.values(Map.get(targeted_plan, :language_plans, %{}))]
+  end
+
+  defp append_validation_apply_sections(plan, sections) do
+    sections
+    |> maybe_append_validation_apply_section(:core, validation_apply_core_section?(plan))
+    |> maybe_append_validation_apply_section(
+      :single,
+      not MapSet.equal?(plan.requested_post_routes, MapSet.new())
+    )
+    |> maybe_append_validation_apply_section(
+      :category,
+      not MapSet.equal?(plan.requested_category_slugs, MapSet.new())
+    )
+    |> maybe_append_validation_apply_section(
+      :tag,
+      not MapSet.equal?(plan.requested_tag_slugs, MapSet.new())
+    )
+    |> maybe_append_validation_apply_section(:date, validation_apply_date_section?(plan))
+  end
+
+  defp validation_apply_core_section?(plan) do
+    plan.request_root_routes or not MapSet.equal?(plan.requested_page_slugs, MapSet.new())
+  end
+
+  defp validation_apply_date_section?(plan) do
+    not MapSet.equal?(plan.requested_years, MapSet.new()) or
+      not MapSet.equal?(plan.requested_year_months, MapSet.new()) or
+      not MapSet.equal?(plan.requested_year_month_days, MapSet.new())
+  end
+
+  defp maybe_append_validation_apply_section(sections, _section, false), do: sections
+
+  defp maybe_append_validation_apply_section(sections, section, true) do
+    if section in sections, do: sections, else: sections ++ [section]
+  end
+
   defp path_section(relative_path) do
     segments = String.split(relative_path, "/", trim: true)
 
@@ -698,50 +1107,70 @@ defmodule BDS.Generation do
     :ok
   end
 
+  defp validation_section_task_label(:core), do: "Render Site Core"
+  defp validation_section_task_label(:single), do: "Render Single Posts"
+  defp validation_section_task_label(:category), do: "Render Category Archives"
+  defp validation_section_task_label(:tag), do: "Render Tag Archives"
+  defp validation_section_task_label(:date), do: "Render Date Archives"
+
+  defp ancillary_validation_progress_label(:calendar), do: "calendar files"
+
+  defp ancillary_validation_task_label(:calendar), do: "Regenerate Calendar"
+
   defp delete_extra_validation_paths(project_id, project, extra_url_paths) do
-    Enum.reduce(extra_url_paths, {0, 0}, fn url_path, {deleted_count, removed_dir_count} ->
+    delete_extra_validation_paths(project_id, project, extra_url_paths, nil)
+  end
+
+  defp delete_extra_validation_paths(project_id, project, extra_url_paths, on_progress) do
+    total = length(extra_url_paths)
+
+    if total == 0 do
+      :ok = report_validation_progress(on_progress, 0.5, "No extra URLs to delete")
+    end
+
+    extra_url_paths
+    |> Enum.with_index(1)
+    |> Enum.reduce({0, 0}, fn {url_path, index}, {deleted_count, removed_dir_count} ->
       relative_path = url_path_to_relative_index_path(url_path)
       full_path = output_path(project, relative_path)
 
-      case File.rm(full_path) do
-        :ok ->
-          Repo.delete_all(
-            from generated_file in GeneratedFileHash,
-              where:
-                generated_file.project_id == ^project_id and
-                  generated_file.relative_path == ^relative_path
-          )
+      result =
+        case File.rm(full_path) do
+          :ok ->
+            Repo.delete_all(
+              from generated_file in GeneratedFileHash,
+                where:
+                  generated_file.project_id == ^project_id and
+                    generated_file.relative_path == ^relative_path
+            )
 
-          {pruned_count, _last_dir} =
-            prune_empty_parent_dirs(Path.dirname(full_path), output_path(project, ""))
+            {pruned_count, _last_dir} =
+              prune_empty_parent_dirs(Path.dirname(full_path), output_path(project, ""))
 
-          {deleted_count + 1, removed_dir_count + pruned_count}
+            {deleted_count + 1, removed_dir_count + pruned_count}
 
-        {:error, :enoent} ->
-          {deleted_count, removed_dir_count}
+          {:error, :enoent} ->
+            {deleted_count, removed_dir_count}
 
-        {:error, _reason} ->
-          {deleted_count, removed_dir_count}
-      end
+          {:error, _reason} ->
+            {deleted_count, removed_dir_count}
+        end
+
+      :ok =
+        report_validation_progress(
+          on_progress,
+          0.2 + 0.3 * index / max(total, 1),
+          "Deleted #{index}/#{total} extra URLs"
+        )
+
+      result
     end)
   end
 
-  defp write_ancillary_validation_outputs(project_id, expected_output_map) do
-    ancillary_paths =
-      Enum.filter(Map.keys(expected_output_map), fn relative_path ->
-        relative_path == "calendar.json" or String.contains?(relative_path, "pagefind/")
-      end)
-
-    Enum.each(ancillary_paths, fn relative_path ->
-      _ =
-        write_generated_file(
-          project_id,
-          relative_path,
-          Map.fetch!(expected_output_map, relative_path)
-        )
-    end)
-
-    :ok
+  defp ancillary_validation_paths(expected_output_map, :calendar) do
+    expected_output_map
+    |> Map.keys()
+    |> Enum.filter(&(&1 == "calendar.json"))
   end
 
   defp output_path(project, relative_path) do

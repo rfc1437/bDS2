@@ -245,7 +245,9 @@ defmodule BDS.Generation.Validation do
       requested_tag_slugs: MapSet.new(),
       requested_years: MapSet.new(),
       requested_year_months: MapSet.new(),
+      requested_year_month_days: MapSet.new(),
       requested_post_routes: [],
+      requested_page_slugs: MapSet.new(),
       language_plans: %{}
     }
   end
@@ -277,25 +279,35 @@ defmodule BDS.Generation.Validation do
                 )
 
               nil ->
-                case Regex.run(~r|^/(\d{4})/(\d{2})(?:/page/\d+)?$|, path) do
-                  [_, year, month] ->
-                    update_in(plan.requested_year_months, &MapSet.put(&1, "#{year}/#{month}"))
-
-                  nil ->
-                    case Regex.run(~r|^/(\d{4})(?:/page/\d+)?$|, path) do
-                      [_, year] ->
-                        update_in(plan.requested_years, &MapSet.put(&1, String.to_integer(year)))
-
-                      nil ->
-                        if path == "/" or Regex.match?(~r|^/page/\d+$|, path) do
-                          %{plan | request_root_routes: true}
-                        else
-                          %{plan | requires_fallback_section_render: true}
-                        end
-                    end
-                end
+                classify_archive_or_page_validation_path(path, plan)
             end
         end
+    end
+  end
+
+  defp classify_archive_or_page_validation_path(path, plan) do
+    cond do
+      Regex.match?(~r|^/(\d{4})/(\d{2})/(\d{2})(?:/page/\d+)?$|, path) ->
+        [_, year, month, day] = Regex.run(~r|^/(\d{4})/(\d{2})/(\d{2})(?:/page/\d+)?$|, path)
+        update_in(plan.requested_year_month_days, &MapSet.put(&1, "#{year}/#{month}/#{day}"))
+
+      Regex.match?(~r|^/(\d{4})/(\d{2})(?:/page/\d+)?$|, path) ->
+        [_, year, month] = Regex.run(~r|^/(\d{4})/(\d{2})(?:/page/\d+)?$|, path)
+        update_in(plan.requested_year_months, &MapSet.put(&1, "#{year}/#{month}"))
+
+      Regex.match?(~r|^/(\d{4})(?:/page/\d+)?$|, path) ->
+        [_, year] = Regex.run(~r|^/(\d{4})(?:/page/\d+)?$|, path)
+        update_in(plan.requested_years, &MapSet.put(&1, String.to_integer(year)))
+
+      path == "/" or Regex.match?(~r|^/page/\d+$|, path) ->
+        %{plan | request_root_routes: true}
+
+      Regex.match?(~r|^/([^/]+)$|, path) ->
+        [_, slug] = Regex.run(~r|^/([^/]+)$|, path)
+        update_in(plan.requested_page_slugs, &MapSet.put(&1, slug))
+
+      true ->
+        %{plan | requires_fallback_section_render: true}
     end
   end
 
@@ -334,10 +346,14 @@ defmodule BDS.Generation.Validation do
                   [:requested_year_months],
                   &MapSet.put(&1, route_month_key(route.year, route.month))
                 )
+                |> update_in(
+                  [:requested_year_month_days],
+                  &MapSet.put(&1, route_day_key(route.year, route.month, route.day))
+                )
                 |> Map.put(:request_root_routes, true)
 
               post ->
-                {year, month, _day} = local_date_parts!(post.created_at)
+                {year, month, day} = local_date_parts!(post.created_at)
 
                 acc
                 |> update_in([:requested_category_slugs], fn set ->
@@ -355,10 +371,15 @@ defmodule BDS.Generation.Validation do
                   [:requested_year_months],
                   &MapSet.put(&1, route_month_key(year, month))
                 )
+                |> update_in(
+                  [:requested_year_month_days],
+                  &MapSet.put(&1, route_day_key(year, month, day))
+                )
                 |> Map.put(:request_root_routes, true)
             end
           end
         )
+        |> cascade_requested_date_archives()
 
       language_plans =
         initial_plan.language_plans
@@ -384,12 +405,40 @@ defmodule BDS.Generation.Validation do
     post.slug == route.slug and year == route.year and month == route.month and day == route.day
   end
 
-  defp route_key(year, month, day, slug) do
+  @spec route_key(integer(), integer(), integer(), String.t()) :: String.t()
+  def route_key(year, month, day, slug) do
     "#{year}/#{String.pad_leading(Integer.to_string(month), 2, "0")}/#{String.pad_leading(Integer.to_string(day), 2, "0")}/#{slug}"
   end
 
   defp route_month_key(year, month) do
     "#{year}/#{String.pad_leading(Integer.to_string(month), 2, "0")}"
+  end
+
+  defp route_day_key(year, month, day) do
+    "#{route_month_key(year, month)}/#{String.pad_leading(Integer.to_string(day), 2, "0")}"
+  end
+
+  defp cascade_requested_date_archives(plan) do
+    plan
+    |> cascade_requested_year_month_days()
+    |> cascade_requested_year_months()
+  end
+
+  defp cascade_requested_year_month_days(plan) do
+    Enum.reduce(plan.requested_year_month_days, plan, fn year_month_day, acc ->
+      [year, month, _day] = String.split(year_month_day, "/", parts: 3)
+
+      acc
+      |> update_in([:requested_year_months], &MapSet.put(&1, "#{year}/#{month}"))
+      |> update_in([:requested_years], &MapSet.put(&1, String.to_integer(year)))
+    end)
+  end
+
+  defp cascade_requested_year_months(plan) do
+    Enum.reduce(plan.requested_year_months, plan, fn year_month, acc ->
+      [year | _rest] = String.split(year_month, "/", parts: 2)
+      update_in(acc.requested_years, &MapSet.put(&1, String.to_integer(year)))
+    end)
   end
 
   defp extract_language_path(path, additional_languages) do
@@ -410,83 +459,6 @@ defmodule BDS.Generation.Validation do
 
       _other ->
         {nil, path}
-    end
-  end
-
-  @spec targeted_output?(String.t(), map(), String.t() | nil, [String.t()]) :: boolean()
-  def targeted_output?(relative_path, targeted_plan, main_language, additional_languages) do
-    {language, stripped_path} =
-      extract_relative_output_language(relative_path, additional_languages)
-
-    plan =
-      case language do
-        nil -> targeted_plan
-        value -> Map.get(targeted_plan.language_plans, value, empty_validation_path_plan())
-      end
-
-    targeted_output_for_plan?(stripped_path, plan, main_language == language or is_nil(language))
-  end
-
-  defp extract_relative_output_language(relative_path, additional_languages) do
-    segments = String.split(relative_path, "/", trim: true)
-
-    case segments do
-      [language | rest] ->
-        if language in additional_languages do
-          {language, Path.join(rest)}
-        else
-          {nil, relative_path}
-        end
-
-      _other ->
-        {nil, relative_path}
-    end
-  end
-
-  defp targeted_output_for_plan?(
-         _relative_path,
-         %{requires_fallback_section_render: true},
-         _main?
-       ),
-       do: true
-
-  defp targeted_output_for_plan?(relative_path, plan, _main?) do
-    cond do
-      relative_path in ["index.html", "404.html", "feed.xml", "atom.xml"] ->
-        plan.request_root_routes
-
-      Regex.match?(~r|^category/([^/]+)(?:/page/\d+)?/index\.html$|, relative_path) ->
-        [_, slug] = Regex.run(~r|^category/([^/]+)(?:/page/\d+)?/index\.html$|, relative_path)
-        MapSet.member?(plan.requested_category_slugs, slug)
-
-      Regex.match?(~r|^tag/([^/]+)/index\.html$|, relative_path) ->
-        [_, slug] = Regex.run(~r|^tag/([^/]+)/index\.html$|, relative_path)
-        MapSet.member?(plan.requested_tag_slugs, slug)
-
-      Regex.match?(~r|^(\d{4})/(\d{2})/(\d{2})/([^/]+)/index\.html$|, relative_path) ->
-        [_, year, month, day, slug] =
-          Regex.run(~r|^(\d{4})/(\d{2})/(\d{2})/([^/]+)/index\.html$|, relative_path)
-
-        MapSet.member?(
-          plan.requested_post_routes,
-          route_key(
-            String.to_integer(year),
-            String.to_integer(month),
-            String.to_integer(day),
-            slug
-          )
-        )
-
-      Regex.match?(~r|^(\d{4})/(\d{2})/index\.html$|, relative_path) ->
-        [_, year, month] = Regex.run(~r|^(\d{4})/(\d{2})/index\.html$|, relative_path)
-        MapSet.member?(plan.requested_year_months, "#{year}/#{month}")
-
-      Regex.match?(~r|^(\d{4})/index\.html$|, relative_path) ->
-        [_, year] = Regex.run(~r|^(\d{4})/index\.html$|, relative_path)
-        MapSet.member?(plan.requested_years, String.to_integer(year))
-
-      true ->
-        false
     end
   end
 

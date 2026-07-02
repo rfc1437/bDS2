@@ -914,6 +914,321 @@ defmodule BDS.GenerationTest do
     assert clean_report.updated_post_url_paths == []
   end
 
+  test "apply_validation renders only targeted routes and leaves feed/atom/404/pagefind untouched",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post_a} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "First Post",
+               content: "First body",
+               language: "en"
+             })
+
+    assert {:ok, _published_a} = Posts.publish_post(post_a.id)
+
+    assert {:ok, _result} =
+             BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
+
+    feed_path = Path.join([temp_dir, "html", "feed.xml"])
+    atom_path = Path.join([temp_dir, "html", "atom.xml"])
+    not_found_path = Path.join([temp_dir, "html", "404.html"])
+    pagefind_path = Path.join([temp_dir, "html", "pagefind", "index.json"])
+
+    feed_before = File.read!(feed_path)
+    atom_before = File.read!(atom_path)
+    not_found_before = File.read!(not_found_path)
+    pagefind_before = File.read!(pagefind_path)
+
+    # Publishing a new post leaves the generated feed/index reflecting only post A
+    # until validation apply targets the newly missing routes.
+    assert {:ok, post_b} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Second Post",
+               content: "Second body",
+               language: "en"
+             })
+
+    assert {:ok, published_b} = Posts.publish_post(post_b.id)
+
+    post_b_path = BDS.Generation.post_output_path(published_b)
+    post_b_file = Path.join([temp_dir, "html", post_b_path])
+    refute File.exists?(post_b_file)
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id)
+    assert relative_path_to_url_path(post_b_path) in report.missing_url_paths
+
+    assert {:ok, repair} = BDS.Generation.apply_validation(project.id, report)
+    assert repair.rendered_url_count > 0
+
+    # The targeted single-post route is rendered.
+    assert File.exists?(post_b_file)
+
+    # Old-app parity: feed, atom, 404, and the search index are NOT regenerated on apply.
+    assert File.read!(feed_path) == feed_before
+    assert File.read!(atom_path) == atom_before
+    assert File.read!(not_found_path) == not_found_before
+    assert File.read!(pagefind_path) == pagefind_before
+  end
+
+  test "apply_validation re-renders only the affected post's categories, tags, and single route",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post_a} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Alpha",
+               content: "Alpha body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["elixir"]
+             })
+
+    assert {:ok, published_a} = Posts.publish_post(post_a.id)
+
+    assert {:ok, post_b} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Beta",
+               content: "Beta body",
+               language: "en",
+               categories: ["photos"],
+               tags: ["erlang"]
+             })
+
+    assert {:ok, published_b} = Posts.publish_post(post_b.id)
+
+    assert {:ok, _result} =
+             BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
+
+    post_a_path = BDS.Generation.post_output_path(published_a)
+    post_b_path = BDS.Generation.post_output_path(published_b)
+
+    notes_before = generated_updated_at(project.id, "category/notes/index.html")
+    elixir_before = generated_updated_at(project.id, "tag/elixir/index.html")
+    photos_before = generated_updated_at(project.id, "category/photos/index.html")
+    erlang_before = generated_updated_at(project.id, "tag/erlang/index.html")
+    post_b_before = generated_updated_at(project.id, post_b_path)
+
+    File.rm!(Path.join([temp_dir, "html", post_a_path]))
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id)
+    assert relative_path_to_url_path(post_a_path) in report.missing_url_paths
+    # Only post A's route is affected; post B must not be flagged as updated.
+    assert report.updated_post_url_paths == []
+
+    assert {:ok, _repair} = BDS.Generation.apply_validation(project.id, report)
+
+    # Post A's own single route plus only its category and tag archives are re-rendered.
+    assert File.exists?(Path.join([temp_dir, "html", post_a_path]))
+    assert generated_updated_at(project.id, "category/notes/index.html") > notes_before
+    assert generated_updated_at(project.id, "tag/elixir/index.html") > elixir_before
+
+    # Post B's single route and its unrelated category and tag archives are left untouched.
+    assert generated_updated_at(project.id, post_b_path) == post_b_before
+    assert generated_updated_at(project.id, "category/photos/index.html") == photos_before
+    assert generated_updated_at(project.id, "tag/erlang/index.html") == erlang_before
+  end
+
+  test "apply_validation streams one progress message per rewritten URL with a running count",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Progress Post",
+               content: "Progress body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["elixir"]
+             })
+
+    assert {:ok, published} = Posts.publish_post(post.id)
+
+    assert {:ok, _result} =
+             BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
+
+    post_path = BDS.Generation.post_output_path(published)
+    File.rm!(Path.join([temp_dir, "html", post_path]))
+
+    assert {:ok, report} = BDS.Generation.validate_site(project.id)
+
+    test_pid = self()
+
+    assert {:ok, _repair} =
+             BDS.Generation.apply_validation(project.id, report,
+               on_progress: fn progress, message ->
+                 send(test_pid, {:progress, progress, message})
+               end
+             )
+
+    messages = collect_progress_messages([])
+    post_url = relative_path_to_url_path(post_path)
+
+    # The rewritten single-post URL is named in a progress message (like the old app).
+    assert Enum.any?(messages, fn {_progress, message} -> String.contains?(message, post_url) end)
+
+    # Progress messages carry a running "(rewritten/total)" count of URLs.
+    assert Enum.any?(messages, fn {_progress, message} -> message =~ ~r/\(\d+\/\d+\)/ end)
+
+    # Progress advances incrementally rather than jumping straight from 0.0 to 1.0.
+    fractions =
+      messages
+      |> Enum.map(fn {progress, _message} -> progress end)
+      |> Enum.filter(fn progress -> progress > 0.0 and progress < 1.0 end)
+
+    assert fractions != []
+  end
+
+  test "prepare_validation_apply classifies page and day archive routes without section fallback",
+       %{project: project} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, page} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "About",
+               content: "About body",
+               language: "en",
+               categories: ["page"]
+             })
+
+    assert {:ok, published_page} = Posts.publish_post(page.id)
+
+    assert {:ok, dated_post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Day Archive Source",
+               content: "Day archive body",
+               language: "en"
+             })
+
+    assert {:ok, published_dated_post} = Posts.publish_post(dated_post.id)
+
+    {year, month, day} =
+      published_dated_post.created_at
+      |> DateTime.from_unix!(:millisecond)
+      |> then(&{&1.year, &1.month, &1.day})
+
+    assert {:ok, page_preparation} =
+             BDS.Generation.prepare_validation_apply(project.id, %{
+               missing_url_paths: ["/#{published_page.slug}"],
+               updated_post_url_paths: [],
+               extra_url_paths: []
+             })
+
+    assert page_preparation.sections_to_render == [:core]
+
+    assert {:ok, day_preparation} =
+             BDS.Generation.prepare_validation_apply(project.id, %{
+               missing_url_paths: [
+                 "/#{year}/#{String.pad_leading(Integer.to_string(month), 2, "0")}/#{String.pad_leading(Integer.to_string(day), 2, "0")}"
+               ],
+               updated_post_url_paths: [],
+               extra_url_paths: []
+             })
+
+    assert day_preparation.sections_to_render == [:date]
+  end
+
+  test "apply_validation_section reports visible progress before section rendering starts", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, template} =
+             BDS.Templates.create_template(%{
+               project_id: project.id,
+               title: "Section Progress Template",
+               kind: :post,
+               content: "{{ labels.site_search_label }}: {{ post.title }}"
+             })
+
+    assert {:ok, published_template} = BDS.Templates.publish_template(template.id)
+
+    published_posts =
+      Enum.map(1..3, fn index ->
+        assert {:ok, post} =
+                 Posts.create_post(%{
+                   project_id: project.id,
+                   title: "Section Progress Post #{index}",
+                   content: "Section progress body #{index}",
+                   template_slug: published_template.slug
+                 })
+
+        assert {:ok, published_post} = Posts.publish_post(post.id)
+        published_post
+      end)
+
+    post_url_paths =
+      Enum.map(
+        published_posts,
+        &(BDS.Generation.post_output_path(&1) |> relative_path_to_url_path())
+      )
+
+    parent = self()
+
+    on_progress = fn value, message ->
+      send(parent, {:apply_section_progress, value, message})
+    end
+
+    assert {:ok, _result} =
+             BDS.Generation.apply_validation_section(
+               project.id,
+               %{
+                 missing_url_paths: post_url_paths,
+                 updated_post_url_paths: [],
+                 extra_url_paths: []
+               },
+               :single,
+               on_progress: on_progress
+             )
+
+    assert_receive {:apply_section_progress, +0.0, "Render Single Posts"}
+
+    assert_receive {:apply_section_progress, progress, message}
+                   when progress > 0.0 and progress < 1.0 and
+                          is_binary(message)
+
+    rendered_path =
+      Path.join([
+        project.data_path,
+        "html",
+        BDS.Generation.post_output_path(List.first(published_posts))
+      ])
+
+    assert File.read!(rendered_path) =~ "Site search: Section Progress Post"
+  end
+
   test "apply_validation returns an error for unreadable generated files", %{
     project: project,
     temp_dir: temp_dir
@@ -1343,6 +1658,23 @@ defmodule BDS.GenerationTest do
   # Pushes generation timestamps and html mtimes far into the past so a
   # subsequent source-file write is newer by more than the second-granularity
   # mtime tolerance, without sleeping across real second boundaries.
+  defp collect_progress_messages(acc) do
+    receive do
+      {:progress, progress, message} -> collect_progress_messages([{progress, message} | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
+  defp generated_updated_at(project_id, relative_path) do
+    BDS.Generation.GeneratedFileHash
+    |> Repo.get_by(project_id: project_id, relative_path: relative_path)
+    |> case do
+      nil -> flunk("expected generated file hash for #{relative_path}")
+      %{updated_at: updated_at} -> updated_at
+    end
+  end
+
   defp backdate_generated_outputs(project_id, temp_dir) do
     past_posix = System.os_time(:second) - 120
 

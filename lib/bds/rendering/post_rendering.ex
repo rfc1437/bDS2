@@ -20,7 +20,7 @@ defmodule BDS.Rendering.PostRendering do
     metadata = RenderMetadata.project_metadata(project_id)
     template_context = TemplateSelection.template_render_context(project_id)
 
-    language = MapUtils.attr(assigns, :language, metadata.main_language || "en")
+    language = MapUtils.attr(assigns, :language) || metadata.main_language || "en"
 
     main_language = metadata.main_language || language
     post_record = Map.get(assigns, :_post_record) || load_post_record(assigns)
@@ -58,24 +58,26 @@ defmodule BDS.Rendering.PostRendering do
 
     %{
       language: language,
-      language_prefix: assign_override(
-        assigns,
-        :language_prefix,
-        "language_prefix",
-        LinksAndLanguages.language_prefix(language, main_language)
-      ),
+      language_prefix:
+        assign_override(
+          assigns,
+          :language_prefix,
+          "language_prefix",
+          LinksAndLanguages.language_prefix(language, main_language)
+        ),
       page_title:
         Map.get(
           assigns,
           :page_title,
           MapUtils.attr(assigns, :title)
         ),
-      pico_stylesheet_href: assign_override(
-        assigns,
-        :pico_stylesheet_href,
-        "pico_stylesheet_href",
-        RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
-      ),
+      pico_stylesheet_href:
+        assign_override(
+          assigns,
+          :pico_stylesheet_href,
+          "pico_stylesheet_href",
+          RenderMetadata.default_pico_stylesheet_href(metadata.pico_theme)
+        ),
       html_theme_attribute:
         assign_override(assigns, :html_theme_attribute, "html_theme_attribute", nil),
       blog_languages: RenderMetadata.blog_languages(metadata, language),

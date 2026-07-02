@@ -221,6 +221,86 @@ msgstr "Auswahl anwenden"
 msgid "Apply Theme"
 msgstr "Theme anwenden"
 
+#: lib/bds/desktop/shell_commands.ex
+msgid "Apply Site Validation"
+msgstr "Website-Validierung anwenden"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Apply Site Validation tasks queued"
+msgstr "Aufgaben zum Anwenden der Website-Validierung eingereiht"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Build Search Index"
+msgstr "Suchindex aufbauen"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Build Search Index complete"
+msgstr "Suchindex aufgebaut"
+
+#: lib/bds/generation.ex
+msgid "Deleting extra URLs..."
+msgstr "Überzählige URLs werden gelöscht..."
+
+#: lib/bds/generation.ex
+msgid "No extra URLs to delete"
+msgstr "Keine überzähligen URLs zu löschen"
+
+#: lib/bds/generation.ex
+msgid "Planning validation apply steps..."
+msgstr "Schritte zum Anwenden der Validierung werden geplant..."
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Prepare Validation Apply"
+msgstr "Anwenden der Validierung vorbereiten"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Regenerate Calendar complete"
+msgstr "Kalender neu erzeugt"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Render Category Archives"
+msgstr "Kategoriearchive rendern"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Render Category Archives complete"
+msgstr "Kategoriearchive gerendert"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Render Date Archives"
+msgstr "Datumsarchive rendern"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Render Date Archives complete"
+msgstr "Datumsarchive gerendert"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Render Single Posts"
+msgstr "Einzelbeiträge rendern"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Render Single Posts complete"
+msgstr "Einzelbeiträge gerendert"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Render Site Core"
+msgstr "Website-Kern rendern"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Render Site Core complete"
+msgstr "Website-Kern gerendert"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Render Tag Archives"
+msgstr "Tag-Archive rendern"
+
+#: lib/bds/desktop/shell_commands.ex
+msgid "Render Tag Archives complete"
+msgstr "Tag-Archive gerendert"
+
+#: lib/bds/generation.ex
+msgid "Validation apply prepared"
+msgstr "Anwenden der Validierung vorbereitet"
+
 #: lib/bds/desktop/shell_data.ex:182
 #: lib/bds/ui/sidebar.ex:331
 #, elixir-autogen, elixir-format

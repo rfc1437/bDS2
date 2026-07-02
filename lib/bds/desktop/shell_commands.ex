@@ -263,27 +263,39 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp dispatch("apply_site_validation", project, params) do
-    report = normalize_apply_validation_report(BDS.MapUtils.attr(params, :report, %{}))
+    validation_report = normalize_apply_validation_report(BDS.MapUtils.attr(params, :report, %{}))
+    group_id = task_group_id("apply_site_validation")
+    attrs = %{group_id: group_id, group_name: "Apply Site Validation"}
 
-    queue_task(
-      project,
-      "apply_site_validation",
-      "Apply Site Validation",
-      "Generation",
-      fn report_fn ->
-        {:ok, _apply} =
-          Generation.apply_validation(project.id, report,
-            on_progress: scaled_progress_reporter(report_fn, 0.0, 0.85)
-          )
+    {:ok, prepare_task} =
+      Tasks.submit_task(
+        "Prepare Validation Apply",
+        fn report ->
+          {:ok, preparation} =
+            Generation.prepare_validation_apply(project.id, validation_report,
+              on_progress: report
+            )
 
-        {:ok, validation} =
-          Generation.validate_site(project.id, @site_sections,
-            on_progress: scaled_progress_reporter(report_fn, 0.85, 1.0)
-          )
+          Map.put(preparation, :project_id, project.id)
+        end,
+        attrs
+      )
 
-        site_validation_result(project.id, validation)
-      end
-    )
+    Task.start(fn ->
+      run_apply_validation_sequence(project, validation_report, group_id, attrs, prepare_task.id)
+    end)
+
+    {:ok,
+     %{
+       kind: "task_queued",
+       action: "apply_site_validation",
+       title: "Apply Site Validation",
+       message: "Apply Site Validation tasks queued",
+       project_id: project.id,
+       task_id: prepare_task.id,
+       task_group_id: group_id,
+       panel_tab: "tasks"
+     }}
   end
 
   defp dispatch("metadata_diff", project, _params) do
@@ -462,6 +474,124 @@ defmodule BDS.Desktop.ShellCommands do
       report.(scaled_value, message)
     end
   end
+
+  defp run_apply_validation_sequence(project, validation_report, group_id, attrs, prepare_task_id) do
+    with :ok <-
+           wait_for_group_phase(group_id, ["Prepare Validation Apply"], @rebuild_phase_timeout),
+         {:ok, preparation} <- completed_task_result(prepare_task_id),
+         :ok <-
+           run_apply_validation_render_tasks(
+             project,
+             validation_report,
+             group_id,
+             attrs,
+             preparation
+           ) do
+      if validation_apply_changed?(preparation) do
+        :ok = run_apply_validation_refresh_task(project, group_id, attrs, :calendar)
+      end
+
+      submit_apply_validation_check_task(project, attrs)
+    else
+      _other -> :ok
+    end
+  end
+
+  defp run_apply_validation_render_tasks(project, validation_report, group_id, attrs, preparation) do
+    sections = Map.get(preparation, :sections_to_render, [])
+    task_names = Enum.map(sections, &apply_validation_section_task_name/1)
+
+    Enum.each(sections, fn section ->
+      task_name = apply_validation_section_task_name(section)
+
+      {:ok, _task} =
+        Tasks.submit_task(
+          task_name,
+          fn report ->
+            {:ok, _result} =
+              Generation.apply_validation_section(project.id, validation_report, section,
+                on_progress: report
+              )
+
+            report.(1.0, apply_validation_section_complete_message(section))
+            :ok
+          end,
+          attrs
+        )
+    end)
+
+    case task_names do
+      [] -> :ok
+      names -> wait_for_group_phase(group_id, names, @rebuild_phase_timeout)
+    end
+  end
+
+  defp run_apply_validation_refresh_task(project, group_id, attrs, kind) do
+    task_name = apply_validation_refresh_task_name(kind)
+
+    {:ok, _task} =
+      Tasks.submit_task(
+        task_name,
+        fn report ->
+          {:ok, _result} =
+            Generation.refresh_validation_ancillary_outputs(project.id, kind, on_progress: report)
+
+          report.(1.0, apply_validation_refresh_complete_message(kind))
+          :ok
+        end,
+        attrs
+      )
+
+    wait_for_group_phase(group_id, [task_name], @rebuild_phase_timeout)
+  end
+
+  defp submit_apply_validation_check_task(project, attrs) do
+    {:ok, _task} =
+      Tasks.submit_task(
+        "Validate Site",
+        fn report ->
+          {:ok, validation} =
+            Generation.validate_site(project.id, @site_sections, on_progress: report)
+
+          site_validation_result(project.id, validation)
+        end,
+        attrs
+      )
+
+    :ok
+  end
+
+  defp completed_task_result(task_id) do
+    case Tasks.get_task(task_id) do
+      %{status: :completed, result: result} when is_map(result) -> {:ok, result}
+      %{status: :failed, error: error} -> {:error, error}
+      _other -> {:error, :task_result_unavailable}
+    end
+  end
+
+  defp validation_apply_changed?(preparation) do
+    Map.get(preparation, :sections_to_render, []) != [] or
+      Map.get(preparation, :deleted_url_count, 0) > 0
+  end
+
+  defp apply_validation_section_task_name(:core), do: "Render Site Core"
+  defp apply_validation_section_task_name(:single), do: "Render Single Posts"
+  defp apply_validation_section_task_name(:category), do: "Render Category Archives"
+  defp apply_validation_section_task_name(:tag), do: "Render Tag Archives"
+  defp apply_validation_section_task_name(:date), do: "Render Date Archives"
+
+  defp apply_validation_section_complete_message(:core), do: "Render Site Core complete"
+  defp apply_validation_section_complete_message(:single), do: "Render Single Posts complete"
+
+  defp apply_validation_section_complete_message(:category),
+    do: "Render Category Archives complete"
+
+  defp apply_validation_section_complete_message(:tag), do: "Render Tag Archives complete"
+  defp apply_validation_section_complete_message(:date), do: "Render Date Archives complete"
+
+  defp apply_validation_refresh_task_name(:calendar), do: "Regenerate Calendar"
+
+  defp apply_validation_refresh_complete_message(:calendar), do: "Regenerate Calendar complete"
 
   defp translation_fill_enabled?(metadata) do
     ([metadata.main_language] ++ metadata.blog_languages)

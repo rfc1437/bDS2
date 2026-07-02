@@ -368,6 +368,76 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert Map.has_key?(completed.result.payload.summary, :updated_count)
   end
 
+  test "apply_site_validation queues visible apply subtasks and revalidates the site", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Validation Apply Task Post",
+               content: "Validation apply task body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["validation-task"]
+             })
+
+    assert {:ok, published_post} = Posts.publish_post(post.id)
+    assert {:ok, _generation} = BDS.Generation.generate_site(project.id, [:core, :single])
+
+    post_path = BDS.Generation.post_output_path(published_post)
+    File.rm!(Path.join([temp_dir, "html", post_path]))
+
+    extra_path = Path.join([temp_dir, "html", "obsolete", "index.html"])
+    File.mkdir_p!(Path.dirname(extra_path))
+    File.write!(extra_path, "<html>obsolete</html>")
+
+    post_url_path = BDS.Generation.Paths.relative_path_to_url_path(post_path)
+
+    assert {:ok, report} =
+             BDS.Generation.validate_site(project.id, [:core, :single, :category, :tag, :date])
+
+    assert post_url_path in report.missing_url_paths
+    assert "/obsolete" in report.extra_url_paths
+
+    assert {:ok, result} = ShellCommands.execute("apply_site_validation", %{report: report})
+
+    assert result.kind == "task_queued"
+    assert result.action == "apply_site_validation"
+    assert result.title == "Apply Site Validation"
+    assert is_binary(result.task_id)
+    assert is_binary(result.task_group_id)
+
+    tasks =
+      wait_for_tasks_by_name(
+        [
+          "Prepare Validation Apply",
+          "Render Site Core",
+          "Render Single Posts",
+          "Validate Site"
+        ],
+        &(&1.status == :completed),
+        5_000
+      )
+
+    assert Enum.all?(tasks, &(&1.group_id == result.task_group_id))
+    assert Enum.all?(tasks, &(&1.group_name == "Apply Site Validation"))
+
+    validation_task = Enum.find(tasks, &(&1.name == "Validate Site"))
+    assert validation_task.result.kind == "open_editor"
+    assert validation_task.result.route == "site_validation"
+    assert validation_task.result.payload.missing_url_paths == []
+    assert validation_task.result.payload.extra_url_paths == []
+    assert validation_task.result.payload.updated_post_url_paths == []
+  end
+
   test "metadata_diff queues a tracked maintenance task and returns the report as an editor payload" do
     assert {:ok, result} = ShellCommands.execute("metadata_diff")
 

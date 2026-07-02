@@ -458,10 +458,11 @@ rule SiteValidationScan {
 rule SiteValidationApply {
     when: SiteValidationApplyRequested(report)
     -- Classifies affected paths into generation sections (core, single, category, tag, date)
-    -- Renders only affected sections in parallel
+    -- Renders only affected routes (a post's own single page plus only its own
+    --   categories, tags, and date archives); unaffected routes are left untouched
     -- Deletes extra HTML files, removes empty directories
-    -- Regenerates calendar if anything changed
-    -- Rebuilds search index if anything rendered or deleted
+    -- Regenerates calendar if anything changed (feed/atom/404/sitemap/search
+    --   index are NOT rebuilt on apply)
     ensures: ApplyValidationRequested(report.project_id, report.affected_sections)
 }
 
