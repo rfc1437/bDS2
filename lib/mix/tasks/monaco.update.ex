@@ -9,8 +9,8 @@ defmodule Mix.Tasks.Monaco.Update do
   This task:
 
   1. Runs `npm install monaco-editor@<version> --save-dev`
-  2. Removes the old `priv/static/assets/monaco.js` and `monaco.css`
-  3. Rebuilds the Monaco bundle via esbuild (both dev and minified)
+  2. Removes the old Monaco bundle assets
+  3. Rebuilds the Monaco main and worker bundles via esbuild (both dev and minified)
 
   Use `mix monaco.version` to check the result.
 
@@ -27,14 +27,14 @@ defmodule Mix.Tasks.Monaco.Update do
         Mix.shell().error("Missing version argument.")
         Mix.shell().info("Usage: mix monaco.update <version>")
         Mix.shell().info("Example: mix monaco.update 0.55.1")
-        System.at_exit(fn _ -> System.halt(1) end)
+        Mix.raise("missing Monaco version argument")
 
       [version] ->
         do_update(version)
 
       _ ->
         Mix.shell().error("Too many arguments. Usage: mix monaco.update <version>")
-        System.at_exit(fn _ -> System.halt(1) end)
+        Mix.raise("too many arguments for mix monaco.update")
     end
   end
 
@@ -49,22 +49,29 @@ defmodule Mix.Tasks.Monaco.Update do
     # 2. Clean old bundle
     monaco_js = Path.join(File.cwd!(), "priv/static/assets/monaco.js")
     monaco_css = Path.join(File.cwd!(), "priv/static/assets/monaco.css")
+    monaco_workers = Path.join(File.cwd!(), "priv/static/assets/monaco")
 
-    for path <- [monaco_js, monaco_css] do
+    for path <- [monaco_js, monaco_css, monaco_workers] do
       if File.exists?(path) do
-        File.rm!(path)
+        File.rm_rf!(path)
       end
     end
 
-    Mix.shell().info("Removed old monaco.js and monaco.css")
+    Mix.shell().info("Removed old Monaco bundle assets")
 
     # 3. Rebuild via esbuild (dev + minified)
-    Mix.Task.run("esbuild", ["monaco"])
-    Mix.Task.run("esbuild", ["monaco", "--minify"])
+    run_esbuild(["monaco"])
+    run_esbuild(["monaco_workers"])
+    run_esbuild(["monaco", "--minify"])
+    run_esbuild(["monaco_workers", "--minify"])
 
     # 4. Verify
     new = current_version()
     Mix.shell().info("monaco-editor is now at #{new}")
+  end
+
+  defp run_esbuild(args) do
+    Mix.Task.run("esbuild", args)
   end
 
   defp current_version do

@@ -67,6 +67,22 @@ config :esbuild,
       --loader:.ttf=dataurl
     ),
     env: %{"NODE_PATH" => Path.expand("../node_modules", __DIR__)}
+  ],
+  monaco_workers: [
+    cd: Path.expand("../assets", __DIR__),
+    args: ~w(
+      js/monaco_workers/editor.worker.js
+      js/monaco_workers/css.worker.js
+      js/monaco_workers/html.worker.js
+      js/monaco_workers/json.worker.js
+      js/monaco_workers/ts.worker.js
+      --bundle
+      --target=es2022
+      --format=esm
+      --outdir=../priv/static/assets/monaco
+      --loader:.ttf=dataurl
+    ),
+    env: %{"NODE_PATH" => Path.expand("../node_modules", __DIR__)}
   ]
 
 config :bds, :scripting,

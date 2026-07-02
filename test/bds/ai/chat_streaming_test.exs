@@ -88,6 +88,7 @@ defmodule BDS.AI.ChatStreamingTest do
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+    Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, {:shared, self()})
 
     Application.put_env(:bds, :chat_stream_test_pid, self())
     Application.put_env(:bds, :chat_stream_scenario, :short)
@@ -101,6 +102,7 @@ defmodule BDS.AI.ChatStreamingTest do
     )
 
     on_exit(fn ->
+      Ecto.Adapters.SQL.Sandbox.mode(BDS.Repo, :manual)
       Application.delete_env(:bds, :chat_stream_scenario)
 
       case original_chat do

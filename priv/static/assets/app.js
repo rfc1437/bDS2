@@ -8821,7 +8821,46 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
   // js/monaco/services.js
   var monacoLoaderPromise;
   var monacoEditors = /* @__PURE__ */ new Map();
+  var monacoWorkerUrls = {
+    editor: "/assets/monaco/editor.worker.js",
+    css: "/assets/monaco/css.worker.js",
+    html: "/assets/monaco/html.worker.js",
+    json: "/assets/monaco/json.worker.js",
+    ts: "/assets/monaco/ts.worker.js"
+  };
+  var workerNameForLanguage = (label) => {
+    switch (label) {
+      case "css":
+      case "scss":
+      case "less":
+        return "css";
+      case "html":
+      case "handlebars":
+      case "razor":
+        return "html";
+      case "json":
+        return "json";
+      case "typescript":
+      case "javascript":
+        return "ts";
+      default:
+        return "editor";
+    }
+  };
+  var ensureMonacoEnvironment = () => {
+    if (globalThis.MonacoEnvironment?.getWorker) {
+      return;
+    }
+    globalThis.MonacoEnvironment = {
+      ...globalThis.MonacoEnvironment,
+      getWorker(_workerId, label) {
+        const workerName = workerNameForLanguage(label);
+        return new Worker(monacoWorkerUrls[workerName], { name: label, type: "module" });
+      }
+    };
+  };
   var loadMonaco = () => {
+    ensureMonacoEnvironment();
     if (window.monaco?.editor) {
       ensureMonacoTheme(window.monaco);
       registerLiquidLanguage(window.monaco);

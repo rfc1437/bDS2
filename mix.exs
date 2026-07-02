@@ -66,8 +66,13 @@ defmodule BDS.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["tailwind default", "esbuild default", "esbuild monaco"],
-      "assets.deploy": ["tailwind default --minify", "esbuild default --minify", "esbuild monaco"],
+      "assets.build": ["tailwind default", "esbuild default", "esbuild monaco", "esbuild monaco_workers"],
+      "assets.deploy": [
+        "tailwind default --minify",
+        "esbuild default --minify",
+        "esbuild monaco --minify",
+        "esbuild monaco_workers --minify"
+      ],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       validate: ["test", "credo --strict", "deps.audit --ignore-file .mix_audit.ignore", "dialyzer"]
     ]

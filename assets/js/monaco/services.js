@@ -4,7 +4,51 @@ import { registerLiquidLanguage, registerMarkdownWithMacrosLanguage } from "./la
 let monacoLoaderPromise;
 const monacoEditors = new Map();
 
+const monacoWorkerUrls = {
+  editor: "/assets/monaco/editor.worker.js",
+  css: "/assets/monaco/css.worker.js",
+  html: "/assets/monaco/html.worker.js",
+  json: "/assets/monaco/json.worker.js",
+  ts: "/assets/monaco/ts.worker.js"
+};
+
+const workerNameForLanguage = (label) => {
+  switch (label) {
+    case "css":
+    case "scss":
+    case "less":
+      return "css";
+    case "html":
+    case "handlebars":
+    case "razor":
+      return "html";
+    case "json":
+      return "json";
+    case "typescript":
+    case "javascript":
+      return "ts";
+    default:
+      return "editor";
+  }
+};
+
+const ensureMonacoEnvironment = () => {
+  if (globalThis.MonacoEnvironment?.getWorker) {
+    return;
+  }
+
+  globalThis.MonacoEnvironment = {
+    ...globalThis.MonacoEnvironment,
+    getWorker(_workerId, label) {
+      const workerName = workerNameForLanguage(label);
+      return new Worker(monacoWorkerUrls[workerName], { name: label, type: "module" });
+    }
+  };
+};
+
 export const loadMonaco = () => {
+  ensureMonacoEnvironment();
+
   if (window.monaco?.editor) {
     ensureMonacoTheme(window.monaco);
     registerLiquidLanguage(window.monaco);

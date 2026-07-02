@@ -358,6 +358,22 @@ defmodule BDS.UI.ShellTest do
     assert File.exists?("/Users/gb/Projects/bDS2/assets/js/monaco/languages.js")
   end
 
+  test "monaco ESM build config emits served worker bundles" do
+    mix_exs = File.read!("/Users/gb/Projects/bDS2/mix.exs")
+    config = File.read!("/Users/gb/Projects/bDS2/config/config.exs")
+    services = File.read!("/Users/gb/Projects/bDS2/assets/js/monaco/services.js")
+    update_task = File.read!("/Users/gb/Projects/bDS2/lib/mix/tasks/monaco.update.ex")
+
+    assert mix_exs =~ ~s("esbuild monaco --minify")
+    assert mix_exs =~ ~s("esbuild monaco_workers --minify")
+    assert config =~ "monaco_workers:"
+    assert config =~ "js/monaco_workers/editor.worker.js"
+    assert services =~ "globalThis.MonacoEnvironment"
+    assert services =~ "/assets/monaco/editor.worker.js"
+    assert update_task =~ ~S|run_esbuild(["monaco_workers", "--minify"])|
+    refute File.exists?("/Users/gb/Projects/bDS2/assets/js/error_reporter.js")
+  end
+
   test "top level shell render uses utility classes for common layout" do
     template = File.read!("/Users/gb/Projects/bDS2/lib/bds/desktop/shell_live/index.html.heex")
 

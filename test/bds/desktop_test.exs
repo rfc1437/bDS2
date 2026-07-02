@@ -352,6 +352,7 @@ defmodule BDS.DesktopTest do
 
     assert conn.resp_body =~ ~s(data-phx-main)
     assert conn.resp_body =~ ~s(href="/assets/app.css")
+    assert conn.resp_body =~ ~s(href="/assets/monaco.css")
     assert conn.resp_body =~ ~s(src="/assets/app.js")
     refute conn.resp_body =~ ~s(src="/assets/live.js")
     refute conn.resp_body =~ ~s(src="/vendor/phoenix/phoenix.min.js")
@@ -369,6 +370,31 @@ defmodule BDS.DesktopTest do
     assert byte_size(css_conn.resp_body) > 0
     assert js_conn.status == 200
     assert byte_size(js_conn.resp_body) > 0
+  end
+
+  test "desktop endpoint serves Monaco ESM bundle and worker assets" do
+    paths = [
+      "/assets/monaco.css",
+      "/assets/monaco.js",
+      "/assets/monaco/editor.worker.js",
+      "/assets/monaco/css.worker.js",
+      "/assets/monaco/html.worker.js",
+      "/assets/monaco/json.worker.js",
+      "/assets/monaco/ts.worker.js"
+    ]
+
+    for path <- paths do
+      asset_conn = conn(:get, "#{path}?k=#{Desktop.Auth.login_key()}")
+      asset_conn = BDS.Desktop.Endpoint.call(asset_conn, BDS.Desktop.Endpoint.init([]))
+
+      assert asset_conn.status == 200
+      assert byte_size(asset_conn.resp_body) > 0
+    end
+  end
+
+  test "desktop automation launch scripts exist at the paths used by automation" do
+    assert File.regular?("/Users/gb/Projects/bDS2/scripts/desktop_automation_app.exs")
+    assert File.regular?("/Users/gb/Projects/bDS2/scripts/desktop_automation_runner.mjs")
   end
 
   test "desktop endpoint serves the live shell without extra router-side secret injection" do

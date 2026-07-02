@@ -158,8 +158,9 @@ mix assets.build
 
 ## Monaco Editor
 
-Monaco is bundled via esbuild using its ESM entry point (`monaco-editor/esm/vs/editor/editor.api.js`). The
-bundle is built as part of `mix assets.build` and lives at `priv/static/assets/monaco.js` and `monaco.css`.
+Monaco is bundled via esbuild using its ESM entry point (`monaco-editor/esm/vs/editor/editor.main.js`). The
+main bundle is built as part of `mix assets.build` and lives at `priv/static/assets/monaco.js` and
+`monaco.css`; ESM worker bundles live under `priv/static/assets/monaco/`.
 
 ```bash
 mix monaco.version    # show current monaco-editor version
