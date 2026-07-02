@@ -17,13 +17,7 @@ defmodule BDS.Desktop.Endpoint do
   plug(Plug.Static,
     at: "/assets",
     from: {:bds, "priv/static/assets"},
-    only: ["app.css", "app.js"]
-  )
-
-  plug(Plug.Static,
-    at: "/monaco",
-    from: {:bds, "priv/ui/monaco"},
-    only: ["vs"]
+    only: ["app.css", "app.js", "monaco.css", "monaco.js"]
   )
 
   plug(BDS.Desktop.Router)

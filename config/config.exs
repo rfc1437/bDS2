@@ -55,6 +55,18 @@ config :esbuild,
       --external:/images/*
     ),
     env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
+  ],
+  monaco: [
+    cd: Path.expand("../assets", __DIR__),
+    args: ~w(
+      js/monaco_entry.js
+      --bundle
+      --target=es2022
+      --format=esm
+      --outfile=../priv/static/assets/monaco.js
+      --loader:.ttf=dataurl
+    ),
+    env: %{"NODE_PATH" => Path.expand("../node_modules", __DIR__)}
   ]
 
 config :bds, :scripting,

@@ -36,7 +36,7 @@ If you are tracing UI behavior, start there first:
 
 - LiveView event routing, workbench state, overlays, and menu handling live in the desktop shell modules.
 - HEEx templates under the same tree now own most common layout and state styling.
-- Monaco remains a vendor drop under [priv/ui/monaco/](/Users/gb/Projects/bDS2/priv/ui/monaco).
+- Monaco is bundled as an ESM bundle via esbuild into `priv/static/assets/monaco.js` and `monaco.css` (source entry at `assets/js/monaco_entry.js`).
 
 ### Domain Modules
 
@@ -155,6 +155,19 @@ mix test
 mix dialyzer
 mix assets.build
 ```
+
+## Monaco Editor
+
+Monaco is bundled via esbuild using its ESM entry point (`monaco-editor/esm/vs/editor/editor.api.js`). The
+bundle is built as part of `mix assets.build` and lives at `priv/static/assets/monaco.js` and `monaco.css`.
+
+```bash
+mix monaco.version    # show current monaco-editor version
+mix monaco.update 0.55.1  # update to a specific version and rebuild the bundle
+```
+
+The update task runs `npm install monaco-editor@<version>`, cleans the old bundle, and rebuilds via esbuild.
+See https://www.npmjs.com/package/monaco-editor for available versions.
 
 Notes for developers:
 

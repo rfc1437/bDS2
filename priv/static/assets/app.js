@@ -1,4 +1,33 @@
 (() => {
+  var __create = Object.create;
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getProtoOf = Object.getPrototypeOf;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+    get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+  }) : x)(function(x) {
+    if (typeof require !== "undefined") return require.apply(this, arguments);
+    throw Error('Dynamic require of "' + x + '" is not supported');
+  });
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+    // If the importer is in node compatibility mode or this is not an ESM
+    // file that has been converted to a CommonJS file using a Babel-
+    // compatible transform (i.e. "__esModule" has not been set), then set
+    // "default" to the CommonJS "module.exports" for node compatibility.
+    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+    mod
+  ));
+
   // ../deps/phoenix/priv/static/phoenix.mjs
   var closure = (value) => {
     if (typeof value === "function") {
@@ -8556,37 +8585,6 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
     };
   };
 
-  // js/utils/script_loader.js
-  var loadScript = (src) => new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      if (existing.dataset.loaded === "true") {
-        resolve();
-        return;
-      }
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), {
-        once: true
-      });
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.addEventListener(
-      "load",
-      () => {
-        script.dataset.loaded = "true";
-        resolve();
-      },
-      { once: true }
-    );
-    script.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), {
-      once: true
-    });
-    document.head.appendChild(script);
-  });
-
   // js/utils/color.js
   var cssVar = (name, fallback) => {
     const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -8833,17 +8831,15 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
     if (monacoLoaderPromise) {
       return monacoLoaderPromise;
     }
-    monacoLoaderPromise = loadScript("/monaco/vs/loader.js").then(
-      () => new Promise((resolve, reject) => {
-        window.require.config({ paths: { vs: "/monaco/vs" } });
-        window.require(["vs/editor/editor.main"], () => {
-          ensureMonacoTheme(window.monaco);
-          registerLiquidLanguage(window.monaco);
-          registerMarkdownWithMacrosLanguage(window.monaco);
-          resolve(window.monaco);
-        }, reject);
-      })
-    ).catch((error) => {
+    monacoLoaderPromise = import("/assets/monaco.js").then((monaco) => {
+      window.monaco = monaco;
+      if (!monaco.editor) throw new Error("Monaco loaded but monaco.editor is missing");
+      ensureMonacoTheme(monaco);
+      registerLiquidLanguage(monaco);
+      registerMarkdownWithMacrosLanguage(monaco);
+      return monaco;
+    }).catch((error) => {
+      console.error("Monaco load failed:", error);
       monacoLoaderPromise = null;
       throw error;
     });

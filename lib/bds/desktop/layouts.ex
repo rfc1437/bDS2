@@ -13,6 +13,7 @@ defmodule BDS.Desktop.Layouts do
         <title><%= @page_title || "Blogging Desktop Server" %></title>
         <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
         <link phx-track-static rel="stylesheet" href="/assets/app.css" />
+        <link phx-track-static rel="stylesheet" href="/assets/monaco.css" />
       </head>
       <body>
         <%= @inner_content %>

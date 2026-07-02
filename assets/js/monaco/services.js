@@ -1,4 +1,3 @@
-import { loadScript } from "../utils/script_loader.js";
 import { ensureMonacoTheme } from "./theme.js";
 import { registerLiquidLanguage, registerMarkdownWithMacrosLanguage } from "./languages.js";
 
@@ -17,20 +16,17 @@ export const loadMonaco = () => {
     return monacoLoaderPromise;
   }
 
-  monacoLoaderPromise = loadScript("/monaco/vs/loader.js")
-    .then(
-      () =>
-        new Promise((resolve, reject) => {
-          window.require.config({ paths: { vs: "/monaco/vs" } });
-          window.require(["vs/editor/editor.main"], () => {
-            ensureMonacoTheme(window.monaco);
-            registerLiquidLanguage(window.monaco);
-            registerMarkdownWithMacrosLanguage(window.monaco);
-            resolve(window.monaco);
-          }, reject);
-        })
-    )
+  monacoLoaderPromise = import("/assets/monaco.js")
+    .then((monaco) => {
+      window.monaco = monaco;
+      if (!monaco.editor) throw new Error("Monaco loaded but monaco.editor is missing");
+      ensureMonacoTheme(monaco);
+      registerLiquidLanguage(monaco);
+      registerMarkdownWithMacrosLanguage(monaco);
+      return monaco;
+    })
     .catch((error) => {
+      console.error("Monaco load failed:", error);
       monacoLoaderPromise = null;
       throw error;
     });
