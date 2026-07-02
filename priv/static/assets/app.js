@@ -9470,6 +9470,40 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
   };
 
   // js/hooks/monaco_editor.js
+  var WEBKIT_TEXTAREA_ARROW_COMMANDS = {
+    ArrowLeft: "cursorLeft",
+    ArrowRight: "cursorRight",
+    ArrowUp: "cursorUp",
+    ArrowDown: "cursorDown"
+  };
+  var isWebKitEngine = () => {
+    const userAgent = globalThis.navigator?.userAgent || "";
+    return userAgent.includes("AppleWebKit") && !userAgent.includes("Chrome") && !userAgent.includes("Chromium");
+  };
+  var isMonacoInputArea = (target) => target instanceof HTMLTextAreaElement && target.classList.contains("inputarea");
+  var webKitTextAreaArrowCommand = (event) => {
+    if (event?.altKey || event?.ctrlKey || event?.metaKey) {
+      return null;
+    }
+    const command = WEBKIT_TEXTAREA_ARROW_COMMANDS[event?.key];
+    if (!command) {
+      return null;
+    }
+    return event.shiftKey ? `${command}Select` : command;
+  };
+  var bridgeWebKitTextAreaArrowKey = (editor, event) => {
+    if (!editor || !isMonacoInputArea(event.target)) {
+      return false;
+    }
+    const command = webKitTextAreaArrowCommand(event);
+    if (!command) {
+      return false;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    editor.trigger("keyboard", command, { source: "keyboard" });
+    return true;
+  };
   var MonacoEditor = {
     mounted() {
       this.textarea = document.getElementById(this.el.dataset.monacoInputId) || this.el.querySelector("textarea");
@@ -9481,6 +9515,9 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
       this.syncTimer = null;
       this.isApplyingRemoteUpdate = false;
       this.lastKnownValue = this.textarea?.value || "";
+      this.handleWebKitTextAreaArrowKey = (event) => {
+        bridgeWebKitTextAreaArrowKey(this.editor, event);
+      };
       this.syncEditorFromTextarea = () => {
         this.textarea = document.getElementById(this.el.dataset.monacoInputId) || this.el.querySelector("textarea");
         if (!this.textarea || !this.editor) {
@@ -9660,6 +9697,9 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
           this.el.addEventListener("dragover", this.handleDragOver);
           this.el.addEventListener("drop", this.handleDrop);
         }
+        if (isWebKitEngine()) {
+          this.host.addEventListener("keydown", this.handleWebKitTextAreaArrowKey, true);
+        }
       }).catch((error) => {
         console.error("Failed to load Monaco editor", error);
       });
@@ -9691,6 +9731,7 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
         this.el.removeEventListener("dragover", this.handleDragOver);
         this.el.removeEventListener("drop", this.handleDrop);
       }
+      this.host?.removeEventListener("keydown", this.handleWebKitTextAreaArrowKey, true);
       unregisterMonacoEditor(this.editorId || this.el.id);
       this.editor?.dispose();
     }

@@ -358,6 +358,48 @@ defmodule BDS.UI.ShellTest do
     assert File.exists?("/Users/gb/Projects/bDS2/assets/js/monaco/languages.js")
   end
 
+  test "monaco hook maps WebKit textarea arrow keys to cursor commands" do
+    script = """
+    import assert from "node:assert/strict";
+    class FakeTextArea {}
+    globalThis.HTMLTextAreaElement = FakeTextArea;
+
+    const { bridgeWebKitTextAreaArrowKey, webKitTextAreaArrowCommand } = await import("./assets/js/hooks/monaco_editor.js");
+
+    assert.equal(webKitTextAreaArrowCommand({ key: "ArrowLeft", shiftKey: false }), "cursorLeft");
+    assert.equal(webKitTextAreaArrowCommand({ key: "ArrowRight", shiftKey: false }), "cursorRight");
+    assert.equal(webKitTextAreaArrowCommand({ key: "ArrowUp", shiftKey: true }), "cursorUpSelect");
+    assert.equal(webKitTextAreaArrowCommand({ key: "ArrowDown", shiftKey: true }), "cursorDownSelect");
+    assert.equal(webKitTextAreaArrowCommand({ key: "ArrowLeft", altKey: true }), null);
+    assert.equal(webKitTextAreaArrowCommand({ key: "A", shiftKey: false }), null);
+
+    const target = new FakeTextArea();
+    target.classList = { contains: (className) => className === "inputarea" };
+
+    const calls = [];
+    const event = {
+      key: "ArrowLeft",
+      shiftKey: false,
+      target,
+      preventDefault: () => calls.push("preventDefault"),
+      stopPropagation: () => calls.push("stopPropagation")
+    };
+    const editor = { trigger: (...args) => calls.push(args) };
+
+    assert.equal(bridgeWebKitTextAreaArrowKey(editor, event), true);
+    assert.deepEqual(calls, ["preventDefault", "stopPropagation", ["keyboard", "cursorLeft", { source: "keyboard" }]]);
+    assert.equal(bridgeWebKitTextAreaArrowKey(editor, { ...event, target: {} }), false);
+    """
+
+    {output, status} =
+      System.cmd("node", ["--input-type=module", "--eval", script],
+        cd: "/Users/gb/Projects/bDS2",
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+  end
+
   test "monaco ESM build config emits served worker bundles" do
     mix_exs = File.read!("/Users/gb/Projects/bDS2/mix.exs")
     config = File.read!("/Users/gb/Projects/bDS2/config/config.exs")

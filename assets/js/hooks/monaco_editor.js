@@ -5,6 +5,52 @@ import {
   unregisterMonacoEditor
 } from "../monaco/services.js";
 
+const WEBKIT_TEXTAREA_ARROW_COMMANDS = {
+  ArrowLeft: "cursorLeft",
+  ArrowRight: "cursorRight",
+  ArrowUp: "cursorUp",
+  ArrowDown: "cursorDown"
+};
+
+const isWebKitEngine = () => {
+  const userAgent = globalThis.navigator?.userAgent || "";
+  return userAgent.includes("AppleWebKit") && !userAgent.includes("Chrome") && !userAgent.includes("Chromium");
+};
+
+const isMonacoInputArea = (target) =>
+  target instanceof HTMLTextAreaElement && target.classList.contains("inputarea");
+
+export const webKitTextAreaArrowCommand = (event) => {
+  if (event?.altKey || event?.ctrlKey || event?.metaKey) {
+    return null;
+  }
+
+  const command = WEBKIT_TEXTAREA_ARROW_COMMANDS[event?.key];
+
+  if (!command) {
+    return null;
+  }
+
+  return event.shiftKey ? `${command}Select` : command;
+};
+
+export const bridgeWebKitTextAreaArrowKey = (editor, event) => {
+  if (!editor || !isMonacoInputArea(event.target)) {
+    return false;
+  }
+
+  const command = webKitTextAreaArrowCommand(event);
+
+  if (!command) {
+    return false;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  editor.trigger("keyboard", command, { source: "keyboard" });
+  return true;
+};
+
 export const MonacoEditor = {
   mounted() {
     this.textarea = document.getElementById(this.el.dataset.monacoInputId) || this.el.querySelector("textarea");
@@ -16,6 +62,10 @@ export const MonacoEditor = {
     this.syncTimer = null;
     this.isApplyingRemoteUpdate = false;
     this.lastKnownValue = this.textarea?.value || "";
+
+    this.handleWebKitTextAreaArrowKey = (event) => {
+      bridgeWebKitTextAreaArrowKey(this.editor, event);
+    };
 
     this.syncEditorFromTextarea = () => {
       this.textarea = document.getElementById(this.el.dataset.monacoInputId) || this.el.querySelector("textarea");
@@ -246,6 +296,10 @@ export const MonacoEditor = {
           this.el.addEventListener("dragover", this.handleDragOver);
           this.el.addEventListener("drop", this.handleDrop);
         }
+
+        if (isWebKitEngine()) {
+          this.host.addEventListener("keydown", this.handleWebKitTextAreaArrowKey, true);
+        }
       })
       .catch((error) => {
         console.error("Failed to load Monaco editor", error);
@@ -286,6 +340,8 @@ export const MonacoEditor = {
       this.el.removeEventListener("dragover", this.handleDragOver);
       this.el.removeEventListener("drop", this.handleDrop);
     }
+
+    this.host?.removeEventListener("keydown", this.handleWebKitTextAreaArrowKey, true);
 
     unregisterMonacoEditor(this.editorId || this.el.id);
     this.editor?.dispose();
