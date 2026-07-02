@@ -79,20 +79,199 @@ defmodule BDS.Generation do
     with {:ok, plan} <- plan_generation(project_id, sections) do
       outputs = build_outputs(plan)
       on_progress = callback(opts)
-      total_outputs = length(outputs)
 
-      :ok = report_generation_started(on_progress, total_outputs, "generated files")
-
-      outputs
-      |> Enum.with_index(1)
-      |> Enum.each(fn {{relative_path, content}, index} ->
-        {:ok, _write} = write_generated_file(project_id, relative_path, content)
-        :ok = report_generation_progress(on_progress, index, total_outputs, "generated files")
-      end)
+      _generated_url_count =
+        stream_write_outputs(project_id, outputs, on_progress,
+          verb: "Generated",
+          gerund: "Generating",
+          refresh_route_timestamps: false
+        )
 
       {:ok, generated_files} = list_generated_files(project_id)
       {:ok, %{sections: plan.sections, generated_files: generated_files}}
     end
+  end
+
+  @doc """
+  Render one section of the full site, streaming one progress message per URL
+  (exactly like validation apply, only rendering ALL URLs of the section rather
+  than just the affected ones). The `:core` section also writes the complete
+  sitemap, feeds, calendar and preview assets. The Pagefind search index is
+  built separately by `build_site_search_index/2`.
+  """
+  @spec render_site_section(String.t(), section(), generation_opts()) ::
+          {:ok, map()} | {:error, term()}
+  def render_site_section(project_id, section, opts \\ [])
+
+  def render_site_section(project_id, section, opts)
+      when is_binary(project_id) and section in @core_sections and is_list(opts) do
+    on_progress = callback(opts)
+
+    with {:ok, plan} <- plan_generation(project_id, [section]) do
+      render_data = validation_render_data(plan)
+      route_total = section_route_total(plan, render_data)
+
+      rendered_url_count =
+        stream_render(project_id, on_progress, route_total,
+          [verb: "Generated", gerund: "Generating", refresh_route_timestamps: false],
+          fn on_output -> full_section_outputs(plan, render_data, section, on_output) end
+        )
+
+      {:ok, %{section: section, rendered_url_count: rendered_url_count}}
+    end
+  end
+
+  @doc """
+  Build the Pagefind search index for the whole site from the HTML already on
+  disk (matching the old app's separate `Build Search Index` step that runs
+  after every section has been rendered).
+  """
+  @spec build_site_search_index(String.t(), generation_opts()) ::
+          {:ok, map()} | {:error, term()}
+  def build_site_search_index(project_id, opts \\ [])
+
+  def build_site_search_index(project_id, opts)
+      when is_binary(project_id) and is_list(opts) do
+    on_progress = callback(opts)
+    :ok = report_validation_progress(on_progress, 0.0, "Building search index...")
+
+    with {:ok, plan} <- plan_generation(project_id, @core_sections) do
+      project = Projects.get_project!(project_id)
+      html_outputs = read_disk_html_outputs(output_path(project, ""))
+      pagefind_outputs = BDS.Generation.Pagefind.build_outputs(plan, html_outputs)
+      total = max(length(pagefind_outputs), 1)
+
+      pagefind_outputs
+      |> Enum.with_index(1)
+      |> Enum.each(fn {{relative_path, content}, index} ->
+        _ = write_generated_file(project_id, relative_path, content)
+        :ok = report_validation_progress(on_progress, index / total, "Built #{relative_path}")
+      end)
+
+      {:ok, %{written_count: length(pagefind_outputs)}}
+    end
+  end
+
+  defp full_section_outputs(plan, render_data, :core, on_output) do
+    data = render_data.data
+
+    build_core_outputs(
+      plan,
+      data.published_list_posts,
+      render_data.localized_list_posts_by_language,
+      on_output
+    ) ++
+      build_page_outputs(
+        plan.project_id,
+        plan.language,
+        data.published_posts,
+        render_data.translations_by_post_language,
+        render_data.localized_posts_by_language,
+        on_output
+      ) ++
+      report_outputs(core_sitemap_outputs(plan, data) ++ PreviewAssets.generated_outputs(), on_output)
+  end
+
+  defp full_section_outputs(plan, render_data, :single, on_output) do
+    data = render_data.data
+
+    build_single_outputs(
+      plan.project_id,
+      plan.language,
+      data.published_posts,
+      render_data.translations_by_post_language,
+      render_data.localized_posts_by_language,
+      on_output
+    )
+  end
+
+  defp full_section_outputs(plan, render_data, :category, on_output) do
+    full_localized_archive_outputs(plan, render_data, fn plan_arg, index, languages ->
+      build_category_outputs(plan_arg, index.posts_by_category, languages, on_output)
+    end)
+  end
+
+  defp full_section_outputs(plan, render_data, :tag, on_output) do
+    full_localized_archive_outputs(plan, render_data, fn plan_arg, index, languages ->
+      build_tag_outputs(plan_arg, index.posts_by_tag, languages, on_output)
+    end)
+  end
+
+  defp full_section_outputs(plan, render_data, :date, on_output) do
+    full_localized_archive_outputs(plan, render_data, fn plan_arg, index, languages ->
+      build_date_outputs(plan_arg, index, languages, on_output)
+    end)
+  end
+
+  # Total number of route (HTML) pages the section will render, computed from the
+  # post index without rendering any content, so streaming progress can report an
+  # accurate `n/total` from the very first page.
+  defp section_route_total(plan, render_data) do
+    data = render_data.data
+
+    main =
+      length(
+        build_validation_route_paths(
+          plan,
+          data.published_posts,
+          data.published_list_posts,
+          data.post_index,
+          nil
+        )
+      )
+
+    additional =
+      additional_languages(plan)
+      |> Enum.map(fn language ->
+        length(
+          build_validation_route_paths(
+            plan,
+            Map.get(render_data.localized_posts_by_language, language, []),
+            Map.get(render_data.localized_list_posts_by_language, language, []),
+            Map.get(render_data.localized_post_indexes, language, empty_generation_post_index()),
+            language
+          )
+        )
+      end)
+      |> Enum.sum()
+
+    main + additional
+  end
+
+  defp report_outputs(outputs, nil), do: outputs
+
+  defp report_outputs(outputs, on_output) do
+    Enum.each(outputs, on_output)
+    outputs
+  end
+
+  defp full_localized_archive_outputs(plan, render_data, builder) do
+    main_outputs = builder.(plan, render_data.data.post_index, [plan.language])
+
+    language_outputs =
+      Enum.flat_map(additional_languages(plan), fn language ->
+        index = Map.get(render_data.localized_post_indexes, language, empty_generation_post_index())
+        builder.(plan, index, [language])
+      end)
+
+    main_outputs ++ language_outputs
+  end
+
+  defp core_sitemap_outputs(plan, data) do
+    published_route_posts =
+      suppress_subtree_translation_variants(data.published_route_posts, additional_languages(plan))
+
+    {_sitemap_content, sitemap_to_write, _expected_paths, _timestamp_checks} =
+      build_validation_sitemap_artifacts(plan, data, published_route_posts, %{}, nil)
+
+    [{"sitemap.xml", sitemap_to_write}]
+  end
+
+  defp read_disk_html_outputs(html_root) do
+    Path.join(html_root, "**/*.html")
+    |> Path.wildcard()
+    |> Enum.map(fn full_path -> {Path.relative_to(full_path, html_root), File.read!(full_path)} end)
+    |> Enum.sort_by(&elem(&1, 0))
   end
 
   @spec validate_site(String.t(), [section()], generation_opts()) ::
@@ -706,45 +885,86 @@ defmodule BDS.Generation do
       end)
     end
   end
-
-  # Write the targeted outputs, streaming one progress message per rewritten URL
-  # (exactly like the old app's `Generated /url` reporting) so the task shows the
-  # actual URLs and advances by the number of URLs rewritten.
+  # Write the targeted validation outputs, streaming one progress message per
+  # rewritten URL so the task shows the actual URLs and advances by the number
+  # of URLs rewritten.
   defp write_validation_outputs(project_id, outputs, on_progress) do
-    route_total = Enum.count(outputs, fn {relative_path, _content} -> route_html_path?(relative_path) end)
-
-    :ok = report_validation_progress(on_progress, 0.0, validation_rewrite_started_message(route_total))
-
-    {rendered, _total} =
-      Enum.reduce(outputs, {0, route_total}, fn {relative_path, content}, {rendered, total} ->
-        _ =
-          write_generated_file(project_id, relative_path, content,
-            refresh_timestamp_on_unchanged: route_html_path?(relative_path)
-          )
-
-        if route_html_path?(relative_path) do
-          rewritten = rendered + 1
-          progress = if total > 0, do: rewritten / total, else: 1.0
-
-          :ok =
-            report_validation_progress(
-              on_progress,
-              progress,
-              "Rewrote #{relative_path_to_url_path(relative_path)} (#{rewritten}/#{total})"
-            )
-
-          {rewritten, total}
-        else
-          {rendered, total}
-        end
-      end)
-
-    rendered
+    stream_write_outputs(project_id, outputs, on_progress,
+      verb: "Rewrote",
+      gerund: "Rewriting",
+      refresh_route_timestamps: true
+    )
   end
 
-  defp validation_rewrite_started_message(0), do: "No URLs to rewrite"
-  defp validation_rewrite_started_message(1), do: "Rewriting 1 URL..."
-  defp validation_rewrite_started_message(total), do: "Rewriting #{total} URLs..."
+  # Shared per-URL streaming writer used by both full site generation and
+  # validation apply. Emits one `<verb> /url (n/total)` progress message per
+  # rendered route page (matching the old app's `Generated /url` reporting) and
+  # advances the task by the number of URLs written. Ancillary files
+  # (sitemap.xml, feeds, calendar, pagefind, assets) are written without a URL
+  # message. Returns the number of route pages written.
+  #
+  # `stream_write_outputs` drives a pre-built list of outputs (used by validation
+  # apply, whose targeted render is cheap); `stream_render` drives the render
+  # itself via the builders' `on_output` callback so a full-site render reports
+  # progress as each page is produced rather than only after every page is built.
+  defp stream_write_outputs(project_id, outputs, on_progress, opts) do
+    route_total =
+      Enum.count(outputs, fn {relative_path, _content} -> route_html_path?(relative_path) end)
+
+    ctx = stream_context(project_id, on_progress, route_total, opts)
+    Enum.each(outputs, fn output -> emit_output(output, ctx) end)
+    :counters.get(ctx.counter, 1)
+  end
+
+  defp stream_render(project_id, on_progress, route_total, opts, build_fn) do
+    ctx = stream_context(project_id, on_progress, route_total, opts)
+    _ = build_fn.(fn output -> emit_output(output, ctx) end)
+    :counters.get(ctx.counter, 1)
+  end
+
+  defp stream_context(project_id, on_progress, route_total, opts) do
+    gerund = Keyword.fetch!(opts, :gerund)
+
+    :ok =
+      report_validation_progress(on_progress, 0.0, url_progress_started_message(gerund, route_total))
+
+    %{
+      project_id: project_id,
+      on_progress: on_progress,
+      route_total: route_total,
+      verb: Keyword.fetch!(opts, :verb),
+      refresh_routes?: Keyword.get(opts, :refresh_route_timestamps, false),
+      counter: :counters.new(1, [])
+    }
+  end
+
+  defp emit_output({relative_path, content} = output, ctx) do
+    route? = route_html_path?(relative_path)
+
+    _ =
+      write_generated_file(ctx.project_id, relative_path, content,
+        refresh_timestamp_on_unchanged: ctx.refresh_routes? and route?
+      )
+
+    if route? do
+      :counters.add(ctx.counter, 1, 1)
+      count = :counters.get(ctx.counter, 1)
+      progress = if ctx.route_total > 0, do: min(count / ctx.route_total, 1.0), else: 1.0
+
+      :ok =
+        report_validation_progress(
+          ctx.on_progress,
+          progress,
+          "#{ctx.verb} #{relative_path_to_url_path(relative_path)} (#{count}/#{ctx.route_total})"
+        )
+    end
+
+    output
+  end
+
+  defp url_progress_started_message(gerund, 0), do: "No URLs to #{String.downcase(gerund)}"
+  defp url_progress_started_message(gerund, 1), do: "#{gerund} 1 URL..."
+  defp url_progress_started_message(gerund, total), do: "#{gerund} #{total} URLs..."
 
   defp validation_render_data(plan) do
     data = generation_data(plan)

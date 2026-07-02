@@ -29,10 +29,23 @@ surface GenerationRuntimeSurface {
 
     @guarantee ProgressReporting
         -- Generation, reindex, and site-validation run as background tasks and
-        -- emit count-based progress (current/total + label, e.g. "Processing
-        -- N of M posts") via the task progress channel (see task.allium
-        -- ReportProgress / ProgressThrottled). Multi-phase work (validation)
-        -- maps each phase onto a fixed fraction of the 0.0..1.0 bar.
+        -- emit progress via the task progress channel (see task.allium
+        -- ReportProgress / ProgressThrottled).
+        --
+        -- Rendering (both full generation and validation apply) streams one
+        -- message per written page — "<verb> /url (n/total)" where verb is
+        -- "Generated" for a full render and "Rewrote" for a validation apply —
+        -- and advances the bar by the number of URLs written.
+        --
+        -- Full generation and validation apply share the same structuring: a
+        -- task group containing one task per section (Render Site Core, Render
+        -- Single Posts, Render Category Archives, Render Tag Archives, Render
+        -- Date Archives) followed by a final Build Search Index task. The only
+        -- difference is that full generation renders every URL while apply
+        -- renders only the affected URLs.
+        --
+        -- Multi-phase work (validation) maps each phase onto a fixed fraction
+        -- of the 0.0..1.0 bar.
 }
 
 value GenerationSection {

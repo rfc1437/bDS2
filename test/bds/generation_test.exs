@@ -1099,6 +1099,125 @@ defmodule BDS.GenerationTest do
     assert fractions != []
   end
 
+  test "render_site_section per section plus build_site_search_index produce a complete, searchable site",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Searchable Alpha",
+               content: "Alpha searchable body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["elixir"]
+             })
+
+    assert {:ok, published} = Posts.publish_post(post.id)
+
+    assert {:ok, page} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "About",
+               content: "About body",
+               language: "en",
+               categories: ["page"]
+             })
+
+    assert {:ok, _published_page} = Posts.publish_post(page.id)
+
+    for section <- [:core, :single, :category, :tag, :date] do
+      assert {:ok, _result} = BDS.Generation.render_site_section(project.id, section)
+    end
+
+    assert {:ok, _search} = BDS.Generation.build_site_search_index(project.id)
+
+    # Rendering section-by-section yields an internally consistent site: the
+    # sitemap written by the core task matches every rendered HTML page.
+    assert {:ok, report} = BDS.Generation.validate_site(project.id)
+    assert report.missing_url_paths == []
+    assert report.extra_url_paths == []
+    assert report.updated_post_url_paths == []
+
+    # Ancillary artifacts are all present.
+    assert File.exists?(Path.join([temp_dir, "html", "sitemap.xml"]))
+    assert File.exists?(Path.join([temp_dir, "html", "feed.xml"]))
+    assert File.exists?(Path.join([temp_dir, "html", "calendar.json"]))
+    assert File.exists?(Path.join([temp_dir, "html", "pagefind", "index.json"]))
+
+    # The disk-based search index picked up the rendered single post.
+    index = Jason.decode!(File.read!(Path.join([temp_dir, "html", "pagefind", "index.json"])))
+    assert Enum.any?(index["pages"], fn page -> String.contains?(page["url"], published.slug) end)
+  end
+
+  test "render_site_section streams one progress message per generated URL with a running count",
+       %{project: project} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en", "de"]
+             })
+
+    # Several posts across categories/tags so the single and archive sections
+    # render multiple pages (proving progress streams incrementally, not 0 -> 100).
+    for index <- 1..4 do
+      assert {:ok, post} =
+               Posts.create_post(%{
+                 project_id: project.id,
+                 title: "Streamed Post #{index}",
+                 content: "Streamed body #{index}",
+                 language: "en",
+                 categories: ["notes"],
+                 tags: ["elixir"]
+               })
+
+      assert {:ok, _published} = Posts.publish_post(post.id)
+    end
+
+    for section <- [:core, :single, :category, :tag, :date] do
+      test_pid = self()
+
+      assert {:ok, result} =
+               BDS.Generation.render_site_section(project.id, section,
+                 on_progress: fn progress, message ->
+                   send(test_pid, {:progress, progress, message})
+                 end
+               )
+
+      messages = collect_progress_messages([])
+
+      url_messages =
+        Enum.filter(messages, fn {_progress, message} -> message =~ ~r/\(\d+\/\d+\)/ end)
+
+      # Every rendered URL produced a "(n/total)" progress message.
+      assert length(url_messages) == result.rendered_url_count
+
+      # The precomputed total is accurate: the final message reaches n == total
+      # and progress reaches exactly 1.0 (never over- or under-shoots).
+      {last_progress, last_message} = List.last(url_messages)
+      [_, n, total] = Regex.run(~r/\((\d+)\/(\d+)\)/, last_message)
+      assert n == total, "section #{section}: last message #{inspect(last_message)}"
+      assert String.to_integer(n) == result.rendered_url_count
+      assert last_progress == 1.0
+
+      # Progress advanced incrementally rather than jumping straight to the end.
+      if result.rendered_url_count > 1 do
+        fractions =
+          url_messages
+          |> Enum.map(fn {progress, _message} -> progress end)
+          |> Enum.filter(fn progress -> progress > 0.0 and progress < 1.0 end)
+
+        assert fractions != []
+      end
+    end
+  end
+
   test "prepare_validation_apply classifies page and day archive routes without section fallback",
        %{project: project} do
     assert {:ok, _metadata} =

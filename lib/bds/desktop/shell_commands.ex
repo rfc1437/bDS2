@@ -239,18 +239,33 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp dispatch("generate_sitemap", project, _params) do
-    queue_task(project, "generate_sitemap", "Generate Site", "Generation", fn report ->
-      {:ok, generation} =
-        Generation.generate_site(project.id, @site_sections, on_progress: report)
+    group_id = task_group_id("generate_sitemap")
+    attrs = %{group_id: group_id, group_name: "Render Site"}
 
-      report.(1.0, "Generated site output")
+    {:ok, first_task} =
+      Tasks.submit_task(
+        section_task_name(:core),
+        fn report ->
+          {:ok, _result} = Generation.render_site_section(project.id, :core, on_progress: report)
+          report.(1.0, section_complete_message(:core))
+          :ok
+        end,
+        attrs
+      )
 
-      %{
-        project_id: project.id,
-        sections: generation.sections,
-        generated_count: length(generation.generated_files)
-      }
-    end)
+    Task.start(fn -> run_render_site_sequence(project, group_id, attrs) end)
+
+    {:ok,
+     %{
+       kind: "task_queued",
+       action: "generate_sitemap",
+       title: "Render Site",
+       message: "Render Site tasks queued",
+       project_id: project.id,
+       task_id: first_task.id,
+       task_group_id: group_id,
+       panel_tab: "tasks"
+     }}
   end
 
   defp dispatch("validate_site", project, _params) do
@@ -475,6 +490,44 @@ defmodule BDS.Desktop.ShellCommands do
     end
   end
 
+  defp run_render_site_sequence(project, group_id, attrs) do
+    remaining_sections = [:single, :category, :tag, :date]
+
+    Enum.each(remaining_sections, fn section ->
+      {:ok, _task} =
+        Tasks.submit_task(
+          section_task_name(section),
+          fn report ->
+            {:ok, _result} =
+              Generation.render_site_section(project.id, section, on_progress: report)
+
+            report.(1.0, section_complete_message(section))
+            :ok
+          end,
+          attrs
+        )
+    end)
+
+    section_names = Enum.map([:core | remaining_sections], &section_task_name/1)
+
+    with :ok <- wait_for_group_phase(group_id, section_names, @rebuild_phase_timeout) do
+      {:ok, _task} =
+        Tasks.submit_task(
+          "Build Search Index",
+          fn report ->
+            {:ok, _result} = Generation.build_site_search_index(project.id, on_progress: report)
+            report.(1.0, "Build Search Index complete")
+            :ok
+          end,
+          attrs
+        )
+
+      wait_for_group_phase(group_id, ["Build Search Index"], @rebuild_phase_timeout)
+    end
+
+    :ok
+  end
+
   defp run_apply_validation_sequence(project, validation_report, group_id, attrs, prepare_task_id) do
     with :ok <-
            wait_for_group_phase(group_id, ["Prepare Validation Apply"], @rebuild_phase_timeout),
@@ -499,10 +552,10 @@ defmodule BDS.Desktop.ShellCommands do
 
   defp run_apply_validation_render_tasks(project, validation_report, group_id, attrs, preparation) do
     sections = Map.get(preparation, :sections_to_render, [])
-    task_names = Enum.map(sections, &apply_validation_section_task_name/1)
+    task_names = Enum.map(sections, &section_task_name/1)
 
     Enum.each(sections, fn section ->
-      task_name = apply_validation_section_task_name(section)
+      task_name = section_task_name(section)
 
       {:ok, _task} =
         Tasks.submit_task(
@@ -513,7 +566,7 @@ defmodule BDS.Desktop.ShellCommands do
                 on_progress: report
               )
 
-            report.(1.0, apply_validation_section_complete_message(section))
+            report.(1.0, section_complete_message(section))
             :ok
           end,
           attrs
@@ -574,20 +627,20 @@ defmodule BDS.Desktop.ShellCommands do
       Map.get(preparation, :deleted_url_count, 0) > 0
   end
 
-  defp apply_validation_section_task_name(:core), do: "Render Site Core"
-  defp apply_validation_section_task_name(:single), do: "Render Single Posts"
-  defp apply_validation_section_task_name(:category), do: "Render Category Archives"
-  defp apply_validation_section_task_name(:tag), do: "Render Tag Archives"
-  defp apply_validation_section_task_name(:date), do: "Render Date Archives"
+  defp section_task_name(:core), do: "Render Site Core"
+  defp section_task_name(:single), do: "Render Single Posts"
+  defp section_task_name(:category), do: "Render Category Archives"
+  defp section_task_name(:tag), do: "Render Tag Archives"
+  defp section_task_name(:date), do: "Render Date Archives"
 
-  defp apply_validation_section_complete_message(:core), do: "Render Site Core complete"
-  defp apply_validation_section_complete_message(:single), do: "Render Single Posts complete"
+  defp section_complete_message(:core), do: "Render Site Core complete"
+  defp section_complete_message(:single), do: "Render Single Posts complete"
 
-  defp apply_validation_section_complete_message(:category),
+  defp section_complete_message(:category),
     do: "Render Category Archives complete"
 
-  defp apply_validation_section_complete_message(:tag), do: "Render Tag Archives complete"
-  defp apply_validation_section_complete_message(:date), do: "Render Date Archives complete"
+  defp section_complete_message(:tag), do: "Render Tag Archives complete"
+  defp section_complete_message(:date), do: "Render Date Archives complete"
 
   defp apply_validation_refresh_task_name(:calendar), do: "Regenerate Calendar"
 

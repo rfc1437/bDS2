@@ -438,6 +438,67 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert validation_task.result.payload.updated_post_url_paths == []
   end
 
+  test "generate_sitemap renders the site as per-section tasks under a Render Site group", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Sitemap Post",
+               content: "Sitemap body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["elixir"]
+             })
+
+    assert {:ok, published} = Posts.publish_post(post.id)
+
+    assert {:ok, result} = ShellCommands.execute("generate_sitemap")
+
+    assert result.kind == "task_queued"
+    assert result.action == "generate_sitemap"
+    assert result.title == "Render Site"
+    assert is_binary(result.task_group_id)
+
+    tasks =
+      wait_for_tasks_by_name(
+        [
+          "Render Site Core",
+          "Render Single Posts",
+          "Render Category Archives",
+          "Render Tag Archives",
+          "Render Date Archives",
+          "Build Search Index"
+        ],
+        &(&1.status == :completed),
+        5_000
+      )
+
+    assert Enum.all?(tasks, &(&1.group_id == result.task_group_id))
+    assert Enum.all?(tasks, &(&1.group_name == "Render Site"))
+
+    # The full site was rendered: the post page, sitemap and search index exist.
+    post_path = BDS.Generation.post_output_path(published)
+    assert File.exists?(Path.join([temp_dir, "html", post_path]))
+    assert File.exists?(Path.join([temp_dir, "html", "sitemap.xml"]))
+    assert File.exists?(Path.join([temp_dir, "html", "pagefind", "index.json"]))
+
+    # The generated site is internally consistent.
+    assert {:ok, report} =
+             BDS.Generation.validate_site(project.id, [:core, :single, :category, :tag, :date])
+
+    assert report.missing_url_paths == []
+    assert report.extra_url_paths == []
+  end
+
   test "metadata_diff queues a tracked maintenance task and returns the report as an editor payload" do
     assert {:ok, result} = ShellCommands.execute("metadata_diff")
 

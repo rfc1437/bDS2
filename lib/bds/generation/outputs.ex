@@ -386,7 +386,12 @@ defmodule BDS.Generation.Outputs do
         localized_posts =
           build_list_posts(plan.base_url, localized_source_posts, localized_prefix)
 
-        (build_root_outputs(plan, localized_language, localized_posts, on_output) ++
+        # `build_root_outputs` is called without `on_output` here because the
+        # combined list (roots + static files) is reported exactly once by the
+        # `Enum.map(&report_output/2)` below. Passing `on_output` to both would
+        # report (and, for streaming callers, write and count) each localized
+        # root page twice.
+        (build_root_outputs(plan, localized_language, localized_posts) ++
            [
              {Path.join(localized_language, "404.html"),
               render_not_found_output(plan, localized_language)},
