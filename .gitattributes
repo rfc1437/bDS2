@@ -1,0 +1,2 @@
+# Downloaded JS — exclude from language detection
+priv/**/*.js linguist-vendored=true
