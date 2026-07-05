@@ -20,6 +20,7 @@ defmodule BDS.Maintenance.DiffReports do
     ]
 
   alias BDS.DocumentFields
+  alias BDS.Media.Linking
   alias BDS.Media.Media
   alias BDS.Media.Translation, as: MediaTranslation
   alias BDS.Metadata
@@ -163,7 +164,12 @@ defmodule BDS.Maintenance.DiffReports do
               diff_field("language", media.language, Map.get(fields, "language")),
               diff_field("created_at", media.created_at, DocumentFields.get(fields, "createdAt")),
               diff_field("updated_at", media.updated_at, DocumentFields.get(fields, "updatedAt")),
-              diff_field("tags", media.tags, Map.get(fields, "tags", []))
+              diff_field("tags", media.tags, Map.get(fields, "tags", [])),
+              diff_field(
+                "linked_post_ids",
+                Linking.linked_post_ids(media.id),
+                DocumentFields.get(fields, "linkedPostIds", [])
+              )
             ]
             |> Enum.reject(&is_nil/1)
 

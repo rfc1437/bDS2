@@ -167,18 +167,14 @@ defmodule BDS.Desktop.ShellLive.GalleryImport do
          translate_targets,
          parent
        ) do
+    # Linking is mandatory and MUST happen regardless of AI availability
+    # (airplane mode / no local model), mirroring the drag-drop chain and the
+    # old app: import -> link -> (optional) AI enrichment. Gating the link
+    # behind AI is what left galleries empty.
     with {:ok, media} <- Media.import_media(%{project_id: project_id, source_path: path}),
          true <- String.starts_with?(media.mime_type || "", "image/"),
-         {:ok, result} <- AI.analyze_image(media.id, language: language),
-         {:ok, _updated} <-
-           Media.update_media(media.id, %{
-             title: result.title,
-             alt: result.alt,
-             caption: result.caption
-           }),
          {:ok, _link} <- Media.link_media_to_post(media.id, post_id) do
-      translate_media_translations(media.id, translate_targets)
-      title = result.title || media.original_name
+      title = enrich_media(media, language, translate_targets)
       send(parent, {:add_image_processed, title})
     else
       false ->
@@ -187,6 +183,32 @@ defmodule BDS.Desktop.ShellLive.GalleryImport do
       {:error, reason} ->
         Logger.warning("Image pipeline error for #{path}: #{inspect(reason)}")
         send(parent, {:add_image_error, path, reason})
+    end
+  end
+
+  # Best-effort AI enrichment: analysis + metadata update + translations. Any
+  # failure (offline, no model) is logged and never unlinks the image. Returns
+  # the display title used for progress reporting.
+  defp enrich_media(media, language, translate_targets) do
+    case AI.analyze_image(media.id, language: language) do
+      {:ok, result} ->
+        case Media.update_media(media.id, %{
+               title: result.title,
+               alt: result.alt,
+               caption: result.caption
+             }) do
+          {:ok, _updated} ->
+            translate_media_translations(media.id, translate_targets)
+            result.title || media.original_name
+
+          {:error, reason} ->
+            Logger.warning("Media metadata update failed for #{media.id}: #{inspect(reason)}")
+            media.original_name
+        end
+
+      {:error, reason} ->
+        Logger.warning("AI image analysis skipped for #{media.id}: #{inspect(reason)}")
+        media.original_name
     end
   end
 

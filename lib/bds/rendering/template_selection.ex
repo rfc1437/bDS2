@@ -223,10 +223,13 @@ defmodule BDS.Rendering.TemplateSelection do
   def template_render_context(project_id) do
     project = Projects.get_project!(project_id)
 
-    Liquex.Context.new(%{},
-      static_environment: %{},
-      filter_module: Filters,
-      file_system: FileSystem.new(StarterTemplates.template_roots(project))
-    )
+    context =
+      Liquex.Context.new(%{},
+        static_environment: %{},
+        filter_module: Filters,
+        file_system: FileSystem.new(StarterTemplates.template_roots(project))
+      )
+
+    %{context | private: Map.put(context.private, :project_id, project_id)}
   end
 end

@@ -114,6 +114,53 @@ defmodule BDS.Media.Linking do
     )
   end
 
+  @doc """
+  Restore `PostMedia` links for `media_id` from the list of `post_ids` persisted
+  in the media sidecar (`linkedPostIds`).
+
+  Used by rebuild-from-filesystem so gallery associations survive a rebuild (and
+  so projects whose link data lives only in sidecars still populate galleries).
+  Idempotent: skips links that already exist and post ids that are not present
+  in the database. Does not re-write sidecars.
+  """
+  @spec restore_post_links(String.t(), String.t(), [String.t()] | term()) :: :ok
+  def restore_post_links(project_id, media_id, post_ids)
+      when is_binary(project_id) and is_binary(media_id) and is_list(post_ids) do
+    post_ids
+    |> Enum.filter(&is_binary/1)
+    |> Enum.uniq()
+    |> Enum.each(fn post_id -> ensure_link(project_id, media_id, post_id) end)
+  end
+
+  def restore_post_links(_project_id, _media_id, _post_ids), do: :ok
+
+  defp ensure_link(project_id, media_id, post_id) do
+    already_linked? =
+      Repo.exists?(
+        from pm in PostMedia,
+          where: pm.media_id == ^media_id and pm.post_id == ^post_id
+      )
+
+    post_exists? = Repo.exists?(from p in BDS.Posts.Post, where: p.id == ^post_id)
+
+    if not already_linked? and post_exists? do
+      %PostMedia{}
+      |> PostMedia.changeset(%{
+        id: Ecto.UUID.generate(),
+        project_id: project_id,
+        post_id: post_id,
+        media_id: media_id,
+        sort_order: next_sort_order(media_id),
+        created_at: Persistence.now_ms()
+      })
+      |> Repo.insert!()
+
+      :ok
+    else
+      :ok
+    end
+  end
+
   defp log_sidecar_error(:ok, _media_id), do: :ok
 
   defp log_sidecar_error({:error, reason}, media_id) do

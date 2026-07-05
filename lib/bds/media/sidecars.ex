@@ -132,6 +132,12 @@ defmodule BDS.Media.Sidecars do
       |> Media.changeset(attrs)
       |> Repo.insert_or_update!()
 
+    Linking.restore_post_links(
+      project.id,
+      media.id,
+      DocumentFields.get(sidecar.fields, "linkedPostIds", [])
+    )
+
     if Keyword.get(opts, :sync_search, true) do
       :ok = Search.sync_media(media)
     end

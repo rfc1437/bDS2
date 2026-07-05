@@ -89,7 +89,8 @@ defmodule BDS.Rendering.RenderContext do
           static_environment: %{},
           filter_module: Filters,
           file_system: file_system
-        ),
+        )
+        |> put_context_project_id(project_id),
       record_by_id: Map.merge(Map.new(translations, &{&1.id, &1}), post_by_id),
       incoming_links_by_post: incoming_links_by_post,
       outgoing_links_by_post: outgoing_links_by_post,
@@ -143,6 +144,13 @@ defmodule BDS.Rendering.RenderContext do
     do: Map.get(ctx.outgoing_links_by_post, post_id, [])
 
   ## --- internals -----------------------------------------------------------
+
+  # Stash the project id in the context's private map (not exposed to templates)
+  # so built-in macros (photo archive, tag cloud, gallery) can resolve their
+  # project-scoped data even when rendered outside a full page context.
+  defp put_context_project_id(%Liquex.Context{private: private} = context, project_id) do
+    %{context | private: Map.put(private, :project_id, project_id)}
+  end
 
   defp build_link_context_maps(project_id, post_by_id, main_language) do
     links =

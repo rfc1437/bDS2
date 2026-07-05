@@ -156,7 +156,7 @@ defmodule BDS.Rendering.ListArchive do
         id: MapUtils.attr(post, :id),
         slug: MapUtils.attr(post, :slug),
         title: MapUtils.attr(post, :title),
-        content: PostRendering.cached_post_content(ctx, raw_content, language),
+        content: PostRendering.cached_post_content(ctx, raw_content, language, post_id),
         raw_content: raw_content,
         excerpt: MapUtils.attr(post, :excerpt, record_value(post_record, :excerpt)),
         author: MapUtils.attr(post, :author, record_value(post_record, :author)),

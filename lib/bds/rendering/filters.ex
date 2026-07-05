@@ -335,25 +335,38 @@ defmodule BDS.Rendering.Filters do
     language = macro_language(context)
     project_id = project_id_from_context(context)
 
-    {words_json, width, height} =
-      if project_id do
-        build_tag_cloud_data(project_id)
-      else
-        {nil, 800, 400}
-      end
+    words_json = if project_id, do: build_tag_cloud_data(project_id), else: nil
 
     render_macro_template(
       "macros/tag-cloud",
       %{
-        "orientation" => Map.get(params, "orientation", "horizontal"),
+        "orientation" => normalize_tag_cloud_orientation(Map.get(params, "orientation")),
         "words_json" => words_json,
-        "width" => Map.get(params, "width", width),
-        "height" => Map.get(params, "height", height),
-        "aria_label" => "Tag cloud",
+        "width" => tag_cloud_dimension(Map.get(params, "width"), 320, 1600, 900),
+        "height" => tag_cloud_dimension(Map.get(params, "height"), 180, 900, 420),
+        "aria_label" => BDS.Gettext.lgettext(language, "render", "Tag cloud"),
         "empty_label" => BDS.Gettext.lgettext(language, "render", "No tags")
       },
       context
     )
+  end
+
+  # Mirror the old app's normalizeTagCloudOrientation so `orientation=diagonal`
+  # (and the other aliases) map to the runtime's `mixed-diagonal`/`mixed-hv`
+  # rotation modes instead of silently falling back to horizontal.
+  defp normalize_tag_cloud_orientation(value) do
+    case value |> to_string() |> String.trim() |> String.downcase() do
+      v when v in ["mixed_hv", "mixed-hv", "hv", "horizontal_vertical"] -> "mixed-hv"
+      v when v in ["mixed_diagonal", "mixed-diagonal", "diagonal", "diag"] -> "mixed-diagonal"
+      _ -> "horizontal"
+    end
+  end
+
+  defp tag_cloud_dimension(value, min, max, default) do
+    case value |> to_string() |> Integer.parse() do
+      {n, _rest} when n >= min and n <= max -> n
+      _other -> default
+    end
   end
 
   defp render_video_macro(kind, params, language, translation, context) do
@@ -382,14 +395,16 @@ defmodule BDS.Rendering.Filters do
   end
 
   defp gallery_items(post_id) do
+    group_name = "gallery-#{post_id}"
+
     post_id
     |> linked_media_images()
     |> Enum.map(fn media ->
       %{
         "media_path" => "/#{media.file_path}",
-        "title" => media.title || media.original_name,
+        "title" => media.caption || media.title || media.original_name,
         "alt" => media.alt || media.title || media.original_name,
-        "group_name" => post_id
+        "group_name" => group_name
       }
     end)
   end
@@ -403,7 +418,7 @@ defmodule BDS.Rendering.Filters do
         on: pm.media_id == m.id,
         where: pm.post_id == ^post_id,
         where: like(m.mime_type, "image/%"),
-        order_by: [asc: pm.sort_order, asc: pm.media_id],
+        order_by: [desc: m.created_at, asc: m.id],
         select: m
     )
   end
@@ -505,6 +520,7 @@ defmodule BDS.Rendering.Filters do
         SELECT trim(je.value) AS tag, COUNT(*) AS cnt
         FROM posts, json_each(posts.tags) je
         WHERE posts.project_id = ?1
+          AND posts.status = 'published'
           AND trim(je.value) != ''
         GROUP BY tag
         ORDER BY cnt DESC, lower(tag) ASC
@@ -518,20 +534,46 @@ defmodule BDS.Rendering.Filters do
       end)
 
     if tag_entries == [] do
-      {nil, 0, 0}
+      nil
     else
-      max_count = Enum.map(tag_entries, & &1.count) |> Enum.max()
-      min_count = Enum.map(tag_entries, & &1.count) |> Enum.min()
-      range = max(max_count - min_count, 1)
+      counts = Enum.map(tag_entries, & &1.count)
+      max_count = Enum.max(counts)
+      min_count = Enum.min(counts)
 
       words =
         Enum.map(tag_entries, fn %{tag: tag, count: count, color: color} ->
-          size = 12.0 + (count - min_count) / range * 28.0
-          %{"text" => tag, "size" => size, "color" => color || "var(--accent-color)"}
+          base = %{
+            "text" => tag,
+            "size" => tag_cloud_font_size(count, min_count, max_count),
+            "count" => count,
+            "url" => "/tag/#{URI.encode(to_string(tag), &URI.char_unreserved?/1)}/"
+          }
+
+          if is_binary(color) and color != "", do: Map.put(base, "color", color), else: base
         end)
 
-      {Jason.encode!(words), 800, 400}
+      escape_html(Jason.encode!(words))
     end
+  end
+
+  # Match the old app's tag-cloud sizing (14px..56px, integer point sizes) so the
+  # d3 word-cloud runtime lays tags out identically.
+  defp tag_cloud_font_size(_count, min_count, max_count) when max_count == min_count,
+    do: round((14 + 56) / 2)
+
+  defp tag_cloud_font_size(count, min_count, max_count),
+    do: round(14 + (count - min_count) / (max_count - min_count) * (56 - 14))
+
+  # The tag-cloud JSON is embedded in a double-quoted HTML data attribute, so it
+  # must be HTML-escaped (matching the old app) or the first `"` closes the
+  # attribute and the client-side JSON.parse silently fails.
+  defp escape_html(value) do
+    value
+    |> String.replace("&", "&amp;")
+    |> String.replace("<", "&lt;")
+    |> String.replace(">", "&gt;")
+    |> String.replace("\"", "&quot;")
+    |> String.replace("'", "&#39;")
   end
 
   # ── Helpers ────────────────────────────────────────────────────────────────
@@ -539,8 +581,19 @@ defmodule BDS.Rendering.Filters do
   defp macro_language(context), do: Access.get(context, "language") || "en"
 
   defp project_id_from_context(context) do
+    context_private_project_id(context) ||
+      context_post_project_id(context) ||
+      project_id_from_post(context)
+  end
+
+  defp context_private_project_id(%Liquex.Context{private: private}) when is_map(private),
+    do: Map.get(private, :project_id)
+
+  defp context_private_project_id(_context), do: nil
+
+  defp context_post_project_id(context) do
     post = Access.get(context, "post") || %{}
-    post["project_id"] || Access.get(post, :project_id) || project_id_from_post(context)
+    post["project_id"] || Access.get(post, :project_id)
   end
 
   defp project_id_from_post(context) do

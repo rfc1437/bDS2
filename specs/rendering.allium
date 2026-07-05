@@ -71,19 +71,31 @@ surface BuiltinMacroSurface {
 
 rule ExpandBuiltinMacros {
     when: MacroEncountered(macro, language, post_id)
+    -- Project-scoped macros (photo_archive, tag_cloud) resolve the owning
+    -- project id from the render context (carried in the Liquid context's
+    -- private data), so they populate correctly even when content is
+    -- pre-rendered outside a full page context.
     -- Unknown macro names are left verbatim in the source.
     if macro.name = "youtube" or macro.name = "vimeo":
         -- Embeds video by `id`; localized default title when title param absent.
         ensures: MacroTemplateRendered(format("macros/{name}", name: macro.name))
     if macro.name = "gallery":
-        -- Image gallery from the post's linked image media (ordered by sort).
+        -- Image gallery from the post's linked image media (PostMedia links,
+        -- restored from media sidecars on rebuild). Linking on import is
+        -- independent of AI enrichment. Ordered newest-first (created_at desc);
+        -- lightbox group is "gallery-{post_id}"; title is caption|title|name.
         -- `columns` clamped to 1..6 (default 3). Empty when no post_id/images.
         ensures: MacroTemplateRendered("macros/gallery")
     if macro.name = "photo_archive":
         -- Month-grouped image archive for the project (optional year/month filter).
         ensures: MacroTemplateRendered("macros/photo-archive")
     if macro.name = "tag_cloud":
-        -- Weighted tag cloud from post tag counts; per-tag colours from Tag rows.
+        -- Weighted tag cloud from PUBLISHED post tag counts; per-tag colours
+        -- from Tag rows. Words carry {text, size, count, url}; the JSON is
+        -- HTML-escaped into the data-tag-cloud-words attribute so the client
+        -- runtime can JSON.parse it. `orientation` aliases normalize to
+        -- horizontal | mixed-hv | mixed-diagonal; width (320..1600, def 900)
+        -- and height (180..900, def 420) clamp to defaults when out of range.
         ensures: MacroTemplateRendered("macros/tag-cloud")
 }
 

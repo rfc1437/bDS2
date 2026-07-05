@@ -64,7 +64,7 @@ defmodule BDS.Rendering.Metadata do
   defp category_settings_for(_category_settings, _category), do: nil
 
   defp category_title(settings) when is_map(settings),
-    do: Map.get(settings, "title") || Map.get(settings, :title)
+    do: BDS.MapUtils.attr(settings, :title)
 
   defp category_title(_settings), do: nil
 
