@@ -196,6 +196,14 @@ defmodule BDS.Desktop.ShellCommands do
     end)
   end
 
+  defp dispatch("rebuild_media_links", project, _params) do
+    queue_task(project, "rebuild_media_links", "Rebuild Media Links", "Maintenance", fn report ->
+      {:ok, result} = BDS.Media.rebuild_media_links(project.id, on_progress: report)
+      report.(1.0, "Media links rebuilt")
+      %{project_id: project.id, counts: %{media_links: result.links}}
+    end)
+  end
+
   defp dispatch("regenerate_missing_thumbnails", project, _params) do
     queue_task(
       project,

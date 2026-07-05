@@ -349,6 +349,29 @@ defmodule BDS.Media.Sidecars do
     |> File.exists?()
   end
 
+  @doc """
+  Read the `linkedPostIds` list persisted in a media item's canonical sidecar.
+
+  The media sidecar is the source of truth for gallery associations (matching
+  the old bDS `linkedPostIds` field). Returns `[]` when the sidecar is missing
+  or has no linked posts.
+  """
+  @spec read_linked_post_ids(BDS.Projects.Project.t(), Media.t()) :: [String.t()]
+  def read_linked_post_ids(project, %Media{} = media) do
+    sidecar_path = Path.join(Projects.project_data_dir(project), media.sidecar_path)
+
+    case parse_existing_canonical_sidecar(project, sidecar_path) do
+      {:ok, sidecar} ->
+        sidecar.fields
+        |> DocumentFields.get("linkedPostIds", [])
+        |> List.wrap()
+        |> Enum.filter(&is_binary/1)
+
+      {:error, _reason} ->
+        []
+    end
+  end
+
   defp parse_existing_canonical_sidecar(project, sidecar_path) do
     if File.exists?(sidecar_path) do
       parse_canonical_sidecar(project, sidecar_path)

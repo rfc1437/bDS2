@@ -5,6 +5,13 @@ defmodule BDS.Media.Linking do
 
   import Ecto.Query
 
+  import BDS.Media.FileOps,
+    only: [
+      progress_callback: 1,
+      report_rebuild_progress: 4,
+      report_rebuild_started: 3
+    ]
+
   alias BDS.Media.Media
   alias BDS.Media.Sidecars
   alias BDS.Persistence
@@ -133,6 +140,45 @@ defmodule BDS.Media.Linking do
   end
 
   def restore_post_links(_project_id, _media_id, _post_ids), do: :ok
+
+  @doc """
+  Rebuild the `post_media` junction for a project from every media sidecar's
+  `linkedPostIds`.
+
+  Media sidecars are the source of truth for gallery associations (matching the
+  old bDS `rebuildFromSidecars`). Existing project links are cleared and then
+  re-created from the on-disk sidecars, so galleries reflect the project's
+  metadata even if the junction table drifted or was never populated. Links to
+  posts that are not present in the database are skipped.
+  """
+  @spec rebuild_links_from_sidecars(String.t(), keyword()) ::
+          {:ok, %{media: non_neg_integer(), links: non_neg_integer()}}
+  def rebuild_links_from_sidecars(project_id, opts \\ []) when is_binary(project_id) do
+    project = Projects.get_project!(project_id)
+    on_progress = progress_callback(opts)
+
+    media_list =
+      Repo.all(from m in Media, where: m.project_id == ^project_id, order_by: [asc: m.id])
+
+    total = length(media_list)
+    :ok = report_rebuild_started(on_progress, total, "media links")
+
+    {_cleared, _} =
+      Repo.delete_all(from pm in PostMedia, where: pm.project_id == ^project_id)
+
+    media_list
+    |> Enum.with_index(1)
+    |> Enum.each(fn {media, index} ->
+      post_ids = Sidecars.read_linked_post_ids(project, media)
+      restore_post_links(project_id, media.id, post_ids)
+      :ok = report_rebuild_progress(on_progress, index, total, "media links")
+    end)
+
+    links =
+      Repo.aggregate(from(pm in PostMedia, where: pm.project_id == ^project_id), :count)
+
+    {:ok, %{media: total, links: links}}
+  end
 
   defp ensure_link(project_id, media_id, post_id) do
     already_linked? =

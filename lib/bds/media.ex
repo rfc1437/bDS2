@@ -66,6 +66,12 @@ defmodule BDS.Media do
   defdelegate link_media_to_post(media_id, post_id), to: BDS.Media.Linking
   defdelegate unlink_media_from_post(media_id, post_id), to: BDS.Media.Linking
 
+  defdelegate rebuild_media_links(project_id), to: BDS.Media.Linking,
+    as: :rebuild_links_from_sidecars
+
+  defdelegate rebuild_media_links(project_id, opts), to: BDS.Media.Linking,
+    as: :rebuild_links_from_sidecars
+
   defdelegate rebuild_media_from_files(project_id), to: BDS.Media.Rebuilder
   defdelegate rebuild_media_from_files(project_id, opts), to: BDS.Media.Rebuilder
 

@@ -1757,7 +1757,7 @@ msgid "Open"
 msgstr "Öffnen"
 
 #: lib/bds/desktop/menu_bar.ex:154
-#: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:381
+#: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:382
 #, elixir-autogen, elixir-format
 msgid "Open Data Folder"
 msgstr "Datenordner öffnen"
@@ -2049,15 +2049,10 @@ msgid "Rebuild Database"
 msgstr "Datenbank neu aufbauen"
 
 #: lib/bds/desktop/menu_bar.ex:184
-#: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:380
+#: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:381
 #, elixir-autogen, elixir-format
 msgid "Rebuild Embedding Index"
 msgstr "Embedding-Index neu aufbauen"
-
-#: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:378
-#, elixir-autogen, elixir-format
-msgid "Rebuild Links"
-msgstr "Links neu aufbauen"
 
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:375
 #, elixir-autogen, elixir-format
@@ -2116,7 +2111,7 @@ msgstr "Übersetzung aktualisieren"
 msgid "Regenerate Calendar"
 msgstr "Kalender neu erzeugen"
 
-#: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:379
+#: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:380
 #, elixir-autogen, elixir-format
 msgid "Regenerate Missing Thumbnails"
 msgstr "Fehlende Vorschaubilder neu erzeugen"
@@ -3533,3 +3528,13 @@ msgstr "Vorgeschlagene Tags"
 #, elixir-autogen, elixir-format
 msgid "Force Render Site"
 msgstr "Website vollständig neu generieren"
+
+#: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:379
+#, elixir-autogen, elixir-format
+msgid "Rebuild Media Links"
+msgstr "Medien-Links neu aufbauen"
+
+#: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:378
+#, elixir-autogen, elixir-format
+msgid "Rebuild Post Links"
+msgstr "Beitrags-Links neu aufbauen"

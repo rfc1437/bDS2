@@ -69,4 +69,51 @@ defmodule BDS.Media.LinkRestoreTest do
     assert {:ok, _} = BDS.Media.rebuild_media_from_files(project.id)
     assert link_count(post.id, media.id) == 1
   end
+
+  test "rebuild_media_links rebuilds gallery links from sidecars", %{
+    project: project,
+    post: post,
+    media: media
+  } do
+    # Simulate a project whose junction table was never populated even though
+    # the media sidecar references the post (the reported gallery regression).
+    Repo.delete_all(from pm in PostMedia, where: pm.media_id == ^media.id)
+    assert link_count(post.id, media.id) == 0
+
+    assert {:ok, %{media: 1, links: 1}} = BDS.Media.rebuild_media_links(project.id)
+
+    assert link_count(post.id, media.id) == 1
+  end
+
+  test "rebuild_media_links drops stale junction links not present in sidecars", %{
+    project: project,
+    post: post,
+    media: media
+  } do
+    {:ok, other_post} =
+      BDS.Posts.create_post(%{
+        project_id: project.id,
+        title: "Unrelated Post",
+        content: "no gallery here",
+        language: "en"
+      })
+
+    # A junction row that drifted from the sidecar: the media is linked to a
+    # post its sidecar does not reference. The sidecar is the source of truth,
+    # so rebuild must drop this link.
+    Repo.insert!(%PostMedia{
+      id: Ecto.UUID.generate(),
+      project_id: project.id,
+      post_id: other_post.id,
+      media_id: media.id,
+      sort_order: 5,
+      created_at: 0
+    })
+
+    assert {:ok, %{links: 1}} = BDS.Media.rebuild_media_links(project.id)
+
+    # The real (sidecar-backed) link survives, the drifted link is gone.
+    assert link_count(post.id, media.id) == 1
+    assert link_count(other_post.id, media.id) == 0
+  end
 end
