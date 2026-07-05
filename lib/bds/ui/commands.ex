@@ -27,6 +27,7 @@ defmodule BDS.UI.Commands do
     %{id: :publish_selected, accelerator: "CTRL+SHIFT+P"},
     %{id: :preview_post, accelerator: "CTRL+SHIFT+V"},
     %{id: :generate_sitemap, accelerator: "CTRL+R"},
+    %{id: :force_render_site, accelerator: "CTRL+SHIFT+R"},
     %{id: :validate_site, accelerator: "CTRL+SHIFT+L"},
     %{id: :upload_site, accelerator: "CTRL+SHIFT+U"}
   ]

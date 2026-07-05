@@ -130,9 +130,21 @@ defmodule BDS.DesktopTest do
     assert menu_item(groups, :publish_selected).native_label == "Publish Selected\tCTRL+SHIFT+P"
     assert menu_item(groups, :preview_post).native_label == "Preview Post\tCTRL+SHIFT+V"
     assert menu_item(groups, :generate_sitemap).native_label == "Generate Site\tCTRL+R"
+
+    assert menu_item(groups, :force_render_site).native_label ==
+             "Force Render Site\tCTRL+SHIFT+R"
+
     assert menu_item(groups, :validate_site).native_label == "Validate Site\tCTRL+SHIFT+L"
     assert menu_item(groups, :upload_site).native_label == "Upload Site\tCTRL+SHIFT+U"
     assert menu_item(groups, :metadata_diff).shortcut == nil
+  end
+
+  test "force render sits directly below generate site in the blog menu" do
+    blog_group = Enum.find(BDS.UI.MenuBar.default_groups(), &(&1.id == :blog))
+    item_ids = Enum.map(blog_group.items, &Map.get(&1, :id))
+    generate_index = Enum.find_index(item_ids, &(&1 == :generate_sitemap))
+
+    assert Enum.at(item_ids, generate_index + 1) == :force_render_site
   end
 
   test "prod forwarded menu surface is covered by the shell dispatcher" do

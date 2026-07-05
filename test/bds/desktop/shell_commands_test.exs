@@ -438,6 +438,63 @@ defmodule BDS.Desktop.ShellCommandsTest do
     assert validation_task.result.payload.updated_post_url_paths == []
   end
 
+  test "force_render_site rewrites drifted outputs that a normal render would skip", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en",
+               blog_languages: ["en"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Force Render Post",
+               content: "Force render body",
+               language: "en",
+               categories: ["notes"],
+               tags: ["elixir"]
+             })
+
+    assert {:ok, published} = Posts.publish_post(post.id)
+
+    # Populate outputs and hashes, then tamper with a file on disk so its
+    # stored hash still matches the expected content.
+    assert {:ok, _} = BDS.Generation.render_site_section(project.id, :single)
+    post_file = Path.join([temp_dir, "html", BDS.Generation.post_output_path(published)])
+    original_html = File.read!(post_file)
+    File.write!(post_file, "TAMPERED")
+
+    assert {:ok, result} = ShellCommands.execute("force_render_site")
+
+    assert result.kind == "task_queued"
+    assert result.action == "force_render_site"
+    assert result.title == "Force Render Site"
+    assert is_binary(result.task_group_id)
+
+    tasks =
+      wait_for_tasks_by_name(
+        [
+          "Render Site Core",
+          "Render Single Posts",
+          "Render Category Archives",
+          "Render Tag Archives",
+          "Render Date Archives",
+          "Build Search Index"
+        ],
+        &(&1.status == :completed),
+        5_000
+      )
+
+    assert Enum.all?(tasks, &(&1.group_id == result.task_group_id))
+    assert Enum.all?(tasks, &(&1.group_name == "Force Render Site"))
+
+    assert File.read!(post_file) == original_html
+  end
+
   test "generate_sitemap renders the site as per-section tasks under a Render Site group", %{
     project: project,
     temp_dir: temp_dir

@@ -63,6 +63,7 @@ defmodule BDS.UI.MenuBar do
           %{id: :find_duplicates},
           %{separator: true},
           %{id: :generate_sitemap},
+          %{id: :force_render_site},
           %{id: :validate_site},
           %{id: :upload_site}
         ]

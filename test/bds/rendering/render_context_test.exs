@@ -74,6 +74,29 @@ defmodule BDS.Rendering.RenderContextTest do
     assert Agent.get(counter, & &1) == 1
   end
 
+  test "memoize/3 computes once even under concurrent first calls", %{project: project} do
+    ctx = RenderContext.build(project.id)
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+    slow_compute = fn ->
+      Agent.update(counter, &(&1 + 1))
+      Process.sleep(30)
+      :computed
+    end
+
+    results =
+      1..8
+      |> Task.async_stream(
+        fn _index -> RenderContext.memoize(ctx, {:test, "concurrent"}, slow_compute) end,
+        max_concurrency: 8,
+        timeout: :infinity
+      )
+      |> Enum.map(fn {:ok, value} -> value end)
+
+    assert Enum.all?(results, &(&1 == :computed))
+    assert Agent.get(counter, & &1) == 1
+  end
+
   test "render_post_page with a context matches the project_id render", %{project: project} do
     {:ok, template} =
       BDS.Templates.create_template(%{
@@ -225,6 +248,27 @@ defmodule BDS.Rendering.RenderContextTest do
       assert file.updated_at == first.updated_at,
              "expected unchanged output #{file.relative_path} to keep its updated_at"
     end)
+  end
+
+  test "force render rewrites outputs whose stored hash still matches", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    post = create_published_post(project, %{title: "Force Post", content: "Force body"})
+
+    assert {:ok, _} = Generation.render_site_section(project.id, :single)
+
+    post_file = Path.join([temp_dir, "html", Generation.post_output_path(post)])
+    original_html = File.read!(post_file)
+    File.write!(post_file, "TAMPERED")
+
+    # A normal render trusts the stored hash and leaves the drifted file alone.
+    assert {:ok, _} = Generation.render_site_section(project.id, :single)
+    assert File.read!(post_file) == "TAMPERED"
+
+    # A forced render ignores the stored hashes and rewrites everything.
+    assert {:ok, _} = Generation.render_site_section(project.id, :single, force: true)
+    assert File.read!(post_file) == original_html
   end
 
   test "full section render issues a bounded number of queries regardless of post count", %{

@@ -137,7 +137,9 @@ defmodule BDS.Desktop.ShellLive do
     |> MapSet.union(
       MapSet.new([:validate_translations, :fill_missing_translations, :find_duplicates])
     )
-    |> MapSet.union(MapSet.new([:generate_sitemap, :validate_site, :upload_site]))
+    |> MapSet.union(
+      MapSet.new([:generate_sitemap, :force_render_site, :validate_site, :upload_site])
+    )
   end
 
   embed_templates("shell_live/*")

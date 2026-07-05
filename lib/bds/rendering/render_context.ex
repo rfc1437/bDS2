@@ -102,19 +102,34 @@ defmodule BDS.Rendering.RenderContext do
 
   @doc """
   Return the cached value for `key`, computing and caching it with `fun` on the
-  first call. Safe to call from concurrently rendering processes; concurrent
-  first calls may compute twice but always return a consistent value.
+  first call. Single-flight: concurrent first calls for the same key compute
+  exactly once — later callers wait for the winner instead of duplicating the
+  work (template parses, file reads) and its queries.
   """
   @spec memoize(t(), term(), (-> value)) :: value when value: term()
-  def memoize(%__MODULE__{cache: cache}, key, fun) when is_function(fun, 0) do
+  def memoize(%__MODULE__{cache: cache} = ctx, key, fun) when is_function(fun, 0) do
     case :ets.lookup(cache, key) do
-      [{^key, value}] ->
-        value
+      [{^key, value}] -> value
+      [] -> compute_memoized(ctx, key, fun)
+    end
+  end
 
-      [] ->
+  defp compute_memoized(%__MODULE__{cache: cache} = ctx, key, fun) do
+    lock_key = {:memoize_lock, key}
+
+    if :ets.insert_new(cache, {lock_key, self()}) do
+      try do
         value = fun.()
-        :ets.insert(cache, {key, value})
+        true = :ets.insert(cache, {key, value})
         value
+      after
+        :ets.delete(cache, lock_key)
+      end
+    else
+      # Another process is computing this key; poll until its value lands (or
+      # its lock disappears because it crashed, in which case we take over).
+      Process.sleep(2)
+      memoize(ctx, key, fun)
     end
   end
 

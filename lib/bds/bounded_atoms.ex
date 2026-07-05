@@ -54,6 +54,7 @@ defmodule BDS.BoundedAtoms do
     :fill_missing_translations,
     :find_duplicates,
     :generate_sitemap,
+    :force_render_site,
     :validate_site,
     :upload_site,
     :documentation,

@@ -44,30 +44,18 @@ defmodule BDS.Generation.Renderers do
     |> IO.iodata_to_binary()
   end
 
-  @doc "Render an archive page (category, tag, year) with pagination."
+  @doc "Render an archive page (category, tag) with pagination."
   @spec render_archive_page(map(), String.t(), [map()], String.t() | nil, String.t(), map()) ::
           String.t()
   def render_archive_page(plan, title, posts, language, kind, pagination) do
-    fallback = fn -> render_inline_list_page(title, posts, language, kind) end
-
-    render_list_output(
+    render_archive_list_page(
       plan,
-      language,
       title,
-      Enum.map(posts, fn post ->
-        %{
-          id: post.id,
-          slug: post.slug,
-          title: post.title,
-          href: "#",
-          excerpt: post.excerpt,
-          content: nil,
-          language: post.language
-        }
-      end),
       %{kind: kind, name: title},
-      pagination,
-      fallback
+      posts,
+      language,
+      kind,
+      pagination
     )
   end
 
@@ -75,12 +63,18 @@ defmodule BDS.Generation.Renderers do
   @spec render_date_archive_page(map(), String.t(), map(), [map()], String.t() | nil, map()) ::
           String.t()
   def render_date_archive_page(plan, label, archive_context, posts, language, pagination) do
-    fallback = fn -> render_inline_list_page(label, posts, language, "date") end
+    render_archive_list_page(plan, label, archive_context, posts, language, "date", pagination)
+  end
+
+  # Shared by every archive kind so category/tag pages get the same post
+  # payloads (loaded bodies, real hrefs) as date archives.
+  defp render_archive_list_page(plan, title, archive_context, posts, language, kind, pagination) do
+    fallback = fn -> render_inline_list_page(title, posts, language, kind) end
 
     render_list_output(
       plan,
       language,
-      label,
+      title,
       build_list_posts(plan, posts, Paths.route_language(plan.language, language)),
       archive_context,
       pagination,

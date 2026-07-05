@@ -99,6 +99,10 @@ defmodule BDS.Generation do
   than just the affected ones). The `:core` section also writes the complete
   sitemap, feeds, calendar and preview assets. The Pagefind search index is
   built separately by `build_site_search_index/2`.
+
+  Pass `force: true` to ignore the stored content hashes and rewrite every
+  output file, repairing any drift between the tracked hashes and what is
+  actually on disk.
   """
   @spec render_site_section(String.t(), section(), generation_opts()) ::
           {:ok, map()} | {:error, term()}
@@ -115,7 +119,12 @@ defmodule BDS.Generation do
 
       rendered_url_count =
         stream_render(project_id, on_progress, route_total,
-          [verb: "Generated", gerund: "Generating", refresh_route_timestamps: false],
+          [
+            verb: "Generated",
+            gerund: "Generating",
+            refresh_route_timestamps: false,
+            force: Keyword.get(opts, :force, false)
+          ],
           fn on_output -> full_section_outputs(plan, render_data, section, on_output) end
         )
 
@@ -143,7 +152,12 @@ defmodule BDS.Generation do
       pagefind_outputs = BDS.Generation.Pagefind.build_outputs(plan, html_outputs)
       total = max(length(pagefind_outputs), 1)
 
-      write_ctx = stream_context(project_id, nil, 0, verb: "Built", gerund: "Building")
+      write_ctx =
+        stream_context(project_id, nil, 0,
+          verb: "Built",
+          gerund: "Building",
+          force: Keyword.get(opts, :force, false)
+        )
 
       pagefind_outputs
       |> Enum.with_index(1)
@@ -953,7 +967,9 @@ defmodule BDS.Generation do
     %{
       project_id: project_id,
       project: Projects.get_project!(project_id),
-      existing_hashes: existing_hash_map(project_id),
+      # force: pretend nothing was ever generated so every output is written.
+      existing_hashes:
+        if(Keyword.get(opts, :force, false), do: %{}, else: existing_hash_map(project_id)),
       pending_hashes: :ets.new(:bds_generation_pending_hashes, [:set, :public]),
       on_progress: on_progress,
       route_total: route_total,

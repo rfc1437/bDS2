@@ -188,6 +188,7 @@ defmodule BDS.Desktop.MenuBar do
   defp item_label(:fill_missing_translations), do: dgettext("ui", "Fill Missing Translations")
   defp item_label(:find_duplicates), do: dgettext("ui", "Find Duplicate Posts")
   defp item_label(:generate_sitemap), do: dgettext("ui", "Generate Site")
+  defp item_label(:force_render_site), do: dgettext("ui", "Force Render Site")
   defp item_label(:validate_site), do: dgettext("ui", "Validate Site")
   defp item_label(:upload_site), do: dgettext("ui", "Upload Site")
   defp item_label(:about), do: dgettext("ui", "About")

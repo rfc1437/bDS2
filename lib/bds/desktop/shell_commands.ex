@@ -239,33 +239,13 @@ defmodule BDS.Desktop.ShellCommands do
   end
 
   defp dispatch("generate_sitemap", project, _params) do
-    group_id = task_group_id("generate_sitemap")
-    attrs = %{group_id: group_id, group_name: "Render Site"}
+    queue_render_site(project, "generate_sitemap", "Render Site", [])
+  end
 
-    {:ok, first_task} =
-      Tasks.submit_task(
-        section_task_name(:core),
-        fn report ->
-          {:ok, _result} = Generation.render_site_section(project.id, :core, on_progress: report)
-          report.(1.0, section_complete_message(:core))
-          :ok
-        end,
-        attrs
-      )
-
-    Task.start(fn -> run_render_site_sequence(project, group_id, attrs) end)
-
-    {:ok,
-     %{
-       kind: "task_queued",
-       action: "generate_sitemap",
-       title: "Render Site",
-       message: "Render Site tasks queued",
-       project_id: project.id,
-       task_id: first_task.id,
-       task_group_id: group_id,
-       panel_tab: "tasks"
-     }}
+  # Forced variant of the site render: ignores the stored content hashes and
+  # rewrites every output file, repairing any drift on disk.
+  defp dispatch("force_render_site", project, _params) do
+    queue_render_site(project, "force_render_site", "Force Render Site", force: true)
   end
 
   defp dispatch("validate_site", project, _params) do
@@ -490,7 +470,43 @@ defmodule BDS.Desktop.ShellCommands do
     end
   end
 
-  defp run_render_site_sequence(project, group_id, attrs) do
+  defp queue_render_site(project, action, title, render_opts) do
+    group_id = task_group_id(action)
+    attrs = %{group_id: group_id, group_name: title}
+
+    {:ok, first_task} =
+      Tasks.submit_task(
+        section_task_name(:core),
+        fn report ->
+          {:ok, _result} =
+            Generation.render_site_section(
+              project.id,
+              :core,
+              [on_progress: report] ++ render_opts
+            )
+
+          report.(1.0, section_complete_message(:core))
+          :ok
+        end,
+        attrs
+      )
+
+    Task.start(fn -> run_render_site_sequence(project, group_id, attrs, render_opts) end)
+
+    {:ok,
+     %{
+       kind: "task_queued",
+       action: action,
+       title: title,
+       message: title <> " tasks queued",
+       project_id: project.id,
+       task_id: first_task.id,
+       task_group_id: group_id,
+       panel_tab: "tasks"
+     }}
+  end
+
+  defp run_render_site_sequence(project, group_id, attrs, render_opts) do
     remaining_sections = [:single, :category, :tag, :date]
 
     Enum.each(remaining_sections, fn section ->
@@ -499,7 +515,11 @@ defmodule BDS.Desktop.ShellCommands do
           section_task_name(section),
           fn report ->
             {:ok, _result} =
-              Generation.render_site_section(project.id, section, on_progress: report)
+              Generation.render_site_section(
+                project.id,
+                section,
+                [on_progress: report] ++ render_opts
+              )
 
             report.(1.0, section_complete_message(section))
             :ok
@@ -515,7 +535,12 @@ defmodule BDS.Desktop.ShellCommands do
         Tasks.submit_task(
           "Build Search Index",
           fn report ->
-            {:ok, _result} = Generation.build_site_search_index(project.id, on_progress: report)
+            {:ok, _result} =
+              Generation.build_site_search_index(
+                project.id,
+                [on_progress: report] ++ render_opts
+              )
+
             report.(1.0, "Build Search Index complete")
             :ok
           end,
