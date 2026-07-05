@@ -273,7 +273,7 @@ defmodule BDS.Rendering.ListArchive do
           |> DateTime.to_date()
           |> Date.to_iso8601())
       )
-      |> Enum.sort_by(fn {label, _posts} -> label end)
+      |> Enum.sort_by(fn {label, _posts} -> label end, :desc)
 
     last_index = length(grouped_blocks) - 1
 
@@ -284,7 +284,7 @@ defmodule BDS.Rendering.ListArchive do
         date_label: date_label,
         show_date_marker: true,
         show_separator: index < last_index,
-        posts: Enum.sort_by(grouped_posts, &Map.get(&1, :created_at))
+        posts: Enum.sort_by(grouped_posts, &Map.get(&1, :created_at), :desc)
       }
     end)
     |> case do

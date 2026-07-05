@@ -246,7 +246,7 @@ defmodule BDS.RenderingTest do
                title: "Render Day Blocks",
                kind: :list,
                content:
-                 "range={{ min_date }}-{{ max_date }}|heading={{ show_archive_range_heading }}|blocks={% for block in day_blocks %}[{{ block.date_label }}:{{ block.posts.size }}:{{ block.show_date_marker }}]{% endfor %}|archive={{ archive_context.kind }}:{{ archive_context.year }}:{{ archive_context.month }}"
+                 "range={{ min_date }}-{{ max_date }}|heading={{ show_archive_range_heading }}|blocks={% for block in day_blocks %}[{{ block.date_label }}:{% for p in block.posts %}{{ p.slug }};{% endfor %}:{{ block.show_date_marker }}]{% endfor %}|archive={{ archive_context.kind }}:{{ archive_context.year }}:{{ archive_context.month }}"
              })
 
     assert {:ok, published_list_template} = BDS.Templates.publish_template(list_template.id)
@@ -289,6 +289,19 @@ defmodule BDS.RenderingTest do
         tags: [],
         categories: [],
         href: "/2024/04/01/second/"
+      },
+      %{
+        id: "second-b",
+        slug: "second-b",
+        title: "Second B",
+        excerpt: "two-b",
+        language: "en",
+        created_at: second_day + 3_600,
+        updated_at: second_day + 3_600,
+        published_at: second_day + 3_600,
+        tags: [],
+        categories: [],
+        href: "/2024/04/01/second-b/"
       }
     ]
 
@@ -311,9 +324,9 @@ defmodule BDS.RenderingTest do
              })
 
     assert rendered =~ "heading=true"
-    assert rendered =~ "blocks=[2024-03-31:1:true][2024-04-01:1:true]"
+    assert rendered =~ "blocks=[2024-04-01:second-b;second;:true][2024-03-31:first;:true]"
     assert rendered =~ "archive=date:2024:4"
-    assert rendered =~ "range=1711843200-1711929600"
+    assert rendered =~ "range=1711843200-1711933200"
   end
 
   test "render_post_page falls back to bundled starter template when the published default template file is missing",

@@ -175,6 +175,7 @@ defmodule BDS.Generation.Data do
         end)
       end
     )
+    |> sort_generation_index_posts()
   end
 
   ## --- internals -----------------------------------------------------------
@@ -397,5 +398,18 @@ defmodule BDS.Generation.Data do
 
   defp append_generation_index(index, field, key, post) do
     update_in(index[field], fn grouped -> Map.update(grouped, key, [post], &[post | &1]) end)
+  end
+
+  # Archive listings (categories, tags, dates) must render newest first. The
+  # index is built by prepending, so each grouped list is sorted explicitly by
+  # creation date (descending) to guarantee a stable newest-first order.
+  defp sort_generation_index_posts(index) do
+    Map.new(index, fn {field, grouped} ->
+      {field, Map.new(grouped, fn {key, posts} -> {key, sort_index_posts_desc(posts)} end)}
+    end)
+  end
+
+  defp sort_index_posts_desc(posts) do
+    Enum.sort_by(posts, &{-(&1.created_at || 0), -(&1.published_at || 0), to_string(&1.slug)})
   end
 end
