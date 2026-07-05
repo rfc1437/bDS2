@@ -537,3 +537,8 @@
   border: 1px solid var(--vscode-panel-border);
   border-radius: 4px;
 }
+
+.monaco-diff-editor-instance {
+  width: 100%;
+  height: 100%;
+}

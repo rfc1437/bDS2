@@ -3009,6 +3009,13 @@ button svg, button svg * {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.post-editor .tag-suggestion-section-label {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vscode-descriptionForeground, #a6a6a6);
+}
 .post-editor .tag-suggestion.create-new {
   border-top: 1px solid var(--vscode-widget-border, #454545);
   margin-top: 4px;
@@ -6233,6 +6240,10 @@ button.import-taxonomy-pill {
   overflow: hidden;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 4px;
+}
+.monaco-diff-editor-instance {
+  width: 100%;
+  height: 100%;
 }
 @layer components {
   .ui-button {
