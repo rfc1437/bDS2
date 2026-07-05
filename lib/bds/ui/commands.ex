@@ -8,6 +8,7 @@ defmodule BDS.UI.Commands do
     %{id: :import_media, accelerator: "CTRL+I"},
     %{id: :save, accelerator: "CTRL+S"},
     %{id: :close_tab, accelerator: "CTRL+W", key: "w", primary: true},
+    %{id: :minimize, accelerator: "CTRL+M"},
     %{id: :quit, accelerator: "CTRL+Q"},
     %{id: :undo, accelerator: "CTRL+Z"},
     %{id: :redo, accelerator: "CTRL+Y"},

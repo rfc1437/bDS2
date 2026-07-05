@@ -118,12 +118,12 @@ msgstr ""
 msgid "API"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:196
+#: lib/bds/desktop/menu_bar.ex:234
 #, elixir-autogen, elixir-format
 msgid "API Documentation"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:194
+#: lib/bds/desktop/menu_bar.ex:232
 #, elixir-autogen, elixir-format
 msgid "About"
 msgstr ""
@@ -381,7 +381,7 @@ msgstr ""
 msgid "Backlinks"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:147
+#: lib/bds/desktop/menu_bar.ex:181
 #, elixir-autogen, elixir-format
 msgid "Blog"
 msgstr ""
@@ -557,7 +557,7 @@ msgstr ""
 msgid "Click to %{action} mapping"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:155
+#: lib/bds/desktop/menu_bar.ex:190
 #, elixir-autogen, elixir-format
 msgid "Close Tab"
 msgstr ""
@@ -607,7 +607,7 @@ msgstr ""
 msgid "Content Categories"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:160
+#: lib/bds/desktop/menu_bar.ex:195
 #, elixir-autogen, elixir-format
 msgid "Copy"
 msgstr ""
@@ -660,7 +660,7 @@ msgstr ""
 msgid "Created"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:159
+#: lib/bds/desktop/menu_bar.ex:194
 #, elixir-autogen, elixir-format
 msgid "Cut"
 msgstr ""
@@ -726,7 +726,7 @@ msgstr ""
 msgid "Default editing mode and diff presentation"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:162
+#: lib/bds/desktop/menu_bar.ex:197
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:98
 #: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:166
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:116
@@ -874,7 +874,7 @@ msgstr ""
 msgid "Do Not Translate"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:195
+#: lib/bds/desktop/menu_bar.ex:233
 #: lib/bds/help_docs.ex:14
 #: lib/bds/ui/registry.ex:118
 #, elixir-autogen, elixir-format
@@ -907,12 +907,12 @@ msgstr ""
 msgid "ETA: %{value}"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:145
+#: lib/bds/desktop/menu_bar.ex:179
 #, elixir-autogen, elixir-format
 msgid "Edit"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:181
+#: lib/bds/desktop/menu_bar.ex:216
 #, elixir-autogen, elixir-format
 msgid "Edit Menu"
 msgstr ""
@@ -1018,7 +1018,7 @@ msgstr ""
 msgid "Extra URLs"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:144
+#: lib/bds/desktop/menu_bar.ex:178
 #: lib/bds/desktop/shell_live/import_editor.ex:882
 #: lib/bds/desktop/shell_live/misc_editor_html/misc_editor.html.heex:157
 #, elixir-autogen, elixir-format
@@ -1045,17 +1045,17 @@ msgstr ""
 msgid "Filesystem Sync"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:188
+#: lib/bds/desktop/menu_bar.ex:223
 #, elixir-autogen, elixir-format
 msgid "Fill Missing Translations"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:164
+#: lib/bds/desktop/menu_bar.ex:199
 #, elixir-autogen, elixir-format
 msgid "Find"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:189
+#: lib/bds/desktop/menu_bar.ex:224
 #, elixir-autogen, elixir-format
 msgid "Find Duplicate Posts"
 msgstr ""
@@ -1070,7 +1070,7 @@ msgstr ""
 msgid "Find Duplicates"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:174
+#: lib/bds/desktop/menu_bar.ex:209
 #, elixir-autogen, elixir-format
 msgid "Force Reload"
 msgstr ""
@@ -1081,7 +1081,7 @@ msgstr ""
 msgid "Gallery"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:190
+#: lib/bds/desktop/menu_bar.ex:225
 #, elixir-autogen, elixir-format
 msgid "Generate Site"
 msgstr ""
@@ -1106,7 +1106,7 @@ msgstr ""
 msgid "Git Log"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:148
+#: lib/bds/desktop/menu_bar.ex:183
 #, elixir-autogen, elixir-format
 msgid "Help"
 msgstr ""
@@ -1193,7 +1193,7 @@ msgstr ""
 msgid "Import (new slug)"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:151
+#: lib/bds/desktop/menu_bar.ex:186
 #, elixir-autogen, elixir-format
 msgid "Import Media"
 msgstr ""
@@ -1395,7 +1395,7 @@ msgstr ""
 msgid "Max Posts Per Page"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:168
+#: lib/bds/desktop/menu_bar.ex:203
 #: lib/bds/desktop/shell_live/media_editor.ex:509
 #: lib/bds/desktop/shell_live/media_editor.ex:513
 #: lib/bds/desktop/shell_live/misc_editor.ex:735
@@ -1440,7 +1440,7 @@ msgstr ""
 msgid "Metadata"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:185
+#: lib/bds/desktop/menu_bar.ex:220
 #: lib/bds/desktop/shell_live/misc_editor.ex:214
 #: lib/bds/desktop/shell_live/misc_editor.ex:226
 #: lib/bds/desktop/shell_live/misc_editor.ex:448
@@ -1492,7 +1492,7 @@ msgstr ""
 msgid "New Page"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:150
+#: lib/bds/desktop/menu_bar.ex:185
 #: lib/bds/desktop/shell_live/sidebar_create.ex:41
 #, elixir-autogen, elixir-format
 msgid "New Post"
@@ -1769,7 +1769,7 @@ msgstr ""
 msgid "Open"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:154
+#: lib/bds/desktop/menu_bar.ex:189
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:382
 #, elixir-autogen, elixir-format
 msgid "Open Data Folder"
@@ -1786,7 +1786,7 @@ msgstr ""
 msgid "Open Settings"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:153
+#: lib/bds/desktop/menu_bar.ex:188
 #, elixir-autogen, elixir-format
 msgid "Open in Browser"
 msgstr ""
@@ -1865,7 +1865,7 @@ msgstr ""
 msgid "Parsing WXR file..."
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:161
+#: lib/bds/desktop/menu_bar.ex:196
 #, elixir-autogen, elixir-format
 msgid "Paste"
 msgstr ""
@@ -1931,7 +1931,7 @@ msgstr ""
 msgid "Post saved"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:167
+#: lib/bds/desktop/menu_bar.ex:202
 #: lib/bds/desktop/shell_live/misc_editor.ex:664
 #: lib/bds/desktop/shell_live/misc_editor.ex:761
 #: lib/bds/ui/registry.ex:14
@@ -1945,7 +1945,7 @@ msgstr ""
 msgid "Posts (%{count})"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:166
+#: lib/bds/desktop/menu_bar.ex:201
 #, elixir-autogen, elixir-format
 msgid "Preferences"
 msgstr ""
@@ -1961,7 +1961,7 @@ msgstr ""
 msgid "Preview Mode"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:180
+#: lib/bds/desktop/menu_bar.ex:215
 #, elixir-autogen, elixir-format
 msgid "Preview Post"
 msgstr ""
@@ -2013,7 +2013,7 @@ msgstr ""
 msgid "Publish"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:179
+#: lib/bds/desktop/menu_bar.ex:214
 #, elixir-autogen, elixir-format
 msgid "Publish Selected"
 msgstr ""
@@ -2046,7 +2046,7 @@ msgstr ""
 msgid "Quick Actions"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:156
+#: lib/bds/desktop/menu_bar.ex:191
 #, elixir-autogen, elixir-format
 msgid "Quit"
 msgstr ""
@@ -2056,12 +2056,12 @@ msgstr ""
 msgid "Ready to import:"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:182
+#: lib/bds/desktop/menu_bar.ex:217
 #, elixir-autogen, elixir-format
 msgid "Rebuild Database"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:184
+#: lib/bds/desktop/menu_bar.ex:219
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:381
 #, elixir-autogen, elixir-format
 msgid "Rebuild Embedding Index"
@@ -2092,7 +2092,7 @@ msgstr ""
 msgid "Rebuild filesystem-backed records and thumbnails"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:158
+#: lib/bds/desktop/menu_bar.ex:193
 #, elixir-autogen, elixir-format
 msgid "Redo"
 msgstr ""
@@ -2119,7 +2119,7 @@ msgstr ""
 msgid "Refresh Translation"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:186
+#: lib/bds/desktop/menu_bar.ex:221
 #, elixir-autogen, elixir-format
 msgid "Regenerate Calendar"
 msgstr ""
@@ -2129,12 +2129,12 @@ msgstr ""
 msgid "Regenerate Missing Thumbnails"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:183
+#: lib/bds/desktop/menu_bar.ex:218
 #, elixir-autogen, elixir-format
 msgid "Reindex Text"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:173
+#: lib/bds/desktop/menu_bar.ex:208
 #, elixir-autogen, elixir-format
 msgid "Reload"
 msgstr ""
@@ -2165,7 +2165,7 @@ msgstr ""
 msgid "Render in Lists"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:165
+#: lib/bds/desktop/menu_bar.ex:200
 #, elixir-autogen, elixir-format
 msgid "Replace"
 msgstr ""
@@ -2182,12 +2182,12 @@ msgstr ""
 msgid "Replace Media File"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:198
+#: lib/bds/desktop/menu_bar.ex:236
 #, elixir-autogen, elixir-format
 msgid "Report Issue"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:175
+#: lib/bds/desktop/menu_bar.ex:210
 #, elixir-autogen, elixir-format
 msgid "Reset Zoom"
 msgstr ""
@@ -2242,7 +2242,7 @@ msgstr ""
 msgid "SSH Mode"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:152
+#: lib/bds/desktop/menu_bar.ex:187
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:89
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:299
 #: lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex:13
@@ -2360,7 +2360,7 @@ msgstr ""
 msgid "Select & Analyze"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:163
+#: lib/bds/desktop/menu_bar.ex:198
 #, elixir-autogen, elixir-format
 msgid "Select All"
 msgstr ""
@@ -2671,12 +2671,12 @@ msgstr ""
 msgid "Title"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:171
+#: lib/bds/desktop/menu_bar.ex:206
 #, elixir-autogen, elixir-format
 msgid "Toggle Assistant Sidebar"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:172
+#: lib/bds/desktop/menu_bar.ex:207
 #, elixir-autogen, elixir-format
 msgid "Toggle Dev Tools"
 msgstr ""
@@ -2687,17 +2687,17 @@ msgstr ""
 msgid "Toggle Filters"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:178
+#: lib/bds/desktop/menu_bar.ex:213
 #, elixir-autogen, elixir-format
 msgid "Toggle Full Screen"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:170
+#: lib/bds/desktop/menu_bar.ex:205
 #, elixir-autogen, elixir-format
 msgid "Toggle Panel"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:169
+#: lib/bds/desktop/menu_bar.ex:204
 #, elixir-autogen, elixir-format
 msgid "Toggle Sidebar"
 msgstr ""
@@ -2793,7 +2793,7 @@ msgstr ""
 msgid "URL"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:157
+#: lib/bds/desktop/menu_bar.ex:192
 #, elixir-autogen, elixir-format
 msgid "Undo"
 msgstr ""
@@ -2843,7 +2843,7 @@ msgstr ""
 msgid "Updated URLs"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:193
+#: lib/bds/desktop/menu_bar.ex:228
 #, elixir-autogen, elixir-format
 msgid "Upload Site"
 msgstr ""
@@ -2870,22 +2870,22 @@ msgstr ""
 msgid "Validate"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:192
+#: lib/bds/desktop/menu_bar.ex:227
 #, elixir-autogen, elixir-format
 msgid "Validate Site"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:187
+#: lib/bds/desktop/menu_bar.ex:222
 #, elixir-autogen, elixir-format
 msgid "Validate Translations"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:146
+#: lib/bds/desktop/menu_bar.ex:180
 #, elixir-autogen, elixir-format
 msgid "View"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:197
+#: lib/bds/desktop/menu_bar.ex:235
 #, elixir-autogen, elixir-format
 msgid "View on GitHub"
 msgstr ""
@@ -2929,12 +2929,12 @@ msgstr ""
 msgid "You"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:176
+#: lib/bds/desktop/menu_bar.ex:211
 #, elixir-autogen, elixir-format
 msgid "Zoom In"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:177
+#: lib/bds/desktop/menu_bar.ex:212
 #, elixir-autogen, elixir-format
 msgid "Zoom Out"
 msgstr ""
@@ -3537,7 +3537,7 @@ msgstr ""
 msgid "Suggested tags"
 msgstr ""
 
-#: lib/bds/desktop/menu_bar.ex:191
+#: lib/bds/desktop/menu_bar.ex:226
 #, elixir-autogen, elixir-format
 msgid "Force Render Site"
 msgstr ""
@@ -3550,4 +3550,24 @@ msgstr ""
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:378
 #, elixir-autogen, elixir-format
 msgid "Rebuild Post Links"
+msgstr ""
+
+#: lib/bds/desktop/menu_bar.ex:231
+#, elixir-autogen, elixir-format
+msgid "Bring All to Front"
+msgstr ""
+
+#: lib/bds/desktop/menu_bar.ex:229
+#, elixir-autogen, elixir-format
+msgid "Minimize"
+msgstr ""
+
+#: lib/bds/desktop/menu_bar.ex:182
+#, elixir-autogen, elixir-format
+msgid "Window"
+msgstr ""
+
+#: lib/bds/desktop/menu_bar.ex:230
+#, elixir-autogen, elixir-format
+msgid "Zoom"
 msgstr ""

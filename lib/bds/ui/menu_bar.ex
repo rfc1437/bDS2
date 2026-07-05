@@ -7,6 +7,7 @@ defmodule BDS.UI.MenuBar do
   @spec default_groups(keyword()) :: [map()]
   def default_groups(opts \\ []) do
     dev_mode? = Keyword.get(opts, :dev_mode?, false)
+    window_menu? = Keyword.get(opts, :window_menu?, false)
 
     [
       %{
@@ -67,16 +68,38 @@ defmodule BDS.UI.MenuBar do
           %{id: :validate_site},
           %{id: :upload_site}
         ]
-      },
+      }
+    ] ++
+      window_group(window_menu?) ++
+      [
+        %{
+          id: :help,
+          items: [
+            %{id: :about},
+            %{id: :documentation},
+            %{id: :api_documentation},
+            %{separator: true},
+            %{id: :view_on_github},
+            %{id: :report_issue}
+          ]
+        }
+      ]
+  end
+
+  # The native macOS menu enables this group; wx's automatic Window menu is
+  # disabled because it races the async menubar populate and lands in the
+  # wrong position (see BDS.Application.disable_auto_window_menu/0).
+  defp window_group(false), do: []
+
+  defp window_group(true) do
+    [
       %{
-        id: :help,
+        id: :window,
         items: [
-          %{id: :about},
-          %{id: :documentation},
-          %{id: :api_documentation},
+          %{id: :minimize},
+          %{id: :zoom},
           %{separator: true},
-          %{id: :view_on_github},
-          %{id: :report_issue}
+          %{id: :bring_all_to_front}
         ]
       }
     ]

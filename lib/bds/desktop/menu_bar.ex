@@ -25,12 +25,7 @@ defmodule BDS.Desktop.MenuBar do
   def mount(menu) do
     UILocale.put(ShellData.ui_language())
 
-    {:ok,
-     Desktop.Menu.assign(
-       menu,
-       :groups,
-       groups(dev_mode?: Application.get_env(:bds, :dev_routes, false))
-     )}
+    {:ok, Desktop.Menu.assign(menu, :groups, groups(native_menu_opts()))}
   end
 
   @impl true
@@ -82,6 +77,24 @@ defmodule BDS.Desktop.MenuBar do
     {:noreply, menu}
   end
 
+  def handle_event("minimize", menu) do
+    with_frame(&:wxTopLevelWindow.iconize(&1, iconize: true))
+    {:noreply, menu}
+  end
+
+  def handle_event("zoom", menu) do
+    with_frame(fn frame ->
+      :wxTopLevelWindow.maximize(frame, maximize: not :wxTopLevelWindow.isMaximized(frame))
+    end)
+
+    {:noreply, menu}
+  end
+
+  def handle_event("bring_all_to_front", menu) do
+    with_frame(&:wxWindow.raise/1)
+    {:noreply, menu}
+  end
+
   def handle_event(command, menu) do
     dispatch_shell_menu_action(command)
     {:noreply, menu}
@@ -91,12 +104,7 @@ defmodule BDS.Desktop.MenuBar do
   def handle_info({:set_ui_locale, locale}, menu) do
     UILocale.put(locale)
 
-    {:noreply,
-     Desktop.Menu.assign(
-       menu,
-       :groups,
-       groups(dev_mode?: Application.get_env(:bds, :dev_routes, false))
-     )}
+    {:noreply, Desktop.Menu.assign(menu, :groups, groups(native_menu_opts()))}
   end
 
   def handle_info(_, menu) do
@@ -118,6 +126,32 @@ defmodule BDS.Desktop.MenuBar do
   defp webview do
     try do
       Window.webview(BDS.Desktop.MainWindow.window_id())
+    catch
+      :exit, _ -> nil
+    end
+  end
+
+  defp native_menu_opts do
+    [
+      dev_mode?: Application.get_env(:bds, :dev_routes, false),
+      window_menu?: OS.type() == MacOS
+    ]
+  end
+
+  defp with_frame(fun) do
+    case frame() do
+      nil ->
+        :ok
+
+      frame ->
+        :wx.set_env(Desktop.Env.wx_env())
+        fun.(frame)
+    end
+  end
+
+  defp frame do
+    try do
+      Window.frame(BDS.Desktop.MainWindow.window_id())
     catch
       :exit, _ -> nil
     end
@@ -145,6 +179,7 @@ defmodule BDS.Desktop.MenuBar do
   defp group_label(:edit), do: dgettext("ui", "Edit")
   defp group_label(:view), do: dgettext("ui", "View")
   defp group_label(:blog), do: dgettext("ui", "Blog")
+  defp group_label(:window), do: dgettext("ui", "Window")
   defp group_label(:help), do: dgettext("ui", "Help")
 
   defp item_label(:new_post), do: dgettext("ui", "New Post")
@@ -191,6 +226,9 @@ defmodule BDS.Desktop.MenuBar do
   defp item_label(:force_render_site), do: dgettext("ui", "Force Render Site")
   defp item_label(:validate_site), do: dgettext("ui", "Validate Site")
   defp item_label(:upload_site), do: dgettext("ui", "Upload Site")
+  defp item_label(:minimize), do: dgettext("ui", "Minimize")
+  defp item_label(:zoom), do: dgettext("ui", "Zoom")
+  defp item_label(:bring_all_to_front), do: dgettext("ui", "Bring All to Front")
   defp item_label(:about), do: dgettext("ui", "About")
   defp item_label(:documentation), do: dgettext("ui", "Documentation")
   defp item_label(:api_documentation), do: dgettext("ui", "API Documentation")

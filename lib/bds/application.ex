@@ -65,6 +65,8 @@ defmodule BDS.Application do
     if desktop_automation?() do
       []
     else
+      disable_auto_window_menu()
+
       window_opts =
         BDS.Desktop.MainWindow.window_options(
           menubar: BDS.Desktop.MenuBar,
@@ -77,6 +79,17 @@ defmodule BDS.Application do
         Supervisor.child_spec({BDS.Desktop.MainWindow, []}, id: BDS.Desktop.MainWindow.Watcher),
         {BDS.Desktop.DeepLink, []}
       ]
+    end
+  end
+
+  # wxOSX injects an untracked "Window" menu into the menubar at install time,
+  # which races elixir-desktop's async menu populate and ends up at an
+  # unstable position. We disable it and ship our own :window menu group
+  # (BDS.UI.MenuBar) placed between Blog and Help.
+  defp disable_auto_window_menu do
+    if :os.type() == {:unix, :darwin} do
+      :wx.set_env(Desktop.Env.wx_env())
+      :wxMenuBar.setAutoWindowMenu(false)
     end
   end
 

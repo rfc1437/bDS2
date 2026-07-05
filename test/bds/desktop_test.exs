@@ -147,6 +147,41 @@ defmodule BDS.DesktopTest do
     assert Enum.at(item_ids, generate_index + 1) == :force_render_site
   end
 
+  test "window menu group sits between blog and help when enabled" do
+    groups = BDS.UI.MenuBar.default_groups(window_menu?: true)
+
+    assert Enum.map(groups, & &1.id) == [:file, :edit, :view, :blog, :window, :help]
+
+    window_group = Enum.find(groups, &(&1.id == :window))
+
+    assert Enum.map(window_group.items, &Map.get(&1, :id)) == [
+             :minimize,
+             :zoom,
+             nil,
+             :bring_all_to_front
+           ]
+  end
+
+  test "window menu group is excluded by default so the titlebar menu stays unchanged" do
+    refute Enum.any?(BDS.UI.MenuBar.default_groups(), &(&1.id == :window))
+  end
+
+  test "desktop menu bar renders window menu labels and the minimize accelerator" do
+    groups = BDS.Desktop.MenuBar.groups(dev_mode?: false, window_menu?: true)
+
+    window_group = Enum.find(groups, &(&1.id == :window))
+    assert window_group.label == "Window"
+    assert menu_item(groups, :minimize).native_label == "Minimize\tCTRL+M"
+    assert menu_item(groups, :zoom).native_label == "Zoom"
+    assert menu_item(groups, :bring_all_to_front).native_label == "Bring All to Front"
+  end
+
+  test "native window menu actions are handled without a running window" do
+    assert {:noreply, :menu} = BDS.Desktop.MenuBar.handle_event("minimize", :menu)
+    assert {:noreply, :menu} = BDS.Desktop.MenuBar.handle_event("zoom", :menu)
+    assert {:noreply, :menu} = BDS.Desktop.MenuBar.handle_event("bring_all_to_front", :menu)
+  end
+
   test "prod forwarded menu surface is covered by the shell dispatcher" do
     forwarded_actions =
       BDS.Desktop.MenuBar.groups(dev_mode?: false)

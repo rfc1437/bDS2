@@ -61,7 +61,7 @@ defmodule BDS.BoundedAtoms do
     :api_documentation,
     :close_tab
   ]
-  @menu_actions MenuBar.default_groups(dev_mode?: true)
+  @menu_actions MenuBar.default_groups(dev_mode?: true, window_menu?: true)
                 |> Enum.flat_map(fn group ->
                   Enum.flat_map(group.items, fn
                     %{separator: true} -> []
