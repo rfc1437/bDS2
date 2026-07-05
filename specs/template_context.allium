@@ -127,7 +127,7 @@ value PostContext {
     excerpt: String?
     author: String?
     language: String?
-    show_title: Boolean     -- Always true for post pages
+    show_title: Boolean     -- True for post pages; in list/archive pages it is false when any of the post's categories has "show title" disabled (e.g. asides)
     published_at: Timestamp
     created_at: Timestamp
     updated_at: Timestamp

@@ -136,6 +136,8 @@ defmodule BDS.Rendering.ListArchive do
   end
 
   defp normalize_list_posts(ctx, posts, language) do
+    show_title_by_category = show_title_by_category(ctx.metadata)
+
     Enum.map(posts, fn post ->
       post_id = MapUtils.attr(post, :id)
       post_record = Map.get(ctx.record_by_id, post_id)
@@ -146,6 +148,9 @@ defmodule BDS.Rendering.ListArchive do
           :content,
           MapUtils.attr(post, :excerpt, "")
         )
+
+      categories =
+        MapUtils.attr(post, :categories, record_list(post_record, :categories)) || []
 
       %{
         id: MapUtils.attr(post, :id),
@@ -161,8 +166,7 @@ defmodule BDS.Rendering.ListArchive do
         created_at: MapUtils.attr(post, :created_at, record_value(post_record, :created_at)),
         updated_at: MapUtils.attr(post, :updated_at, record_value(post_record, :updated_at)),
         tags: MapUtils.attr(post, :tags, record_list(post_record, :tags)) || [],
-        categories:
-          MapUtils.attr(post, :categories, record_list(post_record, :categories)) || [],
+        categories: categories,
         template_slug:
           MapUtils.attr(post, :template_slug, record_value(post_record, :template_slug)),
         do_not_translate:
@@ -172,12 +176,45 @@ defmodule BDS.Rendering.ListArchive do
             record_value(post_record, :do_not_translate, false)
           ),
         href: MapUtils.attr(post, :href),
-        show_title: true,
+        show_title: show_list_title?(categories, show_title_by_category),
         linked_media: [],
         outgoing_links: [],
         incoming_links: []
       }
     end)
+  end
+
+  # A post's title is hidden in list/archive pages when any of its categories
+  # has "show title" turned off. Mirrors the single-post behaviour so that, for
+  # example, asides render as body-only entries everywhere.
+  defp show_list_title?([], _show_title_by_category), do: true
+
+  defp show_list_title?(categories, show_title_by_category) do
+    not Enum.any?(categories, fn category ->
+      Map.get(show_title_by_category, category, true) == false
+    end)
+  end
+
+  @default_show_title_by_category %{
+    "article" => true,
+    "picture" => true,
+    "aside" => false,
+    "page" => true
+  }
+
+  defp show_title_by_category(metadata) do
+    settings = Map.get(metadata, :category_settings, %{}) || %{}
+
+    Enum.reduce(settings, @default_show_title_by_category, fn {category, category_settings}, acc ->
+      Map.put(acc, category, category_show_title?(category_settings))
+    end)
+  end
+
+  defp category_show_title?(settings) do
+    case MapUtils.attr(settings, :show_title, true) do
+      false -> false
+      _other -> true
+    end
   end
 
   defp normalize_pagination(nil, posts) do

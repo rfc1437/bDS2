@@ -50,4 +50,22 @@ defmodule BDS.Generation.AsideArchiveRenderingTest do
     assert category_html =~ "ASIDE BODY MARKER"
     assert tag_html =~ "ASIDE BODY MARKER"
   end
+
+  test "aside titles are hidden in category, tag, and date archives", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    {:ok, _} = Generation.render_site_section(project.id, :category)
+    {:ok, _} = Generation.render_site_section(project.id, :tag)
+    {:ok, _} = Generation.render_site_section(project.id, :date)
+
+    year = Integer.to_string(DateTime.utc_now().year)
+    date_html = read_archive(temp_dir, [year])
+    category_html = read_archive(temp_dir, ["category", "aside"])
+    tag_html = read_archive(temp_dir, ["tag", "asides-tag"])
+
+    refute date_html =~ "Aside Title Marker"
+    refute category_html =~ "Aside Title Marker"
+    refute tag_html =~ "Aside Title Marker"
+  end
 end
