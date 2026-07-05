@@ -106,7 +106,6 @@ defmodule BDS.Posts do
       {:ok, post} ->
         :ok = Embeddings.sync_post(post)
         :ok = Search.sync_post(post)
-        :ok = AutoTranslation.maybe_schedule(post)
         {:ok, post}
 
       error ->
@@ -114,9 +113,9 @@ defmodule BDS.Posts do
     end
   end
 
-  @spec update_post(String.t(), attrs()) ::
+  @spec update_post(String.t(), attrs(), keyword()) ::
           {:ok, Post.t()} | {:error, :not_found | Ecto.Changeset.t()}
-  def update_post(post_id, attrs) do
+  def update_post(post_id, attrs, opts \\ []) do
     case Repo.get(Post, post_id) do
       nil ->
         {:error, :not_found}
@@ -145,7 +144,13 @@ defmodule BDS.Posts do
               :ok = Embeddings.sync_post(updated_post)
               :ok = PostLinks.sync_post_links(updated_post)
               :ok = Search.sync_post(updated_post)
-              :ok = AutoTranslation.maybe_schedule(updated_post)
+
+              # Auto-translation only runs on an explicit manual save from the
+              # editor, never on post creation or autosave.
+              if Keyword.get(opts, :auto_translate, false) do
+                :ok = AutoTranslation.maybe_schedule(updated_post)
+              end
+
               {:ok, updated_post}
 
             error ->

@@ -231,6 +231,8 @@ rule PostTranslateAction {
 
 rule PostAutoTranslateOnSave {
     when: PostSaved(post_id)
+    -- Only an explicit manual save (or publish) triggers this. Auto-saves and
+    -- post creation (sidebar, deeplink/bookmarklet, import, scripting) never do.
     -- Gate: airplane mode check + auto_translate not disabled (doNotTranslate=false)
     -- For each configured blog language missing a translation:
     --   Enqueue background translation task (title model)

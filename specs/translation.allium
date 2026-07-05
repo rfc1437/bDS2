@@ -192,8 +192,9 @@ invariant FtsIncludesTranslations {
 -- Distilled from: lib/bds/posts/auto_translation.ex
 --
 -- Two entry points share one translation primitive:
---   1. ScheduleAutoTranslation - reactive, fired after a post is created or
---      updated. One background task per missing language produces a DRAFT
+--   1. ScheduleAutoTranslation - reactive, fired only by an explicit manual
+--      save (or publish) in the post editor — never by post creation or
+--      auto-save. One background task per missing language produces a DRAFT
 --      translation, then cascades to the post's linked media.
 --   2. FillMissingTranslations - batch maintenance action. Scans every
 --      published post, AUTO-PUBLISHES the generated translations, fills linked
@@ -210,7 +211,9 @@ surface AutoTranslationControlSurface {
     facing _: TranslationOperator
 
     provides:
-        -- Reactive trigger: emitted by post create/update side effects.
+        -- Reactive trigger: emitted only when a post is updated with
+        -- auto_translate enabled (the editor's manual save/publish path);
+        -- post creation and auto-save never emit it.
         PostSavedForAutoTranslation(post)
         -- Batch trigger: "fill missing translations" maintenance action.
         FillMissingTranslationsRequested(project)

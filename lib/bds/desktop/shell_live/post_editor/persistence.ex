@@ -17,7 +17,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
          canonical_language
        ) do
       post
-      |> save_canonical_draft(draft)
+      |> save_canonical_draft(draft, action)
       |> maybe_publish_post(post.id, action)
     else
       post.id
@@ -65,18 +65,22 @@ defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
       else: dgettext("ui", "Delete this unpublished draft")
   end
 
-  defp save_canonical_draft(%Post{id: post_id}, draft) do
-    Posts.update_post(post_id, %{
-      title: blank_to_nil(Map.get(draft, "title")),
-      excerpt: blank_to_nil(Map.get(draft, "excerpt")),
-      content: blank_to_nil(Map.get(draft, "content")),
-      tags: csv_to_list(Map.get(draft, "tags")),
-      categories: csv_to_list(Map.get(draft, "categories")),
-      author: blank_to_nil(Map.get(draft, "author")),
-      language: blank_to_nil(Map.get(draft, "language")),
-      do_not_translate: Map.get(draft, "do_not_translate", false),
-      template_slug: blank_to_nil(Map.get(draft, "template_slug"))
-    })
+  defp save_canonical_draft(%Post{id: post_id}, draft, action) do
+    Posts.update_post(
+      post_id,
+      %{
+        title: blank_to_nil(Map.get(draft, "title")),
+        excerpt: blank_to_nil(Map.get(draft, "excerpt")),
+        content: blank_to_nil(Map.get(draft, "content")),
+        tags: csv_to_list(Map.get(draft, "tags")),
+        categories: csv_to_list(Map.get(draft, "categories")),
+        author: blank_to_nil(Map.get(draft, "author")),
+        language: blank_to_nil(Map.get(draft, "language")),
+        do_not_translate: Map.get(draft, "do_not_translate", false),
+        template_slug: blank_to_nil(Map.get(draft, "template_slug"))
+      },
+      auto_translate: action != :auto_save
+    )
   end
 
   defp save_translation_draft(post_id, language, draft) do

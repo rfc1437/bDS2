@@ -503,7 +503,9 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
         active_language = socket.assigns.active_language
         draft = component_current_draft(socket, post, metadata, active_language)
 
-        case persist(post, draft, active_language, metadata, :save) do
+        action = if keep_draft?, do: :auto_save, else: :save
+
+        case persist(post, draft, active_language, metadata, action) do
           {:ok, record} ->
             refreshed_post = Posts.get_post!(post.id)
             _refreshed_form = persisted_form(refreshed_post, metadata, active_language)

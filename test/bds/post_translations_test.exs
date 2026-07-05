@@ -143,7 +143,7 @@ defmodule BDS.PostTranslationsTest do
     assert {:ok, []} = Posts.list_post_translations(post.id)
   end
 
-  test "create_post enqueues and completes auto-translation tasks for missing project languages",
+  test "create_post does not enqueue auto-translation tasks",
        %{project: project} do
     configure_auto_translation_test_runtime()
 
@@ -162,21 +162,79 @@ defmodule BDS.PostTranslationsTest do
                language: "en"
              })
 
-    translations = wait_for_post_translations(post.id, ["de", "fr"])
-
-    assert Enum.map(translations, & &1.language) == ["de", "fr"]
-    assert Enum.all?(translations, &(&1.title == "Hallo Welt"))
-    assert Enum.all?(translations, &(&1.excerpt == "Kurze Zusammenfassung"))
-    assert Enum.all?(translations, &(&1.content == "# Hallo Welt\n\nUbersetzter Inhalt"))
-
-    tasks = wait_for_ai_tasks(2)
-
-    assert Enum.any?(tasks, &(&1.name == "Auto-translate Post to de" and &1.status == :completed))
-    assert Enum.any?(tasks, &(&1.name == "Auto-translate Post to fr" and &1.status == :completed))
-    assert Enum.all?(tasks, &(&1.group_name == "AI"))
+    assert ai_tasks() == []
+    assert {:ok, []} = Posts.list_post_translations(post.id)
   end
 
-  test "update_post auto-translates missing languages and cascades linked media translations",
+  test "update_post without auto_translate does not enqueue auto-translation tasks",
+       %{project: project} do
+    configure_auto_translation_test_runtime()
+
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en", "de"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Autosaved",
+               content: "Source body",
+               language: "en"
+             })
+
+    assert {:ok, _updated_post} = Posts.update_post(post.id, %{content: "Autosaved body"})
+
+    assert ai_tasks() == []
+    assert {:ok, []} = Posts.list_post_translations(post.id)
+  end
+
+  test "editor persist schedules auto-translation on manual save but not on auto-save",
+       %{project: project} do
+    configure_auto_translation_test_runtime()
+
+    assert {:ok, metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en", "de"]
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Editor Post",
+               content: "Source body",
+               language: "en"
+             })
+
+    draft = %{
+      "title" => "Editor Post",
+      "excerpt" => "",
+      "content" => "Edited body",
+      "tags" => "",
+      "categories" => "",
+      "author" => "",
+      "language" => "en",
+      "do_not_translate" => false,
+      "template_slug" => ""
+    }
+
+    alias BDS.Desktop.ShellLive.PostEditor.Persistence
+
+    assert {:ok, _post} = Persistence.persist(post, draft, "en", metadata, :auto_save)
+    assert ai_tasks() == []
+
+    assert {:ok, _post} = Persistence.persist(post, draft, "en", metadata, :save)
+
+    [translation] = wait_for_post_translations(post.id, ["de"])
+    assert translation.language == "de"
+
+    tasks = wait_for_ai_tasks(1)
+    assert Enum.any?(tasks, &(&1.name == "Auto-translate Post to de" and &1.status == :completed))
+  end
+
+  test "update_post with auto_translate translates missing languages and cascades linked media translations",
        %{project: project, temp_dir: temp_dir} do
     configure_auto_translation_test_runtime()
 
@@ -221,10 +279,14 @@ defmodule BDS.PostTranslationsTest do
     ])
 
     assert {:ok, _updated_post} =
-             Posts.update_post(post.id, %{
-               do_not_translate: false,
-               content: "Updated source body"
-             })
+             Posts.update_post(
+               post.id,
+               %{
+                 do_not_translate: false,
+                 content: "Updated source body"
+               },
+               auto_translate: true
+             )
 
     [translation] = wait_for_post_translations(post.id, ["de"])
     assert translation.language == "de"
@@ -427,8 +489,6 @@ defmodule BDS.PostTranslationsTest do
     end
   end
 
-  defp wait_for_ai_tasks(count, attempts \\ 100)
-
   test "do_not_translate guard prevents translation upsert via the API", %{
     project: project
   } do
@@ -453,14 +513,19 @@ defmodule BDS.PostTranslationsTest do
              {"cannot add translations when do_not_translate is true", []}
   end
 
+  defp ai_tasks do
+    BDS.Tasks.list_tasks()
+    |> Enum.filter(&(&1.group_name == "AI"))
+  end
+
+  defp wait_for_ai_tasks(count, attempts \\ 100)
+
   defp wait_for_ai_tasks(_count, 0) do
     flunk("AI tasks did not reach expected state")
   end
 
   defp wait_for_ai_tasks(count, attempts) do
-    tasks =
-      BDS.Tasks.list_tasks()
-      |> Enum.filter(&(&1.group_name == "AI"))
+    tasks = ai_tasks()
 
     if length(tasks) >= count and Enum.all?(tasks, &(&1.status == :completed)) do
       tasks
