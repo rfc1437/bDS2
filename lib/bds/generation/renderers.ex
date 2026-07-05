@@ -4,20 +4,23 @@ defmodule BDS.Generation.Renderers do
   alias BDS.Generation.Paths
   alias BDS.Projects
   alias BDS.Rendering
+  alias BDS.Rendering.Metadata, as: RenderMetadata
   alias BDS.Rendering.RenderContext
 
   @doc "Render the home page (HTML) using the project's template engine."
   @spec render_home(map(), String.t() | nil) :: String.t()
   def render_home(plan, language) do
+    title = blog_page_title(plan)
+
     [
       "<html>",
       "<head><title>",
-      plan.project_name,
+      title,
       "</title></head>",
       "<body data-language=\"",
       to_string(language),
       "\"><main><h1>",
-      plan.project_name,
+      title,
       "</h1></main></body>",
       "</html>"
     ]
@@ -67,14 +70,15 @@ defmodule BDS.Generation.Renderers do
   end
 
   # Shared by every archive kind so category/tag pages get the same post
-  # payloads (loaded bodies, real hrefs) as date archives.
+  # payloads (loaded bodies, real hrefs) as date archives. The document title
+  # stays the blog title; the archive-specific label lives in `archive_context`.
   defp render_archive_list_page(plan, title, archive_context, posts, language, kind, pagination) do
     fallback = fn -> render_inline_list_page(title, posts, language, kind) end
 
     render_list_output(
       plan,
       language,
-      title,
+      blog_page_title(plan),
       build_list_posts(plan, posts, Paths.route_language(plan.language, language)),
       archive_context,
       pagination,
@@ -128,6 +132,14 @@ defmodule BDS.Generation.Renderers do
     )
   end
 
+  @doc "Blog document title (description, then name) shared by list/home pages."
+  @spec blog_page_title(map()) :: String.t()
+  def blog_page_title(plan) do
+    RenderMetadata.blog_page_title(
+      Map.get(plan, :project_description),
+      Map.get(plan, :project_name)
+    )
+  end
   @doc "Render the project's 404 page via its template, falling back to a static page."
   @spec render_not_found_output(map(), String.t() | nil) :: String.t()
   def render_not_found_output(

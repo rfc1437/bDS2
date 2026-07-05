@@ -10,6 +10,7 @@ defmodule BDS.Preview.Router do
   alias BDS.Posts.Post
   alias BDS.Posts.Translation
   alias BDS.Rendering
+  alias BDS.Rendering.Metadata, as: RenderMetadata
   alias BDS.Rendering.TemplateSelection
   alias BDS.Repo
 
@@ -159,7 +160,8 @@ defmodule BDS.Preview.Router do
 
     render_list(project_id, posts, page_number, metadata, language, main_language, %{
       kind: "category",
-      name: name
+      name: RenderMetadata.category_display_name(metadata.category_settings, name),
+      slug: name
     })
   end
 
@@ -294,7 +296,7 @@ defmodule BDS.Preview.Router do
       assigns = %{
         language: language,
         language_prefix: language_prefix,
-        page_title: archive_page_title(archive_ctx),
+        page_title: RenderMetadata.blog_page_title(metadata.description, metadata.name),
         posts: page_posts,
         archive_context: archive_ctx,
         pagination: pagination
@@ -334,6 +336,10 @@ defmodule BDS.Preview.Router do
   end
 
   defp archive_context_to_segments(%{kind: "core"}), do: []
+
+  defp archive_context_to_segments(%{kind: "category", slug: slug}) when is_binary(slug),
+    do: ["category", slug]
+
   defp archive_context_to_segments(%{kind: "category", name: name}), do: ["category", name]
   defp archive_context_to_segments(%{kind: "tag", name: name}), do: ["tag", name]
 

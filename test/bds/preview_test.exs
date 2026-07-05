@@ -562,6 +562,47 @@ defmodule BDS.PreviewTest do
     assert :ok = BDS.Preview.stop_preview(project.id)
   end
 
+  test "on-demand rendering: document title is the blog title on home and archives", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               main_language: "en",
+               blog_languages: ["en"],
+               description: "My Preview Blog"
+             })
+
+    assert {:ok, _} =
+             Metadata.update_category_settings(project.id, "article", %{
+               "render_in_lists" => true,
+               "show_title" => true,
+               "title" => "Long Form Articles"
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Article Post",
+               content: "Article body",
+               language: "en",
+               categories: ["article"]
+             })
+
+    assert {:ok, _published} = Posts.publish_post(post.id)
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: home_html}} = BDS.Preview.request(project.id, "/")
+    assert home_html =~ "<title>My Preview Blog</title>"
+
+    assert {:ok, %{body: category_html}} =
+             BDS.Preview.request(project.id, "/category/article")
+
+    assert category_html =~ "<title>My Preview Blog</title>"
+    assert category_html =~ ~s(<h1 class="archive-heading">Long Form Articles</h1>)
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
   test "on-demand rendering: tag archive renders filtered posts", %{project: project} do
     assert {:ok, _metadata} =
              Metadata.update_project_metadata(project.id, %{

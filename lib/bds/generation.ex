@@ -59,6 +59,7 @@ defmodule BDS.Generation do
      %{
        project_id: project_id,
        project_name: project.name,
+       project_description: metadata.description,
        base_url: normalize_base_url(metadata.public_url),
        language: metadata.main_language,
        blog_languages: normalize_blog_languages(metadata.main_language, metadata.blog_languages),

@@ -6,6 +6,7 @@ defmodule BDS.Generation.Outputs do
   import BDS.Generation.Sitemap, only: [render_feed: 3, render_atom: 3, render_calendar: 1]
 
   alias BDS.Rendering.RenderContext
+  alias BDS.Rendering.Metadata, as: RenderMetadata
   alias BDS.Rendering.TemplateSelection
 
   @type output_callback :: ({String.t(), iodata()} -> any()) | nil
@@ -214,6 +215,7 @@ defmodule BDS.Generation.Outputs do
     concurrent_flat_map(posts_by_category, fn {category, posts} ->
       paginated_posts = Enum.chunk_every(posts, max(plan.max_posts_per_page, 1))
       category_slug = archive_route_segment(category)
+      category_title = RenderMetadata.category_display_name(plan.category_settings, category)
       total_pages = length(paginated_posts)
       total_items = length(posts)
 
@@ -256,7 +258,7 @@ defmodule BDS.Generation.Outputs do
                 ["category", category_slug],
                 page_number
               ),
-              render_archive_page(plan, category, page_posts, language, "category", pagination)
+              render_archive_page(plan, category_title, page_posts, language, "category", pagination)
             }
 
           report_output(output, on_output)
@@ -508,7 +510,7 @@ defmodule BDS.Generation.Outputs do
          render_list_output(
            plan,
            language,
-           plan.project_name,
+           blog_page_title(plan),
            page_posts,
            %{kind: "core"},
            pagination_for_page(

@@ -62,7 +62,7 @@ value RenderContext {
     language: String                -- Current language code
     language_prefix: String?        -- "/de" or "" depending on language
     html_theme_attribute: String    -- Theme class for <html> element
-    page_title: String              -- Page title for <title> tag
+    page_title: String              -- Blog title (description, else name) for the <title> tag; archive-specific labels come from archive_context
     pico_stylesheet_href: String    -- Path to Pico CSS theme
     blog_languages: List<BlogLanguage>
     alternate_links: List<AlternateLink>
@@ -181,7 +181,7 @@ value LinkContext {
 
 value ArchiveContext {
     kind: category | tag | date
-    name: String?
+    name: String?           -- Heading label: for categories the configured descriptive title (falls back to the category key), for tags the raw tag name
     month: Integer?
     year: Integer?
     day: Integer?

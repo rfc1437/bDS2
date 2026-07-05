@@ -25,6 +25,49 @@ defmodule BDS.Rendering.Metadata do
     metadata
   end
 
+  @doc """
+  Resolve the document/page title (the `<title>` and the home-page heading).
+
+  Mirrors the old app's `resolvePageTitle`: the blog description wins, then the
+  blog name. The archive-specific label (category/tag/date) is carried
+  separately in `archive_context`, so every page's document title stays the
+  blog title.
+  """
+  @spec blog_page_title(String.t() | nil, String.t() | nil) :: String.t()
+  def blog_page_title(description, name) do
+    cond do
+      is_binary(description) and String.trim(description) != "" -> String.trim(description)
+      is_binary(name) and String.trim(name) != "" -> String.trim(name)
+      true -> ""
+    end
+  end
+
+  @doc """
+  Resolve a category's descriptive display name for archive headings.
+
+  Mirrors the old app: the category's configured `title` wins, falling back to
+  the raw category key when no title is set.
+  """
+  @spec category_display_name(map() | nil, String.t()) :: String.t()
+  def category_display_name(category_settings, category) do
+    title =
+      category_settings
+      |> category_settings_for(category)
+      |> category_title()
+
+    if is_binary(title) and String.trim(title) != "", do: String.trim(title), else: category
+  end
+
+  defp category_settings_for(category_settings, category) when is_map(category_settings),
+    do: Map.get(category_settings, category)
+
+  defp category_settings_for(_category_settings, _category), do: nil
+
+  defp category_title(settings) when is_map(settings),
+    do: Map.get(settings, "title") || Map.get(settings, :title)
+
+  defp category_title(_settings), do: nil
+
   @spec menu_items(String.t()) :: [map()]
   def menu_items(project_id) do
     {:ok, %{items: items}} = Menu.get_menu(project_id)
