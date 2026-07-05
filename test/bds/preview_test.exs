@@ -170,6 +170,87 @@ defmodule BDS.PreviewTest do
     assert :ok = BDS.Preview.stop_preview(project.id)
   end
 
+  test "preview renders calendar.json dynamically with count maps, ignoring stale files",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Calendar Post",
+               content: "Calendar body",
+               language: "en"
+             })
+
+    assert {:ok, _published} = Posts.publish_post(post.id)
+
+    # A stale calendar.json in the old (array) format must not be served.
+    File.mkdir_p!(Path.join(temp_dir, "html"))
+    File.write!(Path.join([temp_dir, "html", "calendar.json"]), ~s([{"date":"2000-01-01"}]))
+
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: body, content_type: "application/json"}} =
+             BDS.Preview.request(project.id, "/calendar.json")
+
+    decoded = Jason.decode!(body)
+    day_key = BDS.Generation.Paths.local_date_iso8601!(Posts.get_post!(post.id).created_at)
+
+    assert decoded["days"] == %{day_key => 1}
+    assert decoded["months"] == %{binary_part(day_key, 0, 7) => 1}
+    assert decoded["years"] == %{binary_part(day_key, 0, 4) => 1}
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
+  test "preview renders content dynamically and never serves generated content files from disk",
+       %{project: project, temp_dir: temp_dir} do
+    assert {:ok, _metadata} =
+             Metadata.update_project_metadata(project.id, %{
+               public_url: "https://example.com/blog",
+               main_language: "en"
+             })
+
+    assert {:ok, post} =
+             Posts.create_post(%{
+               project_id: project.id,
+               title: "Dynamic Feed Post",
+               content: "Feed body",
+               language: "en"
+             })
+
+    assert {:ok, _published} = Posts.publish_post(post.id)
+
+    # Stale generated content files must never be served.
+    html_dir = Path.join(temp_dir, "html")
+    File.mkdir_p!(Path.join(html_dir, "pagefind"))
+    File.write!(Path.join(html_dir, "rss.xml"), "<rss>stale feed</rss>")
+    File.write!(Path.join(html_dir, "atom.xml"), "<feed>stale atom</feed>")
+    File.write!(Path.join(html_dir, "sitemap.xml"), "<urlset>stale</urlset>")
+    File.write!(Path.join([html_dir, "pagefind", "pagefind-ui.js"]), "console.log('pf')")
+
+    assert {:ok, _server} = BDS.Preview.start_preview(project.id)
+
+    assert {:ok, %{body: feed_xml, content_type: "application/rss+xml"}} =
+             BDS.Preview.request(project.id, "/rss.xml")
+
+    assert feed_xml =~ "Dynamic Feed Post"
+    refute feed_xml =~ "stale feed"
+
+    assert {:ok, %{body: atom_xml, content_type: "application/atom+xml"}} =
+             BDS.Preview.request(project.id, "/atom.xml")
+
+    assert atom_xml =~ "Dynamic Feed Post"
+    refute atom_xml =~ "stale atom"
+
+    # Content files without a dynamic route render the 404 page instead.
+    assert {:ok, %{status: 404}} = BDS.Preview.request(project.id, "/sitemap.xml")
+
+    # Generated static assets (pagefind search index) still come from disk.
+    assert {:ok, %{body: "console.log('pf')", content_type: "application/javascript"}} =
+             BDS.Preview.request(project.id, "/pagefind/pagefind-ui.js")
+
+    assert :ok = BDS.Preview.stop_preview(project.id)
+  end
+
   test "draft preview renders through the published post template", %{project: project} do
     assert {:ok, template} =
              BDS.Templates.create_template(%{

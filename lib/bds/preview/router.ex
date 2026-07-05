@@ -4,6 +4,7 @@ defmodule BDS.Preview.Router do
   import Ecto.Query
 
   alias BDS.Generation.Paths
+  alias BDS.Generation.Sitemap
   alias BDS.MapUtils
   alias BDS.Metadata, as: ProjectMetadata
   alias BDS.Posts
@@ -23,6 +24,9 @@ defmodule BDS.Preview.Router do
           | {:year, integer(), pos_integer()}
           | {:month, integer(), integer(), pos_integer()}
           | {:day, integer(), integer(), integer(), pos_integer()}
+          | :calendar
+          | :feed
+          | :atom
           | :not_matched
 
   @spec render_route(String.t(), String.t()) :: {:ok, map()} | :not_matched
@@ -40,6 +44,28 @@ defmodule BDS.Preview.Router do
       :not_matched ->
         :not_matched
 
+      :calendar ->
+        posts = load_published_list_posts(project_id, metadata)
+        {:ok, %{content_type: "application/json", body: Sitemap.render_calendar(posts)}}
+
+      :feed ->
+        posts = load_published_list_posts(project_id, metadata)
+
+        {:ok,
+         %{
+           content_type: "application/rss+xml",
+           body: Sitemap.render_feed(feed_plan(metadata), effective_language, posts)
+         }}
+
+      :atom ->
+        posts = load_published_list_posts(project_id, metadata)
+
+        {:ok,
+         %{
+           content_type: "application/atom+xml",
+           body: Sitemap.render_atom(feed_plan(metadata), effective_language, posts)
+         }}
+
       route ->
         case render(project_id, route, effective_language, main_language, metadata) do
           {:ok, body} ->
@@ -53,6 +79,9 @@ defmodule BDS.Preview.Router do
 
   @spec match_route([String.t()]) :: route()
   def match_route([]), do: {:home, 1}
+  def match_route(["calendar.json"]), do: :calendar
+  def match_route(["rss.xml"]), do: :feed
+  def match_route(["atom.xml"]), do: :atom
   def match_route(["page", n]), do: {:home, parse_page(n)}
 
   def match_route(["category", name]), do: {:category, URI.decode(name), 1}
@@ -129,6 +158,14 @@ defmodule BDS.Preview.Router do
   def match_route(_segments), do: :not_matched
 
   ## Rendering
+
+  defp feed_plan(metadata) do
+    %{
+      base_url: metadata.public_url,
+      project_name: metadata.name,
+      language: metadata.main_language || "en"
+    }
+  end
 
   defp render(project_id, {:home, page_number}, language, main_language, metadata) do
     posts = load_published_list_posts(project_id, metadata)

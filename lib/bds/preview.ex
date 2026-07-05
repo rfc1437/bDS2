@@ -201,16 +201,21 @@ defmodule BDS.Preview do
                 query_params: query_params
               )
 
+            :static ->
+              serve_file(safe_join(Path.join(server.data_dir, "html"), relative_path),
+                server: server,
+                query_params: query_params
+              )
+
             :generated ->
+              # Content is always rendered dynamically; generated files on
+              # disk go stale and must never be served by the preview.
               case BDS.Preview.Router.render_route(server.project_id, request_path) do
                 {:ok, response} ->
                   {:ok, apply_response_overrides(response, query_params)}
 
                 :not_matched ->
-                  serve_file(safe_join(Path.join(server.data_dir, "html"), relative_path),
-                    server: server,
-                    query_params: query_params
-                  )
+                  render_not_found_response(server.project_id, query_params)
               end
           end
         end
@@ -318,6 +323,9 @@ defmodule BDS.Preview do
 
       match?(["media" | _], segments) ->
         {:ok, Path.join(tl(segments)), :media}
+
+      match?(["pagefind" | _], segments) ->
+        {:ok, Path.join(segments), :static}
 
       normalized == "/" ->
         {:ok, "index.html", :generated}

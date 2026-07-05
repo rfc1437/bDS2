@@ -103,7 +103,7 @@ defmodule BDS.GenerationTest do
         "404.html",
         "index.html",
         "sitemap.xml",
-        "feed.xml",
+        "rss.xml",
         "atom.xml",
         "calendar.json",
         "pagefind/index.json",
@@ -111,7 +111,7 @@ defmodule BDS.GenerationTest do
         "pagefind/pagefind-ui.js",
         "de/404.html",
         "de/index.html",
-        "de/feed.xml",
+        "de/rss.xml",
         "de/atom.xml",
         "de/pagefind/index.json",
         "de/pagefind/pagefind-ui.css",
@@ -214,7 +214,7 @@ defmodule BDS.GenerationTest do
       "https://example.com/blog" <>
         "/" <> String.trim_trailing(BDS.Generation.post_output_path(published_post), "index.html")
 
-    feed_xml = File.read!(Path.join([temp_dir, "html", "feed.xml"]))
+    feed_xml = File.read!(Path.join([temp_dir, "html", "rss.xml"]))
     atom_xml = File.read!(Path.join([temp_dir, "html", "atom.xml"]))
 
     assert feed_xml =~ "<rss>"
@@ -854,12 +854,13 @@ defmodule BDS.GenerationTest do
 
     assert expected_paths -- Enum.map(result.generated_files, & &1.relative_path) == []
 
+    # Archives paginate newest-first (issue #14), so page 1 holds the newest posts.
     assert File.read!(Path.join([temp_dir, "html", "category", "notes", "index.html"])) =~
-             "Archive 1"
+             "Archive 3"
 
     assert File.read!(
              Path.join([temp_dir, "html", "category", "notes", "page", "2", "index.html"])
-           ) =~ "Archive 3"
+           ) =~ "Archive 1"
 
     assert File.read!(Path.join([temp_dir, "html", "tag", "Elixir", "index.html"])) =~ "Elixir"
     assert File.read!(Path.join([temp_dir, "html", "2026", "04", "index.html"])) =~ "2026-04"
@@ -936,7 +937,7 @@ defmodule BDS.GenerationTest do
     assert {:ok, _result} =
              BDS.Generation.generate_site(project.id, [:core, :single, :category, :tag, :date])
 
-    feed_path = Path.join([temp_dir, "html", "feed.xml"])
+    feed_path = Path.join([temp_dir, "html", "rss.xml"])
     atom_path = Path.join([temp_dir, "html", "atom.xml"])
     not_found_path = Path.join([temp_dir, "html", "404.html"])
     pagefind_path = Path.join([temp_dir, "html", "pagefind", "index.json"])
@@ -1146,7 +1147,7 @@ defmodule BDS.GenerationTest do
 
     # Ancillary artifacts are all present.
     assert File.exists?(Path.join([temp_dir, "html", "sitemap.xml"]))
-    assert File.exists?(Path.join([temp_dir, "html", "feed.xml"]))
+    assert File.exists?(Path.join([temp_dir, "html", "rss.xml"]))
     assert File.exists?(Path.join([temp_dir, "html", "calendar.json"]))
     assert File.exists?(Path.join([temp_dir, "html", "pagefind", "index.json"]))
 

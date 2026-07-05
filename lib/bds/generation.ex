@@ -1355,7 +1355,7 @@ defmodule BDS.Generation do
       ["sitemap.xml"] ->
         :core
 
-      ["feed.xml"] ->
+      ["rss.xml"] ->
         :core
 
       ["atom.xml"] ->

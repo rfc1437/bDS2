@@ -28,8 +28,8 @@ defmodule BDS.MixProject do
 
   defp deps do
     [
-      {:ecto_sql, "~> 3.13"},
-      {:ecto_sqlite3, "~> 0.21"},
+      {:ecto_sql, "~> 3.14"},
+      {:ecto_sqlite3, "~> 0.24"},
       {:luerl, "~> 1.5"},
       {:jason, "~> 1.4"},
       {:mdex, "~> 0.13"},

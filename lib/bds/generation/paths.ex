@@ -237,7 +237,7 @@ defmodule BDS.Generation.Paths do
 
   @spec sitemap_route_output?(String.t()) :: boolean()
   def sitemap_route_output?("404.html"), do: false
-  def sitemap_route_output?("feed.xml"), do: false
+  def sitemap_route_output?("rss.xml"), do: false
   def sitemap_route_output?("atom.xml"), do: false
   def sitemap_route_output?("calendar.json"), do: false
   def sitemap_route_output?(relative_path), do: String.ends_with?(relative_path, ".html")

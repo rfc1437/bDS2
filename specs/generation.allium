@@ -136,8 +136,8 @@ rule GenerateCoreSectionPages {
     ensures: FileGenerated("index.html")
     ensures: FileGenerated("sitemap.xml")
         -- Multi-language sitemap with hreflang alternates
-    ensures: FileGenerated("feed.xml")
-        -- RSS 2.0 feed
+    ensures: FileGenerated("rss.xml")
+        -- RSS 2.0 feed (same output name as the old bDS app; templates link /rss.xml)
     ensures: FileGenerated("atom.xml")
         -- Atom feed
     ensures: FileGenerated("calendar.json")
@@ -146,7 +146,7 @@ rule GenerateCoreSectionPages {
         -- Not-found page rendered from the not-found template
     for lang in generation.blog_languages - {generation.language}:
         ensures: FileGenerated(format("{lang}/index.html", lang: lang))
-        ensures: FileGenerated(format("{lang}/feed.xml", lang: lang))
+        ensures: FileGenerated(format("{lang}/rss.xml", lang: lang))
         ensures: FileGenerated(format("{lang}/atom.xml", lang: lang))
         ensures: FileGenerated(format("{lang}/404.html", lang: lang))
 }

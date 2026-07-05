@@ -375,7 +375,7 @@ defmodule BDS.Generation.Outputs do
     main_static_outputs =
       [
         {"404.html", render_not_found_output(plan, language)},
-        {"feed.xml", render_feed(plan, language, published_posts)},
+        {"rss.xml", render_feed(plan, language, published_posts)},
         {"atom.xml", render_atom(plan, language, published_posts)},
         {"calendar.json", render_calendar(published_posts)}
       ]
@@ -399,7 +399,7 @@ defmodule BDS.Generation.Outputs do
            [
              {Path.join(localized_language, "404.html"),
               render_not_found_output(plan, localized_language)},
-             {Path.join(localized_language, "feed.xml"),
+             {Path.join(localized_language, "rss.xml"),
               render_feed(plan, localized_language, localized_source_posts)},
              {Path.join(localized_language, "atom.xml"),
               render_atom(plan, localized_language, localized_source_posts)}

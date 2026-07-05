@@ -212,13 +212,19 @@ defmodule BDS.Generation.Sitemap do
     "<feed><title>#{xml_escape(plan.project_name)} (#{xml_escape(language || "default")})</title>#{entries}</feed>"
   end
 
-  @doc "Render a JSON calendar of all published posts."
+  @doc """
+  Render the JSON calendar archive consumed by the calendar runtime:
+  post counts keyed by year ("2024"), month ("2024-05"), and day ("2024-05-17").
+  """
   @spec render_calendar([map()]) :: String.t()
   def render_calendar(published_posts) do
-    published_posts
-    |> Enum.map(fn post ->
-      %{date: Paths.local_date_iso8601!(post.created_at), slug: post.slug, title: post.title}
-    end)
+    day_keys = Enum.map(published_posts, &Paths.local_date_iso8601!(&1.created_at))
+
+    %{
+      years: Enum.frequencies_by(day_keys, &binary_part(&1, 0, 4)),
+      months: Enum.frequencies_by(day_keys, &binary_part(&1, 0, 7)),
+      days: Enum.frequencies(day_keys)
+    }
     |> Jason.encode!()
   end
 
