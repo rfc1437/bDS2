@@ -7,43 +7,25 @@ defmodule BDS.Rendering.ListArchive do
   alias BDS.Rendering.LinksAndLanguages
   alias BDS.Rendering.Metadata, as: RenderMetadata
   alias BDS.Rendering.PostRendering
-  alias BDS.Rendering.TemplateSelection
+  alias BDS.Rendering.RenderContext
   use Gettext, backend: BDS.Gettext
 
-  @spec list_assigns(String.t(), map()) :: map()
-  def list_assigns(project_id, assigns) do
-    metadata = RenderMetadata.project_metadata(project_id)
-    template_context = TemplateSelection.template_render_context(project_id)
+  @spec list_assigns(RenderContext.t() | String.t(), map()) :: map()
+  def list_assigns(project_id, assigns) when is_binary(project_id) do
+    list_assigns(RenderContext.build(project_id), assigns)
+  end
+
+  def list_assigns(%RenderContext{} = ctx, assigns) do
+    metadata = ctx.metadata
 
     language = MapUtils.attr(assigns, :language, metadata.main_language || "en")
 
     main_language = metadata.main_language || language
     archive_context = MapUtils.attr(assigns, :archive_context, %{})
 
-    canonical_post_paths =
-      LinksAndLanguages.canonical_post_path_by_slug(project_id, main_language)
-
-    canonical_media_paths = LinksAndLanguages.canonical_media_path_by_source_path(project_id)
-
     input_posts = MapUtils.attr(assigns, :posts, [])
 
-    post_ids =
-      input_posts
-      |> Enum.map(&MapUtils.attr(&1, :id))
-      |> Enum.reject(&is_nil/1)
-      |> Enum.uniq()
-
-    post_records = PostRendering.load_post_records_batch(post_ids)
-
-    posts =
-      normalize_list_posts(
-        input_posts,
-        post_records,
-        canonical_post_paths,
-        canonical_media_paths,
-        language,
-        template_context
-      )
+    posts = normalize_list_posts(ctx, input_posts, language)
 
     pagination =
       normalize_pagination(MapUtils.attr(assigns, :pagination), posts)
@@ -73,7 +55,7 @@ defmodule BDS.Rendering.ListArchive do
         assign_override(assigns, :html_theme_attribute, "html_theme_attribute", nil),
       blog_languages: RenderMetadata.blog_languages(metadata, language),
       alternate_links: [],
-      menu_items: RenderMetadata.menu_items(project_id),
+      menu_items: ctx.menu_items,
       calendar_initial_year: calendar_initial_year_from_posts(posts),
       calendar_initial_month: calendar_initial_month_from_posts(posts),
       archive_context: normalized_archive_context,
@@ -92,8 +74,8 @@ defmodule BDS.Rendering.ListArchive do
       total_pages: pagination.total_pages,
       total_items: pagination.total_items,
       items_per_page: pagination.items_per_page,
-      canonical_post_path_by_slug: canonical_post_paths,
-      canonical_media_path_by_source_path: canonical_media_paths,
+      canonical_post_path_by_slug: ctx.canonical_post_paths,
+      canonical_media_path_by_source_path: ctx.canonical_media_paths,
       post_data_json_by_id:
         Enum.into(posts, %{}, fn post -> {post.id, PostRendering.post_data_json_value(post)} end),
       day_blocks: day_blocks,
@@ -103,9 +85,13 @@ defmodule BDS.Rendering.ListArchive do
     }
   end
 
-  @spec not_found_assigns(String.t(), map()) :: map()
-  def not_found_assigns(project_id, assigns) do
-    metadata = RenderMetadata.project_metadata(project_id)
+  @spec not_found_assigns(RenderContext.t() | String.t(), map()) :: map()
+  def not_found_assigns(project_id, assigns) when is_binary(project_id) do
+    not_found_assigns(RenderContext.build(project_id), assigns)
+  end
+
+  def not_found_assigns(%RenderContext{} = ctx, assigns) do
+    metadata = ctx.metadata
 
     language = MapUtils.attr(assigns, :language, metadata.main_language || "en")
 
@@ -129,7 +115,7 @@ defmodule BDS.Rendering.ListArchive do
       html_theme_attribute:
         assign_override(assigns, :html_theme_attribute, "html_theme_attribute", nil),
       blog_languages: RenderMetadata.blog_languages(metadata, language),
-      menu_items: RenderMetadata.menu_items(project_id),
+      menu_items: ctx.menu_items,
       alternate_links: [],
       not_found_message:
         assign_override(
@@ -149,17 +135,10 @@ defmodule BDS.Rendering.ListArchive do
     }
   end
 
-  defp normalize_list_posts(
-         posts,
-         post_records,
-         canonical_post_paths,
-         canonical_media_paths,
-         language,
-         template_context
-       ) do
+  defp normalize_list_posts(ctx, posts, language) do
     Enum.map(posts, fn post ->
       post_id = MapUtils.attr(post, :id)
-      post_record = Map.get(post_records, post_id)
+      post_record = Map.get(ctx.record_by_id, post_id)
 
       raw_content =
         Map.get(
@@ -172,14 +151,7 @@ defmodule BDS.Rendering.ListArchive do
         id: MapUtils.attr(post, :id),
         slug: MapUtils.attr(post, :slug),
         title: MapUtils.attr(post, :title),
-        content:
-          PostRendering.render_post_content(
-            raw_content,
-            canonical_post_paths,
-            canonical_media_paths,
-            language,
-            template_context
-          ),
+        content: PostRendering.cached_post_content(ctx, raw_content, language),
         raw_content: raw_content,
         excerpt: MapUtils.attr(post, :excerpt, record_value(post_record, :excerpt)),
         author: MapUtils.attr(post, :author, record_value(post_record, :author)),

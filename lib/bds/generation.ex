@@ -21,7 +21,7 @@ defmodule BDS.Generation do
   import BDS.Generation.Progress
   import BDS.Generation.Outputs
   import BDS.Generation.Data
-  import BDS.Generation.Renderers, only: [build_list_posts: 3]
+  import BDS.Generation.Renderers, only: [build_list_posts: 3, plan_render_target: 1]
   import BDS.Generation.Validation
 
   alias BDS.Generation.GeneratedFileHash
@@ -31,6 +31,7 @@ defmodule BDS.Generation do
   alias BDS.PreviewAssets
   alias BDS.Posts.Post
   alias BDS.Projects
+  alias BDS.Rendering.RenderContext
   alias BDS.Repo
 
   @core_sections [:core, :single, :category, :tag, :date]
@@ -108,6 +109,7 @@ defmodule BDS.Generation do
     on_progress = callback(opts)
 
     with {:ok, plan} <- plan_generation(project_id, [section]) do
+      plan = with_render_context(plan)
       render_data = validation_render_data(plan)
       route_total = section_route_total(plan, render_data)
 
@@ -141,12 +143,16 @@ defmodule BDS.Generation do
       pagefind_outputs = BDS.Generation.Pagefind.build_outputs(plan, html_outputs)
       total = max(length(pagefind_outputs), 1)
 
+      write_ctx = stream_context(project_id, nil, 0, verb: "Built", gerund: "Building")
+
       pagefind_outputs
       |> Enum.with_index(1)
       |> Enum.each(fn {{relative_path, content}, index} ->
-        _ = write_generated_file(project_id, relative_path, content)
+        :ok = write_output_tracked(write_ctx, relative_path, content, false)
         :ok = report_validation_progress(on_progress, index / total, "Built #{relative_path}")
       end)
+
+      flush_pending_hashes(write_ctx)
 
       {:ok, %{written_count: length(pagefind_outputs)}}
     end
@@ -162,7 +168,7 @@ defmodule BDS.Generation do
       on_output
     ) ++
       build_page_outputs(
-        plan.project_id,
+        plan_render_target(plan),
         plan.language,
         data.published_posts,
         render_data.translations_by_post_language,
@@ -176,7 +182,7 @@ defmodule BDS.Generation do
     data = render_data.data
 
     build_single_outputs(
-      plan.project_id,
+      plan_render_target(plan),
       plan.language,
       data.published_posts,
       render_data.translations_by_post_language,
@@ -236,6 +242,13 @@ defmodule BDS.Generation do
       |> Enum.sum()
 
     main + additional
+  end
+
+  # Attach a load-once render context to the plan so every page render works
+  # from preloaded in-memory data instead of re-querying per page. Idempotent:
+  # a plan that already carries a context keeps it.
+  defp with_render_context(plan) do
+    Map.put_new_lazy(plan, :render_context, fn -> RenderContext.build(plan.project_id) end)
   end
 
   defp report_outputs(outputs, nil), do: outputs
@@ -618,6 +631,7 @@ defmodule BDS.Generation do
   end
 
   defp build_outputs(plan, on_output \\ nil) do
+    plan = with_render_context(plan)
     data = generation_data(plan)
     published_translations = flattened_generation_translations(data.translations_by_post)
     translations_by_post_language = translation_lookup_map(published_translations)
@@ -674,7 +688,7 @@ defmodule BDS.Generation do
     page_outputs =
       if :core in plan.sections do
         build_page_outputs(
-          plan.project_id,
+          plan_render_target(plan),
           plan.language,
           data.published_posts,
           translations_by_post_language,
@@ -688,7 +702,7 @@ defmodule BDS.Generation do
     single_outputs =
       if :single in plan.sections do
         build_single_outputs(
-          plan.project_id,
+          plan_render_target(plan),
           plan.language,
           data.published_posts,
           translations_by_post_language,
@@ -856,6 +870,7 @@ defmodule BDS.Generation do
 
   defp validation_apply_plan(project_id, sections, report) do
     with {:ok, plan} <- plan_generation(project_id, sections) do
+      plan = with_render_context(plan)
       published_posts = list_published_posts(project_id)
 
       targeted_plan =
@@ -913,15 +928,22 @@ defmodule BDS.Generation do
 
     ctx = stream_context(project_id, on_progress, route_total, opts)
     Enum.each(outputs, fn output -> emit_output(output, ctx) end)
+    flush_pending_hashes(ctx)
     :counters.get(ctx.counter, 1)
   end
 
   defp stream_render(project_id, on_progress, route_total, opts, build_fn) do
     ctx = stream_context(project_id, on_progress, route_total, opts)
     _ = build_fn.(fn output -> emit_output(output, ctx) end)
+    flush_pending_hashes(ctx)
     :counters.get(ctx.counter, 1)
   end
 
+  # The stream context mirrors the old app's generation worker hash store: the
+  # hashes of every previously generated file are loaded once up front, writes
+  # compare against that in-memory map, and the changed hashes are accumulated
+  # in a (cross-process safe) ETS table that `flush_pending_hashes/1` persists
+  # in a few batched upserts — instead of 3 database roundtrips per file.
   defp stream_context(project_id, on_progress, route_total, opts) do
     gerund = Keyword.fetch!(opts, :gerund)
 
@@ -930,6 +952,9 @@ defmodule BDS.Generation do
 
     %{
       project_id: project_id,
+      project: Projects.get_project!(project_id),
+      existing_hashes: existing_hash_map(project_id),
+      pending_hashes: :ets.new(:bds_generation_pending_hashes, [:set, :public]),
       on_progress: on_progress,
       route_total: route_total,
       verb: Keyword.fetch!(opts, :verb),
@@ -938,13 +963,19 @@ defmodule BDS.Generation do
     }
   end
 
+  defp existing_hash_map(project_id) do
+    Repo.all(
+      from generated_file in GeneratedFileHash,
+        where: generated_file.project_id == ^project_id,
+        select: {generated_file.relative_path, generated_file.content_hash}
+    )
+    |> Map.new()
+  end
+
   defp emit_output({relative_path, content} = output, ctx) do
     route? = route_html_path?(relative_path)
 
-    _ =
-      write_generated_file(ctx.project_id, relative_path, content,
-        refresh_timestamp_on_unchanged: ctx.refresh_routes? and route?
-      )
+    :ok = write_output_tracked(ctx, relative_path, content, ctx.refresh_routes? and route?)
 
     if route? do
       :counters.add(ctx.counter, 1, 1)
@@ -960,6 +991,62 @@ defmodule BDS.Generation do
     end
 
     output
+  end
+
+  defp write_output_tracked(ctx, relative_path, content, refresh_timestamp?) do
+    content_hash = sha256(content)
+    full_path = output_path(ctx.project, relative_path)
+
+    case Map.get(ctx.existing_hashes, relative_path) do
+      ^content_hash ->
+        cond do
+          not File.exists?(full_path) ->
+            :ok = Persistence.atomic_write(full_path, content)
+            true = :ets.insert(ctx.pending_hashes, {relative_path, content_hash})
+            :ok
+
+          refresh_timestamp? ->
+            true = :ets.insert(ctx.pending_hashes, {relative_path, content_hash})
+            :ok
+
+          true ->
+            :ok
+        end
+
+      _other ->
+        :ok = Persistence.atomic_write(full_path, content)
+        true = :ets.insert(ctx.pending_hashes, {relative_path, content_hash})
+        :ok
+    end
+  end
+
+  # SQLite allows at most 999 bound parameters per statement; 4 columns per row
+  # keeps 200-row chunks comfortably below that.
+  @hash_flush_chunk_size 200
+
+  defp flush_pending_hashes(ctx) do
+    rows = :ets.tab2list(ctx.pending_hashes)
+    :ets.delete(ctx.pending_hashes)
+    now = Persistence.now_ms()
+
+    rows
+    |> Enum.map(fn {relative_path, content_hash} ->
+      %{
+        project_id: ctx.project_id,
+        relative_path: relative_path,
+        content_hash: content_hash,
+        updated_at: now
+      }
+    end)
+    |> Enum.chunk_every(@hash_flush_chunk_size)
+    |> Enum.each(fn chunk ->
+      Repo.insert_all(GeneratedFileHash, chunk,
+        on_conflict: {:replace, [:content_hash, :updated_at]},
+        conflict_target: [:project_id, :relative_path]
+      )
+    end)
+
+    :ok
   end
 
   defp url_progress_started_message(gerund, 0), do: "No URLs to #{String.downcase(gerund)}"
@@ -1021,7 +1108,7 @@ defmodule BDS.Generation do
 
     main_root =
       if targeted_plan.request_root_routes do
-        posts = build_list_posts(plan.base_url, data.published_list_posts, nil)
+        posts = build_list_posts(plan, data.published_list_posts, nil)
         build_root_outputs(plan, plan.language, posts)
       else
         []
@@ -1034,7 +1121,7 @@ defmodule BDS.Generation do
         if language_plan.request_root_routes do
           source = Map.get(render_data.localized_list_posts_by_language, language, [])
           prefix = route_language(plan.language, language)
-          posts = build_list_posts(plan.base_url, source, prefix)
+          posts = build_list_posts(plan, source, prefix)
           build_root_outputs(plan, language, posts)
         else
           []
@@ -1056,7 +1143,7 @@ defmodule BDS.Generation do
 
     page_outputs =
       build_page_outputs(
-        plan.project_id,
+        plan_render_target(plan),
         plan.language,
         main_page_posts,
         render_data.translations_by_post_language,
@@ -1080,7 +1167,7 @@ defmodule BDS.Generation do
       end)
 
     build_single_outputs(
-      plan.project_id,
+      plan_render_target(plan),
       plan.language,
       main_posts,
       render_data.translations_by_post_language,

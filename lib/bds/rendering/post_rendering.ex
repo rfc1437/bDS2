@@ -7,49 +7,34 @@ defmodule BDS.Rendering.PostRendering do
   alias BDS.Rendering.Labels
   alias BDS.Rendering.LinksAndLanguages
   alias BDS.Rendering.Metadata, as: RenderMetadata
-  alias BDS.Rendering.TemplateSelection
+  alias BDS.Rendering.RenderContext
   alias BDS.MapUtils
   alias BDS.Posts.Post
-  alias BDS.Posts.PostMedia
   alias BDS.Posts.Translation
-  alias BDS.Media.Media, as: MediaRecord
   alias BDS.Repo
 
-  @spec post_assigns(String.t(), map()) :: map()
-  def post_assigns(project_id, assigns) do
-    metadata = RenderMetadata.project_metadata(project_id)
-    template_context = TemplateSelection.template_render_context(project_id)
+  @spec post_assigns(RenderContext.t() | String.t(), map()) :: map()
+  def post_assigns(project_id, assigns) when is_binary(project_id) do
+    post_assigns(RenderContext.build(project_id), assigns)
+  end
+
+  def post_assigns(%RenderContext{} = ctx, assigns) do
+    metadata = ctx.metadata
 
     language = MapUtils.attr(assigns, :language) || metadata.main_language || "en"
 
     main_language = metadata.main_language || language
-    post_record = Map.get(assigns, :_post_record) || load_post_record(assigns)
-    canonical_post = canonical_post_record(post_record)
+    post_record = Map.get(assigns, :_post_record) || load_post_record(ctx, assigns)
+    canonical_post = canonical_post_record(ctx, post_record)
     post_id = canonical_post_id(post_record, assigns)
     post_categories = record_list(post_record, :categories)
     post_tags = record_list(post_record, :tags)
 
-    canonical_post_paths =
-      LinksAndLanguages.canonical_post_path_by_slug(project_id, main_language)
-
-    canonical_media_paths = LinksAndLanguages.canonical_media_path_by_source_path(project_id)
     raw_content = MapUtils.attr(assigns, :content)
+    rendered_content = cached_post_content(ctx, raw_content, language, post_id)
 
-    rendered_content =
-      render_post_content(
-        raw_content,
-        canonical_post_paths,
-        canonical_media_paths,
-        language,
-        template_context,
-        post_id
-      )
-
-    incoming_links =
-      LinksAndLanguages.link_contexts(project_id, post_id, :incoming, main_language)
-
-    outgoing_links =
-      LinksAndLanguages.link_contexts(project_id, post_id, :outgoing, main_language)
+    incoming_links = RenderContext.link_contexts(ctx, post_id, :incoming)
+    outgoing_links = RenderContext.link_contexts(ctx, post_id, :outgoing)
 
     post_assigns =
       assigns
@@ -81,29 +66,58 @@ defmodule BDS.Rendering.PostRendering do
       html_theme_attribute:
         assign_override(assigns, :html_theme_attribute, "html_theme_attribute", nil),
       blog_languages: RenderMetadata.blog_languages(metadata, language),
-      alternate_links: RenderMetadata.alternate_links(canonical_post, project_id, main_language),
-      menu_items: RenderMetadata.menu_items(project_id),
+      alternate_links:
+        RenderMetadata.alternate_links_from(
+          canonical_post,
+          ctx_translations(ctx, canonical_post),
+          main_language
+        ),
+      menu_items: ctx.menu_items,
       calendar_initial_year: RenderMetadata.calendar_initial_year(post_record),
       calendar_initial_month: RenderMetadata.calendar_initial_month(post_record),
       post_categories: post_categories,
       post_tags: post_tags,
-      tag_color_by_name: RenderMetadata.tag_color_by_name(project_id),
+      tag_color_by_name: ctx.tag_color_by_name,
       backlinks: RenderMetadata.backlinks(incoming_links),
-      canonical_post_path_by_slug: canonical_post_paths,
-      canonical_media_path_by_source_path: canonical_media_paths,
-      post_data_json_by_id: post_data_json(post_assigns, post_record),
-      post: build_post_context(post_assigns, post_record, incoming_links, outgoing_links),
+      canonical_post_path_by_slug: ctx.canonical_post_paths,
+      canonical_media_path_by_source_path: ctx.canonical_media_paths,
+      post_data_json_by_id:
+        post_data_json(ctx, post_assigns, post_record, incoming_links, outgoing_links),
+      post:
+        build_post_context(ctx, post_assigns, post_record, incoming_links, outgoing_links),
       labels: Labels.for_language(language)
     }
   end
 
-  @spec load_post_record(map()) :: Post.t() | Translation.t() | nil
-  def load_post_record(assigns) do
-    case MapUtils.attr(assigns, :id) do
-      nil -> nil
-      post_id -> Repo.get(Post, post_id) || Repo.get(Translation, post_id)
-    end
+  @doc """
+  Render post markdown through the context's canonical URL maps, memoizing by
+  content, language, and post id so the same content is only rendered once per
+  full-site render (posts appear on many list/archive pages).
+  """
+  @spec cached_post_content(RenderContext.t(), term(), String.t(), term()) :: String.t()
+  def cached_post_content(%RenderContext{} = ctx, content, language, post_id \\ nil) do
+    raw = to_string(content || "")
+
+    RenderContext.memoize(
+      ctx,
+      {:rendered_markdown, :erlang.md5(raw), language, post_id},
+      fn ->
+        render_post_content(
+          raw,
+          ctx.canonical_post_paths,
+          ctx.canonical_media_paths,
+          language,
+          ctx.template_context,
+          post_id
+        )
+      end
+    )
   end
+
+  defp ctx_translations(_ctx, nil), do: []
+
+  defp ctx_translations(%RenderContext{} = ctx, %Post{id: post_id}),
+    do: Map.get(ctx.translations_by_post, post_id, [])
 
   @spec load_post_records_batch([String.t()]) :: %{String.t() => Post.t() | Translation.t() | nil}
   def load_post_records_batch([]), do: %{}
@@ -135,38 +149,35 @@ defmodule BDS.Rendering.PostRendering do
     Map.merge(posts, Map.merge(translations, nil_entries))
   end
 
-  defp canonical_post_record(%Translation{translation_for: post_id}), do: Repo.get(Post, post_id)
-  defp canonical_post_record(%Post{} = post), do: post
-  defp canonical_post_record(_other), do: nil
+  defp load_post_record(%RenderContext{} = ctx, assigns) do
+    case MapUtils.attr(assigns, :id) do
+      nil -> nil
+      post_id -> Map.get(ctx.record_by_id, post_id)
+    end
+  end
+
+  defp canonical_post_record(%RenderContext{} = ctx, %Translation{translation_for: post_id}) do
+    case Map.get(ctx.record_by_id, post_id) do
+      %Post{} = post -> post
+      _other -> nil
+    end
+  end
+
+  defp canonical_post_record(_ctx, %Post{} = post), do: post
+  defp canonical_post_record(_ctx, _other), do: nil
 
   defp canonical_post_id(%Translation{translation_for: post_id}, _assigns), do: post_id
   defp canonical_post_id(%Post{id: post_id}, _assigns), do: post_id
   defp canonical_post_id(_post_record, assigns), do: MapUtils.attr(assigns, :id)
 
-  defp post_data_json(assigns, post_record) do
+  defp post_data_json(ctx, assigns, post_record, incoming_links, outgoing_links) do
     id = MapUtils.attr(assigns, :id)
 
     if is_binary(id) do
-      incoming_links =
-        LinksAndLanguages.link_contexts(
-          Map.get(post_record || %{}, :project_id),
-          canonical_post_id(post_record, assigns),
-          :incoming,
-          Map.get(post_record || %{}, :language)
-        )
-
-      outgoing_links =
-        LinksAndLanguages.link_contexts(
-          Map.get(post_record || %{}, :project_id),
-          canonical_post_id(post_record, assigns),
-          :outgoing,
-          Map.get(post_record || %{}, :language)
-        )
-
       %{
         id =>
           post_data_json_value(
-            build_post_context(assigns, post_record, incoming_links, outgoing_links)
+            build_post_context(ctx, assigns, post_record, incoming_links, outgoing_links)
           )
       }
     else
@@ -194,7 +205,7 @@ defmodule BDS.Rendering.PostRendering do
     end
   end
 
-  defp build_post_context(assigns, post_record, incoming_links, outgoing_links) do
+  defp build_post_context(ctx, assigns, post_record, incoming_links, outgoing_links) do
     %{
       id: MapUtils.attr(assigns, :id),
       slug: MapUtils.attr(assigns, :slug),
@@ -228,7 +239,7 @@ defmodule BDS.Rendering.PostRendering do
           MapUtils.attr(assigns, :template_slug)
         ),
       do_not_translate: record_value(post_record, :do_not_translate, false),
-      linked_media: linked_media_images(assigns),
+      linked_media: linked_media_images(ctx, assigns),
       outgoing_links: outgoing_links,
       incoming_links: incoming_links
     }
@@ -260,19 +271,11 @@ defmodule BDS.Rendering.PostRendering do
     )
   end
 
-  defp linked_media_images(assigns) do
+  defp linked_media_images(%RenderContext{} = ctx, assigns) do
     post_id = MapUtils.attr(assigns, :id)
 
     if is_binary(post_id) do
-      Repo.all(
-        from pm in PostMedia,
-          join: m in MediaRecord,
-          on: pm.media_id == m.id,
-          where: pm.post_id == ^post_id,
-          where: like(m.mime_type, "image/%"),
-          order_by: [asc: pm.sort_order, asc: pm.media_id],
-          select: m
-      )
+      Map.get(ctx.linked_media_by_post, post_id, [])
     else
       []
     end

@@ -103,6 +103,13 @@ defmodule BDS.Rendering.Metadata do
           order_by: [asc: translation.language]
       )
 
+    alternate_links_from(post, translations, main_language)
+  end
+
+  @spec alternate_links_from(Post.t() | nil, [Translation.t()], String.t()) :: [map()]
+  def alternate_links_from(nil, _translations, _main_language), do: []
+
+  def alternate_links_from(%Post{} = post, translations, main_language) do
     [
       %{
         href: LinksAndLanguages.post_path(post, nil),

@@ -84,17 +84,19 @@ defmodule BDS.Rendering.LinksAndLanguages do
       end
 
     case Repo.get(Post, linked_post_id) do
-      nil ->
-        nil
-
-      linked_post ->
-        %{
-          href: post_path(linked_post, nil),
-          title: linked_post.title,
-          display_slug: linked_post.slug,
-          language: normalize_language(linked_post.language, main_language)
-        }
+      nil -> nil
+      linked_post -> link_context_for_post(linked_post, main_language)
     end
+  end
+
+  @spec link_context_for_post(map(), String.t()) :: map()
+  def link_context_for_post(linked_post, main_language) do
+    %{
+      href: post_path(linked_post, nil),
+      title: linked_post.title,
+      display_slug: linked_post.slug,
+      language: normalize_language(linked_post.language, main_language)
+    }
   end
 
   @spec language_prefix(String.t() | nil, String.t()) :: String.t()

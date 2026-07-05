@@ -5,9 +5,11 @@ defmodule BDS.Generation.Outputs do
   import BDS.Generation.Renderers
   import BDS.Generation.Sitemap, only: [render_feed: 3, render_atom: 3, render_calendar: 1]
 
+  alias BDS.Rendering.RenderContext
   alias BDS.Rendering.TemplateSelection
 
   @type output_callback :: ({String.t(), iodata()} -> any()) | nil
+  @type render_target :: RenderContext.t() | String.t()
 
   @spec additional_languages(map()) :: [String.t()]
   def additional_languages(plan) do
@@ -209,7 +211,7 @@ defmodule BDS.Generation.Outputs do
           {String.t(), iodata()}
         ]
   def build_category_outputs(plan, posts_by_category, languages, on_output \\ nil) do
-    Enum.flat_map(posts_by_category, fn {category, posts} ->
+    concurrent_flat_map(posts_by_category, fn {category, posts} ->
       paginated_posts = Enum.chunk_every(posts, max(plan.max_posts_per_page, 1))
       category_slug = archive_route_segment(category)
       total_pages = length(paginated_posts)
@@ -267,7 +269,7 @@ defmodule BDS.Generation.Outputs do
           {String.t(), iodata()}
         ]
   def build_tag_outputs(plan, posts_by_tag, languages, on_output \\ nil) do
-    Enum.flat_map(posts_by_tag, fn {tag, posts} ->
+    concurrent_flat_map(posts_by_tag, fn {tag, posts} ->
       tag_slug = archive_route_segment(tag)
 
       build_paginated_archive_outputs(
@@ -288,7 +290,7 @@ defmodule BDS.Generation.Outputs do
         ]
   def build_date_outputs(plan, post_index, languages, on_output \\ nil) do
     year_outputs =
-      Enum.flat_map(post_index.posts_by_year, fn {year, posts} ->
+      concurrent_flat_map(post_index.posts_by_year, fn {year, posts} ->
         build_paginated_archive_outputs(
           plan,
           languages,
@@ -309,7 +311,7 @@ defmodule BDS.Generation.Outputs do
       end)
 
     month_outputs =
-      Enum.flat_map(post_index.posts_by_year_month, fn {year_month, posts} ->
+      concurrent_flat_map(post_index.posts_by_year_month, fn {year_month, posts} ->
         [year, month] = String.split(year_month, "/", parts: 2)
 
         build_paginated_archive_outputs(
@@ -332,7 +334,7 @@ defmodule BDS.Generation.Outputs do
       end)
 
     day_outputs =
-      Enum.flat_map(post_index.posts_by_year_month_day, fn {year_month_day, posts} ->
+      concurrent_flat_map(post_index.posts_by_year_month_day, fn {year_month_day, posts} ->
         [year, month, day] = String.split(year_month_day, "/", parts: 3)
 
         build_paginated_archive_outputs(
@@ -366,7 +368,7 @@ defmodule BDS.Generation.Outputs do
   def build_core_outputs(plan, published_posts, localized_posts_by_language, on_output \\ nil) do
     language = plan.language
     additional_languages = Enum.reject(plan.blog_languages, &(&1 == language))
-    main_posts = build_list_posts(plan.base_url, published_posts, nil)
+    main_posts = build_list_posts(plan, published_posts, nil)
 
     main_static_outputs =
       [
@@ -384,7 +386,7 @@ defmodule BDS.Generation.Outputs do
         localized_source_posts = Map.get(localized_posts_by_language, localized_language, [])
 
         localized_posts =
-          build_list_posts(plan.base_url, localized_source_posts, localized_prefix)
+          build_list_posts(plan, localized_source_posts, localized_prefix)
 
         # `build_root_outputs` is called without `on_output` here because the
         # combined list (roots + static files) is reported exactly once by the
@@ -404,11 +406,12 @@ defmodule BDS.Generation.Outputs do
       end)
   end
 
-  @spec build_page_outputs(String.t(), String.t(), [map()], map(), map(), output_callback()) :: [
-          {String.t(), iodata()}
-        ]
+  @spec build_page_outputs(render_target(), String.t(), [map()], map(), map(), output_callback()) ::
+          [
+            {String.t(), iodata()}
+          ]
   def build_page_outputs(
-        project_id,
+        render_target,
         main_language,
         published_posts,
         translations_by_post_language,
@@ -418,17 +421,17 @@ defmodule BDS.Generation.Outputs do
     page_outputs =
       published_posts
       |> Enum.filter(&("page" in (&1.categories || [])))
-      |> Enum.map(fn post ->
+      |> concurrent_map(fn post ->
         canonical_variant = Map.get(translations_by_post_language, {post.id, main_language}, post)
         render_language = effective_render_language(canonical_variant.language, main_language)
-        body = load_body(project_id, canonical_variant.file_path, canonical_variant.content)
+        body = load_body(render_target, canonical_variant.file_path, canonical_variant.content)
 
-        effective_slug = effective_template_slug(project_id, post)
+        effective_slug = effective_template_slug(render_target, post)
 
         output =
           {page_output_path(post.slug, nil),
            render_post_output(
-             project_id,
+             render_target,
              effective_slug,
              %{
                id: canonical_variant.id,
@@ -457,16 +460,16 @@ defmodule BDS.Generation.Outputs do
       |> Enum.flat_map(fn {language, posts} ->
         posts
         |> Enum.filter(&("page" in (&1.categories || [])))
-        |> Enum.map(fn post ->
+        |> concurrent_map(fn post ->
           render_language = effective_render_language(post.language, language)
-          body = load_body(project_id, post.file_path, post.content)
+          body = load_body(render_target, post.file_path, post.content)
 
-          effective_slug = effective_template_slug(project_id, post)
+          effective_slug = effective_template_slug(render_target, post)
 
           output =
             {page_output_path(post.slug, language),
              render_post_output(
-               project_id,
+               render_target,
                effective_slug,
                %{
                  id: post.id,
@@ -497,7 +500,7 @@ defmodule BDS.Generation.Outputs do
     posts
     |> paginate_posts(plan.max_posts_per_page)
     |> Enum.with_index(1)
-    |> Enum.map(fn {page_posts, page_number} ->
+    |> concurrent_map(fn {page_posts, page_number} ->
       route_language = route_language(plan.language, language)
 
       output =
@@ -570,12 +573,12 @@ defmodule BDS.Generation.Outputs do
     end)
   end
 
-  @spec build_single_outputs(String.t(), String.t(), [map()], map(), map(), output_callback()) ::
+  @spec build_single_outputs(render_target(), String.t(), [map()], map(), map(), output_callback()) ::
           [
             {String.t(), iodata()}
           ]
   def build_single_outputs(
-        project_id,
+        render_target,
         main_language,
         published_posts,
         translations_by_post_language,
@@ -583,17 +586,17 @@ defmodule BDS.Generation.Outputs do
         on_output \\ nil
       ) do
     post_outputs =
-      Enum.map(published_posts, fn post ->
+      concurrent_map(published_posts, fn post ->
         canonical_variant = Map.get(translations_by_post_language, {post.id, main_language}, post)
         render_language = effective_render_language(canonical_variant.language, main_language)
-        body = load_body(project_id, canonical_variant.file_path, canonical_variant.content)
+        body = load_body(render_target, canonical_variant.file_path, canonical_variant.content)
 
-        effective_slug = effective_template_slug(project_id, post)
+        effective_slug = effective_template_slug(render_target, post)
 
         output =
           {post_output_path(post),
            render_post_output(
-             project_id,
+             render_target,
              effective_slug,
              %{
                id: canonical_variant.id,
@@ -620,16 +623,16 @@ defmodule BDS.Generation.Outputs do
     translation_outputs =
       localized_posts_by_language
       |> Enum.flat_map(fn {language, posts} ->
-        Enum.map(posts, fn post ->
+        concurrent_map(posts, fn post ->
           render_language = effective_render_language(post.language, language)
-          body = load_body(project_id, post.file_path, post.content)
+          body = load_body(render_target, post.file_path, post.content)
 
-          effective_slug = effective_template_slug(project_id, post)
+          effective_slug = effective_template_slug(render_target, post)
 
           output =
             {post_output_path(post, language),
              render_post_output(
-               project_id,
+               render_target,
                effective_slug,
                %{
                  id: post.id,
@@ -650,14 +653,14 @@ defmodule BDS.Generation.Outputs do
     post_outputs ++ translation_outputs
   end
 
-  defp effective_template_slug(project_id, post) do
+  defp effective_template_slug(render_target, post) do
     slug = Map.get(post, :template_slug)
 
     if is_binary(slug) and slug != "" do
       slug
     else
       TemplateSelection.resolve_post_template_slug(
-        project_id,
+        render_target,
         Map.get(post, :tags) || [],
         Map.get(post, :categories) || []
       )
@@ -681,5 +684,24 @@ defmodule BDS.Generation.Outputs do
   defp report_output(output, on_output) when is_function(on_output, 1) do
     on_output.(output)
     output
+  end
+
+  # Render pages on all cores, like the old app's worker threads — safe because
+  # the render context is immutable data and the output callback only touches
+  # cross-process-safe state (file writes, ETS, counters). Order is preserved.
+  defp concurrent_map(enum, fun) do
+    enum
+    |> Task.async_stream(fun,
+      timeout: :infinity,
+      max_concurrency: System.schedulers_online(),
+      ordered: true
+    )
+    |> Enum.map(fn {:ok, value} -> value end)
+  end
+
+  defp concurrent_flat_map(enum, fun) do
+    enum
+    |> concurrent_map(fun)
+    |> Enum.concat()
   end
 end

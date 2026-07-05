@@ -4,6 +4,7 @@ defmodule BDS.Generation.Renderers do
   alias BDS.Generation.Paths
   alias BDS.Projects
   alias BDS.Rendering
+  alias BDS.Rendering.RenderContext
 
   @doc "Render the home page (HTML) using the project's template engine."
   @spec render_home(map(), String.t() | nil) :: String.t()
@@ -80,7 +81,7 @@ defmodule BDS.Generation.Renderers do
       plan,
       language,
       label,
-      build_list_posts(plan.base_url, posts, Paths.route_language(plan.language, language)),
+      build_list_posts(plan, posts, Paths.route_language(plan.language, language)),
       archive_context,
       pagination,
       fallback
@@ -88,9 +89,13 @@ defmodule BDS.Generation.Renderers do
   end
 
   @doc "Try the project's post template; on error, fall back to the inline `fallback` thunk."
-  @spec render_post_output(String.t(), String.t() | nil, map(), (-> String.t())) :: String.t()
-  def render_post_output(project_id, template_slug, assigns, fallback) do
-    render_with_fallback(fn -> Rendering.render_post_page(project_id, template_slug, assigns) end, fallback)
+  @spec render_post_output(RenderContext.t() | String.t(), String.t() | nil, map(), (-> String.t())) ::
+          String.t()
+  def render_post_output(render_target, template_slug, assigns, fallback) do
+    render_with_fallback(
+      fn -> Rendering.render_post_page(render_target, template_slug, assigns) end,
+      fallback
+    )
   end
 
   @doc "Render a list/archive page through the project template, falling back to inline."
@@ -105,7 +110,7 @@ defmodule BDS.Generation.Renderers do
         ) ::
           String.t()
   def render_list_output(
-        %{project_id: project_id, language: main_language},
+        %{project_id: project_id, language: main_language} = plan,
         language,
         page_title,
         posts,
@@ -116,7 +121,7 @@ defmodule BDS.Generation.Renderers do
       when is_binary(project_id) do
     render_with_fallback(
       fn ->
-        Rendering.render_list_page(project_id, %{
+        Rendering.render_list_page(plan_render_target(plan), %{
           language: language,
           language_prefix: Paths.language_prefix(language, main_language),
           page_title: page_title,
@@ -131,17 +136,29 @@ defmodule BDS.Generation.Renderers do
 
   @doc "Render the project's 404 page via its template, falling back to a static page."
   @spec render_not_found_output(map(), String.t() | nil) :: String.t()
-  def render_not_found_output(%{project_id: project_id, language: main_language}, language)
+  def render_not_found_output(
+        %{project_id: project_id, language: main_language} = plan,
+        language
+      )
       when is_binary(project_id) do
     render_with_fallback(
       fn ->
-        Rendering.render_not_found_page(project_id, %{
+        Rendering.render_not_found_page(plan_render_target(plan), %{
           language: language,
           language_prefix: Paths.language_prefix(language, main_language)
         })
       end,
       fn -> render_not_found_page(language) end
     )
+  end
+
+  @doc "The render context stashed in the plan, or the bare project id when absent."
+  @spec plan_render_target(map()) :: RenderContext.t() | String.t()
+  def plan_render_target(plan) do
+    case Map.get(plan, :render_context) do
+      %RenderContext{} = ctx -> ctx
+      _other -> plan.project_id
+    end
   end
 
   @doc "Static fallback HTML for a 404 page."
@@ -156,41 +173,49 @@ defmodule BDS.Generation.Renderers do
   end
 
   @doc "Build the list-of-posts payload (with hrefs and bodies) for archive/list templates."
-  @spec build_list_posts(String.t() | nil, [map()], String.t() | nil) :: [map()]
-  def build_list_posts(base_url, posts, language_prefix) do
+  @spec build_list_posts(map(), [map()], String.t() | nil) :: [map()]
+  def build_list_posts(plan, posts, language_prefix) do
+    render_target = plan_render_target(plan)
+
     Enum.map(posts, fn post ->
       %{
         id: post.id,
         slug: post.slug,
         title: post.title,
-        href: Paths.url_for_output(base_url, Paths.post_output_path(post, language_prefix)),
+        href: Paths.url_for_output(plan.base_url, Paths.post_output_path(post, language_prefix)),
         excerpt: post.excerpt,
-        content: load_body(post.project_id, post.file_path, post.content)
+        content: load_body(render_target, post.file_path, post.content)
       }
     end)
   end
 
   @doc "Load the post body from disk (or pass-through inline content) for list rendering."
-  @spec load_body(String.t() | nil, String.t() | nil, String.t() | nil) :: String.t()
-  def load_body(_project_id, _file_path, inline_content) when is_binary(inline_content),
+  @spec load_body(RenderContext.t() | String.t() | nil, String.t() | nil, String.t() | nil) ::
+          String.t()
+  def load_body(_render_target, _file_path, inline_content) when is_binary(inline_content),
     do: inline_content
 
-  def load_body(project_id, file_path, _inline_content) do
-    case file_path do
-      nil ->
-        ""
+  def load_body(%RenderContext{} = ctx, file_path, _inline_content)
+      when is_binary(file_path) and file_path != "" do
+    RenderContext.memoize(ctx, {:post_body, file_path}, fn ->
+      read_body_file(Path.expand(file_path, ctx.project_data_dir))
+    end)
+  end
 
-      "" ->
-        ""
+  def load_body(project_id, file_path, _inline_content)
+      when is_binary(project_id) and is_binary(file_path) and file_path != "" do
+    project_id
+    |> Projects.get_project!()
+    |> Projects.project_data_dir()
+    |> then(&read_body_file(Path.expand(file_path, &1)))
+  end
 
-      value ->
-        project_path =
-          Path.expand(value, Projects.project_data_dir(Projects.get_project!(project_id)))
+  def load_body(_render_target, _file_path, _inline_content), do: ""
 
-        case File.read(project_path) do
-          {:ok, contents} -> parse_frontmatter_body(contents)
-          {:error, _reason} -> ""
-        end
+  defp read_body_file(full_path) do
+    case File.read(full_path) do
+      {:ok, contents} -> parse_frontmatter_body(contents)
+      {:error, _reason} -> ""
     end
   end
 
