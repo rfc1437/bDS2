@@ -181,7 +181,7 @@ defmodule BDS.Publishing do
          ssh_auth_sock
        ) do
     args =
-      ["--update", "--compress", "--verbose"] ++
+      ["--update", "--compress", "--verbose", "--recursive", "--times"] ++
         rsync_excludes(target) ++
         [
           "-e",
@@ -198,22 +198,36 @@ defmodule BDS.Publishing do
       files_to_upload =
         filter_scp_uploads(project_id, credentials, target.kind, files_with_mtimes)
 
-      case upload_scp_files(
-             project_id,
-             target,
-             credentials,
-             runner,
-             ssh_auth_sock,
-             files_to_upload,
-             []
-           ) do
-        {:ok, uploaded_files} ->
-          persist_uploaded_scp_files(project_id, credentials, target.kind, uploaded_files)
-          :ok
-
-        {:error, reason} ->
-          {:error, reason}
+      with :ok <-
+             ensure_remote_dirs(target, credentials, runner, ssh_auth_sock, files_to_upload) do
+        do_upload_scp_files(
+          project_id,
+          target,
+          credentials,
+          runner,
+          ssh_auth_sock,
+          files_to_upload
+        )
       end
+    end
+  end
+
+  defp do_upload_scp_files(project_id, target, credentials, runner, ssh_auth_sock, files_to_upload) do
+    case upload_scp_files(
+           project_id,
+           target,
+           credentials,
+           runner,
+           ssh_auth_sock,
+           files_to_upload,
+           []
+         ) do
+      {:ok, uploaded_files} ->
+        persist_uploaded_scp_files(project_id, credentials, target.kind, uploaded_files)
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -300,6 +314,25 @@ defmodule BDS.Publishing do
         persist_uploaded_scp_files(project_id, credentials, target.kind, uploaded_files)
         {:error, reason}
     end
+  end
+
+  # scp does not create missing remote directories, so create them up front.
+  defp ensure_remote_dirs(_target, _credentials, _runner, _ssh_auth_sock, []), do: :ok
+
+  defp ensure_remote_dirs(target, credentials, runner, ssh_auth_sock, files_to_upload) do
+    remote_dirs =
+      files_to_upload
+      |> Enum.map(fn {relative_path, _local_mtime} ->
+        target.remote_dir |> Path.join(relative_path) |> Path.dirname()
+      end)
+      |> Enum.uniq()
+
+    run_command(
+      runner,
+      "ssh",
+      [remote_base(credentials), "mkdir", "-p" | remote_dirs],
+      ssh_auth_sock
+    )
   end
 
   defp collect_file_mtimes(local_dir, files) do

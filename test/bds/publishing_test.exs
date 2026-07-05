@@ -99,6 +99,8 @@ defmodule BDS.PublishingTest do
              "--update",
              "--compress",
              "--verbose",
+             "--recursive",
+             "--times",
              "-e",
              "ssh",
              Path.join([temp_dir, "html"]) <> "/",
@@ -113,6 +115,8 @@ defmodule BDS.PublishingTest do
              "--update",
              "--compress",
              "--verbose",
+             "--recursive",
+             "--times",
              "-e",
              "ssh",
              Path.join([temp_dir, "thumbnails"]) <> "/",
@@ -125,6 +129,8 @@ defmodule BDS.PublishingTest do
              "--update",
              "--compress",
              "--verbose",
+             "--recursive",
+             "--times",
              "--exclude=*.meta",
              "-e",
              "ssh",
@@ -174,6 +180,10 @@ defmodule BDS.PublishingTest do
 
     failed_job = wait_for_publish_job(job.id, &(&1.status == :failed))
     assert failed_job.error =~ "thumbnail failure"
+
+    assert_receive {:command_run, "ssh",
+                    ["deploy@example.com", "mkdir", "-p", "/srv/blog", "/srv/blog/posts"],
+                    _mkdir_opts}
 
     assert_receive {:command_run, "scp",
                     ["-q", ^html_index, "deploy@example.com:/srv/blog/index.html"], opts_a}
@@ -254,7 +264,7 @@ defmodule BDS.PublishingTest do
 
     assert wait_for_publish_job(first_job.id, &(&1.status == :completed)).status == :completed
     first_uploads = collect_command_runs()
-    assert length(first_uploads) == 3
+    assert Enum.count(first_uploads, fn {command, _args} -> command == "scp" end) == 3
 
     assert {:ok, second_job} =
              BDS.Publishing.upload_site(project.id, credentials,
@@ -275,8 +285,9 @@ defmodule BDS.PublishingTest do
 
     assert wait_for_publish_job(third_job.id, &(&1.status == :completed)).status == :completed
 
-    assert [html_upload] = collect_command_runs()
-    assert elem(html_upload, 0) == "scp"
+    third_uploads = collect_command_runs()
+
+    assert [html_upload] = Enum.filter(third_uploads, fn {command, _args} -> command == "scp" end)
     assert elem(html_upload, 1) == ["-q", html_index, "deploy@example.com:/srv/blog/index.html"]
   end
 
