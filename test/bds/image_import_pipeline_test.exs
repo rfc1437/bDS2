@@ -207,12 +207,12 @@ defmodule BDS.ImageImportPipelineTest do
         "subtitle" => "draft"
       })
 
-      html =
-        view
-        |> element("[phx-click='add_gallery_images']")
-        |> render_click()
+      view
+      |> element("[phx-click='add_gallery_images']")
+      |> render_click()
 
-      assert html =~ "Automatic AI actions stay gated by airplane mode"
+      output_html = render_click(view, "select_panel_tab", %{"tab" => "output"})
+      assert output_html =~ "Automatic AI actions stay gated by airplane mode"
 
       assert :ok = AI.set_airplane_mode(false)
     end

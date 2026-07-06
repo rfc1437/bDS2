@@ -3311,7 +3311,9 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> render_click()
 
     refute html =~ "ai-suggestions-modal"
-    assert html =~ "Automatic AI actions stay gated by airplane mode"
+
+    output_html = render_click(view, "select_panel_tab", %{"tab" => "output"})
+    assert output_html =~ "Automatic AI actions stay gated by airplane mode"
   end
 
   test "ai suggestions overlay fetches async results for posts when online", %{project: project} do
@@ -3482,7 +3484,9 @@ defmodule BDS.Desktop.ShellLiveTest do
       |> render_click()
 
     refute html =~ "ai-suggestions-modal"
-    assert html =~ "Automatic AI actions stay gated by airplane mode"
+
+    output_html = render_click(view, "select_panel_tab", %{"tab" => "output"})
+    assert output_html =~ "Automatic AI actions stay gated by airplane mode"
   end
 
   test "ai suggestions overlay uses the local model in airplane mode for media", %{
