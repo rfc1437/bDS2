@@ -85,7 +85,7 @@
       <button class="secondary ui-button ui-button-secondary" type="button" phx-click="replace_media_editor_file" phx-target={@myself}>
         <%= dgettext("ui", "Replace File") %>
       </button>
-      <button class="ui-button ui-button-primary" data-testid="media-save-button" type="button" phx-click="save_media_editor" phx-target={@myself}>
+      <button class="primary ui-button ui-button-primary" data-testid="media-save-button" type="button" phx-click="save_media_editor" phx-target={@myself}>
         <%= dgettext("ui", "Save") %>
       </button>
       <button
@@ -211,7 +211,7 @@
       <div class="editor-field linked-posts-section flex flex-col gap-2">
         <label>
           <%= dgettext("ui", "Linked Posts") %>
-          <button class="add-link-btn" type="button" phx-click="toggle_media_post_picker" phx-target={@myself}>
+          <button class="add-link-btn secondary compact ui-button ui-button-secondary ui-button-compact" type="button" phx-click="toggle_media_post_picker" phx-target={@myself}>
             <%= dgettext("ui", "Link to Post") %>
           </button>
         </label>
@@ -296,7 +296,7 @@
         </form>
         <div class="translation-modal-footer flex items-center justify-end gap-2">
           <button class="secondary ui-button ui-button-secondary" type="button" phx-click="close_media_translation_editor" phx-target={@myself}><%= dgettext("ui", "Cancel") %></button>
-          <button class="ui-button ui-button-primary" type="button" phx-click="save_media_translation" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
+          <button class="primary ui-button ui-button-primary" type="button" phx-click="save_media_translation" phx-target={@myself}><%= dgettext("ui", "Save") %></button>
         </div>
       </div>
     </div>

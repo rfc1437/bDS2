@@ -148,7 +148,6 @@
   gap: 2px;
 }
 
-.assistant-card span,
 .panel-entry span,
 .editor-meta-row span,
 .editor-subtitle,
@@ -777,8 +776,8 @@
 }
 
 .filter-chip.active {
-  background-color: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background-color: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
 }
 
 .filter-chip.has-color {

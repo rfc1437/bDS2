@@ -94,7 +94,7 @@ defmodule BDS.Desktop.ImportShellLiveTest do
     assert html =~ "https://legacy.example"
     assert html =~ ~s(class="import-stat-cards")
     assert html =~ "Macros (1)"
-    assert html =~ ~s(class="import-execute-btn")
+    assert html =~ ~s(class="import-execute-btn primary ui-button ui-button-primary")
 
     _html =
       view

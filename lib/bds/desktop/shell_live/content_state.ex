@@ -74,7 +74,6 @@ defmodule BDS.Desktop.ShellLive.ContentState do
     |> assign(:tab_meta, tab_meta)
     |> assign(:task_status, task_status)
     |> assign(:offline_mode, offline_mode)
-    |> assign(:assistant_cards, ShellData.assistant_cards())
     |> assign(:supported_ui_languages, ShellData.supported_ui_languages())
     |> assign(:menu_groups, socket.assigns[:menu_groups] || TitlebarMenu.groups())
     |> assign(:titlebar_menu_item_index, socket.assigns[:titlebar_menu_item_index])

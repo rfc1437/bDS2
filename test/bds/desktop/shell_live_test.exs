@@ -446,8 +446,10 @@ defmodule BDS.Desktop.ShellLiveTest do
 
     assert shell_html =~ ~s(class="assistant-sidebar-context flex shrink-0 flex-col gap-2")
     assert shell_html =~ ~s(class="assistant-sidebar-prompt min-h-[8rem] w-full resize-y")
-    assert shell_html =~ ~s(class="assistant-sidebar-start-button ui-button ui-button-primary")
-    assert shell_html =~ ~s(class="assistant-sidebar-welcome min-h-0 flex-1 overflow-auto")
+    assert shell_html =~
+             ~s(class="assistant-sidebar-start-button primary ui-button ui-button-primary")
+    refute shell_html =~ "assistant-sidebar-welcome"
+    refute shell_html =~ "assistant-card"
 
     assert media_html =~
              "class=\"editor-content media-editor grid min-h-0 flex-1 gap-4 overflow-auto p-4 xl:grid-cols-[minmax(320px,1fr)_minmax(0,1.2fr)]\""

@@ -14,8 +14,7 @@
 
 .editor-main,
 .editor-meta,
-.panel-shell,
-.assistant-card {
+.panel-shell {
   min-width: 0;
 }
 
@@ -750,8 +749,7 @@
 }
 
 .post-editor .editor-toolbar {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
@@ -759,23 +757,27 @@
 
 .post-editor .editor-toolbar-left {
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   justify-content: flex-start;
 }
 
 .post-editor .editor-toolbar-center {
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
 }
 
+/* ponytail: right group keeps its content width so buttons never wrap or
+   overlap the mode toggle; the left label shrinks instead */
 .post-editor .editor-toolbar-right {
   display: flex;
+  flex: 1 0 auto;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  min-width: 0;
-  flex-wrap: wrap;
 }
 
 .post-editor .editor-mode-toggle {
@@ -815,38 +817,6 @@
 
 .post-editor .editor-excerpt-panel.is-collapsed {
   display: none;
-}
-
-.post-editor .gallery-button {
-  padding: 4px 12px;
-  font-size: 12px;
-  border-radius: 4px;
-  background-color: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.post-editor .gallery-button:hover {
-  background-color: var(--vscode-button-secondaryHoverBackground);
-}
-
-.post-editor .insert-post-link-button,
-.post-editor .insert-media-button {
-  padding: 4px 8px;
-  font-size: 14px;
-  border-radius: 4px;
-  background-color: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.post-editor .insert-post-link-button:hover,
-.post-editor .insert-media-button:hover {
-  background-color: var(--vscode-button-secondaryHoverBackground);
 }
 
 .post-editor .editor-preview {
@@ -937,8 +907,7 @@
   .post-editor .editor-header,
   .scripts-view-shell .ui-editor-header,
   .templates-view-shell .ui-editor-header,
-  .post-editor .metadata-toggle-header,
-  .post-editor .editor-toolbar {
+  .post-editor .metadata-toggle-header {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -954,7 +923,6 @@
     width: 100%;
   }
 
-  .post-editor .editor-toolbar-right,
   .post-editor .ui-editor-actions,
   .scripts-view-shell .ui-editor-actions,
   .templates-view-shell .ui-editor-actions {

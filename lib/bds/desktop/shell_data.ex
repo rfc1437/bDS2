@@ -91,24 +91,6 @@ defmodule BDS.Desktop.ShellData do
     end
   end
 
-  def assistant_cards do
-    [
-      %{
-        label: dgettext("ui", "Offline Gate"),
-        text: dgettext("ui", "Automatic AI actions stay gated by airplane mode.")
-      },
-      %{
-        label: dgettext("ui", "Filesystem Sync"),
-        text:
-          dgettext("ui", "Metadata flush, diffing, and rebuild hooks still need editor wiring.")
-      },
-      %{
-        label: dgettext("ui", "Desktop Runtime"),
-        text: dgettext("ui", "The app window is now served from LiveView state.")
-      }
-    ]
-  end
-
   def editor_meta(task_status) do
     [
       %{

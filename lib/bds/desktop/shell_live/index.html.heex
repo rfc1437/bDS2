@@ -531,7 +531,7 @@
             ><%= @assistant_prompt %></textarea>
 
             <button
-              class="assistant-sidebar-start-button ui-button ui-button-primary"
+              class="assistant-sidebar-start-button primary ui-button ui-button-primary"
               data-testid="assistant-start-button"
               type="submit"
               disabled={String.trim(@assistant_prompt || "") == ""}
@@ -540,16 +540,7 @@
             </button>
           </form>
 
-          <%= if Enum.empty?(@assistant_messages) do %>
-            <div class="assistant-sidebar-welcome min-h-0 flex-1 overflow-auto">
-              <%= for card <- @assistant_cards do %>
-                <section class="assistant-card flex flex-col gap-1">
-                  <strong><%= card.label %></strong>
-                  <span><%= card.text %></span>
-                </section>
-              <% end %>
-            </div>
-          <% else %>
+          <%= unless Enum.empty?(@assistant_messages) do %>
             <div class="assistant-sidebar-transcript min-h-0 flex-1 overflow-auto">
               <%= for message <- @assistant_messages do %>
                 <article

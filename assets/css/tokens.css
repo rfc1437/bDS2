@@ -37,6 +37,9 @@
   --vscode-editorGroupHeader-tabsBorder: #1e1e1e;
   --vscode-toolbar-hoverBackground: rgba(90, 93, 94, 0.31);
   --vscode-toolbar-activeBackground: rgba(99, 102, 103, 0.31);
+  --vscode-button-secondaryBackground: rgba(255, 255, 255, 0.08);
+  --vscode-button-secondaryForeground: #cccccc;
+  --vscode-button-secondaryHoverBackground: #4a4d51;
   --vscode-foreground: #cccccc;
   --vscode-descriptionForeground: #858585;
   --vscode-panel-border: #80808059;
@@ -130,12 +133,13 @@ button.compact {
 }
 
 button.primary {
-  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground, #ffffff);
+  background-color: var(--vscode-button-background, #0e639c);
   font-weight: 500;
 }
 
 button.primary:hover {
-  background-color: var(--vscode-button-hoverBackground);
+  background-color: var(--vscode-button-hoverBackground, #1177bb);
 }
 
 button.success {

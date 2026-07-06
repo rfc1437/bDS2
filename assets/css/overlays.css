@@ -257,8 +257,7 @@
 }
 
 .ai-suggestions-modal-footer,
-.confirm-delete-modal-footer,
-.confirm-dialog-actions {
+.confirm-delete-modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -266,40 +265,10 @@
   border-top: 1px solid #3c3c3c;
 }
 
-.button-cancel,
-.button-delete,
-.button-apply,
-.confirm-dialog-actions button,
-.insert-modal-submit,
 .language-picker-row,
 .shared-popover-entry,
 .colour-swatch {
   cursor: pointer;
-}
-
-.button-cancel,
-.confirm-dialog-actions button,
-.insert-modal-submit {
-  border: 1px solid #4c4c4c;
-  border-radius: 4px;
-  padding: 8px 14px;
-  background: transparent;
-  color: #f0f0f0;
-}
-
-.button-apply,
-.confirm-dialog-actions .primary,
-.insert-modal-submit {
-  background: #0e639c;
-  border-color: #0e639c;
-}
-
-.button-delete {
-  border: none;
-  border-radius: 4px;
-  padding: 8px 14px;
-  background: #c73c3c;
-  color: #ffffff;
 }
 
 .insert-modal-tabs {

@@ -116,7 +116,6 @@
 }
 
 .assistant-sidebar-prompt-form,
-.assistant-sidebar-welcome,
 .assistant-sidebar-transcript {
   display: flex;
   flex-direction: column;
@@ -142,12 +141,6 @@
 
 .assistant-sidebar-start-button {
   align-self: flex-start;
-  border: 1px solid var(--vscode-button-border, transparent);
-  border-radius: 999px;
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  padding: 7px 14px;
-  cursor: pointer;
 }
 
 .assistant-sidebar-start-button:disabled {
@@ -155,7 +148,6 @@
   opacity: 0.55;
 }
 
-.assistant-card,
 .assistant-sidebar-message {
   display: flex;
   flex-direction: column;

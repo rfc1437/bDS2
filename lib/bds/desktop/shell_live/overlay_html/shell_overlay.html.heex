@@ -39,8 +39,8 @@
             </div>
           </div>
           <div class="ai-suggestions-modal-footer">
-            <button class="button-cancel" type="button" phx-click="close_overlay"><%= dgettext("ui", "Cancel") %></button>
-            <button class="button-apply" type="button" phx-click="overlay_confirm"><%= dgettext("ui", "Apply Selected") %></button>
+            <button class="button-cancel secondary ui-button ui-button-secondary" type="button" phx-click="close_overlay"><%= dgettext("ui", "Cancel") %></button>
+            <button class="button-apply primary ui-button ui-button-primary" type="button" phx-click="overlay_confirm"><%= dgettext("ui", "Apply Selected") %></button>
           </div>
         </div>
       </div>
@@ -82,7 +82,7 @@
                 <span class="insert-modal-label"><%= dgettext("ui", "Display Text") %></span>
                 <input class="insert-modal-input" type="text" name="overlay[text]" value={@shell_overlay.external_text} />
               </label>
-              <button class="insert-modal-submit" type="button" phx-click="overlay_insert_external"><%= dgettext("ui", "Insert") %></button>
+              <button class="insert-modal-submit primary ui-button ui-button-primary" type="button" phx-click="overlay_insert_external"><%= dgettext("ui", "Insert") %></button>
             </form>
           <% end %>
         </div>
@@ -162,8 +162,8 @@
             <% end %>
           </div>
           <div class="confirm-delete-modal-footer">
-            <button class="button-cancel" type="button" phx-click="close_overlay"><%= dgettext("ui", "Cancel") %></button>
-            <button class="button-delete" type="button" phx-click="overlay_confirm"><%= dgettext("ui", "Delete") %></button>
+            <button class="button-cancel secondary ui-button ui-button-secondary" type="button" phx-click="close_overlay"><%= dgettext("ui", "Cancel") %></button>
+            <button class="button-delete danger ui-button ui-button-danger" type="button" phx-click="overlay_confirm"><%= dgettext("ui", "Delete") %></button>
           </div>
         </div>
       </div>
@@ -180,8 +180,8 @@
             <div class="confirm-delete-message"><%= @shell_overlay.message %></div>
           </div>
           <div class="confirm-delete-modal-footer">
-            <button class="button-cancel" type="button" phx-click="close_overlay"><%= dgettext("ui", "Cancel") %></button>
-            <button class="button-apply" type="button" phx-click="overlay_confirm"><%= dgettext("ui", "Confirm") %></button>
+            <button class="button-cancel secondary ui-button ui-button-secondary" type="button" phx-click="close_overlay"><%= dgettext("ui", "Cancel") %></button>
+            <button class="button-apply primary ui-button ui-button-primary" type="button" phx-click="overlay_confirm"><%= dgettext("ui", "Confirm") %></button>
           </div>
         </div>
       </div>

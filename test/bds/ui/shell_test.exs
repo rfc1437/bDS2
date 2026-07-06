@@ -642,7 +642,9 @@ defmodule BDS.UI.ShellTest do
     assert css =~ "resize: vertical;"
     assert css =~ ".linked-posts-section label {"
     assert css =~ "justify-content: space-between;"
-    assert css =~ ".add-link-btn {"
+    assert template =~
+             ~s(class="add-link-btn secondary compact ui-button ui-button-secondary ui-button-compact")
+
     assert css =~ "font-size: 11px;"
     assert css =~ ".post-picker {"
     assert css =~ "max-height: 250px;"

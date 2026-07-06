@@ -840,7 +840,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           <div class={["import-file-path", if(blank?(@import_editor.uploads_folder_path), do: "placeholder")]}>
             <%= @import_editor.uploads_folder_path || dgettext("ui", "No folder selected") %>
           </div>
-          <button type="button" phx-click="select_import_uploads_folder" phx-target={@myself}><%= dgettext("ui", "Open") %></button>
+          <button class="secondary ui-button ui-button-secondary" type="button" phx-click="select_import_uploads_folder" phx-target={@myself}><%= dgettext("ui", "Open") %></button>
         </div>
 
         <div class="import-file-row">
@@ -848,7 +848,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
           <div class={["import-file-path", if(blank?(@import_editor.wxr_file_path), do: "placeholder")]}>
             <%= @import_editor.wxr_file_path || dgettext("ui", "Select a file to analyze") %>
           </div>
-          <button class="import-analyze-btn" type="button" phx-click="select_import_wxr_file" phx-target={@myself}><%= dgettext("ui", "Select & Analyze") %></button>
+          <button class="import-analyze-btn primary ui-button ui-button-primary" type="button" phx-click="select_import_wxr_file" phx-target={@myself}><%= dgettext("ui", "Select & Analyze") %></button>
         </div>
       </div>
 
@@ -944,7 +944,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
               <%= if @counts.pages > 0 do %><span class="import-count-tag"><%= @counts.pages %> <%= dgettext("ui", "pages") %></span><% end %>
             </div>
 
-            <button class="import-execute-btn" type="button" phx-click="execute_import_editor" phx-target={@myself} disabled={@counts.total == 0}>
+            <button class="import-execute-btn primary ui-button ui-button-primary" type="button" phx-click="execute_import_editor" phx-target={@myself} disabled={@counts.total == 0}>
               <%= if @counts.total == 0 do %>
                 <%= dgettext("ui", "Nothing to Import") %>
               <% else %>
@@ -1000,7 +1000,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
             <%= if @sections.taxonomy do %>
               <div class="taxonomy-analyze-row">
                 <div class="taxonomy-analyze-dropdown">
-                  <button class="taxonomy-analyze-btn" type="button" phx-click="toggle_import_ai_model_selector" phx-target={@myself}><%= dgettext("ui", "Analyze with...") %></button>
+                  <button class="taxonomy-analyze-btn secondary ui-button ui-button-secondary" type="button" phx-click="toggle_import_ai_model_selector" phx-target={@myself}><%= dgettext("ui", "Analyze with...") %></button>
                   <%= if @import_editor.model_selector_open? do %>
                     <div class="taxonomy-model-dropdown">
                       <%= for model <- @import_editor.available_models do %>
@@ -1012,7 +1012,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                   <% end %>
                 </div>
 
-                <button class="taxonomy-analyze-btn" type="button" phx-click="analyze_import_taxonomy_ai" phx-target={@myself} disabled={Enum.empty?(@import_editor.available_models) and not @import_editor.offline?}>
+                <button class="taxonomy-analyze-btn secondary ui-button ui-button-secondary" type="button" phx-click="analyze_import_taxonomy_ai" phx-target={@myself} disabled={Enum.empty?(@import_editor.available_models) and not @import_editor.offline?}>
                   <%= @import_editor.selected_model_label %>
                 </button>
 
@@ -1362,7 +1362,7 @@ defmodule BDS.Desktop.ShellLive.ImportEditor do
                 list={"taxonomy-suggestions-#{@type}"}
                 autocomplete="off"
               />
-              <button class="taxonomy-edit-btn" type="submit" title={dgettext("ui", "Map to...")}>✓</button>
+              <button class="taxonomy-edit-btn secondary" type="submit" title={dgettext("ui", "Map to...")}>✓</button>
               <button class="taxonomy-edit-btn ghost" type="button" phx-click="cancel_import_taxonomy_edit" phx-target={@myself} title={dgettext("ui", "Cancel")}>×</button>
               <%= if present?(item.mapped_to) do %>
                 <button class="taxonomy-clear-btn" type="button" phx-click="clear_import_taxonomy_mapping" phx-target={@myself} phx-value-type={@type} phx-value-name={item.name} title={dgettext("ui", "Clear mapping")}>×</button>

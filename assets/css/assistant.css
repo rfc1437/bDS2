@@ -646,12 +646,6 @@
   max-width: 22px;
   max-height: 22px;
   padding: 0;
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-}
-
-.chat-panel .chat-send-button:hover:not(:disabled) {
-  background: var(--vscode-button-hoverBackground);
 }
 
 .chat-panel .chat-send-button:disabled {

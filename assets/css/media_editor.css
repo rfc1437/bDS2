@@ -128,20 +128,6 @@
   align-items: center;
 }
 
-[data-testid="media-editor"] .add-link-btn {
-  background: var(--vscode-button-secondaryBackground);
-  border: none;
-  color: var(--vscode-button-secondaryForeground);
-  padding: 2px 8px;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 11px;
-}
-
-[data-testid="media-editor"] .add-link-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
-}
-
 [data-testid="media-editor"] .post-picker {
   background: var(--vscode-dropdown-background);
   border: 1px solid var(--vscode-dropdown-border);

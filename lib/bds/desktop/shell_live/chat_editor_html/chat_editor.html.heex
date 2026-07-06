@@ -62,7 +62,7 @@
         <h2><%= dgettext("ui", "API Key Required") %></h2>
         <p><%= dgettext("ui", "Configure an API key in Settings to enable AI chat.") %></p>
         <div class="api-key-form">
-          <button class="api-key-submit ui-button ui-button-primary" type="button" phx-click="open_chat_settings" phx-target={@myself}><%= dgettext("ui", "Open Settings") %></button>
+          <button class="api-key-submit primary ui-button ui-button-primary" type="button" phx-click="open_chat_settings" phx-target={@myself}><%= dgettext("ui", "Open Settings") %></button>
         </div>
       </div>
     <% else %>
@@ -154,7 +154,7 @@
 
       <form class="chat-input-wrapper flex items-end gap-2" phx-change="change_chat_editor_input" phx-submit="send_chat_editor_message" phx-target={@myself}>
         <textarea class="chat-input chat-surface-input ui-textarea" name="message" rows="1" placeholder={dgettext("ui", "Type a message...")} disabled={@chat_editor.is_streaming}><%= @chat_editor.input %></textarea>
-        <button class="chat-send-button ui-button ui-button-primary" data-testid="chat-send-button" type="button" phx-click="send_chat_editor_message" phx-target={@myself}>↑</button>
+        <button class="chat-send-button primary ui-button ui-button-primary" data-testid="chat-send-button" type="button" phx-click="send_chat_editor_message" phx-target={@myself}>↑</button>
       </form>
 
       <%= if @chat_editor.action_error do %>

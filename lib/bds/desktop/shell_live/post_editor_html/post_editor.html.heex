@@ -394,7 +394,7 @@
         <div class="editor-toolbar-right ui-toolbar-group flex items-center gap-2">
           <%= if @post_editor.mode == :markdown do %>
             <button
-              class="insert-post-link-button"
+              class="insert-post-link-button secondary ui-button ui-button-secondary whitespace-nowrap"
               data-testid="editor-toolbar-overlay-button"
               type="button"
               phx-click="open_overlay"
@@ -403,7 +403,7 @@
               <%= dgettext("ui", "Insert Link") %>
             </button>
             <button
-              class="insert-media-button"
+              class="insert-media-button secondary ui-button ui-button-secondary whitespace-nowrap"
               data-testid="editor-toolbar-overlay-button"
               type="button"
               phx-click="open_overlay"
@@ -412,7 +412,7 @@
               <%= dgettext("ui", "Insert Media") %>
             </button>
             <button
-              class="add-gallery-images-button"
+              class="add-gallery-images-button secondary ui-button ui-button-secondary whitespace-nowrap"
               type="button"
               phx-click="add_gallery_images"
               phx-value-post-id={@post_editor.id}
@@ -423,7 +423,7 @@
 
           <%= if @post_editor.gallery_count > 0 do %>
             <button
-              class="gallery-button"
+              class="gallery-button secondary ui-button ui-button-secondary whitespace-nowrap"
               data-testid="editor-toolbar-overlay-button"
               type="button"
               phx-click="open_overlay"
