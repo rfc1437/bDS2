@@ -4468,7 +4468,7 @@ button svg, button svg * {
   position: relative;
   margin-bottom: 14px;
 }
-.ai-suggestions-modal-backdrop, .insert-modal-backdrop, .language-picker-modal-backdrop, .confirm-delete-modal-backdrop, .confirm-dialog-overlay, .gallery-overlay, .lightbox-overlay {
+.ai-suggestions-modal-backdrop, .insert-modal-backdrop, .language-picker-modal-backdrop, .confirm-delete-modal-backdrop, .confirm-dialog-overlay, .git-run-backdrop, .gallery-overlay, .lightbox-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.68);
@@ -4477,13 +4477,72 @@ button svg, button svg * {
   justify-content: center;
   pointer-events: auto;
 }
-.ai-suggestions-modal, .insert-modal, .language-picker-modal, .confirm-delete-modal, .confirm-dialog, .gallery-overlay-content {
+.ai-suggestions-modal, .insert-modal, .language-picker-modal, .confirm-delete-modal, .confirm-dialog, .git-run-modal, .gallery-overlay-content {
   position: relative;
   z-index: 1;
   background: #1e1e1e;
   border: 1px solid #3c3c3c;
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.git-run-modal {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.git-run-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #3c3c3c;
+}
+.git-run-title {
+  margin: 0;
+  font-size: 14px;
+  font-family: var(--font-mono, monospace);
+}
+.git-run-status {
+  font-size: 12px;
+  font-weight: 600;
+}
+.git-run-status.running {
+  color: #d7ba7d;
+}
+.git-run-status.ok {
+  color: #4ec9b0;
+}
+.git-run-status.fail {
+  color: #f48771;
+}
+.git-run-output {
+  margin: 0;
+  padding: 12px 16px;
+  overflow: auto;
+  flex: 1;
+  min-height: 160px;
+  max-height: 60vh;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  background: #141414;
+}
+.git-run-stdout {
+  color: #d4d4d4;
+}
+.git-run-stderr {
+  color: #f48771;
+}
+.git-run-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid #3c3c3c;
 }
 .ai-suggestions-modal, .language-picker-modal, .confirm-delete-modal, .confirm-dialog {
   width: min(680px, calc(100vw - 32px));

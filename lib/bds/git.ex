@@ -133,7 +133,6 @@ defmodule BDS.Git do
              opts
            ),
          {:ok, remote_log} <- remote_history_log(project_dir, branch, opts) do
-
       local_commits = parse_history_log(local_log)
       remote_hashes = MapSet.new(parse_remote_history(remote_log))
       local_hashes = MapSet.new(Enum.map(local_commits, & &1.hash))
@@ -193,6 +192,30 @@ defmodule BDS.Git do
       {:ok, %{updated: true, output: output}}
     end
   end
+
+  @doc """
+  Start a streaming network git command (`:fetch | :pull | :push`), forwarding
+  output to `subscriber` (see `BDS.Git.Stream`) so the UI can show it live and
+  cancel a hanging run. Returns `{:ok, pid, ref}`, or `{:error, reason}` when the
+  project can't be resolved.
+  """
+  def stream(project_id, operation, subscriber, opts \\ [])
+      when is_binary(project_id) and operation in [:fetch, :pull, :push] and is_pid(subscriber) do
+    with {:ok, project_dir} <- project_dir(project_id) do
+      env = command_opts(project_dir, 0)[:env]
+
+      BDS.Git.Stream.start(
+        subscriber,
+        project_dir,
+        stream_args(operation),
+        Keyword.put(opts, :env, env)
+      )
+    end
+  end
+
+  defp stream_args(:fetch), do: ["fetch", "--all", "--prune", "--progress"]
+  defp stream_args(:pull), do: ["pull", "--ff-only", "--progress"]
+  defp stream_args(:push), do: ["push", "--progress"]
 
   def commit_all(project_id, message, opts \\ [])
       when is_binary(project_id) and is_binary(message) and is_list(opts) do

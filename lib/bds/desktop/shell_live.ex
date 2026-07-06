@@ -14,6 +14,7 @@ defmodule BDS.Desktop.ShellLive do
     ChatEditor,
     GalleryImport,
     GitHandler,
+    GitRun,
     ImportEditor,
     MediaEditor,
     MenuEditor,
@@ -62,6 +63,7 @@ defmodule BDS.Desktop.ShellLive do
   @refresh_interval 1_500
 
   def refresh_interval, do: @refresh_interval
+
   @sidebar_filter_events [
     "toggle_sidebar_filters",
     "toggle_sidebar_archive",
@@ -176,12 +178,13 @@ defmodule BDS.Desktop.ShellLive do
      |> assign(:chat_editor_request_refs, %{})
      |> assign(:file_picker_task, nil)
      |> assign(:shell_overlay, nil)
+     |> assign(:git_run, nil)
      |> assign(:output_entries, [])
      |> assign(:panel_post_links, %{backlinks: [], outlinks: []})
      |> assign(:panel_git_entries, [])
      |> assign(:auto_save_timers, %{})
      |> reload_shell(workbench)
-      |> UrlState.apply_params(params)
+     |> UrlState.apply_params(params)
      |> tap(&sync_menu_bar_locale/1)}
   end
 
@@ -209,7 +212,7 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply,
      socket
      |> refresh_sidebar(workbench)
-      |> UrlState.push()}
+     |> UrlState.push()}
   end
 
   def handle_event("select_panel_tab", %{"tab" => tab}, socket) do
@@ -242,8 +245,24 @@ defmodule BDS.Desktop.ShellLive do
   end
 
   def handle_event(event, _params, socket) when event in @git_action_events do
-    {:noreply, GitHandler.run_action(socket, event)}
+    if GitRun.network_event?(event) do
+      {:noreply, GitRun.start(socket, event, current_project_id(socket))}
+    else
+      {:noreply, GitHandler.run_action(socket, event)}
+    end
   end
+
+  def handle_event("git_run_close", _params, socket) do
+    socket = GitRun.close(socket)
+    {:noreply, refresh_sidebar(socket, socket.assigns.workbench)}
+  end
+
+  def handle_event("git_run_keydown", %{"key" => "Escape"}, socket) do
+    socket = GitRun.close(socket)
+    {:noreply, refresh_sidebar(socket, socket.assigns.workbench)}
+  end
+
+  def handle_event("git_run_keydown", _params, socket), do: {:noreply, socket}
 
   def handle_event("git_commit", params, socket) do
     message = params |> get_in(["git", "message"]) |> to_string() |> String.trim()
@@ -302,7 +321,7 @@ defmodule BDS.Desktop.ShellLive do
      socket
      |> assign(:tab_meta, tab_meta)
      |> refresh_layout(workbench)
-      |> UrlState.push()}
+     |> UrlState.push()}
   end
 
   def handle_event(
@@ -691,6 +710,15 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, handle_blogmark_deep_link(socket, url)}
   end
 
+  def handle_info({:git_output, ref, stream, chunk}, socket) do
+    {:noreply, GitRun.append(socket, ref, stream, chunk)}
+  end
+
+  def handle_info({:git_done, ref, status}, socket) do
+    socket = GitRun.done(socket, ref, status)
+    {:noreply, refresh_sidebar(socket, socket.assigns.workbench)}
+  end
+
   def handle_info(message, socket) do
     Bridges.handle_info(message, socket, bridges_callbacks())
   end
@@ -987,7 +1015,8 @@ defmodule BDS.Desktop.ShellLive do
 
   defp handle_socket_menu_action(socket, :save), do: TabActions.save_current_tab(socket)
 
-  defp handle_socket_menu_action(socket, :publish_selected), do: TabActions.publish_current_tab(socket)
+  defp handle_socket_menu_action(socket, :publish_selected),
+    do: TabActions.publish_current_tab(socket)
 
   defp handle_socket_menu_action(socket, :quit) do
     Shutdown.request_quit()

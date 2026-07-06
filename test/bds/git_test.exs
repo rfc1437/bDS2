@@ -250,6 +250,21 @@ defmodule BDS.GitTest do
     end)
   end
 
+  test "stream/4 runs a network operation for the project and streams output live", %{
+    project: project,
+    temp_root: temp_root
+  } do
+    script = Path.join(temp_root, "fake-git")
+    File.write!(script, "#!/bin/sh\nprintf 'pushing %s\\n' \"$1\" 1>&2\nexit 0\n")
+    File.chmod!(script, 0o755)
+
+    assert {:ok, _pid, ref} = Git.stream(project.id, :push, self(), command: script)
+
+    assert_receive {:git_output, ^ref, :stderr, chunk}, 2_000
+    assert chunk =~ "pushing push"
+    assert_receive {:git_done, ^ref, 0}, 2_000
+  end
+
   defp fake_runner(handler) do
     fn command, args, opts -> handler.(command, args, opts) end
   end
