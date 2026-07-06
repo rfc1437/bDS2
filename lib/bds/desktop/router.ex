@@ -19,6 +19,7 @@ defmodule BDS.Desktop.Router do
 
     get("/health", HealthController, :show)
     get("/media-thumbnail/:media_id", MediaController, :thumbnail)
+    get("/media-file/:media_id", MediaController, :file)
 
     live_session :desktop_shell,
       root_layout: {BDS.Desktop.Layouts, :root} do

@@ -492,6 +492,81 @@ defmodule BDS.DesktopTest do
     assert byte_size(conn.resp_body) > 0
   end
 
+  test "desktop endpoint serves the original media file for the editor preview" do
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-desktop-media-file-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+
+    on_exit(fn ->
+      File.rm_rf(temp_dir)
+    end)
+
+    {:ok, project} =
+      BDS.Projects.create_project(%{name: "Desktop Media File", data_path: temp_dir})
+
+    {:ok, _active} = BDS.Projects.set_active_project(project.id)
+
+    source_path = Path.join(temp_dir, "sample.jpg")
+    original_bytes = tiny_jpeg_binary()
+    File.write!(source_path, original_bytes)
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    conn = conn(:get, "/media-file/#{media.id}?k=#{Desktop.Auth.login_key()}")
+    conn = BDS.Desktop.Endpoint.call(conn, BDS.Desktop.Endpoint.init([]))
+
+    assert conn.status == 200
+    assert [content_type] = Plug.Conn.get_resp_header(conn, "content-type")
+    assert String.starts_with?(content_type, "image/jpeg")
+    assert conn.resp_body == original_bytes
+  end
+
+  test "desktop endpoint falls back to the large thumbnail for non-web-displayable media" do
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(BDS.Repo)
+
+    temp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "bds-desktop-media-fallback-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(temp_dir)
+
+    on_exit(fn ->
+      File.rm_rf(temp_dir)
+    end)
+
+    {:ok, project} =
+      BDS.Projects.create_project(%{name: "Desktop Media Fallback", data_path: temp_dir})
+
+    {:ok, _active} = BDS.Projects.set_active_project(project.id)
+
+    source_path = Path.join(temp_dir, "sample.jpg")
+    File.write!(source_path, tiny_jpeg_binary())
+
+    assert {:ok, media} =
+             BDS.Media.import_media(%{project_id: project.id, source_path: source_path})
+
+    # Simulate a format browsers cannot render inline (e.g. TIFF): thumbnails
+    # exist from import, but the original must not be served directly.
+    {:ok, _media} =
+      media
+      |> Ecto.Changeset.change(mime_type: "image/tiff")
+      |> BDS.Repo.update()
+
+    conn = conn(:get, "/media-file/#{media.id}?k=#{Desktop.Auth.login_key()}")
+    conn = BDS.Desktop.Endpoint.call(conn, BDS.Desktop.Endpoint.init([]))
+
+    assert conn.status == 200
+    assert [content_type] = Plug.Conn.get_resp_header(conn, "content-type")
+    assert String.starts_with?(content_type, "image/webp")
+    assert byte_size(conn.resp_body) > 0
+  end
+
   defp menu_item(groups, id) do
     groups
     |> Enum.flat_map(& &1.items)

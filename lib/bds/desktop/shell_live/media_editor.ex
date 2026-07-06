@@ -645,7 +645,7 @@ defmodule BDS.Desktop.ShellLive.MediaEditor do
 
   defp preview_url(%MediaRecord{} = media) do
     if image?(media),
-      do: "/media-thumbnail/#{media.id}?size=large&t=#{media.updated_at}",
+      do: "/media-file/#{media.id}?t=#{media.updated_at}",
       else: nil
   end
 

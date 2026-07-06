@@ -8,16 +8,45 @@ defmodule BDS.Desktop.MediaController do
   alias BDS.Projects
   alias BDS.Repo
 
-  def thumbnail(conn, %{"media_id" => media_id} = params) do
-    case active_media_thumbnail(media_id, Map.get(params, "size")) do
-      {:ok, content_type, path} ->
-        conn
-        |> Plug.Conn.put_resp_content_type(content_type)
-        |> Plug.Conn.send_file(200, path)
+  @web_image_types ~w(image/jpeg image/png image/webp image/gif image/svg+xml image/avif)
 
-      :error ->
-        send_resp(conn, 404, "not found")
+  def thumbnail(conn, %{"media_id" => media_id} = params) do
+    send_media(conn, active_media_thumbnail(media_id, Map.get(params, "size")))
+  end
+
+  def file(conn, %{"media_id" => media_id}) do
+    send_media(conn, active_media_file(media_id))
+  end
+
+  defp send_media(conn, {:ok, content_type, path}) do
+    conn
+    |> Plug.Conn.put_resp_content_type(content_type)
+    |> Plug.Conn.send_file(200, path)
+  end
+
+  defp send_media(conn, :error), do: send_resp(conn, 404, "not found")
+
+  # Serves the original image at full resolution; formats browsers cannot
+  # render inline fall back to the large thumbnail.
+  defp active_media_file(media_id) do
+    with %{} = project <- Projects.get_active_project(),
+         %MediaRecord{} = media <- Repo.get(MediaRecord, media_id),
+         true <- media.project_id == project.id,
+         true <- media.mime_type in @web_image_types,
+         absolute_path = Path.join(Projects.project_data_dir(project), media.file_path),
+         true <- File.exists?(absolute_path) do
+      {:ok, media.mime_type, absolute_path}
+    else
+      _other -> active_media_thumbnail(media_id, "large")
     end
+  rescue
+    error in [Exqlite.Error, DBConnection.OwnershipError] ->
+      if match?(%Exqlite.Error{}, error) and
+           not String.contains?(Exception.message(error), "no such table") do
+        reraise error, __STACKTRACE__
+      end
+
+      :error
   end
 
   defp active_media_thumbnail(media_id, size) do

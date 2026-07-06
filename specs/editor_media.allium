@@ -116,7 +116,11 @@ surface MediaEditorSurface {
         --   Translate Metadata (globe icon).
 
     @guarantee PreviewArea
-        -- Images: rendered via bds-media:// protocol with cache-busting timestamp.
+        -- Images: rendered at full resolution via the /media-file/:id route
+        --   (serves the original file; falls back to the large thumbnail for
+        --   formats browsers cannot display inline) with cache-busting
+        --   timestamp. Never upscaled beyond natural size. The sidebar keeps
+        --   using small thumbnails.
         -- Non-images: SVG file icon placeholder + original filename text.
 
     @guarantee MetadataForm
