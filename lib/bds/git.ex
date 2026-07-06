@@ -429,9 +429,19 @@ defmodule BDS.Git do
       env: %{
         "GIT_TERMINAL_PROMPT" => "0",
         "GCM_INTERACTIVE" => "never",
-        "GIT_SSH_COMMAND" => ssh_command
+        "GIT_SSH_COMMAND" => ssh_command,
+        "PATH" => git_path()
       }
     ]
+  end
+
+  # A macOS app launched from Finder inherits a minimal PATH and never sources
+  # the login shell, so Homebrew tools like git-lfs (called from git hooks) are
+  # not found. Prepend the standard Homebrew bin dirs to the inherited PATH.
+  defp git_path do
+    ["/opt/homebrew/bin", "/usr/local/bin", System.get_env("PATH") || ""]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join(":")
   end
 
   defp upstream_branch(project_dir, opts) do

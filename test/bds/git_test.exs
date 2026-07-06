@@ -193,6 +193,9 @@ defmodule BDS.GitTest do
     assert fetch_opts[:env]["GIT_TERMINAL_PROMPT"] == "0"
     assert fetch_opts[:env]["GCM_INTERACTIVE"] == "never"
     assert fetch_opts[:env]["GIT_SSH_COMMAND"] =~ "BatchMode=yes"
+    # git hooks (e.g. git-lfs pre-push) must find Homebrew tools even when the
+    # app is launched from Finder with a minimal PATH.
+    assert fetch_opts[:env]["PATH"] =~ "/opt/homebrew/bin"
   end
 
   test "fetch returns structured auth errors with provider guidance", %{project: project} do
