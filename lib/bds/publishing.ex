@@ -55,7 +55,7 @@ defmodule BDS.Publishing do
 
     {:ok, task} =
       Tasks.submit_task(
-        "publish #{project_id}",
+        "publish #{project.name}",
         fn report ->
           run_upload(job_id, normalized_credentials, targets, uploader, report)
         end,
