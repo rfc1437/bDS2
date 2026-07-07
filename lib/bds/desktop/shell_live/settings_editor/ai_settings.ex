@@ -4,6 +4,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
   use Phoenix.Component
 
   alias BDS.AI
+  alias BDS.Desktop.ShellLive.Notify
   alias BDS.Desktop.ShellLive.SettingsEditor.EditorSettings
   require Logger
   use Gettext, backend: BDS.Gettext
@@ -71,6 +72,8 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
 
     with {:ok, endpoint} <- endpoint_refresh_attrs(endpoint_key, attrs),
          {:ok, models} <- AI.list_endpoint_models(endpoint) do
+      notify_models_loaded(models)
+
       socket
       |> assign(
         :settings_editor_endpoint_models,
@@ -83,14 +86,25 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
       |> reload.(socket.assigns.workbench)
     else
       {:error, reason} ->
+        message = ai_error_message(reason)
+        Notify.alert(dgettext("ui", "Could not load models"), message)
+
         socket
-        |> append_output.(dgettext("ui", "AI Settings"), inspect(reason), nil, "error")
+        |> append_output.(dgettext("ui", "AI Settings"), message, nil, "error")
         |> reload.(socket.assigns.workbench)
     end
   end
 
   @spec save_ai(term(), term(), term()) :: term()
   def save_ai(socket, reload, append_output) do
+    do_save_ai(socket, reload, append_output)
+  rescue
+    error ->
+      Logger.error("AI settings save crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      surface_ai_error(socket, reload, append_output, error)
+  end
+
+  defp do_save_ai(socket, reload, append_output) do
     attrs = ai_attrs(socket.assigns)
 
     with :ok <-
@@ -142,17 +156,47 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
              attrs.offline_chat_images
            ),
          :ok <- EditorSettings.put_global_setting("ai.system_prompt", attrs.system_prompt) do
+      LiveToast.send_toast(:info, dgettext("ui", "AI settings saved."))
+
       socket
       |> assign(:settings_editor_ai_draft, %{})
       |> assign(:offline_mode, attrs.offline_mode)
       |> reload.(socket.assigns.workbench)
     else
       {:error, reason} ->
-        socket
-        |> append_output.(dgettext("ui", "AI Settings"), inspect(reason), nil, "error")
-        |> reload.(socket.assigns.workbench)
+        surface_ai_error(socket, reload, append_output, reason)
     end
   end
+
+  defp notify_models_loaded([]) do
+    LiveToast.send_toast(
+      :info,
+      dgettext(
+        "ui",
+        "The endpoint returned no models. You can still type a model name manually."
+      )
+    )
+  end
+
+  defp notify_models_loaded(models) do
+    LiveToast.send_toast(
+      :info,
+      dgettext("ui", "Loaded %{count} models.", count: length(models))
+    )
+  end
+
+  defp surface_ai_error(socket, reload, append_output, reason) do
+    message = ai_error_message(reason)
+    Notify.alert(dgettext("ui", "Could not save AI settings"), message)
+
+    socket
+    |> append_output.(dgettext("ui", "AI Settings"), message, nil, "error")
+    |> reload.(socket.assigns.workbench)
+  end
+
+  defp ai_error_message(%{__exception__: true} = error), do: Exception.message(error)
+  defp ai_error_message(reason) when is_binary(reason), do: reason
+  defp ai_error_message(reason), do: inspect(reason)
 
   @spec reset_ai_prompt(term(), term(), term()) :: term()
   def reset_ai_prompt(socket, reload, append_output) do
@@ -179,7 +223,9 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
   end
 
   defp ai_attrs(assigns) do
-    draft = Map.get(assigns, :settings_editor_ai_draft, %{})
+    # Merge the stored form with the edit draft so untouched fields (URLs, API
+    # keys) are preserved on save instead of being read as nil and wiped.
+    draft = Map.merge(ai_form(assigns), Map.get(assigns, :settings_editor_ai_draft, %{}))
 
     %{
       online_url: blank_to_nil(Map.get(draft, "online_url")),

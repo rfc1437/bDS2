@@ -6,8 +6,10 @@ import { ColourPicker } from "./colour_picker.js";
 import { MenuEditorTree } from "./menu_editor_tree.js";
 import { MonacoEditor } from "./monaco_editor.js";
 import { MonacoDiffEditor } from "./monaco_diff_editor.js";
+import { createLiveToastHook } from "live_toast";
 
 export const Hooks = {
+  LiveToast: createLiveToastHook(),
   AppShell,
   SidebarInteractions,
   SettingsSectionScroll,

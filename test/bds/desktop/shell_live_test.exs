@@ -2085,6 +2085,50 @@ defmodule BDS.Desktop.ShellLiveTest do
              BDS.AI.Catalog.model_capabilities("llama3.3")
   end
 
+  test "saving ai settings without editing preserves stored endpoints" do
+    assert {:ok, _online} =
+             AI.put_endpoint(:online, %{
+               url: "https://api.example.test/v1",
+               api_key: "keep-me",
+               model: "gpt-4.1"
+             })
+
+    assert {:ok, _airplane} =
+             AI.put_endpoint(:airplane, %{
+               url: "http://localhost:11434/v1",
+               api_key: nil,
+               model: "llama3.3"
+             })
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    _html =
+      view
+      |> element("[data-testid='activity-button'][data-view='settings']")
+      |> render_click()
+
+    _html =
+      view
+      |> element("[data-testid='sidebar-open-item'][data-item-id='settings-project']")
+      |> render_click()
+
+    # Save with an untouched form (no change_settings_ai). The endpoints must
+    # survive instead of being wiped by an empty draft.
+    _html =
+      view
+      |> element("#settings-editor-shell button[phx-click='save_settings_ai']")
+      |> render_click()
+
+    assert {:ok, online} = AI.get_endpoint(:online)
+    assert online.url == "https://api.example.test/v1"
+    assert online.api_key == "keep-me"
+    assert online.model == "gpt-4.1"
+
+    assert {:ok, airplane} = AI.get_endpoint(:airplane)
+    assert airplane.url == "http://localhost:11434/v1"
+    assert airplane.model == "llama3.3"
+  end
+
   test "ai settings refresh models from the configured endpoints" do
     Application.put_env(:bds, :ai_http_client, FakeEndpointModelHttpClient)
 

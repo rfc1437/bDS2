@@ -385,6 +385,28 @@ defmodule BDS.AITest do
     assert Repo.get(Setting, "__encrypted_ai.online.api_key") == nil
   end
 
+  test "put_endpoint clears fields on nil instead of crashing" do
+    assert {:ok, _endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{url: "https://api.example.test/v1", api_key: "secret", model: "gpt-4o-mini"},
+               secret_backend: FakeSecretBackend
+             )
+
+    # A partial config (blank URL/model) must not raise — it clears those keys.
+    assert {:ok, endpoint} =
+             BDS.AI.put_endpoint(
+               :online,
+               %{url: nil, api_key: nil, model: nil},
+               secret_backend: FakeSecretBackend
+             )
+
+    assert endpoint.url == nil
+    assert Repo.get(Setting, "ai.online.url") == nil
+    assert Repo.get(Setting, "ai.online.model") == nil
+    assert Repo.get(Setting, "__encrypted_ai.online.api_key") == nil
+  end
+
   test "airplane_endpoint_configured? reflects the airplane endpoint url and model" do
     refute BDS.AI.airplane_endpoint_configured?()
 

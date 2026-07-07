@@ -20,6 +20,12 @@ defmodule BDS.Desktop.ShellLive.Notify do
     :ok
   end
 
+  @spec alert(String.t(), String.t()) :: :ok
+  def alert(title, message) do
+    send(self(), {:shell_alert, title, message})
+    :ok
+  end
+
   @spec tab_meta(atom(), term(), String.t(), String.t()) :: :ok
   def tab_meta(type, id, title, subtitle) do
     send(self(), {:editor_tab_meta, type, id, %{title: title, subtitle: subtitle || ""}})

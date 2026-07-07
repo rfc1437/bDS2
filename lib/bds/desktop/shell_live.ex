@@ -719,6 +719,11 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, refresh_sidebar(socket, socket.assigns.workbench)}
   end
 
+  def handle_info({:shell_alert, title, message}, socket) do
+    overlay = %{kind: :alert, title: title, message: message, tone: "error"}
+    {:noreply, assign(socket, :shell_overlay, overlay)}
+  end
+
   def handle_info(message, socket) do
     Bridges.handle_info(message, socket, bridges_callbacks())
   end
@@ -727,6 +732,20 @@ defmodule BDS.Desktop.ShellLive do
   def render(assigns) do
     UILocale.put(assigns.page_language)
     index(assigns)
+  end
+
+  # Dark-themed toast classes for LiveToast (its default is bg-white/text-black).
+  # Mirrors the library's structural classes but uses the app's dark palette.
+  @doc false
+  @spec toast_class_fn(map()) :: [String.t() | false]
+  def toast_class_fn(assigns) do
+    [
+      "group/toast z-100 pointer-events-auto relative w-full items-center justify-between origin-center overflow-hidden rounded-lg p-4 shadow-lg border col-start-1 col-end-1 row-start-1 row-end-2",
+      "bg-[#2d2d2d] text-[#f0f0f0] border-[#3c3c3c]",
+      "[@media(scripting:enabled)]:opacity-0 [@media(scripting:enabled){[data-phx-main]_&}]:opacity-100",
+      if(assigns[:rest][:hidden] == true, do: "hidden", else: "flex"),
+      assigns[:kind] == :error && "!bg-[#3a2020] !text-red-300 !border-[#5a2a2a]"
+    ]
   end
 
   defp refresh_layout(socket, workbench), do: SocketState.refresh_layout(socket, workbench)

@@ -186,6 +186,23 @@
         </div>
       </div>
 
+    <% :alert -> %>
+      <div class="shell-overlay-backdrop confirm-delete-modal-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
+        <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={dgettext("ui", "Close")}></button>
+        <div class={["confirm-delete-modal", "alert-modal", "alert-modal-#{@shell_overlay.tone}"]} role="alertdialog" aria-modal="true">
+          <div class="confirm-delete-modal-header">
+            <h2><%= @shell_overlay.title %></h2>
+            <button class="confirm-delete-modal-close" type="button" phx-click="close_overlay">×</button>
+          </div>
+          <div class="confirm-delete-modal-body">
+            <div class="confirm-delete-message"><%= @shell_overlay.message %></div>
+          </div>
+          <div class="confirm-delete-modal-footer">
+            <button class="button-apply primary ui-button ui-button-primary" type="button" phx-click="close_overlay"><%= dgettext("ui", "OK") %></button>
+          </div>
+        </div>
+      </div>
+
     <% :gallery -> %>
       <div class="shell-overlay-backdrop gallery-overlay-backdrop" data-testid="shell-overlay-backdrop" phx-window-keydown="overlay_keydown">
         <button class="shell-overlay-dismiss" type="button" phx-click="close_overlay" aria-label={dgettext("ui", "Cancel")}></button>

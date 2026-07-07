@@ -37,6 +37,7 @@ defmodule BDS.MixProject do
       {:plug, "~> 1.18"},
       {:bandit, "~> 1.5"},
       {:req, "~> 0.5"},
+      {:live_toast, "~> 0.8.0"},
       {:saxy, "~> 1.4"},
       {:desktop, "~> 1.5"},
       {:image, "~> 0.67"},

@@ -678,5 +678,6 @@
   </footer>
 
   <ShellOverlayComponents.shell_overlay shell_overlay={@shell_overlay} />
+  <LiveToast.toast_group flash={@flash} connected={assigns[:socket] != nil} toasts_sync={assigns[:toasts_sync]} corner={:bottom_right} toast_class_fn={&toast_class_fn/1} />
   <GitRun.git_run_modal git_run={@git_run} />
 </div>

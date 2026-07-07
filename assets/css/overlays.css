@@ -377,3 +377,8 @@
   font: inherit;
 }
 
+
+/* Alert modal (errors) — reuses .confirm-delete-modal with a tone accent. */
+.alert-modal-error {
+  border-top: 3px solid #ff6b6b;
+}

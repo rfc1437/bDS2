@@ -83,9 +83,9 @@ msgstr ""
 msgid "AI Assistant"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:87
-#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:152
-#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:167
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:93
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:190
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:208
 #, elixir-autogen, elixir-format
 msgid "AI Settings"
 msgstr ""
@@ -349,7 +349,7 @@ msgstr ""
 msgid "Auto"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:442
+#: lib/bds/desktop/shell_live.ex:448
 #: lib/bds/desktop/shell_live/chat_editor.ex:234
 #: lib/bds/desktop/shell_live/media_editor.ex:171
 #: lib/bds/desktop/shell_live/media_editor.ex:364
@@ -431,7 +431,7 @@ msgstr ""
 msgid "Bookmarklet copy support is wired through the desktop runtime and project public URL."
 msgstr ""
 
-#: lib/bds/desktop/shell_live/git_run.ex:126
+#: lib/bds/desktop/shell_live/git_run.ex:128
 #: lib/bds/desktop/shell_live/import_editor.ex:1366
 #: lib/bds/desktop/shell_live/media_editor_html/media_editor.html.heex:298
 #: lib/bds/desktop/shell_live/menu_editor.ex:335
@@ -444,8 +444,8 @@ msgstr ""
 #: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:165
 #: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:173
 #: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:183
-#: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:191
 #: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:208
+#: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:225
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr ""
@@ -499,7 +499,7 @@ msgstr ""
 msgid "Category name is required"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:748
+#: lib/bds/desktop/shell_live.ex:771
 #: lib/bds/desktop/shell_live/chat_editor.ex:87
 #: lib/bds/desktop/shell_live/chat_editor.ex:233
 #: lib/bds/desktop/shell_live/chat_editor.ex:323
@@ -1065,7 +1065,7 @@ msgstr ""
 msgid "Force Reload"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:194
+#: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:211
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:432
 #, elixir-autogen, elixir-format
 msgid "Gallery"
@@ -1076,7 +1076,7 @@ msgstr ""
 msgid "Generate Site"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:749
+#: lib/bds/desktop/shell_live.ex:772
 #: lib/bds/desktop/shell_live/socket_state.ex:109
 #: lib/bds/ui/sidebar.ex:789
 #, elixir-autogen, elixir-format
@@ -1090,7 +1090,7 @@ msgid "Git Diff"
 msgstr ""
 
 #: lib/bds/desktop/shell_data.ex:226
-#: lib/bds/desktop/shell_live.ex:745
+#: lib/bds/desktop/shell_live.ex:768
 #: lib/bds/desktop/shell_live/panel_renderer.ex:171
 #, elixir-autogen, elixir-format
 msgid "Git Log"
@@ -1213,9 +1213,9 @@ msgstr ""
 msgid "Import failed: %{error}"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:592
-#: lib/bds/desktop/shell_live.ex:861
-#: lib/bds/desktop/shell_live.ex:867
+#: lib/bds/desktop/shell_live.ex:598
+#: lib/bds/desktop/shell_live.ex:884
+#: lib/bds/desktop/shell_live.ex:890
 #: lib/bds/desktop/shell_live/sidebar_create.ex:47
 #, elixir-autogen, elixir-format
 msgid "Import media"
@@ -1797,7 +1797,7 @@ msgstr ""
 msgid "Other (%{count})"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:744
+#: lib/bds/desktop/shell_live.ex:767
 #: lib/bds/desktop/shell_live/panel_renderer.ex:83
 #, elixir-autogen, elixir-format
 msgid "Output"
@@ -2551,7 +2551,7 @@ msgstr ""
 msgid "Tags"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:743
+#: lib/bds/desktop/shell_live.ex:766
 #: lib/bds/desktop/shell_live/panel_renderer.ex:54
 #, elixir-autogen, elixir-format
 msgid "Tasks"
@@ -3231,12 +3231,12 @@ msgstr ""
 msgid "Comparing database and filesystem metadata"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:668
+#: lib/bds/desktop/shell_live.ex:674
 #, elixir-autogen, elixir-format
 msgid "Added %{count} images to post"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:636
+#: lib/bds/desktop/shell_live.ex:642
 #, elixir-autogen, elixir-format
 msgid "Added %{title}"
 msgstr ""
@@ -3256,18 +3256,18 @@ msgstr ""
 msgid "Image Import Concurrency"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:441
-#: lib/bds/desktop/shell_live.ex:454
-#: lib/bds/desktop/shell_live.ex:635
-#: lib/bds/desktop/shell_live.ex:667
-#: lib/bds/desktop/shell_live.ex:678
-#: lib/bds/desktop/shell_live.ex:689
+#: lib/bds/desktop/shell_live.ex:447
+#: lib/bds/desktop/shell_live.ex:460
+#: lib/bds/desktop/shell_live.ex:641
+#: lib/bds/desktop/shell_live.ex:673
+#: lib/bds/desktop/shell_live.ex:684
+#: lib/bds/desktop/shell_live.ex:695
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:420
 #, elixir-autogen, elixir-format
 msgid "Add Gallery Images"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:690
+#: lib/bds/desktop/shell_live.ex:696
 #, elixir-autogen, elixir-format
 msgid "Failed to process %{path}: %{reason}"
 msgstr ""
@@ -3366,7 +3366,7 @@ msgid "Local only"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/git_handler.ex:113
-#: lib/bds/desktop/shell_live/git_run.ex:82
+#: lib/bds/desktop/shell_live/git_run.ex:83
 #, elixir-autogen, elixir-format
 msgid "No active project"
 msgstr ""
@@ -3458,12 +3458,12 @@ msgstr ""
 msgid "untracked"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:769
+#: lib/bds/desktop/shell_live.ex:792
 #, elixir-autogen, elixir-format
 msgid "Blogmark"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:812
+#: lib/bds/desktop/shell_live.ex:835
 #, elixir-autogen, elixir-format
 msgid "Open a project before importing a blogmark."
 msgstr ""
@@ -3504,7 +3504,7 @@ msgstr ""
 msgid "Failed to copy bookmarklet to clipboard"
 msgstr ""
 
-#: lib/bds/desktop/shell_live.ex:781
+#: lib/bds/desktop/shell_live.ex:804
 #, elixir-autogen, elixir-format
 msgid "The project this blogmark targets does not exist here."
 msgstr ""
@@ -3550,12 +3550,13 @@ msgid "Zoom"
 msgstr ""
 
 #: lib/bds/desktop/shell_live/git_run.ex:91
-#: lib/bds/desktop/shell_live/git_run.ex:127
+#: lib/bds/desktop/shell_live/git_run.ex:129
+#: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:191
 #, elixir-autogen, elixir-format
 msgid "Close"
 msgstr ""
 
-#: lib/bds/desktop/shell_live/git_run.ex:124
+#: lib/bds/desktop/shell_live/git_run.ex:126
 #, elixir-autogen, elixir-format
 msgid "Failed (exit %{status})"
 msgstr ""
@@ -3578,4 +3579,34 @@ msgstr ""
 #: lib/bds/desktop/shell_live/git_run.ex:113
 #, elixir-autogen, elixir-format
 msgid "git push"
+msgstr ""
+
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:159
+#, elixir-autogen, elixir-format
+msgid "AI settings saved."
+msgstr ""
+
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:90
+#, elixir-autogen, elixir-format
+msgid "Could not load models"
+msgstr ""
+
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:187
+#, elixir-autogen, elixir-format
+msgid "Could not save AI settings"
+msgstr ""
+
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:182
+#, elixir-autogen, elixir-format
+msgid "Loaded %{count} models."
+msgstr ""
+
+#: lib/bds/desktop/shell_live/overlay_html/shell_overlay.html.heex:201
+#, elixir-autogen, elixir-format
+msgid "OK"
+msgstr ""
+
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:173
+#, elixir-autogen, elixir-format
+msgid "The endpoint returned no models. You can still type a model name manually."
 msgstr ""

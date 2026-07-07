@@ -54,12 +54,20 @@ defmodule BDS.AI do
     model = MapUtils.attr(attrs, :model)
     api_key = MapUtils.attr(attrs, :api_key)
 
-    with :ok <- put_setting("ai.#{kind_key}.url", url),
-         :ok <- put_setting("ai.#{kind_key}.model", model),
-         :ok <- put_secret("ai.#{kind_key}.api_key", api_key, backend) do
+    with :ok <- put_or_delete_setting("ai.#{kind_key}.url", url),
+         :ok <- put_or_delete_setting("ai.#{kind_key}.model", model),
+         :ok <- put_or_delete_secret("ai.#{kind_key}.api_key", api_key, backend) do
       {:ok, %{kind: kind, url: url, api_key: api_key, model: model}}
     end
   end
+
+  # A nil field means "clear it" — writing nil into put_setting/2 would raise a
+  # FunctionClauseError and crash the caller (the preferences panel).
+  defp put_or_delete_setting(key, nil), do: delete_setting(key)
+  defp put_or_delete_setting(key, value) when is_binary(value), do: put_setting(key, value)
+
+  defp put_or_delete_secret(key, nil, _backend), do: delete_setting(encrypted_key(key))
+  defp put_or_delete_secret(key, value, backend), do: put_secret(key, value, backend)
 
   @spec get_endpoint(endpoint_kind(), keyword()) ::
           {:ok, endpoint() | nil} | {:error, term()}

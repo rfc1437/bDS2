@@ -542,7 +542,7 @@
         const _timeoutId = setTimeout(() => controller.abort(), timeout);
         options.signal = controller.signal;
       }
-      global.fetch(endPoint, options).then((response) => response.text()).then((data) => this.parseJSON(data)).then((data) => callback && callback(data)).catch((err) => {
+      global.fetch(endPoint, options).then((response) => response.text()).then((data2) => this.parseJSON(data2)).then((data2) => callback && callback(data2)).catch((err) => {
         if (err.name === "AbortError" && ontimeout) {
           ontimeout();
         } else {
@@ -869,8 +869,8 @@
       offset = offset + topicSize;
       let event = decoder.decode(buffer.slice(offset, offset + eventSize));
       offset = offset + eventSize;
-      let data = buffer.slice(offset, buffer.byteLength);
-      return { join_ref: joinRef, ref: null, topic, event, payload: data };
+      let data2 = buffer.slice(offset, buffer.byteLength);
+      return { join_ref: joinRef, ref: null, topic, event, payload: data2 };
     },
     decodeReply(buffer, view, decoder) {
       let joinRefSize = view.getUint8(1);
@@ -886,8 +886,8 @@
       offset = offset + topicSize;
       let event = decoder.decode(buffer.slice(offset, offset + eventSize));
       offset = offset + eventSize;
-      let data = buffer.slice(offset, buffer.byteLength);
-      let payload = { status: event, response: data };
+      let data2 = buffer.slice(offset, buffer.byteLength);
+      let payload = { status: event, response: data2 };
       return { join_ref: joinRef, ref, topic, event: CHANNEL_EVENTS.reply, payload };
     },
     decodeBroadcast(buffer, view, decoder) {
@@ -898,8 +898,8 @@
       offset = offset + topicSize;
       let event = decoder.decode(buffer.slice(offset, offset + eventSize));
       offset = offset + eventSize;
-      let data = buffer.slice(offset, buffer.byteLength);
-      return { join_ref: null, ref: null, topic, event, payload: data };
+      let data2 = buffer.slice(offset, buffer.byteLength);
+      return { join_ref: null, ref: null, topic, event, payload: data2 };
     }
   };
   var Socket = class {
@@ -972,8 +972,8 @@
       };
       this.logger = opts.logger || null;
       if (!this.logger && opts.debug) {
-        this.logger = (kind, msg, data) => {
-          console.log(`${kind}: ${msg}`, data);
+        this.logger = (kind, msg, data2) => {
+          console.log(`${kind}: ${msg}`, data2);
         };
       }
       this.longpollerTimeout = opts.longpollerTimeout || 2e4;
@@ -1089,8 +1089,8 @@
      * @param {string} msg
      * @param {Object} data
      */
-    log(kind, msg, data) {
-      this.logger && this.logger(kind, msg, data);
+    log(kind, msg, data2) {
+      this.logger && this.logger(kind, msg, data2);
     }
     /**
      * Returns true if a logger has been set on this socket.
@@ -1419,15 +1419,15 @@
     /**
      * @param {Object} data
      */
-    push(data) {
+    push(data2) {
       if (this.hasLogger()) {
-        let { topic, event, payload, ref, join_ref } = data;
+        let { topic, event, payload, ref, join_ref } = data2;
         this.log("push", `${topic} ${event} (${join_ref}, ${ref})`, payload);
       }
       if (this.isConnected()) {
-        this.encode(data, (result) => this.conn.send(result));
+        this.encode(data2, (result) => this.conn.send(result));
       } else {
-        this.sendBuffer.push(() => this.encode(data, (result) => this.conn.send(result)));
+        this.sendBuffer.push(() => this.encode(data2, (result) => this.conn.send(result)));
       }
     }
     /**
@@ -2417,8 +2417,8 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
     metadata() {
       return this.meta;
     }
-    progress(progress) {
-      this._progress = Math.floor(progress);
+    progress(progress2) {
+      this._progress = Math.floor(progress2);
       if (this._progress > this._lastProgressSent) {
         if (this._progress >= 100) {
           this._progress = 100;
@@ -4693,10 +4693,10 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
   var default_transition_time = 200;
   var JS = {
     // private
-    exec(e, eventType, phxEvent, view, sourceEl, defaults) {
-      const [defaultKind, defaultArgs] = defaults || [
+    exec(e, eventType, phxEvent, view, sourceEl, defaults2) {
+      const [defaultKind, defaultArgs] = defaults2 || [
         null,
-        { callback: defaults && defaults.callback }
+        { callback: defaults2 && defaults2.callback }
       ];
       const commands = phxEvent.charAt(0) === "[" ? JSON.parse(phxEvent) : [[defaultKind, defaultArgs]];
       commands.forEach(([kind, args]) => {
@@ -4742,7 +4742,7 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
     exec_push(e, eventType, phxEvent, view, sourceEl, el, args) {
       const {
         event,
-        data,
+        data: data2,
         target,
         page_loading,
         loading,
@@ -4793,7 +4793,7 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
             sourceEl,
             targetCtx,
             event || phxEvent,
-            data,
+            data2,
             pushOpts,
             callback
           );
@@ -4848,14 +4848,14 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
         });
       }
     },
-    exec_add_class(e, eventType, phxEvent, view, sourceEl, el, { names, transition, time, blocking }) {
-      this.addOrRemoveClasses(el, names, [], transition, time, view, blocking);
+    exec_add_class(e, eventType, phxEvent, view, sourceEl, el, { names, transition, time: time2, blocking }) {
+      this.addOrRemoveClasses(el, names, [], transition, time2, view, blocking);
     },
-    exec_remove_class(e, eventType, phxEvent, view, sourceEl, el, { names, transition, time, blocking }) {
-      this.addOrRemoveClasses(el, [], names, transition, time, view, blocking);
+    exec_remove_class(e, eventType, phxEvent, view, sourceEl, el, { names, transition, time: time2, blocking }) {
+      this.addOrRemoveClasses(el, [], names, transition, time2, view, blocking);
     },
-    exec_toggle_class(e, eventType, phxEvent, view, sourceEl, el, { names, transition, time, blocking }) {
-      this.toggleClasses(el, names, transition, time, view, blocking);
+    exec_toggle_class(e, eventType, phxEvent, view, sourceEl, el, { names, transition, time: time2, blocking }) {
+      this.toggleClasses(el, names, transition, time2, view, blocking);
     },
     exec_toggle_attr(e, eventType, phxEvent, view, sourceEl, el, { attr: [attr, val1, val2] }) {
       this.toggleAttr(el, attr, val1, val2);
@@ -4863,17 +4863,17 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
     exec_ignore_attrs(e, eventType, phxEvent, view, sourceEl, el, { attrs }) {
       this.ignoreAttrs(el, attrs);
     },
-    exec_transition(e, eventType, phxEvent, view, sourceEl, el, { time, transition, blocking }) {
-      this.addOrRemoveClasses(el, [], [], transition, time, view, blocking);
+    exec_transition(e, eventType, phxEvent, view, sourceEl, el, { time: time2, transition, blocking }) {
+      this.addOrRemoveClasses(el, [], [], transition, time2, view, blocking);
     },
-    exec_toggle(e, eventType, phxEvent, view, sourceEl, el, { display, ins, outs, time, blocking }) {
-      this.toggle(eventType, view, el, display, ins, outs, time, blocking);
+    exec_toggle(e, eventType, phxEvent, view, sourceEl, el, { display, ins, outs, time: time2, blocking }) {
+      this.toggle(eventType, view, el, display, ins, outs, time2, blocking);
     },
-    exec_show(e, eventType, phxEvent, view, sourceEl, el, { display, transition, time, blocking }) {
-      this.show(eventType, view, el, display, transition, time, blocking);
+    exec_show(e, eventType, phxEvent, view, sourceEl, el, { display, transition, time: time2, blocking }) {
+      this.show(eventType, view, el, display, transition, time2, blocking);
     },
-    exec_hide(e, eventType, phxEvent, view, sourceEl, el, { display, transition, time, blocking }) {
-      this.hide(eventType, view, el, display, transition, time, blocking);
+    exec_hide(e, eventType, phxEvent, view, sourceEl, el, { display, transition, time: time2, blocking }) {
+      this.hide(eventType, view, el, display, transition, time2, blocking);
     },
     exec_set_attr(e, eventType, phxEvent, view, sourceEl, el, { attr: [attr, val] }) {
       this.setOrRemoveAttrs(el, [[attr, val]], []);
@@ -4908,7 +4908,7 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
       }
     },
     // utils for commands
-    show(eventType, view, el, display, transition, time, blocking) {
+    show(eventType, view, el, display, transition, time2, blocking) {
       if (!this.isVisible(el)) {
         this.toggle(
           eventType,
@@ -4917,12 +4917,12 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
           display,
           transition,
           null,
-          time,
+          time2,
           blocking
         );
       }
     },
-    hide(eventType, view, el, display, transition, time, blocking) {
+    hide(eventType, view, el, display, transition, time2, blocking) {
       if (this.isVisible(el)) {
         this.toggle(
           eventType,
@@ -4931,13 +4931,13 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
           display,
           null,
           transition,
-          time,
+          time2,
           blocking
         );
       }
     },
-    toggle(eventType, view, el, display, ins, outs, time, blocking) {
-      time = time || default_transition_time;
+    toggle(eventType, view, el, display, ins, outs, time2, blocking) {
+      time2 = time2 || default_transition_time;
       const [inClasses, inStartClasses, inEndClasses] = ins || [[], [], []];
       const [outClasses, outStartClasses, outEndClasses] = outs || [[], [], []];
       if (inClasses.length > 0 || outClasses.length > 0) {
@@ -4967,9 +4967,9 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
           el.dispatchEvent(new Event("phx:hide-start"));
           if (blocking === false) {
             onStart();
-            setTimeout(onEnd, time);
+            setTimeout(onEnd, time2);
           } else {
-            view.transition(time, onStart, onEnd);
+            view.transition(time2, onStart, onEnd);
           }
         } else {
           if (eventType === "remove") {
@@ -5001,9 +5001,9 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
           el.dispatchEvent(new Event("phx:show-start"));
           if (blocking === false) {
             onStart();
-            setTimeout(onEnd, time);
+            setTimeout(onEnd, time2);
           } else {
-            view.transition(time, onStart, onEnd);
+            view.transition(time2, onStart, onEnd);
           }
         }
       } else {
@@ -5031,7 +5031,7 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
         }
       }
     },
-    toggleClasses(el, classes, transition, time, view, blocking) {
+    toggleClasses(el, classes, transition, time2, view, blocking) {
       window.requestAnimationFrame(() => {
         const [prevAdds, prevRemoves] = dom_default.getSticky(el, "classes", [[], []]);
         const newAdds = classes.filter(
@@ -5045,7 +5045,7 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
           newAdds,
           newRemoves,
           transition,
-          time,
+          time2,
           view,
           blocking
         );
@@ -5066,8 +5066,8 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
         this.setOrRemoveAttrs(el, [[attr, val1]], []);
       }
     },
-    addOrRemoveClasses(el, adds, removes, transition, time, view, blocking) {
-      time = time || default_transition_time;
+    addOrRemoveClasses(el, adds, removes, transition, time2, view, blocking) {
+      time2 = time2 || default_transition_time;
       const [transitionRun, transitionStart, transitionEnd] = transition || [
         [],
         [],
@@ -5094,9 +5094,9 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
         );
         if (blocking === false) {
           onStart();
-          setTimeout(onDone, time);
+          setTimeout(onDone, time2);
         } else {
-          view.transition(time, onStart, onDone);
+          view.transition(time2, onStart, onDone);
         }
         return;
       }
@@ -5267,10 +5267,10 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
       },
       push(el, type, opts = {}) {
         liveSocket.withinOwners(el, (view) => {
-          const data = opts.value || {};
+          const data2 = opts.value || {};
           delete opts.value;
           let e = new CustomEvent("phx:exec", { detail: { sourceElement: el } });
-          js_default.exec(e, eventType, type, view, el, ["push", { data, ...opts }]);
+          js_default.exec(e, eventType, type, view, el, ["push", { data: data2, ...opts }]);
         });
       },
       navigate(href, opts = {}) {
@@ -5565,9 +5565,9 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
           onlyHiddenInputs2[key] = true;
         }
         const isUsed = dom_default.private(input, PHX_HAS_FOCUSED) || dom_default.private(input, PHX_HAS_SUBMITTED);
-        const isHidden = input.type === "hidden";
+        const isHidden2 = input.type === "hidden";
         inputsUnused2[key] = inputsUnused2[key] && !isUsed;
-        onlyHiddenInputs2[key] = onlyHiddenInputs2[key] && isHidden;
+        onlyHiddenInputs2[key] = onlyHiddenInputs2[key] && isHidden2;
         return acc;
       },
       { inputsUnused: {}, onlyHiddenInputs: {} }
@@ -5751,9 +5751,9 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
     log(kind, msgCallback) {
       this.liveSocket.log(this, kind, msgCallback);
     }
-    transition(time, onStart, onDone = function() {
+    transition(time2, onStart, onDone = function() {
     }) {
-      this.liveSocket.transition(time, onStart, onDone);
+      this.liveSocket.transition(time2, onStart, onDone);
     }
     // calls the callback with the view and target element for the given phxTarget
     // targets can be:
@@ -6831,14 +6831,14 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
         }
       ).then(({ reply }) => onReply && onReply(reply)).catch((error) => logError("Failed to push event", error));
     }
-    pushFileProgress(fileEl, entryRef, progress, onReply = function() {
+    pushFileProgress(fileEl, entryRef, progress2, onReply = function() {
     }) {
       this.liveSocket.withinOwners(fileEl.form, (view, targetCtx) => {
         view.pushWithReply(null, "progress", {
           event: fileEl.getAttribute(view.binding(PHX_PROGRESS)),
           ref: fileEl.getAttribute(PHX_UPLOAD_REF),
           entry_ref: entryRef,
-          progress,
+          progress: progress2,
           cid: view.targetComponentID(fileEl.form, targetCtx)
         }).then(() => onReply()).catch((error) => logError("Failed to push file progress", error));
       });
@@ -7492,17 +7492,17 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
     asyncTransition(promise) {
       this.transitions.addAsyncTransition(promise);
     }
-    transition(time, onStart, onDone = function() {
+    transition(time2, onStart, onDone = function() {
     }) {
-      this.transitions.addTransition(time, onStart, onDone);
+      this.transitions.addTransition(time2, onStart, onDone);
     }
     onChannel(channel, event, cb) {
-      channel.on(event, (data) => {
+      channel.on(event, (data2) => {
         const latency = this.getLatencySim();
         if (!latency) {
-          cb(data);
+          cb(data2);
         } else {
-          setTimeout(() => cb(data), latency);
+          setTimeout(() => cb(data2), latency);
         }
       });
     }
@@ -7788,16 +7788,16 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
           if (matchKey && matchKey.toLowerCase() !== pressedKey) {
             return;
           }
-          const data = { key: e.key, ...this.eventMeta(type, e, targetEl) };
-          js_default.exec(e, type, phxEvent, view, targetEl, ["push", { data }]);
+          const data2 = { key: e.key, ...this.eventMeta(type, e, targetEl) };
+          js_default.exec(e, type, phxEvent, view, targetEl, ["push", { data: data2 }]);
         }
       );
       this.bind(
         { blur: "focusout", focus: "focusin" },
         (e, type, view, targetEl, phxEvent, phxTarget) => {
           if (!phxTarget) {
-            const data = { key: e.key, ...this.eventMeta(type, e, targetEl) };
-            js_default.exec(e, type, phxEvent, view, targetEl, ["push", { data }]);
+            const data2 = { key: e.key, ...this.eventMeta(type, e, targetEl) };
+            js_default.exec(e, type, phxEvent, view, targetEl, ["push", { data: data2 }]);
           }
         }
       );
@@ -7805,8 +7805,8 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
         { blur: "blur", focus: "focus" },
         (e, type, view, targetEl, phxEvent, phxTarget) => {
           if (phxTarget === "window") {
-            const data = this.eventMeta(type, e, targetEl);
-            js_default.exec(e, type, phxEvent, view, targetEl, ["push", { data }]);
+            const data2 = this.eventMeta(type, e, targetEl);
+            js_default.exec(e, type, phxEvent, view, targetEl, ["push", { data: data2 }]);
           }
         }
       );
@@ -8360,13 +8360,13 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
         this.pushPendingOp(callback);
       }
     }
-    addTransition(time, onStart, onDone) {
+    addTransition(time2, onStart, onDone) {
       onStart();
       const timer = setTimeout(() => {
         this.transitions.delete(timer);
         onDone();
         this.flushPendingOps();
-      }, time);
+      }, time2);
       this.transitions.add(timer);
     }
     addAsyncTransition(promise) {
@@ -9842,8 +9842,816 @@ removing illegal node: "${(childNode.outerHTML || childNode.nodeValue).trim()}"
     }
   };
 
+  // ../deps/live_toast/priv/static/live_toast.esm.js
+  function addUniqueItem(array, item) {
+    array.indexOf(item) === -1 && array.push(item);
+  }
+  var clamp2 = (min, max, v) => Math.min(Math.max(v, min), max);
+  var defaults = {
+    duration: 0.3,
+    delay: 0,
+    endDelay: 0,
+    repeat: 0,
+    easing: "ease"
+  };
+  var isNumber = (value) => typeof value === "number";
+  var isEasingList = (easing) => Array.isArray(easing) && !isNumber(easing[0]);
+  var wrap = (min, max, v) => {
+    const rangeSize = max - min;
+    return ((v - min) % rangeSize + rangeSize) % rangeSize + min;
+  };
+  function getEasingForSegment(easing, i) {
+    return isEasingList(easing) ? easing[wrap(0, easing.length, i)] : easing;
+  }
+  var mix = (min, max, progress2) => -progress2 * min + progress2 * max + min;
+  var noop2 = () => {
+  };
+  var noopReturn = (v) => v;
+  var progress = (min, max, value) => max - min === 0 ? 1 : (value - min) / (max - min);
+  function fillOffset(offset, remaining) {
+    const min = offset[offset.length - 1];
+    for (let i = 1; i <= remaining; i++) {
+      const offsetProgress = progress(0, remaining, i);
+      offset.push(mix(min, 1, offsetProgress));
+    }
+  }
+  function defaultOffset(length) {
+    const offset = [0];
+    fillOffset(offset, length - 1);
+    return offset;
+  }
+  function interpolate(output, input = defaultOffset(output.length), easing = noopReturn) {
+    const length = output.length;
+    const remainder = length - input.length;
+    remainder > 0 && fillOffset(input, remainder);
+    return (t) => {
+      let i = 0;
+      for (; i < length - 2; i++) {
+        if (t < input[i + 1])
+          break;
+      }
+      let progressInRange = clamp2(0, 1, progress(input[i], input[i + 1], t));
+      const segmentEasing = getEasingForSegment(easing, i);
+      progressInRange = segmentEasing(progressInRange);
+      return mix(output[i], output[i + 1], progressInRange);
+    };
+  }
+  var isCubicBezier = (easing) => Array.isArray(easing) && isNumber(easing[0]);
+  var isEasingGenerator = (easing) => typeof easing === "object" && Boolean(easing.createAnimation);
+  var isFunction = (value) => typeof value === "function";
+  var isString = (value) => typeof value === "string";
+  var time = {
+    ms: (seconds) => seconds * 1e3,
+    s: (milliseconds) => milliseconds / 1e3
+  };
+  var calcBezier = (t, a1, a2) => (((1 - 3 * a2 + 3 * a1) * t + (3 * a2 - 6 * a1)) * t + 3 * a1) * t;
+  var subdivisionPrecision = 1e-7;
+  var subdivisionMaxIterations = 12;
+  function binarySubdivide(x, lowerBound, upperBound, mX1, mX2) {
+    let currentX;
+    let currentT;
+    let i = 0;
+    do {
+      currentT = lowerBound + (upperBound - lowerBound) / 2;
+      currentX = calcBezier(currentT, mX1, mX2) - x;
+      if (currentX > 0) {
+        upperBound = currentT;
+      } else {
+        lowerBound = currentT;
+      }
+    } while (Math.abs(currentX) > subdivisionPrecision && ++i < subdivisionMaxIterations);
+    return currentT;
+  }
+  function cubicBezier(mX1, mY1, mX2, mY2) {
+    if (mX1 === mY1 && mX2 === mY2)
+      return noopReturn;
+    const getTForX = (aX) => binarySubdivide(aX, 0, 1, mX1, mX2);
+    return (t) => t === 0 || t === 1 ? t : calcBezier(getTForX(t), mY1, mY2);
+  }
+  var steps = (steps2, direction = "end") => (progress2) => {
+    progress2 = direction === "end" ? Math.min(progress2, 0.999) : Math.max(progress2, 1e-3);
+    const expanded = progress2 * steps2;
+    const rounded = direction === "end" ? Math.floor(expanded) : Math.ceil(expanded);
+    return clamp2(0, 1, rounded / steps2);
+  };
+  var namedEasings = {
+    ease: cubicBezier(0.25, 0.1, 0.25, 1),
+    "ease-in": cubicBezier(0.42, 0, 1, 1),
+    "ease-in-out": cubicBezier(0.42, 0, 0.58, 1),
+    "ease-out": cubicBezier(0, 0, 0.58, 1)
+  };
+  var functionArgsRegex = /\((.*?)\)/;
+  function getEasingFunction(definition) {
+    if (isFunction(definition))
+      return definition;
+    if (isCubicBezier(definition))
+      return cubicBezier(...definition);
+    if (namedEasings[definition])
+      return namedEasings[definition];
+    if (definition.startsWith("steps")) {
+      const args = functionArgsRegex.exec(definition);
+      if (args) {
+        const argsArray = args[1].split(",");
+        return steps(parseFloat(argsArray[0]), argsArray[1].trim());
+      }
+    }
+    return noopReturn;
+  }
+  var Animation = class {
+    constructor(output, keyframes = [0, 1], { easing, duration: initialDuration = defaults.duration, delay = defaults.delay, endDelay = defaults.endDelay, repeat = defaults.repeat, offset, direction = "normal", autoplay = true } = {}) {
+      this.startTime = null;
+      this.rate = 1;
+      this.t = 0;
+      this.cancelTimestamp = null;
+      this.easing = noopReturn;
+      this.duration = 0;
+      this.totalDuration = 0;
+      this.repeat = 0;
+      this.playState = "idle";
+      this.finished = new Promise((resolve, reject) => {
+        this.resolve = resolve;
+        this.reject = reject;
+      });
+      easing = easing || defaults.easing;
+      if (isEasingGenerator(easing)) {
+        const custom = easing.createAnimation(keyframes);
+        easing = custom.easing;
+        keyframes = custom.keyframes || keyframes;
+        initialDuration = custom.duration || initialDuration;
+      }
+      this.repeat = repeat;
+      this.easing = isEasingList(easing) ? noopReturn : getEasingFunction(easing);
+      this.updateDuration(initialDuration);
+      const interpolate$1 = interpolate(keyframes, offset, isEasingList(easing) ? easing.map(getEasingFunction) : noopReturn);
+      this.tick = (timestamp) => {
+        var _a;
+        delay = delay;
+        let t = 0;
+        if (this.pauseTime !== void 0) {
+          t = this.pauseTime;
+        } else {
+          t = (timestamp - this.startTime) * this.rate;
+        }
+        this.t = t;
+        t /= 1e3;
+        t = Math.max(t - delay, 0);
+        if (this.playState === "finished" && this.pauseTime === void 0) {
+          t = this.totalDuration;
+        }
+        const progress2 = t / this.duration;
+        let currentIteration = Math.floor(progress2);
+        let iterationProgress = progress2 % 1;
+        if (!iterationProgress && progress2 >= 1) {
+          iterationProgress = 1;
+        }
+        iterationProgress === 1 && currentIteration--;
+        const iterationIsOdd = currentIteration % 2;
+        if (direction === "reverse" || direction === "alternate" && iterationIsOdd || direction === "alternate-reverse" && !iterationIsOdd) {
+          iterationProgress = 1 - iterationProgress;
+        }
+        const p = t >= this.totalDuration ? 1 : Math.min(iterationProgress, 1);
+        const latest = interpolate$1(this.easing(p));
+        output(latest);
+        const isAnimationFinished = this.pauseTime === void 0 && (this.playState === "finished" || t >= this.totalDuration + endDelay);
+        if (isAnimationFinished) {
+          this.playState = "finished";
+          (_a = this.resolve) === null || _a === void 0 ? void 0 : _a.call(this, latest);
+        } else if (this.playState !== "idle") {
+          this.frameRequestId = requestAnimationFrame(this.tick);
+        }
+      };
+      if (autoplay)
+        this.play();
+    }
+    play() {
+      const now = performance.now();
+      this.playState = "running";
+      if (this.pauseTime !== void 0) {
+        this.startTime = now - this.pauseTime;
+      } else if (!this.startTime) {
+        this.startTime = now;
+      }
+      this.cancelTimestamp = this.startTime;
+      this.pauseTime = void 0;
+      this.frameRequestId = requestAnimationFrame(this.tick);
+    }
+    pause() {
+      this.playState = "paused";
+      this.pauseTime = this.t;
+    }
+    finish() {
+      this.playState = "finished";
+      this.tick(0);
+    }
+    stop() {
+      var _a;
+      this.playState = "idle";
+      if (this.frameRequestId !== void 0) {
+        cancelAnimationFrame(this.frameRequestId);
+      }
+      (_a = this.reject) === null || _a === void 0 ? void 0 : _a.call(this, false);
+    }
+    cancel() {
+      this.stop();
+      this.tick(this.cancelTimestamp);
+    }
+    reverse() {
+      this.rate *= -1;
+    }
+    commitStyles() {
+    }
+    updateDuration(duration) {
+      this.duration = duration;
+      this.totalDuration = duration * (this.repeat + 1);
+    }
+    get currentTime() {
+      return this.t;
+    }
+    set currentTime(t) {
+      if (this.pauseTime !== void 0 || this.rate === 0) {
+        this.pauseTime = t;
+      } else {
+        this.startTime = performance.now() - t / this.rate;
+      }
+    }
+    get playbackRate() {
+      return this.rate;
+    }
+    set playbackRate(rate) {
+      this.rate = rate;
+    }
+  };
+  var warning = function() {
+  };
+  var invariant = function() {
+  };
+  if (true) {
+    warning = function(check, message) {
+      if (!check && typeof console !== "undefined") {
+        console.warn(message);
+      }
+    };
+    invariant = function(check, message) {
+      if (!check) {
+        throw new Error(message);
+      }
+    };
+  }
+  var MotionValue = class {
+    setAnimation(animation) {
+      this.animation = animation;
+      animation === null || animation === void 0 ? void 0 : animation.finished.then(() => this.clearAnimation()).catch(() => {
+      });
+    }
+    clearAnimation() {
+      this.animation = this.generator = void 0;
+    }
+  };
+  var data = /* @__PURE__ */ new WeakMap();
+  function getAnimationData(element) {
+    if (!data.has(element)) {
+      data.set(element, {
+        transforms: [],
+        values: /* @__PURE__ */ new Map()
+      });
+    }
+    return data.get(element);
+  }
+  function getMotionValue(motionValues, name) {
+    if (!motionValues.has(name)) {
+      motionValues.set(name, new MotionValue());
+    }
+    return motionValues.get(name);
+  }
+  var axes = ["", "X", "Y", "Z"];
+  var order = ["translate", "scale", "rotate", "skew"];
+  var transformAlias = {
+    x: "translateX",
+    y: "translateY",
+    z: "translateZ"
+  };
+  var rotation = {
+    syntax: "<angle>",
+    initialValue: "0deg",
+    toDefaultUnit: (v) => v + "deg"
+  };
+  var baseTransformProperties = {
+    translate: {
+      syntax: "<length-percentage>",
+      initialValue: "0px",
+      toDefaultUnit: (v) => v + "px"
+    },
+    rotate: rotation,
+    scale: {
+      syntax: "<number>",
+      initialValue: 1,
+      toDefaultUnit: noopReturn
+    },
+    skew: rotation
+  };
+  var transformDefinitions = /* @__PURE__ */ new Map();
+  var asTransformCssVar = (name) => `--motion-${name}`;
+  var transforms = ["x", "y", "z"];
+  order.forEach((name) => {
+    axes.forEach((axis) => {
+      transforms.push(name + axis);
+      transformDefinitions.set(asTransformCssVar(name + axis), baseTransformProperties[name]);
+    });
+  });
+  var compareTransformOrder = (a, b) => transforms.indexOf(a) - transforms.indexOf(b);
+  var transformLookup = new Set(transforms);
+  var isTransform = (name) => transformLookup.has(name);
+  var addTransformToElement = (element, name) => {
+    if (transformAlias[name])
+      name = transformAlias[name];
+    const { transforms: transforms2 } = getAnimationData(element);
+    addUniqueItem(transforms2, name);
+    element.style.transform = buildTransformTemplate(transforms2);
+  };
+  var buildTransformTemplate = (transforms2) => transforms2.sort(compareTransformOrder).reduce(transformListToString, "").trim();
+  var transformListToString = (template, name) => `${template} ${name}(var(${asTransformCssVar(name)}))`;
+  var isCssVar = (name) => name.startsWith("--");
+  var registeredProperties = /* @__PURE__ */ new Set();
+  function registerCssVariable(name) {
+    if (registeredProperties.has(name))
+      return;
+    registeredProperties.add(name);
+    try {
+      const { syntax, initialValue } = transformDefinitions.has(name) ? transformDefinitions.get(name) : {};
+      CSS.registerProperty({
+        name,
+        inherits: false,
+        syntax,
+        initialValue
+      });
+    } catch (e) {
+    }
+  }
+  var testAnimation = (keyframes, options) => document.createElement("div").animate(keyframes, options);
+  var featureTests = {
+    cssRegisterProperty: () => typeof CSS !== "undefined" && Object.hasOwnProperty.call(CSS, "registerProperty"),
+    waapi: () => Object.hasOwnProperty.call(Element.prototype, "animate"),
+    partialKeyframes: () => {
+      try {
+        testAnimation({ opacity: [1] });
+      } catch (e) {
+        return false;
+      }
+      return true;
+    },
+    finished: () => Boolean(testAnimation({ opacity: [0, 1] }, { duration: 1e-3 }).finished),
+    linearEasing: () => {
+      try {
+        testAnimation({ opacity: 0 }, { easing: "linear(0, 1)" });
+      } catch (e) {
+        return false;
+      }
+      return true;
+    }
+  };
+  var results = {};
+  var supports = {};
+  for (const key in featureTests) {
+    supports[key] = () => {
+      if (results[key] === void 0)
+        results[key] = featureTests[key]();
+      return results[key];
+    };
+  }
+  var resolution = 0.015;
+  var generateLinearEasingPoints = (easing, duration) => {
+    let points = "";
+    const numPoints = Math.round(duration / resolution);
+    for (let i = 0; i < numPoints; i++) {
+      points += easing(progress(0, numPoints - 1, i)) + ", ";
+    }
+    return points.substring(0, points.length - 2);
+  };
+  var convertEasing = (easing, duration) => {
+    if (isFunction(easing)) {
+      return supports.linearEasing() ? `linear(${generateLinearEasingPoints(easing, duration)})` : defaults.easing;
+    } else {
+      return isCubicBezier(easing) ? cubicBezierAsString(easing) : easing;
+    }
+  };
+  var cubicBezierAsString = ([a, b, c, d]) => `cubic-bezier(${a}, ${b}, ${c}, ${d})`;
+  function hydrateKeyframes(keyframes, readInitialValue) {
+    for (let i = 0; i < keyframes.length; i++) {
+      if (keyframes[i] === null) {
+        keyframes[i] = i ? keyframes[i - 1] : readInitialValue();
+      }
+    }
+    return keyframes;
+  }
+  var keyframesList = (keyframes) => Array.isArray(keyframes) ? keyframes : [keyframes];
+  function getStyleName(key) {
+    if (transformAlias[key])
+      key = transformAlias[key];
+    return isTransform(key) ? asTransformCssVar(key) : key;
+  }
+  var style = {
+    get: (element, name) => {
+      name = getStyleName(name);
+      let value = isCssVar(name) ? element.style.getPropertyValue(name) : getComputedStyle(element)[name];
+      if (!value && value !== 0) {
+        const definition = transformDefinitions.get(name);
+        if (definition)
+          value = definition.initialValue;
+      }
+      return value;
+    },
+    set: (element, name, value) => {
+      name = getStyleName(name);
+      if (isCssVar(name)) {
+        element.style.setProperty(name, value);
+      } else {
+        element.style[name] = value;
+      }
+    }
+  };
+  function stopAnimation(animation, needsCommit = true) {
+    if (!animation || animation.playState === "finished")
+      return;
+    try {
+      if (animation.stop) {
+        animation.stop();
+      } else {
+        needsCommit && animation.commitStyles();
+        animation.cancel();
+      }
+    } catch (e) {
+    }
+  }
+  function getUnitConverter(keyframes, definition) {
+    var _a;
+    let toUnit = (definition === null || definition === void 0 ? void 0 : definition.toDefaultUnit) || noopReturn;
+    const finalKeyframe = keyframes[keyframes.length - 1];
+    if (isString(finalKeyframe)) {
+      const unit = ((_a = finalKeyframe.match(/(-?[\d.]+)([a-z%]*)/)) === null || _a === void 0 ? void 0 : _a[2]) || "";
+      if (unit)
+        toUnit = (value) => value + unit;
+    }
+    return toUnit;
+  }
+  function getDevToolsRecord() {
+    return window.__MOTION_DEV_TOOLS_RECORD;
+  }
+  function animateStyle(element, key, keyframesDefinition, options = {}, AnimationPolyfill) {
+    const record = getDevToolsRecord();
+    const isRecording = options.record !== false && record;
+    let animation;
+    let { duration = defaults.duration, delay = defaults.delay, endDelay = defaults.endDelay, repeat = defaults.repeat, easing = defaults.easing, persist = false, direction, offset, allowWebkitAcceleration = false, autoplay = true } = options;
+    const data2 = getAnimationData(element);
+    const valueIsTransform = isTransform(key);
+    let canAnimateNatively = supports.waapi();
+    valueIsTransform && addTransformToElement(element, key);
+    const name = getStyleName(key);
+    const motionValue = getMotionValue(data2.values, name);
+    const definition = transformDefinitions.get(name);
+    stopAnimation(motionValue.animation, !(isEasingGenerator(easing) && motionValue.generator) && options.record !== false);
+    return () => {
+      const readInitialValue = () => {
+        var _a, _b;
+        return (_b = (_a = style.get(element, name)) !== null && _a !== void 0 ? _a : definition === null || definition === void 0 ? void 0 : definition.initialValue) !== null && _b !== void 0 ? _b : 0;
+      };
+      let keyframes = hydrateKeyframes(keyframesList(keyframesDefinition), readInitialValue);
+      const toUnit = getUnitConverter(keyframes, definition);
+      if (isEasingGenerator(easing)) {
+        const custom = easing.createAnimation(keyframes, key !== "opacity", readInitialValue, name, motionValue);
+        easing = custom.easing;
+        keyframes = custom.keyframes || keyframes;
+        duration = custom.duration || duration;
+      }
+      if (isCssVar(name)) {
+        if (supports.cssRegisterProperty()) {
+          registerCssVariable(name);
+        } else {
+          canAnimateNatively = false;
+        }
+      }
+      if (valueIsTransform && !supports.linearEasing() && (isFunction(easing) || isEasingList(easing) && easing.some(isFunction))) {
+        canAnimateNatively = false;
+      }
+      if (canAnimateNatively) {
+        if (definition) {
+          keyframes = keyframes.map((value) => isNumber(value) ? definition.toDefaultUnit(value) : value);
+        }
+        if (keyframes.length === 1 && (!supports.partialKeyframes() || isRecording)) {
+          keyframes.unshift(readInitialValue());
+        }
+        const animationOptions = {
+          delay: time.ms(delay),
+          duration: time.ms(duration),
+          endDelay: time.ms(endDelay),
+          easing: !isEasingList(easing) ? convertEasing(easing, duration) : void 0,
+          direction,
+          iterations: repeat + 1,
+          fill: "both"
+        };
+        animation = element.animate({
+          [name]: keyframes,
+          offset,
+          easing: isEasingList(easing) ? easing.map((thisEasing) => convertEasing(thisEasing, duration)) : void 0
+        }, animationOptions);
+        if (!animation.finished) {
+          animation.finished = new Promise((resolve, reject) => {
+            animation.onfinish = resolve;
+            animation.oncancel = reject;
+          });
+        }
+        const target = keyframes[keyframes.length - 1];
+        animation.finished.then(() => {
+          if (persist)
+            return;
+          style.set(element, name, target);
+          animation.cancel();
+        }).catch(noop2);
+        if (!allowWebkitAcceleration)
+          animation.playbackRate = 1.000001;
+      } else if (AnimationPolyfill && valueIsTransform) {
+        keyframes = keyframes.map((value) => typeof value === "string" ? parseFloat(value) : value);
+        if (keyframes.length === 1) {
+          keyframes.unshift(parseFloat(readInitialValue()));
+        }
+        animation = new AnimationPolyfill((latest) => {
+          style.set(element, name, toUnit ? toUnit(latest) : latest);
+        }, keyframes, Object.assign(Object.assign({}, options), {
+          duration,
+          easing
+        }));
+      } else {
+        const target = keyframes[keyframes.length - 1];
+        style.set(element, name, definition && isNumber(target) ? definition.toDefaultUnit(target) : target);
+      }
+      if (isRecording) {
+        record(element, key, keyframes, {
+          duration,
+          delay,
+          easing,
+          repeat,
+          offset
+        }, "motion-one");
+      }
+      motionValue.setAnimation(animation);
+      if (animation && !autoplay)
+        animation.pause();
+      return animation;
+    };
+  }
+  var getOptions = (options, key) => options[key] ? Object.assign(Object.assign({}, options), options[key]) : Object.assign({}, options);
+  function resolveElements(elements, selectorCache) {
+    var _a;
+    if (typeof elements === "string") {
+      if (selectorCache) {
+        (_a = selectorCache[elements]) !== null && _a !== void 0 ? _a : selectorCache[elements] = document.querySelectorAll(elements);
+        elements = selectorCache[elements];
+      } else {
+        elements = document.querySelectorAll(elements);
+      }
+    } else if (elements instanceof Element) {
+      elements = [elements];
+    }
+    return Array.from(elements || []);
+  }
+  var createAnimation = (factory) => factory();
+  var withControls = (animationFactory, options, duration = defaults.duration) => {
+    return new Proxy({
+      animations: animationFactory.map(createAnimation).filter(Boolean),
+      duration,
+      options
+    }, controls);
+  };
+  var getActiveAnimation = (state) => state.animations[0];
+  var controls = {
+    get: (target, key) => {
+      const activeAnimation = getActiveAnimation(target);
+      switch (key) {
+        case "duration":
+          return target.duration;
+        case "currentTime":
+          return time.s((activeAnimation === null || activeAnimation === void 0 ? void 0 : activeAnimation[key]) || 0);
+        case "playbackRate":
+        case "playState":
+          return activeAnimation === null || activeAnimation === void 0 ? void 0 : activeAnimation[key];
+        case "finished":
+          if (!target.finished) {
+            target.finished = Promise.all(target.animations.map(selectFinished)).catch(noop2);
+          }
+          return target.finished;
+        case "stop":
+          return () => {
+            target.animations.forEach((animation) => stopAnimation(animation));
+          };
+        case "forEachNative":
+          return (callback) => {
+            target.animations.forEach((animation) => callback(animation, target));
+          };
+        default:
+          return typeof (activeAnimation === null || activeAnimation === void 0 ? void 0 : activeAnimation[key]) === "undefined" ? void 0 : () => target.animations.forEach((animation) => animation[key]());
+      }
+    },
+    set: (target, key, value) => {
+      switch (key) {
+        case "currentTime":
+          value = time.ms(value);
+        case "playbackRate":
+          for (let i = 0; i < target.animations.length; i++) {
+            target.animations[i][key] = value;
+          }
+          return true;
+      }
+      return false;
+    }
+  };
+  var selectFinished = (animation) => animation.finished;
+  function resolveOption(option, i, total) {
+    return isFunction(option) ? option(i, total) : option;
+  }
+  function createAnimate(AnimatePolyfill) {
+    return function animate3(elements, keyframes, options = {}) {
+      elements = resolveElements(elements);
+      const numElements = elements.length;
+      invariant(Boolean(numElements), "No valid element provided.");
+      invariant(Boolean(keyframes), "No keyframes defined.");
+      const animationFactories = [];
+      for (let i = 0; i < numElements; i++) {
+        const element = elements[i];
+        for (const key in keyframes) {
+          const valueOptions = getOptions(options, key);
+          valueOptions.delay = resolveOption(valueOptions.delay, i, numElements);
+          const animation = animateStyle(element, key, keyframes[key], valueOptions, AnimatePolyfill);
+          animationFactories.push(animation);
+        }
+      }
+      return withControls(animationFactories, options, options.duration);
+    };
+  }
+  var animate = createAnimate(Animation);
+  function animateProgress(target, options = {}) {
+    return withControls([
+      () => {
+        const animation = new Animation(target, [0, 1], options);
+        animation.finished.catch(() => {
+        });
+        return animation;
+      }
+    ], options, options.duration);
+  }
+  function animate2(target, keyframesOrOptions, options) {
+    const factory = isFunction(target) ? animateProgress : animate;
+    return factory(target, keyframesOrOptions, options);
+  }
+  function isHidden(el) {
+    if (el === null) {
+      return true;
+    }
+    return el.offsetParent === null;
+  }
+  function isFlash(el) {
+    return el.dataset.component === "flash";
+  }
+  function flashCount() {
+    let num = 0;
+    if (!isHidden(document.getElementById("server-error"))) {
+      num += 1;
+    }
+    if (!isHidden(document.getElementById("client-error"))) {
+      num += 1;
+    }
+    if (!isHidden(document.getElementById("flash-info"))) {
+      num += 1;
+    }
+    if (!isHidden(document.getElementById("flash-error"))) {
+      num += 1;
+    }
+    return num;
+  }
+  var removalTime = 5;
+  var animationTime = 550;
+  var maxItemsIgnoresFlashes = true;
+  var gap = 15;
+  var lastTS = [];
+  function doAnimations(delayTime, maxItems, elToRemove) {
+    const ts = [];
+    let toasts = Array.from(document.querySelectorAll('#toast-group [phx-hook="LiveToast"]')).map((t) => {
+      if (isHidden(t)) {
+        return null;
+      } else {
+        return t;
+      }
+    }).filter(Boolean).reverse();
+    if (elToRemove) {
+      toasts = toasts.filter((t) => t !== elToRemove);
+    }
+    for (let i = 0; i < toasts.length; i++) {
+      const toast = toasts[i];
+      if (isHidden(toast)) {
+        continue;
+      }
+      toast.order = i;
+      ts[i] = toast;
+    }
+    for (let i = 0; i < ts.length; i++) {
+      const max = maxItemsIgnoresFlashes ? maxItems + flashCount() : maxItems;
+      const toast = ts[i];
+      let direction = "";
+      if (toast.dataset.corner === "bottom_left" || toast.dataset.corner === "bottom_right") {
+        direction = "-";
+      }
+      let val = 0;
+      for (let j = 0; j < toast.order; j++) {
+        val += ts[j].offsetHeight + gap;
+      }
+      const opacity = toast.order > max ? 0 : 1 - (toast.order - max + 1);
+      if (toast.order >= max) {
+        toast.classList.remove("pointer-events-auto");
+      } else {
+        toast.classList.add("pointer-events-auto");
+      }
+      const keyframes = { y: [`${direction}${val}px`], opacity: [opacity] };
+      if (toast.order === 0 && lastTS.includes(toast) === false) {
+        const val2 = toast.offsetHeight + gap;
+        const oppositeDirection = direction === "-" ? "" : "-";
+        keyframes.y.unshift(`${oppositeDirection}${val2}px`);
+        keyframes.opacity.unshift(0);
+      }
+      toast.targetDestination = `${direction}${val}px`;
+      const duration = animationTime / 1e3;
+      animate2(toast, keyframes, {
+        duration,
+        easing: [0.22, 1, 0.36, 1]
+      });
+      toast.order += 1;
+      toast.style.zIndex = (50 - toast.order).toString();
+      window.setTimeout(() => {
+        if (toast.order > max) {
+          this.pushEventTo("#toast-group", "clear", { id: toast.id });
+        }
+      }, delayTime + removalTime);
+      lastTS = ts;
+    }
+  }
+  async function animateOut() {
+    const val = (this.el.order - 2) * 100 + (this.el.order - 2) * gap;
+    let direction = "";
+    if (this.el.dataset.corner === "bottom_left" || this.el.dataset.corner === "bottom_right") {
+      direction = "-";
+    }
+    const animation = animate2(this.el, { y: `${direction}${val}%`, opacity: 0 }, {
+      opacity: {
+        duration: 0.2,
+        easing: "ease-out"
+      },
+      duration: 0.3,
+      easing: "ease-out"
+    });
+    await animation.finished;
+  }
+  function createLiveToastHook(duration = 6e3, maxItems = 3) {
+    return {
+      destroyed() {
+        doAnimations.bind(this)(duration, maxItems);
+      },
+      updated() {
+        const keyframes = { y: [this.el.targetDestination] };
+        animate2(this.el, keyframes, { duration: 0 });
+      },
+      mounted() {
+        if (["server-error", "client-error"].includes(this.el.id)) {
+          if (isHidden(document.getElementById(this.el.id))) {
+            return;
+          }
+        }
+        window.addEventListener("phx:clear-flash", (e) => {
+          this.pushEvent("lv:clear-flash", {
+            key: e.detail.key
+          });
+        });
+        window.addEventListener("flash-leave", async (event) => {
+          if (event.target === this.el) {
+            doAnimations.bind(this, duration, maxItems, this.el)();
+            await animateOut.bind(this)();
+          }
+        });
+        doAnimations.bind(this)(duration, maxItems);
+        if (isFlash(this.el)) {
+          return;
+        }
+        let durationOverride = duration;
+        if (this.el.dataset.duration !== void 0) {
+          durationOverride = Number.parseInt(this.el.dataset.duration);
+        }
+        window.setTimeout(async () => {
+          await animateOut.bind(this)();
+          this.pushEventTo("#toast-group", "clear", { id: this.el.id });
+        }, durationOverride + removalTime);
+      }
+    };
+  }
+
   // js/hooks/index.js
   var Hooks2 = {
+    LiveToast: createLiveToastHook(),
     AppShell,
     SidebarInteractions,
     SettingsSectionScroll,
