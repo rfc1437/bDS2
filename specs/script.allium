@@ -271,9 +271,13 @@ rule ExecuteTransform {
         -- project_id and no active project the import is refused with a warning.
 
     @guarantee BlogmarkColdStartDelivery
-        -- A deep link that arrives before the shell is connected (e.g. the
-        -- bookmarklet launching the app) is queued and replayed once a shell
-        -- attaches, so launching via a bookmarklet still creates the post.
+        -- A deep link that arrives before the shell is ready (e.g. the
+        -- bookmarklet launching the app) is queued and replayed only after the
+        -- client has finished initialising and rehydrating its stored
+        -- workbench session, so the post is created and the editor it opens is
+        -- not overwritten by the session restore. A session restore arriving
+        -- after a deep link (e.g. when the link switched projects) preserves
+        -- the newly opened editor tab as the active tab.
 
     @guarantee TransformTrigger
         -- Transform scripts are triggered automatically by blogmark import.

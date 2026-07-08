@@ -960,6 +960,73 @@ defmodule BDS.Desktop.ShellLiveTest do
            end)
   end
 
+  test "cold-start deep links replay only after the client signals shell_ready", %{
+    project: project
+  } do
+    start_supervised!({BDS.Desktop.DeepLink, []})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    url =
+      "bds2://new-post?title=" <>
+        URI.encode_www_form("Cold Start Post") <>
+        "&url=" <> URI.encode_www_form("https://example.com/cold")
+
+    send(BDS.Desktop.DeepLink, {:open_url, String.to_charlist(url)})
+
+    # The link stays queued while the client is still rehydrating.
+    _html = render(view)
+    refute Repo.get_by(Post, title: "Cold Start Post")
+
+    # The client restores its stored session, then signals readiness.
+    session_payload =
+      Workbench.new()
+      |> Workbench.open_tab(:post, "stored-post", :pin)
+      |> Session.serialize()
+
+    _html = render_hook(view, "restore_workbench_session", %{"session" => session_payload})
+    _html = render_hook(view, "shell_ready", %{})
+    html = render(view)
+
+    created_post = Repo.get_by!(Post, title: "Cold Start Post")
+    assert created_post.project_id == project.id
+
+    # The blogmark post is open and active; the restored tab survived.
+    assert html =~ ~s(data-tab-id="#{created_post.id}")
+    assert html =~ ~s(data-tab-id="stored-post")
+
+    assert :sys.get_state(view.pid).socket.assigns.workbench.active_tab ==
+             {:post, created_post.id}
+  end
+
+  test "workbench session restore preserves a blogmark tab opened before the restore arrives" do
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    url =
+      "bds2://new-post?title=" <>
+        URI.encode_www_form("Survives Restore") <>
+        "&url=" <> URI.encode_www_form("https://example.com/survives")
+
+    send(view.pid, {:blogmark_deep_link, url})
+    _html = render(view)
+    created_post = Repo.get_by!(Post, title: "Survives Restore")
+
+    # A late session restore (e.g. after the blogmark switched projects) must
+    # not discard the editor tab the blogmark just opened.
+    session_payload =
+      Workbench.new()
+      |> Workbench.open_tab(:post, "stored-post", :pin)
+      |> Session.serialize()
+
+    html = render_hook(view, "restore_workbench_session", %{"session" => session_payload})
+
+    assert html =~ ~s(data-tab-id="#{created_post.id}")
+    assert html =~ ~s(data-tab-id="stored-post")
+
+    assert :sys.get_state(view.pid).socket.assigns.workbench.active_tab ==
+             {:post, created_post.id}
+  end
+
   test "settings sidebar selections expose a scroll target for the preferences editor" do
     {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
 

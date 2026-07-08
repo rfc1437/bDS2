@@ -152,7 +152,6 @@ defmodule BDS.Desktop.ShellLive do
 
     if connected do
       Phoenix.PubSub.subscribe(BDS.PubSub, Watcher.topic())
-      attach_deep_link()
       Process.send_after(self(), :refresh_task_status, @refresh_interval)
     end
 
@@ -546,7 +545,20 @@ defmodule BDS.Desktop.ShellLive do
 
   def handle_event("restore_workbench_session", %{"session" => session_payload}, socket)
       when is_map(session_payload) do
-    {:noreply, reload_shell(socket, SessionUtil.restore_workbench_session(session_payload))}
+    restored =
+      session_payload
+      |> SessionUtil.restore_workbench_session()
+      |> preserve_active_tab(socket.assigns.workbench)
+
+    {:noreply, reload_shell(socket, restored)}
+  end
+
+  # The client signals readiness after mounting its hooks and pushing any
+  # stored workbench session. Deep links attach only now, so cold-start
+  # blogmark links run after rehydration and the editor they open survives.
+  def handle_event("shell_ready", _params, socket) do
+    attach_deep_link()
+    {:noreply, socket}
   end
 
   def handle_event(event, params, socket) when event in @native_menu_events do
@@ -921,6 +933,21 @@ defmodule BDS.Desktop.ShellLive do
     |> assign(:tab_meta, tab_meta)
     |> refresh_layout(workbench)
     |> UrlState.push()
+  end
+
+  # A tab opened before the client's stored session arrives (e.g. a blogmark
+  # deep link that switched projects) must survive the restore, so re-open it
+  # on the restored workbench with its original transient/pinned intent.
+  defp preserve_active_tab(restored, %{active_tab: nil}), do: restored
+
+  defp preserve_active_tab(restored, %{active_tab: {type, id}} = previous) do
+    intent =
+      case Enum.find(previous.tabs, &(&1.type == type and &1.id == id)) do
+        %{is_transient: true} -> :preview
+        _ -> :pin
+      end
+
+    Workbench.open_tab(restored, type, id, intent)
   end
 
   defp current_project_id(socket), do: (socket.assigns[:projects] || %{})[:active_project_id]

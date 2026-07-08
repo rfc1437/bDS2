@@ -186,6 +186,9 @@ export const AppShell = {
     this.el.addEventListener("change", this.handleChange);
     syncMediaThumbnailState(this.el);
     this.restoreStoredWorkbenchSession();
+    // Rehydration is done (any stored-session push is ordered before this):
+    // tell the server it may now deliver queued deep links.
+    this.pushEvent("shell_ready", {});
   },
 
   updated() {
