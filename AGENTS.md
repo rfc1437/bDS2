@@ -124,6 +124,34 @@ This document provides context and best practices for GitHub Copilot when workin
 
 ---
 
+## ⚠️ MANDATORY: macOS Bundle Build Order and Blogmark Verification
+
+**`mix release` copies `priv/static` as-is — it never rebuilds assets.** Always build in this order, or the bundle ships stale JS while the server code is current (this silently broke blogmark deep links in July 2026: the server waited for the client's `shell_ready` event that the stale `app.js` never sent, so every deep link queued forever with no error, no toast, no log):
+
+```
+mix assets.deploy
+MIX_ENV=prod mix release bds --overwrite
+mix bds.bundle.macos
+```
+
+**After building a bundle, verify blogmark deep links end-to-end with:**
+
+```
+scripts/verify_blogmark_macos.sh [path/to/BDS2.app]   # defaults to dist/macos/BDS2.app
+```
+
+The script launches the bundle via LaunchServices with an isolated database (`launchctl setenv BDS_DATABASE_PATH ...`), fires `bds2://new-post` links with `open -a` exactly like a browser bookmarklet, and asserts draft posts appear in the database — both for cold start (link launches the app, queued until the shell attaches) and for an already-running app. It refuses to run while any BDS2 instance is up; quit the app first.
+
+Things learned the hard way, encoded in the script — do not "simplify" them away:
+
+- Deep links only reach an app **launched through LaunchServices** (`open -a`). A process started by exec'ing `Contents/MacOS/bds2` from a shell never receives Apple Events, so deep links vanish without a trace. For the same reason `open` does not inherit the shell environment — inject env vars with `launchctl setenv` (and unset them afterwards).
+- To introspect a running bundle, launch it with `RELEASE_DISTRIBUTION=name` and `RELEASE_NODE=bds@127.0.0.1` set (via `launchctl setenv`), then use `.../Contents/Resources/rel/bin/bds rpc '<elixir>'` with the same env. The default `-sname` node is unreachable when the hostname resolves to LAN addresses.
+- The wx → `Desktop.Env` → `BDS.Desktop.DeepLink` → shell pipeline downstream of the OS can be exercised without LaunchServices via `send(Process.whereis(BDS.Desktop.DeepLink), {:open_url, ~c"bds2://new-post?..."})` over rpc.
+
+> **Assets before release. Verify blogmarks after bundling. No exceptions.**
+
+---
+
 ## ⚠️ MANDATORY: Proper I18N for UI and Rendering Text
 
 **All user-facing text MUST follow proper i18n patterns.**
