@@ -71,8 +71,8 @@ msgid "AI Assistant"
 msgstr "KI-Assistent"
 
 #: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:93
-#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:190
-#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:208
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:193
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:211
 #, elixir-autogen, elixir-format
 msgid "AI Settings"
 msgstr "KI-Einstellungen"
@@ -336,7 +336,7 @@ msgstr "Autor"
 msgid "Auto"
 msgstr "Automatisch"
 
-#: lib/bds/desktop/shell_live.ex:448
+#: lib/bds/desktop/shell_live.ex:442
 #: lib/bds/desktop/shell_live/chat_editor.ex:234
 #: lib/bds/desktop/shell_live/media_editor.ex:171
 #: lib/bds/desktop/shell_live/media_editor.ex:364
@@ -486,7 +486,7 @@ msgstr "Kategorie-Standards, Render-Flags und Template-Zuordnung"
 msgid "Category name is required"
 msgstr "Kategoriename ist erforderlich"
 
-#: lib/bds/desktop/shell_live.ex:771
+#: lib/bds/desktop/shell_live.ex:780
 #: lib/bds/desktop/shell_live/chat_editor.ex:87
 #: lib/bds/desktop/shell_live/chat_editor.ex:233
 #: lib/bds/desktop/shell_live/chat_editor.ex:323
@@ -1063,7 +1063,7 @@ msgstr "Galerie"
 msgid "Generate Site"
 msgstr "Website generieren"
 
-#: lib/bds/desktop/shell_live.ex:772
+#: lib/bds/desktop/shell_live.ex:781
 #: lib/bds/desktop/shell_live/socket_state.ex:109
 #: lib/bds/ui/sidebar.ex:789
 #, elixir-autogen, elixir-format
@@ -1077,7 +1077,7 @@ msgid "Git Diff"
 msgstr "Git-Diff"
 
 #: lib/bds/desktop/shell_data.ex:226
-#: lib/bds/desktop/shell_live.ex:768
+#: lib/bds/desktop/shell_live.ex:777
 #: lib/bds/desktop/shell_live/panel_renderer.ex:171
 #, elixir-autogen, elixir-format
 msgid "Git Log"
@@ -1200,9 +1200,9 @@ msgstr "Importdefinitionen"
 msgid "Import failed: %{error}"
 msgstr "Import fehlgeschlagen: %{error}"
 
-#: lib/bds/desktop/shell_live.ex:598
-#: lib/bds/desktop/shell_live.ex:884
-#: lib/bds/desktop/shell_live.ex:890
+#: lib/bds/desktop/shell_live.ex:605
+#: lib/bds/desktop/shell_live.ex:893
+#: lib/bds/desktop/shell_live.ex:899
 #: lib/bds/desktop/shell_live/sidebar_create.ex:47
 #, elixir-autogen, elixir-format
 msgid "Import media"
@@ -1784,7 +1784,7 @@ msgstr "Sonstige"
 msgid "Other (%{count})"
 msgstr "Andere (%{count})"
 
-#: lib/bds/desktop/shell_live.ex:767
+#: lib/bds/desktop/shell_live.ex:776
 #: lib/bds/desktop/shell_live/panel_renderer.ex:83
 #, elixir-autogen, elixir-format
 msgid "Output"
@@ -2538,7 +2538,7 @@ msgstr "Schlagwortname"
 msgid "Tags"
 msgstr "Tags"
 
-#: lib/bds/desktop/shell_live.ex:766
+#: lib/bds/desktop/shell_live.ex:775
 #: lib/bds/desktop/shell_live/panel_renderer.ex:54
 #, elixir-autogen, elixir-format
 msgid "Tasks"
@@ -3218,12 +3218,12 @@ msgstr "Willkommen beim KI-Assistenten"
 msgid "Comparing database and filesystem metadata"
 msgstr "Vergleicht Datenbank- und Dateisystem-Metadaten"
 
-#: lib/bds/desktop/shell_live.ex:674
+#: lib/bds/desktop/shell_live.ex:681
 #, elixir-autogen, elixir-format
 msgid "Added %{count} images to post"
 msgstr "%{count} Bilder zum Beitrag hinzugefügt"
 
-#: lib/bds/desktop/shell_live.ex:642
+#: lib/bds/desktop/shell_live.ex:649
 #, elixir-autogen, elixir-format
 msgid "Added %{title}"
 msgstr "%{title} hinzugefügt"
@@ -3243,18 +3243,18 @@ msgstr "Endbenutzer-Anleitung für redaktionelle Arbeitsabläufe, Medien, Vorlag
 msgid "Image Import Concurrency"
 msgstr "Gleichzeitige Bildimporte"
 
-#: lib/bds/desktop/shell_live.ex:447
-#: lib/bds/desktop/shell_live.ex:460
-#: lib/bds/desktop/shell_live.ex:641
-#: lib/bds/desktop/shell_live.ex:673
-#: lib/bds/desktop/shell_live.ex:684
-#: lib/bds/desktop/shell_live.ex:695
+#: lib/bds/desktop/shell_live.ex:441
+#: lib/bds/desktop/shell_live.ex:454
+#: lib/bds/desktop/shell_live.ex:648
+#: lib/bds/desktop/shell_live.ex:680
+#: lib/bds/desktop/shell_live.ex:691
+#: lib/bds/desktop/shell_live.ex:702
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:420
 #, elixir-autogen, elixir-format
 msgid "Add Gallery Images"
 msgstr "Galerie-Bilder hinzufügen"
 
-#: lib/bds/desktop/shell_live.ex:696
+#: lib/bds/desktop/shell_live.ex:703
 #, elixir-autogen, elixir-format
 msgid "Failed to process %{path}: %{reason}"
 msgstr "%{path} konnte nicht verarbeitet werden: %{reason}"
@@ -3445,12 +3445,12 @@ msgstr "umbenannt"
 msgid "untracked"
 msgstr "nicht verfolgt"
 
-#: lib/bds/desktop/shell_live.ex:792
+#: lib/bds/desktop/shell_live.ex:801
 #, elixir-autogen, elixir-format
 msgid "Blogmark"
 msgstr "Blogmark"
 
-#: lib/bds/desktop/shell_live.ex:835
+#: lib/bds/desktop/shell_live.ex:844
 #, elixir-autogen, elixir-format
 msgid "Open a project before importing a blogmark."
 msgstr "Öffnen Sie ein Projekt, bevor Sie ein Blogmark importieren."
@@ -3491,7 +3491,7 @@ msgstr "Loeschen"
 msgid "Failed to copy bookmarklet to clipboard"
 msgstr "Bookmarklet konnte nicht in die Zwischenablage kopiert werden"
 
-#: lib/bds/desktop/shell_live.ex:804
+#: lib/bds/desktop/shell_live.ex:813
 #, elixir-autogen, elixir-format
 msgid "The project this blogmark targets does not exist here."
 msgstr "Das Projekt, auf das dieses Blogmark verweist, existiert hier nicht."
@@ -3578,12 +3578,12 @@ msgstr "KI-Einstellungen gespeichert."
 msgid "Could not load models"
 msgstr "Modelle konnten nicht geladen werden"
 
-#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:187
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:190
 #, elixir-autogen, elixir-format
 msgid "Could not save AI settings"
 msgstr "KI-Einstellungen konnten nicht gespeichert werden"
 
-#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:182
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:184
 #, elixir-autogen, elixir-format
 msgid "Loaded %{count} models."
 msgstr "%{count} Modelle geladen."
@@ -3593,7 +3593,17 @@ msgstr "%{count} Modelle geladen."
 msgid "OK"
 msgstr "OK"
 
-#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:173
+#: lib/bds/desktop/shell_live/settings_editor/ai_settings.ex:174
 #, elixir-autogen, elixir-format
 msgid "The endpoint returned no models. You can still type a model name manually."
 msgstr "Der Endpunkt hat keine Modelle zurückgegeben. Sie können einen Modellnamen weiterhin manuell eingeben."
+
+#: lib/bds/tui.ex:28
+#, elixir-autogen, elixir-format
+msgid "Blogging Desktop Server"
+msgstr "Blogging Desktop Server"
+
+#: lib/bds/tui.ex:30
+#, elixir-autogen, elixir-format
+msgid "Press q to quit."
+msgstr "Drücken Sie q zum Beenden."

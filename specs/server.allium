@@ -1,0 +1,62 @@
+-- allium: 1
+-- Headless Server Mode (issue #26, phase 1)
+-- Scope: extension (client/server split — SSH transport for TUI and GUI)
+-- Distilled from: lib/bds/server.ex, lib/bds/application.ex, lib/bds/tui.ex
+
+entity BootMode {
+    kind: desktop | server
+    -- Resolved from the BDS_MODE environment variable at application start.
+    -- Anything other than "server" (case-insensitive) is desktop.
+}
+
+entity SshKeyMaterial {
+    dir: String                     -- <data dir>/ssh, next to the database
+    host_key: String                -- ssh_host_rsa_key, generated on first boot
+    authorized_keys: String         -- created empty (mode 600) on first boot
+
+    -- Invariant: key material lives in the private app data dir,
+    -- never in the repo or an application priv dir.
+}
+
+surface ServerRuntimeSurface {
+    facing _: ServerRuntime
+
+    provides:
+        ApplicationStarted(mode)
+        SshClientConnected()
+}
+
+rule ModeResolution {
+    when: ApplicationStarted(mode)
+    -- BDS_MODE environment variable decides the mode once per boot
+    ensures: BootMode.created(kind: mode)
+}
+
+rule DesktopBoot {
+    when: ApplicationStarted(mode: desktop)
+    -- Unchanged behavior: wx window shell, loopback HTTP endpoint.
+    ensures: DesktopWindowStarted()
+}
+
+rule ServerBoot {
+    when: ApplicationStarted(mode: server)
+    -- Headless: no wx children at all. Works on macOS, Windows, Linux.
+    ensures: LoopbackEndpointStarted()
+        -- HTTP endpoint stays bound to 127.0.0.1; never exposed directly
+    ensures: CliSyncWatcherStarted()
+    ensures: SshDaemonStarted()
+        -- ExRatatui.SSH.Daemon: public-key auth only (no passwords),
+        -- tcpip_tunnel_out enabled so GUI clients tunnel to the loopback
+        -- endpoint through the same SSH connection and the same keys
+    ensures: SshKeyMaterial.created()
+        -- host key generated and authorized_keys touched on first boot only
+}
+
+rule TuiSession {
+    when: SshClientConnected()
+    -- Each SSH client gets its own TUI app instance on the server;
+    -- only terminal cells cross the wire.
+    ensures: TuiAppMounted()
+        -- UI locale comes from the server-side UI language setting,
+        -- identical for every client
+}

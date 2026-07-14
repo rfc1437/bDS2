@@ -25,6 +25,8 @@ config :bds, :desktop,
   window_min_size: {800, 600},
   title: "Blogging Desktop Server"
 
+config :bds, :server, ssh_port: 2222
+
 config :bds, BDS.Desktop.Endpoint,
   url: [host: "127.0.0.1"],
   adapter: Bandit.PhoenixAdapter,

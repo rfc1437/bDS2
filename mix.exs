@@ -40,6 +40,7 @@ defmodule BDS.MixProject do
       {:live_toast, "~> 0.8.0"},
       {:saxy, "~> 1.4"},
       {:desktop, "~> 1.5"},
+      {:ex_ratatui, "~> 0.11"},
       {:image, "~> 0.67"},
       {:nx, "~> 0.10"},
       {:exla, "~> 0.10"},

@@ -127,7 +127,9 @@ defmodule BDS.Scripting.JobTest do
     _running_job = wait_for_job(job.id, &(&1.status == :running))
 
     assert :ok = BDS.Scripting.cancel_job(job.id)
-    assert_receive :job_cleanup_ran, 1_000
+    # Generous timeout: cleanup runs in a separate shutdown path and 1s
+    # flakes when the full suite loads the machine.
+    assert_receive :job_cleanup_ran, 5_000
 
     cancelled_job = wait_for_job(job.id, &(&1.status == :cancelled))
     assert cancelled_job.finished_at != nil

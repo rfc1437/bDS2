@@ -5,6 +5,15 @@ defmodule BDS.Application do
 
   @compiled_env Application.compile_env(:bds, :current_env, Mix.env())
 
+  # Children that depend on the boot mode (issue #26): desktop mode runs the
+  # wx window shell, server mode runs headless behind the SSH daemon. Both
+  # start the loopback HTTP endpoint and the CLI sync watcher.
+  def mode_children(:server, _env) do
+    [{BDS.Desktop.Server, []}, BDS.CliSync.Watcher, BDS.Server]
+  end
+
+  def mode_children(:desktop, env), do: desktop_children(env)
+
   def desktop_children(env \\ nil)
 
   def desktop_children(:test) do
@@ -41,7 +50,7 @@ defmodule BDS.Application do
         {Task.Supervisor, name: BDS.Scripting.TaskSupervisor},
         BDS.Scripting.JobSupervisor,
         BDS.Embeddings.Index
-      ] ++ embedding_children() ++ desktop_children(current_env())
+      ] ++ embedding_children() ++ mode_children(BDS.Server.mode(), current_env())
 
     opts = [strategy: :one_for_one, name: BDS.Supervisor]
     Supervisor.start_link(children, opts)
