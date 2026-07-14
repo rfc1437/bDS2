@@ -1,4 +1,4 @@
-defmodule BDS.Desktop.ShellLive.PostEditor.ListValues do
+defmodule BDS.UI.PostEditor.ListValues do
   @moduledoc false
 
   alias BDS.{Metadata, Tags}

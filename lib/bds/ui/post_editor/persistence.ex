@@ -1,17 +1,21 @@
-defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
-  @moduledoc false
+defmodule BDS.UI.PostEditor.Persistence do
+  @moduledoc """
+  Save/publish/discard workflow for post drafts, shared by the LiveView
+  shell and the TUI (issue #26, phase 3). Routes canonical-language edits
+  to the post itself and other languages to translations.
+  """
 
   alias BDS.Posts
   alias BDS.Posts.Post
-  alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, PostMetadata}
+  alias BDS.UI.PostEditor.{Draft, Metadata}
   use Gettext, backend: BDS.Gettext
 
   @spec persist(term(), term(), term(), term(), term()) :: term()
   def persist(%Post{} = post, draft, active_language, metadata, action) do
-    canonical_language = PostMetadata.canonical_language(post, metadata)
-    translations = PostMetadata.translations(post.id)
+    canonical_language = Metadata.canonical_language(post, metadata)
+    translations = Metadata.translations(post.id)
 
-    if DraftManagement.editing_canonical_language?(
+    if Draft.editing_canonical_language?(
          translations,
          active_language,
          canonical_language
@@ -28,11 +32,11 @@ defmodule BDS.Desktop.ShellLive.PostEditor.Persistence do
 
   @spec discard(term(), term(), term()) :: term()
   def discard(%Post{} = post, active_language, metadata) do
-    canonical_language = PostMetadata.canonical_language(post, metadata)
-    current_translations = PostMetadata.translations(post.id)
+    canonical_language = Metadata.canonical_language(post, metadata)
+    current_translations = Metadata.translations(post.id)
 
     cond do
-      not DraftManagement.editing_canonical_language?(
+      not Draft.editing_canonical_language?(
         current_translations,
         active_language,
         canonical_language

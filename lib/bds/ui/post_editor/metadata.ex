@@ -1,4 +1,4 @@
-defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
+defmodule BDS.UI.PostEditor.Metadata do
   @moduledoc false
 
   import Ecto.Query
@@ -20,7 +20,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor.PostMetadata do
 
   @spec canonical_language(term(), term()) :: term()
   def canonical_language(post, metadata) do
-    BDS.Desktop.ShellLive.PostEditor.DraftManagement.normalize_language(
+    BDS.UI.PostEditor.Draft.normalize_language(
       post.language,
       metadata.main_language || "en"
     )

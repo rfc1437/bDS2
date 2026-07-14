@@ -55,43 +55,43 @@ defmodule BDS.GalleryPipelineTest do
     test "counts [[gallery]] macro as gallery content" do
       form = %{"content" => "Some text\n\n[[gallery]]\n\nMore text"}
 
-      assert BDS.Desktop.ShellLive.PostEditor.PostMetadata.gallery_count(form) == 1
+      assert BDS.UI.PostEditor.Metadata.gallery_count(form) == 1
     end
 
     test "counts inline images as before" do
       form = %{"content" => "![Alt](image.jpg)"}
 
-      assert BDS.Desktop.ShellLive.PostEditor.PostMetadata.gallery_count(form) == 1
+      assert BDS.UI.PostEditor.Metadata.gallery_count(form) == 1
     end
 
     test "counts both [[gallery]] and inline images" do
       form = %{"content" => "![Alt](image.jpg)\n[[gallery]]"}
 
-      assert BDS.Desktop.ShellLive.PostEditor.PostMetadata.gallery_count(form) == 1
+      assert BDS.UI.PostEditor.Metadata.gallery_count(form) == 1
     end
 
     test "returns 0 when no gallery marks present" do
       form = %{"content" => "Just plain text"}
 
-      assert BDS.Desktop.ShellLive.PostEditor.PostMetadata.gallery_count(form) == 0
+      assert BDS.UI.PostEditor.Metadata.gallery_count(form) == 0
     end
 
     test "handles empty content" do
       form = %{}
 
-      assert BDS.Desktop.ShellLive.PostEditor.PostMetadata.gallery_count(form) == 0
+      assert BDS.UI.PostEditor.Metadata.gallery_count(form) == 0
     end
 
     test "counts multiple [[gallery]] occurrences" do
       form = %{"content" => "[[gallery]] some text [[gallery]]"}
 
-      assert BDS.Desktop.ShellLive.PostEditor.PostMetadata.gallery_count(form) == 2
+      assert BDS.UI.PostEditor.Metadata.gallery_count(form) == 2
     end
 
     test "is case insensitive for [[gallery]]" do
       form = %{"content" => "[[Gallery]]"}
 
-      assert BDS.Desktop.ShellLive.PostEditor.PostMetadata.gallery_count(form) == 1
+      assert BDS.UI.PostEditor.Metadata.gallery_count(form) == 1
     end
   end
 

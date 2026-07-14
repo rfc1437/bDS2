@@ -220,7 +220,7 @@ defmodule BDS.PostTranslationsTest do
       "template_slug" => ""
     }
 
-    alias BDS.Desktop.ShellLive.PostEditor.Persistence
+    alias BDS.UI.PostEditor.Persistence
 
     assert {:ok, _post} = Persistence.persist(post, draft, "en", metadata, :auto_save)
     assert ai_tasks() == []

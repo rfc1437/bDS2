@@ -6,11 +6,11 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
   alias BDS.{AI, Embeddings, Metadata, Posts, Preview, Tasks}
   alias BDS.Desktop.ShellData
   alias BDS.Desktop.ShellLive.{EditorImageDrop, Notify}
-  alias BDS.Desktop.ShellLive.PostEditor.{DraftManagement, ListValues, Persistence, PostMetadata}
   alias BDS.Posts.Post
   alias BDS.Tags
+  alias BDS.UI.PostEditor.{Draft, ListValues, Persistence}
 
-  import DraftManagement,
+  import Draft,
     only: [
       editing_canonical_language?: 3,
       normalize_language: 2,
@@ -48,7 +48,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   use Gettext, backend: BDS.Gettext
 
-  import PostMetadata,
+  import BDS.UI.PostEditor.Metadata,
     only: [
       blank?: 1,
       blank_to_nil: 1,
