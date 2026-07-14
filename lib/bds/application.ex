@@ -12,6 +12,10 @@ defmodule BDS.Application do
     [{BDS.Desktop.Server, []}, BDS.CliSync.Watcher, BDS.Server]
   end
 
+  # Local TUI: the headless server plus a TUI on the launching terminal, so
+  # a GUI (via tunnel) and the local terminal can work in parallel.
+  def mode_children(:tui, env), do: mode_children(:server, env) ++ [{BDS.TUI, []}]
+
   def mode_children(:desktop, env), do: desktop_children(env)
 
   def desktop_children(env \\ nil)

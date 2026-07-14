@@ -1,0 +1,70 @@
+-- allium: 1
+-- Terminal UI (issue #26, phase 4)
+-- Scope: extension (second renderer over the shared UI core)
+-- Distilled from: lib/bds/tui.ex, lib/bds/ui/sidebar.ex, lib/bds/ui/post_editor/*.ex
+
+entity TuiState {
+    view: posts | media | templates | scripts | tags
+    focus: sidebar | editor
+    selected_index: Integer
+    editing_post: Boolean
+    -- The editor drives the same BDS.UI.PostEditor workflow as the GUI:
+    -- canonical-language edits update the post, other languages update
+    -- translations; publish routes through the same publishing pipeline.
+}
+
+surface TuiSurface {
+    facing _: TuiRuntime
+
+    provides:
+        TuiKeyPressed(code, modifiers)
+        TuiEventReceived(entity, entity_id, action)
+        TuiSettingsChanged(key)
+}
+
+rule SidebarNavigation {
+    when: TuiKeyPressed(code: "up" | "down" | "j" | "k")
+    -- Selection moves over the flattened sidebar items and skips
+    -- section headers; data comes from BDS.UI.Sidebar.view, identical
+    -- to the GUI sidebar content.
+    ensures: TuiState.selected_index.updated()
+}
+
+rule OpenEntry {
+    when: TuiKeyPressed(code: "enter")
+    -- Posts open in the editor (title + textarea seeded from the
+    -- persisted form). Images open in the terminal image preview.
+    -- Other entities report that terminal editing is not available yet.
+    ensures: TuiState.editing_post.updated()
+}
+
+rule SaveAndPublish {
+    when: TuiKeyPressed(code: "s" | "p", modifiers: "ctrl")
+    -- ctrl+s saves the draft, ctrl+p saves and publishes — both through
+    -- BDS.UI.PostEditor.Persistence, so files, embeddings, search, and
+    -- the event bus behave exactly as a GUI save.
+    ensures: PostPersisted()
+}
+
+rule AiQuickAction {
+    when: TuiKeyPressed(code: "g", modifiers: "ctrl")
+    -- One-shot AI post analysis (title/excerpt suggestions). Gated by
+    -- airplane mode: without a local endpoint the TUI shows a status
+    -- message instead of calling out.
+    ensures: AiSuggestionsRequestedOrRefused()
+}
+
+rule MultiClientSync {
+    when: TuiEventReceived(entity, entity_id, action)
+    -- Domain events refresh the sidebar; a post deleted elsewhere closes
+    -- the open editor. Keeps TUI sessions synchronized with GUI clients
+    -- and pipeline ingestion.
+    ensures: TuiState.updated()
+}
+
+rule ServerSideLocale {
+    when: TuiSettingsChanged(key: "ui.language")
+    -- The TUI re-reads the server-side UI language and re-renders; all
+    -- clients always share one language.
+    ensures: TuiRelocalized()
+}

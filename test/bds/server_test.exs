@@ -14,6 +14,10 @@ defmodule BDS.ServerTest do
       assert Server.mode("SERVER") == :server
     end
 
+    test "recognizes tui mode" do
+      assert Server.mode("tui") == :tui
+    end
+
     test "unknown values fall back to :desktop" do
       assert Server.mode("garbage") == :desktop
     end
@@ -101,6 +105,11 @@ defmodule BDS.ServerTest do
                {Desktop.Window, _} -> true
                _other -> false
              end)
+    end
+
+    test "tui mode is the server plus a local TUI" do
+      assert BDS.Application.mode_children(:tui, :prod) ==
+               BDS.Application.mode_children(:server, :prod) ++ [{BDS.TUI, []}]
     end
 
     test "desktop mode delegates to desktop_children" do

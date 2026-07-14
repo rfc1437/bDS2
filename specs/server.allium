@@ -4,9 +4,10 @@
 -- Distilled from: lib/bds/server.ex, lib/bds/application.ex, lib/bds/tui.ex
 
 entity BootMode {
-    kind: desktop | server
+    kind: desktop | server | tui
     -- Resolved from the BDS_MODE environment variable at application start.
-    -- Anything other than "server" (case-insensitive) is desktop.
+    -- "server" is headless; "tui" is the headless server plus a TUI on the
+    -- launching terminal; anything else is desktop.
 }
 
 entity SshKeyMaterial {

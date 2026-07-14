@@ -11,14 +11,19 @@ defmodule BDS.Server do
   """
 
   @doc """
-  Resolves the boot mode from the `BDS_MODE` environment variable.
-  Anything other than `"server"` (case-insensitive) is desktop mode.
+  Resolves the boot mode from the `BDS_MODE` environment variable:
+  `"server"` (headless + SSH daemon), `"tui"` (headless + SSH daemon +
+  a TUI attached to the launching terminal), anything else is desktop.
   """
-  @spec mode(String.t() | nil) :: :desktop | :server
+  @spec mode(String.t() | nil) :: :desktop | :server | :tui
   def mode(value \\ System.get_env("BDS_MODE"))
 
   def mode(value) when is_binary(value) do
-    if String.downcase(value) == "server", do: :server, else: :desktop
+    case String.downcase(value) do
+      "server" -> :server
+      "tui" -> :tui
+      _other -> :desktop
+    end
   end
 
   def mode(nil), do: :desktop

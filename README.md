@@ -12,6 +12,7 @@ The major architectural rework is in place.
 - Assets use Phoenix-default Tailwind and esbuild tooling from [assets/](/Users/gb/Projects/bDS2/assets) into [priv/static/](/Users/gb/Projects/bDS2/priv/static).
 - Core editorial flows are implemented in the main application: posts, media, tags, templates, scripts, imports, preview, generation, publishing, maintenance, AI, and MCP.
 - Localization is now a first-class architectural concern rather than an afterthought: UI chrome and rendered site output have separate locale flows, and post/media translation workflows are built into the domain model.
+- The app boots in three modes: the desktop app, a headless server (SSH-served terminal UI + tunneled GUI), and a local TUI — see [Headless Server Mode And Terminal UI](#headless-server-mode-and-terminal-ui).
 
 The rewrite still aims to preserve the product behavior of bDS while replacing the technical stack. The contract is product behavior, not the old implementation language or framework choices.
 
@@ -155,6 +156,62 @@ mix test
 mix dialyzer
 mix assets.build
 ```
+
+## Headless Server Mode And Terminal UI
+
+Since issue #26 the app has three boot modes, selected with the `BDS_MODE`
+environment variable (any release or dev boot; default is the desktop app):
+
+- `desktop` — the native desktop app, unchanged.
+- `server` — headless: no window, loopback-only HTTP endpoint, CLI sync
+  watcher, and an SSH daemon serving the terminal UI. Works on macOS,
+  Windows, and Linux (no display needed).
+- `tui` — the headless server plus a TUI attached to the launching terminal.
+
+### Build and run a headless server
+
+```bash
+MIX_ENV=prod mix release bds --overwrite
+BDS_MODE=server _build/prod/rel/bds/bin/bds start
+```
+
+The SSH daemon listens on port `2222` (`BDS_SSH_PORT` or
+`config :bds, :server, ssh_port:` to change). Authentication is public-key
+only: on first boot the server generates a host key and an empty
+`authorized_keys` (mode 600) in `ssh/` next to the database (default
+`~/Library/Application Support/BDS2/ssh/`, or under `BDS_DATABASE_PATH`).
+Add your public key there, then connect from any terminal:
+
+```bash
+ssh -p 2222 <server-host>          # opens the TUI
+```
+
+Each SSH connection gets its own TUI session on the server; only terminal
+cells cross the wire. All clients stay synchronized through the domain
+event bus (`BDS.Events`) — a post created by a pipeline or another client
+appears in every open shell.
+
+### TUI keys
+
+`↑/↓` or `j/k` navigate · `enter` open · `n` new post · `1-5` switch view
+(posts/media/templates/scripts/tags) · `r` refresh · in the editor:
+`ctrl+s` save, `ctrl+p` publish, `ctrl+t` title, `ctrl+l` language,
+`ctrl+g` AI suggestions (airplane-mode gated), `esc` back · `ctrl+q` quit.
+Images preview inline via the terminal image protocol. The UI language is
+the server-side setting shared by every client.
+
+### Remote GUI
+
+The HTTP endpoint stays bound to `127.0.0.1` and is never exposed; GUI
+clients tunnel through the same SSH daemon and keys:
+
+```bash
+ssh -p 2222 -L 4010:127.0.0.1:4010 -N <server-host> &
+open http://127.0.0.1:4010
+```
+
+A built-in "Connect to Server…" mode in the desktop app is in progress
+(issue #26, phase 5).
 
 ## Monaco Editor
 
