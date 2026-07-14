@@ -62,8 +62,21 @@ defmodule BDS.I18n do
   def resolve_ui_locale(locale), do: resolve_supported_locale(locale) || @default_language
 
   def current_ui_locale do
-    (System.get_env("LC_ALL") || System.get_env("LC_MESSAGES") || System.get_env("LANG"))
+    (stored_ui_locale() || System.get_env("LC_ALL") || System.get_env("LC_MESSAGES") ||
+       System.get_env("LANG"))
     |> resolve_ui_locale()
+  end
+
+  # The UI language is a server-side setting shared by all connected clients
+  # (issue #26); the OS locale is only the fallback for a fresh install.
+  defp stored_ui_locale do
+    with true <- BDS.Repo.ready?(),
+         value when is_binary(value) and value != "" <-
+           BDS.Settings.get_global_setting("ui.language") do
+      value
+    else
+      _other -> nil
+    end
   end
 
   def resolve_render_locale(language), do: resolve_supported_locale(language) || @default_language

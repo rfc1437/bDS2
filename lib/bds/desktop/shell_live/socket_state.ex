@@ -38,7 +38,7 @@ defmodule BDS.Desktop.ShellLive.SocketState do
       |> assign(:sidebar_header, active_sidebar_label(activity_buttons, workbench.active_view, sidebar_data))
       |> assign(:panel_tabs, ShellData.panel_tabs(workbench))
       |> assign(:current_tab, current_tab)
-      |> assign(:editor_meta, ShellData.editor_meta(task_status))
+      |> assign(:editor_meta, ShellData.editor_meta(task_status, page_language))
       |> assign(
         :status,
         ShellData.status_bar(workbench, task_status, dashboard,

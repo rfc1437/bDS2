@@ -91,14 +91,16 @@ defmodule BDS.Desktop.ShellData do
     end
   end
 
-  def editor_meta(task_status) do
+  # Accepts the caller's already-resolved locale so hot render paths never
+  # re-read the ui.language setting from the database.
+  def editor_meta(task_status, ui_language \\ nil) do
     [
       %{
         label: dgettext("ui", "Status"),
         value: task_status.running_task_message || dgettext("ui", "Idle")
       },
       %{label: dgettext("ui", "Mode"), value: dgettext("ui", "Offline")},
-      %{label: dgettext("ui", "Main Language"), value: ui_language()}
+      %{label: dgettext("ui", "Main Language"), value: ui_language || ui_language()}
     ]
   end
 
@@ -107,7 +109,7 @@ defmodule BDS.Desktop.ShellData do
       post_count: dashboard.post_stats.total_posts,
       media_count: dashboard.media_stats.media_count,
       theme_badge: "desktop-shell",
-      ui_language: Keyword.get(opts, :ui_language, ui_language()),
+      ui_language: Keyword.get_lazy(opts, :ui_language, &ui_language/0),
       offline_mode: Keyword.get(opts, :offline_mode, true),
       running_task_message: task_status.running_task_message,
       running_task_overflow: task_status.running_task_overflow,

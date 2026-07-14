@@ -6,7 +6,6 @@ defmodule BDS.Desktop.ShellLive do
   import Phoenix.HTML
 
   alias BDS.{AI, Blogmark, BoundedAtoms, Metadata}
-  alias BDS.CliSync.Watcher
   alias BDS.Desktop.{FilePicker, FolderPicker, ShellData, UILocale}
 
   alias BDS.Desktop.ShellLive.{
@@ -151,7 +150,9 @@ defmodule BDS.Desktop.ShellLive do
     connected = connected?(socket)
 
     if connected do
-      Phoenix.PubSub.subscribe(BDS.PubSub, Watcher.topic())
+      # Entity + settings events from every source: in-app contexts, other
+      # connected clients (GUI or TUI), and the CLI sync watcher.
+      :ok = BDS.Events.subscribe()
       Process.send_after(self(), :refresh_task_status, @refresh_interval)
     end
 
@@ -736,6 +737,14 @@ defmodule BDS.Desktop.ShellLive do
     {:noreply, assign(socket, :shell_overlay, overlay)}
   end
 
+  # The UI language is a server-side setting shared by all clients; when any
+  # client (or script) changes it, every shell re-renders in the new locale.
+  def handle_info({:settings_changed, "ui.language"}, socket) do
+    {:noreply, set_page_language(socket, ShellData.ui_language())}
+  end
+
+  def handle_info({:settings_changed, _key}, socket), do: {:noreply, socket}
+
   def handle_info(message, socket) do
     Bridges.handle_info(message, socket, bridges_callbacks())
   end
@@ -981,6 +990,9 @@ defmodule BDS.Desktop.ShellLive do
       socket
     else
       UILocale.put(normalized)
+      # Persist server-side so every client renders the same language; the
+      # resulting settings_changed broadcast is a no-op for this socket.
+      _ = BDS.Settings.put_global_setting("ui.language", normalized)
 
       socket
       |> assign(:page_language, normalized)

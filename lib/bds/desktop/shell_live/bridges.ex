@@ -266,7 +266,7 @@ defmodule BDS.Desktop.ShellLive.Bridges do
 
           socket
           |> assign(:task_status, task_status)
-          |> assign(:editor_meta, ShellData.editor_meta(task_status))
+          |> assign(:editor_meta, ShellData.editor_meta(task_status, socket.assigns.page_language))
           |> assign(
             :status,
             ShellData.status_bar(

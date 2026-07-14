@@ -27,8 +27,12 @@ defmodule BDS.Settings do
     })
     |> Repo.insert_or_update()
     |> case do
-      {:ok, _setting} -> :ok
-      {:error, reason} -> {:error, reason}
+      {:ok, _setting} ->
+        :ok = BDS.Events.settings_changed(key)
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 end

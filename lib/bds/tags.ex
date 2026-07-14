@@ -6,6 +6,7 @@ defmodule BDS.Tags do
 
   import Ecto.Query
 
+  alias BDS.Events
   alias BDS.MapUtils
   alias BDS.Persistence
   alias BDS.Posts
@@ -40,6 +41,7 @@ defmodule BDS.Tags do
       |> case do
         {:ok, tag} ->
           with :ok <- write_tags_json(project_id) do
+            :ok = Events.entity_changed("tag", tag.id, :created)
             {:ok, tag}
           end
 
@@ -130,6 +132,7 @@ defmodule BDS.Tags do
         |> case do
           {:ok, updated_tag} ->
             with :ok <- write_tags_json(updated_tag.project_id) do
+              :ok = Events.entity_changed("tag", updated_tag.id, :updated)
               {:ok, updated_tag}
             end
 
@@ -165,6 +168,7 @@ defmodule BDS.Tags do
           {:ok, post_ids} ->
             with :ok <- rewrite_published_posts(post_ids),
                  :ok <- write_tags_json(tag.project_id) do
+              :ok = Events.entity_changed("tag", tag.id, :deleted)
               {:ok, :deleted}
             end
 
@@ -205,6 +209,7 @@ defmodule BDS.Tags do
             {:ok, {updated_tag, post_ids}} ->
               with :ok <- rewrite_published_posts(post_ids),
                    :ok <- write_tags_json(tag.project_id) do
+                :ok = Events.entity_changed("tag", updated_tag.id, :updated)
                 {:ok, updated_tag}
               end
 
@@ -250,6 +255,8 @@ defmodule BDS.Tags do
           {:ok, post_ids} ->
             with :ok <- rewrite_published_posts(post_ids),
                  :ok <- write_tags_json(target_tag.project_id) do
+              Enum.each(source_tags, &Events.entity_changed("tag", &1.id, :deleted))
+              :ok = Events.entity_changed("tag", target_tag.id, :updated)
               {:ok, :merged}
             end
 

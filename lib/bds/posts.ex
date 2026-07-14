@@ -12,6 +12,7 @@ defmodule BDS.Posts do
   import BDS.MapUtils, only: [attr: 2, maybe_put: 3]
 
   alias BDS.Embeddings
+  alias BDS.Events
   alias BDS.Media
   alias BDS.Persistence
   alias BDS.PostLinks
@@ -106,6 +107,7 @@ defmodule BDS.Posts do
       {:ok, post} ->
         :ok = Embeddings.sync_post(post)
         :ok = Search.sync_post(post)
+        :ok = Events.entity_changed("post", post.id, :created)
         {:ok, post}
 
       error ->
@@ -151,6 +153,7 @@ defmodule BDS.Posts do
                 :ok = AutoTranslation.maybe_schedule(updated_post)
               end
 
+              :ok = Events.entity_changed("post", updated_post.id, :updated)
               {:ok, updated_post}
 
             error ->
@@ -202,6 +205,7 @@ defmodule BDS.Posts do
             :ok = Translations.publish_post_translations(updated_post)
             :ok = PostLinks.sync_post_links(updated_post)
             :ok = Search.sync_post(updated_post)
+            :ok = Events.entity_changed("post", updated_post.id, :updated)
             {:ok, updated_post}
 
           error ->
@@ -335,6 +339,7 @@ defmodule BDS.Posts do
             PostLinks.delete_post_links(deleted_post.id)
             Enum.each(linked_media_ids, &sync_deleted_post_media_sidecar/1)
             Search.delete_post(deleted_post.id)
+            :ok = Events.entity_changed("post", deleted_post.id, :deleted)
             {:ok, :deleted}
 
           {:error, changeset} ->

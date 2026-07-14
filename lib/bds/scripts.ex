@@ -5,6 +5,7 @@ defmodule BDS.Scripts do
   import BDS.MapUtils, only: [attr: 2, maybe_put: 3]
 
   alias BDS.DocumentFields
+  alias BDS.Events
   alias BDS.Frontmatter
   alias BDS.Persistence
   alias BDS.ProgressReporter
@@ -40,6 +41,7 @@ defmodule BDS.Scripts do
       updated_at: now
     })
     |> Repo.insert()
+    |> Events.broadcast_result("script", :created)
   end
 
   @spec create_and_publish_script(attrs()) :: script_result()
@@ -84,6 +86,7 @@ defmodule BDS.Scripts do
               serialize_script_file(script, content)
             )
 
+          :ok = Events.entity_changed("script", script.id, :created)
           {:ok, script}
         end
 
@@ -132,6 +135,7 @@ defmodule BDS.Scripts do
               updated_at: updated_at
             })
             |> Repo.update()
+            |> Events.broadcast_result("script", :updated)
 
           {:error, reason} ->
             {:error, {:invalid_script, reason}}
@@ -176,6 +180,7 @@ defmodule BDS.Scripts do
         script
         |> Script.changeset(updates)
         |> Repo.update()
+        |> Events.broadcast_result("script", :updated)
     end
   end
 
@@ -189,6 +194,7 @@ defmodule BDS.Scripts do
         case Repo.delete(script) do
           {:ok, deleted_script} ->
             delete_file_if_present(deleted_script.project_id, deleted_script.file_path)
+            :ok = Events.entity_changed("script", deleted_script.id, :deleted)
             {:ok, :deleted}
 
           {:error, changeset} ->

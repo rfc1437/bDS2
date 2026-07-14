@@ -34,6 +34,7 @@ defmodule BDS.Media do
 
   import Ecto.Query
 
+  alias BDS.Events
   alias BDS.Media.Media
   alias BDS.Media.Translation
   alias BDS.Persistence
@@ -121,6 +122,7 @@ defmodule BDS.Media do
         log_sidecar_error(write_sidecar(project, media), media.id)
         log_thumbnail_error(ensure_thumbnails(project, media), media.id)
         :ok = Search.sync_media(media)
+        :ok = Events.entity_changed("media", media.id, :created)
         {:ok, media}
 
       {:error, reason} ->
@@ -162,6 +164,7 @@ defmodule BDS.Media do
           {:ok, updated_media} ->
             log_sidecar_error(write_sidecar(project, updated_media), updated_media.id)
             :ok = Search.sync_media(updated_media)
+            :ok = Events.entity_changed("media", updated_media.id, :updated)
             {:ok, updated_media}
 
           {:error, reason} ->
@@ -211,6 +214,7 @@ defmodule BDS.Media do
             end)
 
             Search.delete_media(media.id)
+            :ok = Events.entity_changed("media", media.id, :deleted)
             {:ok, :deleted}
 
           {:error, reason} ->

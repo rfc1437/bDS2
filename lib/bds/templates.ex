@@ -17,6 +17,7 @@ defmodule BDS.Templates do
   alias BDS.Projects
   alias BDS.Repo
   alias BDS.Slug
+  alias BDS.Events
   alias BDS.Tags
   alias BDS.Templates.Template
 
@@ -58,6 +59,7 @@ defmodule BDS.Templates do
           serialize_template_file(template, template.content || "")
         )
 
+      :ok = Events.entity_changed("template", template.id, :created)
       {:ok, template}
     end
   end
@@ -102,6 +104,7 @@ defmodule BDS.Templates do
               updated_at: updated_at
             })
             |> Repo.update()
+            |> Events.broadcast_result("template", :updated)
 
           {:error, reason} ->
             {:error, {:invalid_liquid, reason}}
@@ -149,6 +152,7 @@ defmodule BDS.Templates do
               serialize_template_file(template, content)
             )
 
+          :ok = Events.entity_changed("template", template.id, :created)
           {:ok, template}
         end
 
@@ -183,6 +187,7 @@ defmodule BDS.Templates do
              affected_posts,
              slug_changed?
            ) do
+      :ok = Events.entity_changed("template", updated_template.id, :updated)
       {:ok, updated_template}
     end
   end
@@ -299,6 +304,7 @@ defmodule BDS.Templates do
             case Repo.delete(template) do
               {:ok, deleted_template} ->
                 delete_file_if_present(deleted_template.project_id, deleted_template.file_path)
+                :ok = Events.entity_changed("template", deleted_template.id, :deleted)
                 {:ok, :deleted}
 
               {:error, changeset} ->
