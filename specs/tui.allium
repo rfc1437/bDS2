@@ -46,6 +46,14 @@ rule SaveAndPublish {
     ensures: PostPersisted()
 }
 
+rule WrappedPreview {
+    when: TuiKeyPressed(code: "e", modifiers: "ctrl")
+    -- The editing textarea cannot soft-wrap (upstream ratatui-textarea
+    -- limitation), so ctrl+e toggles a read-only word-wrapped Markdown
+    -- preview of the current draft; keys in preview never edit content.
+    ensures: PreviewToggled()
+}
+
 rule AiQuickAction {
     when: TuiKeyPressed(code: "g", modifiers: "ctrl")
     -- One-shot AI post analysis (title/excerpt suggestions). Gated by

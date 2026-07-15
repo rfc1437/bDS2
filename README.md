@@ -195,8 +195,9 @@ appears in every open shell.
 
 `↑/↓` or `j/k` navigate · `enter` open · `n` new post · `1-5` switch view
 (posts/media/templates/scripts/tags) · `r` refresh · in the editor:
-`ctrl+s` save, `ctrl+p` publish, `ctrl+t` title, `ctrl+l` language,
-`ctrl+g` AI suggestions (airplane-mode gated), `esc` back · `ctrl+q` quit.
+`ctrl+s` save, `ctrl+p` publish, `ctrl+e` word-wrapped preview,
+`ctrl+t` title, `ctrl+l` language, `ctrl+g` AI suggestions
+(airplane-mode gated), `esc` back · `ctrl+q` quit.
 Images preview inline via the terminal image protocol. The UI language is
 the server-side setting shared by every client.
 

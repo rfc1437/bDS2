@@ -12,9 +12,10 @@ defmodule BDS.TUI do
   Sidebar focus: `↑/↓`/`j/k` navigate, `enter` open, `n` new post,
   `1..5` switch view (posts/media/templates/scripts/tags), `r` refresh.
   Editor focus: text keys edit, `ctrl+s` save, `ctrl+p` publish,
-  `ctrl+t` edit title, `ctrl+l` cycle language, `ctrl+g` AI suggestions,
-  `esc` back to sidebar. `ctrl+q` quits, `esc` also closes a media
-  preview. The UI locale is the server-side UI language setting.
+  `ctrl+e` word-wrapped preview, `ctrl+t` edit title, `ctrl+l` cycle
+  language, `ctrl+g` AI suggestions, `esc` back to sidebar. `ctrl+q`
+  quits, `esc` also closes a media preview. The UI locale is the
+  server-side UI language setting.
   """
 
   use ExRatatui.App
@@ -30,7 +31,7 @@ defmodule BDS.TUI do
   alias ExRatatui.Layout
   alias ExRatatui.Layout.Rect
   alias ExRatatui.Style
-  alias ExRatatui.Widgets.{Block, List, Paragraph, Tabs, Textarea}
+  alias ExRatatui.Widgets.{Block, List, Markdown, Paragraph, Tabs, Textarea}
 
   @views ~w(posts media templates scripts tags)
 
@@ -135,7 +136,13 @@ defmodule BDS.TUI do
   defp editor_key(%{code: "esc"}, %{editor: %{editing_title?: true}} = state),
     do: {:noreply, put_in(state.editor.editing_title?, false)}
 
+  defp editor_key(%{code: "esc"}, %{editor: %{preview?: true}} = state),
+    do: {:noreply, put_in(state.editor.preview?, false)}
+
   defp editor_key(%{code: "esc"}, state), do: {:noreply, %{state | focus: :sidebar}}
+
+  defp editor_key(%{code: "e", modifiers: ["ctrl"]}, state),
+    do: {:noreply, update_in(state.editor.preview?, &(not &1))}
 
   defp editor_key(%{code: "s", modifiers: ["ctrl"]}, state), do: {:noreply, persist(state, :save)}
 
@@ -152,6 +159,9 @@ defmodule BDS.TUI do
 
   defp editor_key(key, %{editor: %{editing_title?: true}} = state),
     do: {:noreply, title_key(key, state)}
+
+  # While previewing, text keys must not edit the (invisible) textarea.
+  defp editor_key(_key, %{editor: %{preview?: true}} = state), do: {:noreply, state}
 
   defp editor_key(%{code: code, modifiers: modifiers}, %{editor: editor} = state) do
     :ok = ExRatatui.textarea_handle_key(editor.textarea, code, modifiers)
@@ -316,22 +326,38 @@ defmodule BDS.TUI do
            if(editor.editing_title?, do: %Style{fg: :yellow}, else: %Style{})
        }, title_rect}
 
+    [title_widget, body_widget(state, editor, body_rect)]
+  end
+
+  # The editing textarea cannot soft-wrap (upstream ratatui-textarea
+  # limitation), so ctrl+e flips to a word-wrapped read-only Markdown
+  # preview of the current draft. Wrap moves into the editor itself with
+  # the planned MarkdownEditor custom widget.
+  defp body_widget(_state, %{preview?: true} = editor, body_rect) do
+    preview_title =
+      "#{dgettext("ui", "Preview (ctrl+e to edit)")} [#{editor.language}]"
+
+    {%Markdown{
+       content: ExRatatui.textarea_get_value(editor.textarea),
+       wrap: true,
+       block: %Block{title: preview_title, borders: [:all]}
+     }, body_rect}
+  end
+
+  defp body_widget(state, editor, body_rect) do
     body_title =
       "#{dgettext("ui", "Content")} [#{editor.language}]" <>
         if(editor.dirty, do: " •", else: "")
 
-    body_widget =
-      {%Textarea{
-         state: editor.textarea,
-         block: %Block{title: body_title, borders: [:all]},
-         cursor_style:
-           if(state.focus == :editor and not editor.editing_title?,
-             do: %Style{bg: :cyan},
-             else: %Style{}
-           )
-       }, body_rect}
-
-    [title_widget, body_widget]
+    {%Textarea{
+       state: editor.textarea,
+       block: %Block{title: body_title, borders: [:all]},
+       cursor_style:
+         if(state.focus == :editor and not editor.editing_title?,
+           do: %Style{bg: :cyan},
+           else: %Style{}
+         )
+     }, body_rect}
   end
 
   defp status_widgets(state, rect) do
@@ -375,7 +401,7 @@ defmodule BDS.TUI do
     do:
       dgettext(
         "ui",
-        "ctrl+s save · ctrl+p publish · ctrl+t title · ctrl+l language · ctrl+g AI · esc back"
+        "ctrl+s save · ctrl+p publish · ctrl+e preview · ctrl+t title · ctrl+l language · ctrl+g AI · esc back"
       )
 
   # ── Sidebar data ─────────────────────────────────────────────────────────
@@ -493,6 +519,7 @@ defmodule BDS.TUI do
       title: form["title"] || "",
       textarea: textarea,
       editing_title?: false,
+      preview?: false,
       dirty: false
     }
   end

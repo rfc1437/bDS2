@@ -109,6 +109,37 @@ defmodule BDS.TUITest do
     assert state.focus == :sidebar
   end
 
+  test "ctrl+e toggles a word-wrapped preview of the draft", %{post: post} do
+    long_line = String.duplicate("lorem ipsum dolor sit amet ", 8) <> "FINALWORD"
+    {:ok, _} = BDS.Posts.update_post(post.id, %{content: long_line})
+
+    state = mount!() |> press("enter") |> press("e", ["ctrl"])
+    assert state.editor.preview?
+
+    # The textarea cannot soft-wrap, so the tail of a long line is off-screen
+    # there; the preview renders through the Markdown widget, which wraps.
+    assert screen_text(state, 80, 32) =~ "FINALWORD"
+
+    state = press(state, "e", ["ctrl"])
+    refute state.editor.preview?
+  end
+
+  test "keys in preview mode do not edit the content" do
+    state = mount!() |> press("enter") |> press("e", ["ctrl"])
+    before = ExRatatui.textarea_get_value(state.editor.textarea)
+
+    state = press(state, "x")
+    assert ExRatatui.textarea_get_value(state.editor.textarea) == before
+    refute state.editor.dirty
+  end
+
+  test "esc in preview returns to editing, not to the sidebar" do
+    state = mount!() |> press("enter") |> press("e", ["ctrl"]) |> press("esc")
+
+    refute state.editor.preview?
+    assert state.focus == :editor
+  end
+
   test "entity_changed refreshes the sidebar", %{project: project} do
     state = mount!()
 
