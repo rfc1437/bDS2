@@ -150,7 +150,7 @@ local result = bds.app.get_default_project_path()
 
 ### app.get_system_language
 
-Return the current UI locale.
+Return the current UI locale (the server-side UI language setting, falling back to the OS locale when unset).
 
 **Parameters**
 

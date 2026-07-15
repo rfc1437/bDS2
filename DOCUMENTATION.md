@@ -23,6 +23,7 @@
 - [Generating and publishing](#generating-and-publishing)
 - [Typical editorial workflows](#typical-editorial-workflows)
 - [Working fully offline](#working-fully-offline)
+- [Running a headless server and the terminal UI](#running-a-headless-server-and-the-terminal-ui)
 - [Troubleshooting and recovery](#troubleshooting-and-recovery)
 - [Team conventions](#team-conventions)
 
@@ -438,6 +439,29 @@ When AI is involved, airplane mode determines which automatic actions are allowe
 - Core editing and publishing workflows work offline.
 - Local commits still matter when no remote is available.
 - Reconnect and synchronize in a controlled order.
+
+[↑ Back to In this article](#in-this-article)
+
+---
+
+## Running a headless server and the terminal UI
+
+bDS2 can run without a window on a server (for example a Linux VPS) and be used from several places at once. Start it with `BDS_MODE=server`; the same release binary that runs the desktop app then runs headless. All clients connect through one SSH port (default 2222) — the web endpoint itself stays private on the server.
+
+Access is controlled by SSH keys, not passwords. On first start the server creates an `ssh/` folder next to its database (for example `~/Library/Application Support/BDS2/ssh/` on macOS) containing the host key and an empty `authorized_keys` file. Paste the public keys of every machine that may connect into `authorized_keys`, one per line — the same file format OpenSSH uses.
+
+To work in a terminal, connect with plain `ssh -p 2222 user@server`: the terminal UI opens directly. You can browse posts, media, templates, scripts, and tags, create and edit posts, publish, preview images, and run the one-shot AI actions. The status line at the bottom always shows the available keys.
+
+To work in the desktop app against a remote server, use **File → Connect to Server…** and enter `user@host` (or `user@host:port`). The app connects with the SSH key from its own local `ssh/` folder and shows the remote workspace in the window; **File → Disconnect from Server** returns to the local workspace. A plain browser works too, through a manual SSH tunnel (`ssh -p 2222 -L 4010:127.0.0.1:4010 user@server`, then open `http://127.0.0.1:4010`).
+
+Everything you see stays synchronized: when a script, another client, or a pipeline changes content on the server, every connected terminal and window updates. The interface language is a server-side setting — changing it in any client changes it for all of them.
+
+### Key takeaways
+
+- `BDS_MODE=server` runs the same app headless; only the SSH port is exposed.
+- Access is public-key only: manage `authorized_keys` in the server's `ssh/` folder.
+- `ssh` gives the terminal UI; **File → Connect to Server…** gives the desktop app; both use the same keys.
+- All connected clients stay synchronized and share one interface language.
 
 [↑ Back to In this article](#in-this-article)
 

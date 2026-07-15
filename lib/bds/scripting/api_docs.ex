@@ -38,7 +38,8 @@ defmodule BDS.Scripting.ApiDocs do
     %{
       module: "app",
       name: "get_system_language",
-      description: "Return the current UI locale.",
+      description:
+        "Return the current UI locale (the server-side UI language setting, falling back to the OS locale when unset).",
       params: [],
       returns: "string | nil"
     },
