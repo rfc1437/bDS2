@@ -62,6 +62,19 @@ rule AiQuickAction {
     ensures: AiSuggestionsRequestedOrRefused()
 }
 
+rule CommandPrompt {
+    when: TuiKeyPressed(code: ":" | "?")
+    -- Vi-style prompt: ":" opens a filterable list of the parameterless
+    -- Blog-menu shell commands (metadata diff, validate site, force
+    -- render, rebuilds, reindex, translations, duplicates, upload,
+    -- browser preview URL) and runs the selection through the same
+    -- BDS.Desktop.ShellCommands backend as the GUI menu; "?" (or ":?")
+    -- shows the same list as help. Commands whose report/apply follow-up
+    -- UI exists only in the GUI are marked so the user knows. Queued
+    -- tasks report progress in the status line until all tasks finish.
+    ensures: CommandListShownOrExecuted()
+}
+
 rule MultiClientSync {
     when: TuiEventReceived(entity, entity_id, action)
     -- Domain events refresh the sidebar; a post deleted elsewhere closes

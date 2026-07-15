@@ -164,6 +164,98 @@ defmodule BDS.TUITest do
     assert {:stop, _state} = BDS.TUI.handle_event(key("q", ["ctrl"]), mount!())
   end
 
+  describe "command prompt" do
+    defp mount_with_executor! do
+      parent = self()
+
+      mount!(
+        command_executor: fn action ->
+          send(parent, {:executed, action})
+          {:ok, %{kind: "output", title: "T", message: "done"}}
+        end
+      )
+    end
+
+    test "':' opens the prompt and lists commands" do
+      state = mount_with_executor!() |> press(":")
+
+      assert state.command != nil
+      text = screen_text(state)
+      assert text =~ "metadata_diff"
+      assert text =~ "validate_site"
+    end
+
+    test "'?' opens the command help list with GUI markers" do
+      state = mount_with_executor!() |> press("?")
+
+      assert state.command.help?
+      text = screen_text(state)
+      assert text =~ "metadata_diff"
+      # Commands whose report/apply UI lives in the GUI are marked.
+      assert text =~ "GUI"
+
+      state = press(state, "esc")
+      assert state.command == nil
+    end
+
+    test "typing filters and enter runs the selected command" do
+      state =
+        mount_with_executor!()
+        |> press(":")
+        |> press("m")
+        |> press("e")
+        |> press("t")
+        |> press("a")
+        |> press("enter")
+
+      assert_receive {:executed, "metadata_diff"}
+      assert state.command == nil
+      assert state.status =~ "done"
+    end
+
+    test "up/down move the selection" do
+      state = mount_with_executor!() |> press(":") |> press("down") |> press("enter")
+
+      assert_receive {:executed, action}
+      assert is_binary(action)
+    end
+
+    test "no match reports an unknown command" do
+      state =
+        mount_with_executor!()
+        |> press(":")
+        |> press("z")
+        |> press("z")
+        |> press("enter")
+
+      refute_receive {:executed, _action}, 50
+      assert state.command == nil
+      assert state.status != nil
+    end
+
+    test "a queued task starts status polling and finishes with a toast" do
+      parent = self()
+
+      state =
+        mount!(
+          command_executor: fn action ->
+            send(parent, {:executed, action})
+            {:ok, %{kind: "task_queued", title: "Rebuild", message: "queued"}}
+          end
+        )
+        |> press(":")
+        |> press("enter")
+
+      assert_receive {:executed, _action}
+      assert state.task_polling
+
+      # No tasks are actually running in this test, so the first poll ends it.
+      {:noreply, state} = BDS.TUI.handle_info(:poll_tasks, state)
+      refute state.task_polling
+      assert state.status != nil
+    end
+  end
+
   test "local tui mode stops the VM when the app exits" do
     parent = self()
     state = mount!(stop_vm_on_exit: true, stop_fun: fn -> send(parent, :vm_stopped) end)

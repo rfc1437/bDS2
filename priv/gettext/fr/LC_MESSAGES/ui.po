@@ -81,11 +81,11 @@ msgstr "Paramètres IA"
 #: lib/bds/desktop/shell_live/overlay_manager.ex:72
 #: lib/bds/desktop/shell_live/post_editor.ex:920
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:43
-#: lib/bds/tui.ex:224
-#: lib/bds/tui.ex:227
-#: lib/bds/tui.ex:230
-#: lib/bds/tui.ex:238
-#: lib/bds/tui.ex:575
+#: lib/bds/tui.ex:285
+#: lib/bds/tui.ex:288
+#: lib/bds/tui.ex:291
+#: lib/bds/tui.ex:299
+#: lib/bds/tui.ex:686
 #, elixir-autogen, elixir-format
 msgid "AI Suggestions"
 msgstr "Suggestions IA"
@@ -572,6 +572,7 @@ msgid "Collapse unchanged diff hunks"
 msgstr "Réduire les blocs de diff inchangés"
 
 #: lib/bds/desktop/shell_live/overlay_manager.ex:422
+#: lib/bds/tui.ex:779
 #, elixir-autogen, elixir-format
 msgid "Command completed"
 msgstr "Commande terminée"
@@ -589,7 +590,7 @@ msgstr "Confirmer"
 #: lib/bds/desktop/shell_live/post_editor_html/post_editor.html.heex:375
 #: lib/bds/desktop/shell_live/script_editor_html/script_editor.html.heex:34
 #: lib/bds/desktop/shell_live/template_editor_html/template_editor.html.heex:32
-#: lib/bds/tui.ex:348
+#: lib/bds/tui.ex:424
 #: lib/bds/ui/sidebar.ex:764
 #, elixir-autogen, elixir-format
 msgid "Content"
@@ -1029,6 +1030,7 @@ msgid "Filename"
 msgstr "Nom de fichier"
 
 #: lib/bds/desktop/menu_bar.ex:254
+#: lib/bds/tui.ex:745
 #, elixir-autogen, elixir-format
 msgid "Fill Missing Translations"
 msgstr "Compléter les traductions manquantes"
@@ -1039,6 +1041,7 @@ msgid "Find"
 msgstr "Rechercher"
 
 #: lib/bds/desktop/menu_bar.ex:255
+#: lib/bds/tui.ex:748
 #, elixir-autogen, elixir-format
 msgid "Find Duplicate Posts"
 msgstr "Trouver les doublons"
@@ -1065,6 +1068,7 @@ msgid "Gallery"
 msgstr "Galerie"
 
 #: lib/bds/desktop/menu_bar.ex:256
+#: lib/bds/tui.ex:729
 #, elixir-autogen, elixir-format
 msgid "Generate Site"
 msgstr "Générer le site"
@@ -1385,9 +1389,9 @@ msgstr "Nombre maximal d’articles par page"
 #: lib/bds/desktop/shell_live/misc_editor.ex:762
 #: lib/bds/desktop/shell_live/sidebar_components.ex:654
 #: lib/bds/desktop/shell_live/sidebar_delete.ex:175
-#: lib/bds/tui.ex:489
-#: lib/bds/tui.ex:619
-#: lib/bds/tui.ex:622
+#: lib/bds/tui.ex:600
+#: lib/bds/tui.ex:808
+#: lib/bds/tui.ex:811
 #: lib/bds/ui/registry.ex:30
 #: lib/bds/ui/registry.ex:100
 #: lib/bds/ui/sidebar.ex:558
@@ -1430,6 +1434,7 @@ msgstr "Métadonnées"
 #: lib/bds/desktop/shell_live/misc_editor.ex:214
 #: lib/bds/desktop/shell_live/misc_editor.ex:226
 #: lib/bds/desktop/shell_live/misc_editor.ex:448
+#: lib/bds/tui.ex:726
 #: lib/bds/ui/registry.ex:111
 #, elixir-autogen, elixir-format
 msgid "Metadata Diff"
@@ -1475,7 +1480,7 @@ msgstr "Nouvelle page"
 
 #: lib/bds/desktop/menu_bar.ex:214
 #: lib/bds/desktop/shell_live/sidebar_create.ex:41
-#: lib/bds/tui.ex:115
+#: lib/bds/tui.ex:130
 #, elixir-autogen, elixir-format
 msgid "New Post"
 msgstr "Nouvel article"
@@ -1764,6 +1769,7 @@ msgid "Open Settings"
 msgstr "Ouvrir les Réglages"
 
 #: lib/bds/desktop/menu_bar.ex:217
+#: lib/bds/tui.ex:750
 #, elixir-autogen, elixir-format
 msgid "Open in Browser"
 msgstr "Ouvrir dans le navigateur"
@@ -1911,8 +1917,8 @@ msgstr "Article enregistré"
 #: lib/bds/desktop/menu_bar.ex:233
 #: lib/bds/desktop/shell_live/misc_editor.ex:664
 #: lib/bds/desktop/shell_live/misc_editor.ex:761
-#: lib/bds/tui.ex:488
-#: lib/bds/tui.ex:499
+#: lib/bds/tui.ex:599
+#: lib/bds/tui.ex:610
 #: lib/bds/ui/registry.ex:14
 #: lib/bds/ui/sidebar.ex:271
 #, elixir-autogen, elixir-format
@@ -2036,12 +2042,14 @@ msgid "Ready to import:"
 msgstr "Prêt à importer :"
 
 #: lib/bds/desktop/menu_bar.ex:248
+#: lib/bds/tui.ex:730
 #, elixir-autogen, elixir-format
 msgid "Rebuild Database"
 msgstr "Reconstruire la base de données"
 
 #: lib/bds/desktop/menu_bar.ex:250
 #: lib/bds/desktop/shell_live/settings_editor_html/settings_editor.html.heex:381
+#: lib/bds/tui.ex:734
 #, elixir-autogen, elixir-format
 msgid "Rebuild Embedding Index"
 msgstr "Reconstruire l’index d’embeddings"
@@ -2099,6 +2107,7 @@ msgid "Refresh Translation"
 msgstr "Actualiser la traduction"
 
 #: lib/bds/desktop/menu_bar.ex:252
+#: lib/bds/tui.ex:737
 #, elixir-autogen, elixir-format
 msgid "Regenerate Calendar"
 msgstr "Régénérer le calendrier"
@@ -2109,6 +2118,7 @@ msgid "Regenerate Missing Thumbnails"
 msgstr "Régénérer les vignettes manquantes"
 
 #: lib/bds/desktop/menu_bar.ex:249
+#: lib/bds/tui.ex:731
 #, elixir-autogen, elixir-format
 msgid "Reindex Text"
 msgstr "Réindexer le texte"
@@ -2294,7 +2304,7 @@ msgstr "Les capacités de script sont configurées au niveau de l’application 
 #: lib/bds/desktop/shell_live/script_editor.ex:216
 #: lib/bds/desktop/shell_live/script_editor.ex:219
 #: lib/bds/desktop/shell_live/script_editor.ex:234
-#: lib/bds/tui.ex:491
+#: lib/bds/tui.ex:602
 #: lib/bds/ui/registry.ex:38
 #: lib/bds/ui/sidebar.ex:63
 #: lib/bds/ui/sidebar.ex:115
@@ -2542,7 +2552,7 @@ msgstr "Nom du mot-clé"
 #: lib/bds/desktop/shell_live/tags_editor.ex:222
 #: lib/bds/desktop/shell_live/tags_editor.ex:253
 #: lib/bds/desktop/shell_live/tags_editor_html/tags_editor.html.heex:11
-#: lib/bds/tui.ex:492
+#: lib/bds/tui.ex:603
 #: lib/bds/ui/registry.ex:54
 #: lib/bds/ui/registry.ex:103
 #: lib/bds/ui/sidebar.ex:289
@@ -2554,6 +2564,7 @@ msgstr "Tags"
 
 #: lib/bds/desktop/shell_live.ex:786
 #: lib/bds/desktop/shell_live/panel_renderer.ex:54
+#: lib/bds/tui.ex:312
 #, elixir-autogen, elixir-format
 msgid "Tasks"
 msgstr "Tâches"
@@ -2598,7 +2609,7 @@ msgstr "La syntaxe du template est valide"
 #: lib/bds/desktop/shell_live/template_editor.ex:171
 #: lib/bds/desktop/shell_live/template_editor.ex:176
 #: lib/bds/desktop/shell_live/template_editor.ex:191
-#: lib/bds/tui.ex:490
+#: lib/bds/tui.ex:601
 #: lib/bds/ui/registry.ex:46
 #: lib/bds/ui/sidebar.ex:71
 #: lib/bds/ui/sidebar.ex:122
@@ -2821,6 +2832,7 @@ msgid "Updated URLs"
 msgstr "URLs mises à jour"
 
 #: lib/bds/desktop/menu_bar.ex:259
+#: lib/bds/tui.ex:749
 #, elixir-autogen, elixir-format
 msgid "Upload Site"
 msgstr "Téléverser le site"
@@ -2848,11 +2860,13 @@ msgid "Validate"
 msgstr "Valider"
 
 #: lib/bds/desktop/menu_bar.ex:258
+#: lib/bds/tui.ex:727
 #, elixir-autogen, elixir-format
 msgid "Validate Site"
 msgstr "Valider le site"
 
 #: lib/bds/desktop/menu_bar.ex:253
+#: lib/bds/tui.ex:740
 #, elixir-autogen, elixir-format
 msgid "Validate Translations"
 msgstr "Valider les traductions"
@@ -3517,6 +3531,7 @@ msgid "Suggested tags"
 msgstr "Tags suggérés"
 
 #: lib/bds/desktop/menu_bar.ex:257
+#: lib/bds/tui.ex:728
 #, elixir-autogen, elixir-format
 msgid "Force Render Site"
 msgstr "Forcer la régénération du site"
@@ -3613,87 +3628,82 @@ msgstr "OK"
 msgid "The endpoint returned no models. You can still type a model name manually."
 msgstr "Le point de terminaison n'a renvoyé aucun modèle. Vous pouvez toujours saisir un nom de modèle manuellement."
 
-#: lib/bds/tui.ex:576
+#: lib/bds/tui.ex:687
 #, elixir-autogen, elixir-format
 msgid "AI is unavailable in airplane mode without a local endpoint."
 msgstr "L'IA n'est pas disponible en mode avion sans point de terminaison local."
 
-#: lib/bds/tui.ex:622
+#: lib/bds/tui.ex:811
 #, elixir-autogen, elixir-format
 msgid "Could not load this file."
 msgstr "Impossible de charger ce fichier."
 
-#: lib/bds/tui.ex:123
+#: lib/bds/tui.ex:138
 #, elixir-autogen, elixir-format
 msgid "Editing this item is not available in the terminal UI yet."
 msgstr "La modification de cet élément n'est pas encore disponible dans l'interface du terminal."
 
-#: lib/bds/tui.ex:227
+#: lib/bds/tui.ex:288
 #, elixir-autogen, elixir-format
 msgid "No suggestions returned."
 msgstr "Aucune suggestion reçue."
 
-#: lib/bds/tui.ex:619
+#: lib/bds/tui.ex:808
 #, elixir-autogen, elixir-format
 msgid "Only images can be previewed."
 msgstr "Seules les images peuvent être prévisualisées."
 
-#: lib/bds/tui.ex:499
+#: lib/bds/tui.ex:610
 #, elixir-autogen, elixir-format
 msgid "Post not found."
 msgstr "Article introuvable."
 
-#: lib/bds/tui.ex:303
+#: lib/bds/tui.ex:379
 #, elixir-autogen, elixir-format
 msgid "Press enter to preview %{name}."
 msgstr "Appuyez sur Entrée pour prévisualiser %{name}."
 
-#: lib/bds/tui.ex:546
+#: lib/bds/tui.ex:657
 #, elixir-autogen, elixir-format
 msgid "Published."
 msgstr "Publié."
 
-#: lib/bds/tui.ex:562
+#: lib/bds/tui.ex:673
 #, elixir-autogen, elixir-format
 msgid "Save before switching languages."
 msgstr "Enregistrez avant de changer de langue."
 
-#: lib/bds/tui.ex:547
+#: lib/bds/tui.ex:658
 #, elixir-autogen, elixir-format
 msgid "Saved."
 msgstr "Enregistré."
 
-#: lib/bds/tui.ex:306
+#: lib/bds/tui.ex:382
 #, elixir-autogen, elixir-format
 msgid "Select an entry and press enter to open it."
 msgstr "Sélectionnez une entrée et appuyez sur Entrée pour l'ouvrir."
 
-#: lib/bds/tui.ex:224
+#: lib/bds/tui.ex:285
 #, elixir-autogen, elixir-format
 msgid "Suggestions applied."
 msgstr "Suggestions appliquées."
 
-#: lib/bds/tui.ex:318
+#: lib/bds/tui.ex:394
 #, elixir-autogen, elixir-format
 msgid "Title (ctrl+t to edit)"
 msgstr "Titre (ctrl+t pour modifier)"
 
-#: lib/bds/tui.ex:317
+#: lib/bds/tui.ex:393
 #, elixir-autogen, elixir-format
 msgid "Title (editing — enter to confirm)"
 msgstr "Titre (édition — Entrée pour confirmer)"
 
-#: lib/bds/tui.ex:365
+#: lib/bds/tui.ex:441
 #, elixir-autogen, elixir-format
 msgid "Working…"
 msgstr "Traitement en cours…"
 
-#: lib/bds/tui.ex:394
-#, elixir-autogen, elixir-format
-msgid "enter open · n new post · 1-5 views · r refresh · ctrl+q quit"
-msgstr "entrée ouvrir · n nouvel article · 1-5 vues · r actualiser · ctrl+q quitter"
-
-#: lib/bds/tui.ex:386
+#: lib/bds/tui.ex:462
 #, elixir-autogen, elixir-format
 msgid "esc to close"
 msgstr "échap pour fermer"
@@ -3730,12 +3740,37 @@ msgstr "Adresse du serveur (user@host ou user@host:port), authentification par c
 msgid "Use the form user@host or user@host:port."
 msgstr "Utilisez le format user@host ou user@host:port."
 
-#: lib/bds/tui.ex:337
+#: lib/bds/tui.ex:413
 #, elixir-autogen, elixir-format
 msgid "Preview (ctrl+e to edit)"
 msgstr "Aperçu (ctrl+e pour modifier)"
 
-#: lib/bds/tui.ex:401
+#: lib/bds/tui.ex:512
 #, elixir-autogen, elixir-format
 msgid "ctrl+s save · ctrl+p publish · ctrl+e preview · ctrl+t title · ctrl+l language · ctrl+g AI · esc back"
 msgstr "ctrl+s enregistrer · ctrl+p publier · ctrl+e aperçu · ctrl+t titre · ctrl+l langue · ctrl+g IA · échap retour"
+
+#: lib/bds/tui.ex:312
+#, elixir-autogen, elixir-format
+msgid "All tasks finished."
+msgstr "Toutes les tâches sont terminées."
+
+#: lib/bds/tui.ex:488
+#, elixir-autogen, elixir-format
+msgid "Commands — esc to close"
+msgstr "Commandes — échap pour fermer"
+
+#: lib/bds/tui.ex:159
+#, elixir-autogen, elixir-format
+msgid "Unknown command."
+msgstr "Commande inconnue."
+
+#: lib/bds/tui.ex:478
+#, elixir-autogen, elixir-format
+msgid "[report/apply in GUI]"
+msgstr "[rapport/application dans la GUI]"
+
+#: lib/bds/tui.ex:505
+#, elixir-autogen, elixir-format
+msgid "enter open · n new post · 1-5 views · : commands · ? help · r refresh · ctrl+q quit"
+msgstr "entrée ouvrir · n nouvel article · 1-5 vues · : commandes · ? aide · r actualiser · ctrl+q quitter"

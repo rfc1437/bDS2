@@ -10,7 +10,9 @@ defmodule BDS.TUI do
   ## Keys
 
   Sidebar focus: `↑/↓`/`j/k` navigate, `enter` open, `n` new post,
-  `1..5` switch view (posts/media/templates/scripts/tags), `r` refresh.
+  `1..5` switch view (posts/media/templates/scripts/tags), `r` refresh,
+  `:` vi-style command prompt over the Blog-menu shell commands, `?`
+  command help (commands whose report/apply UI is GUI-only are marked).
   Editor focus: text keys edit, `ctrl+s` save, `ctrl+p` publish,
   `ctrl+e` word-wrapped preview, `ctrl+t` edit title, `ctrl+l` cycle
   language, `ctrl+g` AI suggestions, `esc` back to sidebar. `ctrl+q`
@@ -49,6 +51,10 @@ defmodule BDS.TUI do
       # shuts the VM down instead of leaving a headless server behind.
       stop_vm_on_exit: Keyword.get(opts, :stop_vm_on_exit, false),
       stop_fun: Keyword.get(opts, :stop_fun, &System.stop/0),
+      command_executor:
+        Keyword.get(opts, :command_executor, &BDS.Desktop.ShellCommands.execute/1),
+      command: nil,
+      task_polling: false,
       project_id: project_id,
       view: "posts",
       sidebar: nil,
@@ -79,6 +85,10 @@ defmodule BDS.TUI do
   def handle_event(%ExRatatui.Event.Key{code: "q", modifiers: ["ctrl"]}, state),
     do: {:stop, state}
 
+  def handle_event(%ExRatatui.Event.Key{kind: "press"} = key, %{command: command} = state)
+      when command != nil,
+      do: command_key(key, state)
+
   def handle_event(%ExRatatui.Event.Key{code: "esc"}, %{image: image} = state)
       when image != nil,
       do: {:noreply, %{state | image: nil}}
@@ -106,6 +116,12 @@ defmodule BDS.TUI do
 
   defp sidebar_key(%{code: "r"}, state), do: {:noreply, load_sidebar(state)}
 
+  defp sidebar_key(%{code: ":"}, state),
+    do: {:noreply, %{state | command: %{input: "", selected: 0, help?: false}}}
+
+  defp sidebar_key(%{code: "?"}, state),
+    do: {:noreply, %{state | command: %{input: "", selected: 0, help?: true}}}
+
   defp sidebar_key(%{code: "n"}, %{project_id: project_id} = state)
        when is_binary(project_id) do
     case Posts.create_post(%{project_id: project_id, title: "", content: ""}) do
@@ -130,6 +146,52 @@ defmodule BDS.TUI do
     do: {:noreply, %{state | focus: :editor}}
 
   defp sidebar_key(_key, state), do: {:noreply, state}
+
+  # ── Events: command prompt (vi-style) ────────────────────────────────────
+
+  defp command_key(%{code: "esc"}, state), do: {:noreply, %{state | command: nil}}
+
+  defp command_key(_key, %{command: %{help?: true}} = state),
+    do: {:noreply, %{state | command: nil}}
+
+  defp command_key(%{code: "enter"}, %{command: command} = state) do
+    case Enum.at(filtered_commands(command.input), command.selected) do
+      nil ->
+        {:noreply,
+         toast(%{state | command: nil}, ":" <> command.input, dgettext("ui", "Unknown command."))}
+
+      entry ->
+        {:noreply, run_command(%{state | command: nil}, entry)}
+    end
+  end
+
+  defp command_key(%{code: "down"}, %{command: command} = state) do
+    count = length(filtered_commands(command.input))
+    {:noreply, put_in(state.command.selected, min(command.selected + 1, max(count - 1, 0)))}
+  end
+
+  defp command_key(%{code: "up"}, %{command: command} = state),
+    do: {:noreply, put_in(state.command.selected, max(command.selected - 1, 0))}
+
+  defp command_key(%{code: "backspace"}, %{command: command} = state) do
+    {:noreply,
+     %{state | command: %{command | input: String.slice(command.input, 0..-2//1), selected: 0}}}
+  end
+
+  # `:?` — the vi way to reach help from the prompt.
+  defp command_key(%{code: "?"}, %{command: %{input: ""}} = state),
+    do: {:noreply, put_in(state.command.help?, true)}
+
+  defp command_key(%{code: code, modifiers: []}, %{command: command} = state)
+       when byte_size(code) >= 1 do
+    if String.length(code) == 1 do
+      {:noreply, %{state | command: %{command | input: command.input <> code, selected: 0}}}
+    else
+      {:noreply, state}
+    end
+  end
+
+  defp command_key(_key, state), do: {:noreply, state}
 
   # ── Events: editor focus ─────────────────────────────────────────────────
 
@@ -239,6 +301,20 @@ defmodule BDS.TUI do
     {:noreply, toast(%{state | busy: false}, dgettext("ui", "AI Suggestions"), inspect(reason))}
   end
 
+  def handle_info(:poll_tasks, %{task_polling: true} = state) do
+    case BDS.Tasks.status_snapshot() do
+      %{running_task_message: message} when is_binary(message) and message != "" ->
+        Process.send_after(self(), :poll_tasks, 1_000)
+        {:noreply, %{state | status: message}}
+
+      _idle ->
+        {:noreply,
+         %{state | task_polling: false}
+         |> load_sidebar()
+         |> toast(dgettext("ui", "Tasks"), dgettext("ui", "All tasks finished."))}
+    end
+  end
+
   def handle_info(_message, state), do: {:noreply, state}
 
   # ── Render ───────────────────────────────────────────────────────────────
@@ -261,7 +337,8 @@ defmodule BDS.TUI do
       sidebar_widgets(state, sidebar_rect) ++
       main_widgets(state, main_rect) ++
       status_widgets(state, status_rect) ++
-      image_widgets(state, body_rect)
+      image_widgets(state, body_rect) ++
+      command_widgets(state, body_rect)
   end
 
   defp view_tabs(state, rect) do
@@ -390,11 +467,46 @@ defmodule BDS.TUI do
     ]
   end
 
+  defp command_widgets(%{command: nil}, _rect), do: []
+
+  defp command_widgets(%{command: command}, rect) do
+    overlay = %Rect{
+      x: rect.x + 4,
+      y: rect.y + 1,
+      width: max(rect.width - 8, 20),
+      height: max(rect.height - 2, 6)
+    }
+
+    gui_marker = dgettext("ui", "[report/apply in GUI]")
+
+    items =
+      Enum.map(filtered_commands(command.input), fn entry ->
+        marker = if entry.gui, do: " " <> gui_marker, else: ""
+        "#{entry.action} — #{entry.label}#{marker}"
+      end)
+
+    title =
+      if command.help? do
+        dgettext("ui", "Commands — esc to close")
+      else
+        ":" <> command.input
+      end
+
+    [
+      {%List{
+         items: items,
+         selected: if(command.help?, do: nil, else: command.selected),
+         highlight_style: %Style{fg: :black, bg: :cyan},
+         block: %Block{title: title, borders: [:all]}
+       }, overlay}
+    ]
+  end
+
   defp default_status(%{focus: :sidebar}),
     do:
       dgettext(
         "ui",
-        "enter open · n new post · 1-5 views · r refresh · ctrl+q quit"
+        "enter open · n new post · 1-5 views · : commands · ? help · r refresh · ctrl+q quit"
       )
 
   defp default_status(%{focus: :editor}),
@@ -604,6 +716,84 @@ defmodule BDS.TUI do
 
   defp editor_title(editor),
     do: Metadata.display_title(editor.title, editor.post.slug, editor.post.id)
+
+  # ── Shell commands (main-menu functionality) ─────────────────────────────
+
+  # The parameterless Blog-menu commands. `gui: true` marks commands whose
+  # report/apply follow-up UI exists only in the GUI shell for now — the
+  # command still runs here, but reviewing and applying its report (repair,
+  # orphan import, validation apply) needs the desktop app.
+  defp commands do
+    [
+      %{action: "metadata_diff", label: dgettext("ui", "Metadata Diff"), gui: true},
+      %{action: "validate_site", label: dgettext("ui", "Validate Site"), gui: true},
+      %{action: "force_render_site", label: dgettext("ui", "Force Render Site"), gui: false},
+      %{action: "generate_sitemap", label: dgettext("ui", "Generate Site"), gui: false},
+      %{action: "rebuild_database", label: dgettext("ui", "Rebuild Database"), gui: false},
+      %{action: "reindex_text", label: dgettext("ui", "Reindex Text"), gui: false},
+      %{
+        action: "rebuild_embedding_index",
+        label: dgettext("ui", "Rebuild Embedding Index"),
+        gui: false
+      },
+      %{action: "regenerate_calendar", label: dgettext("ui", "Regenerate Calendar"), gui: false},
+      %{
+        action: "validate_translations",
+        label: dgettext("ui", "Validate Translations"),
+        gui: true
+      },
+      %{
+        action: "fill_missing_translations",
+        label: dgettext("ui", "Fill Missing Translations"),
+        gui: false
+      },
+      %{action: "find_duplicates", label: dgettext("ui", "Find Duplicate Posts"), gui: true},
+      %{action: "upload_site", label: dgettext("ui", "Upload Site"), gui: false},
+      %{action: "open_in_browser", label: dgettext("ui", "Open in Browser"), gui: false}
+    ]
+  end
+
+  defp filtered_commands(""), do: commands()
+
+  defp filtered_commands(input) do
+    needle = String.downcase(input)
+
+    Enum.filter(commands(), fn entry ->
+      String.contains?(entry.action, needle) or String.contains?(String.downcase(entry.label), needle)
+    end)
+  end
+
+  defp run_command(state, entry) do
+    case state.command_executor.(entry.action) do
+      {:ok, %{kind: "task_queued", title: title, message: message}} ->
+        state
+        |> toast(title, message)
+        |> start_task_polling()
+
+      {:ok, %{kind: "open_url", title: title, url: url}} ->
+        toast(state, title, url)
+
+      {:ok, %{kind: kind, title: title, message: message}}
+      when kind in ["output", "open_editor"] ->
+        toast(state, title, message)
+
+      {:ok, _other} ->
+        toast(state, entry.label, dgettext("ui", "Command completed"))
+
+      {:error, %{message: message}} ->
+        toast(state, entry.label, message)
+
+      {:error, reason} ->
+        toast(state, entry.label, inspect(reason))
+    end
+  end
+
+  defp start_task_polling(%{task_polling: true} = state), do: state
+
+  defp start_task_polling(state) do
+    Process.send_after(self(), :poll_tasks, 1_000)
+    %{state | task_polling: true}
+  end
 
   # ── Media preview ────────────────────────────────────────────────────────
 

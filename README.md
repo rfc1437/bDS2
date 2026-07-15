@@ -194,7 +194,9 @@ appears in every open shell.
 ### TUI keys
 
 `↑/↓` or `j/k` navigate · `enter` open · `n` new post · `1-5` switch view
-(posts/media/templates/scripts/tags) · `r` refresh · in the editor:
+(posts/media/templates/scripts/tags) · `:` command prompt (metadata
+diff, validate site, force render, rebuilds, …) · `?` command help ·
+`r` refresh · in the editor:
 `ctrl+s` save, `ctrl+p` publish, `ctrl+e` word-wrapped preview,
 `ctrl+t` title, `ctrl+l` language, `ctrl+g` AI suggestions
 (airplane-mode gated), `esc` back · `ctrl+q` quit.
