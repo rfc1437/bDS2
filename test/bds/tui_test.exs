@@ -230,6 +230,15 @@ defmodule BDS.TUITest do
       assert is_binary(action)
     end
 
+    test "input that matches no command renders without errors" do
+      state = mount_with_executor!() |> press(":") |> press("j")
+
+      # Filtering down to zero commands must not blow up the render
+      # (List panics on a selected index into an empty item list).
+      text = screen_text(state)
+      assert text =~ ":j"
+    end
+
     test "no match reports an unknown command" do
       state =
         mount_with_executor!()

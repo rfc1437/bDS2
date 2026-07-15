@@ -487,7 +487,7 @@ defmodule BDS.TUI do
     [
       {%List{
          items: items,
-         selected: state.selected,
+         selected: list_selected(items, state.selected),
          highlight_style:
            if(focused?,
              do: %Style{fg: :black, bg: :cyan},
@@ -497,6 +497,11 @@ defmodule BDS.TUI do
        }, rect}
     ]
   end
+
+  # The List widget requires selected: nil when the collection is empty
+  # and raises otherwise — clamp every dynamic list through this.
+  defp list_selected([], _selected), do: nil
+  defp list_selected(items, selected), do: min(selected, length(items) - 1)
 
   defp main_widgets(%{editor: nil} = state, rect) do
     text =
@@ -621,7 +626,7 @@ defmodule BDS.TUI do
       {%Clear{}, overlay},
       {%List{
          items: items,
-         selected: if(command.help?, do: nil, else: command.selected),
+         selected: if(command.help?, do: nil, else: list_selected(items, command.selected)),
          highlight_style: %Style{fg: :black, bg: :cyan},
          block: %Block{title: title, borders: [:all]}
        }, overlay}
@@ -642,7 +647,7 @@ defmodule BDS.TUI do
       {%Clear{}, overlay},
       {%List{
          items: report_lines(report),
-         selected: report.scroll,
+         selected: list_selected(report_lines(report), report.scroll),
          scroll_padding: 2,
          highlight_style: %Style{modifiers: [:bold]},
          block: %Block{title: report_title(report), borders: [:all]}
