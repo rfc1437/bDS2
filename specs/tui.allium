@@ -20,6 +20,7 @@ surface TuiSurface {
         TuiKeyPressed(code, modifiers)
         TuiEventReceived(entity, entity_id, action)
         TuiSettingsChanged(key)
+        ShellTaskCompleted(route)
 }
 
 rule SidebarNavigation {
@@ -63,16 +64,30 @@ rule AiQuickAction {
 }
 
 rule CommandPrompt {
-    when: TuiKeyPressed(code: ":" | "?")
+    when: TuiKeyPressed(code: ":")
     -- Vi-style prompt: ":" opens a filterable list of the parameterless
     -- Blog-menu shell commands (metadata diff, validate site, force
     -- render, rebuilds, reindex, translations, duplicates, upload,
     -- browser preview URL) and runs the selection through the same
-    -- BDS.Desktop.ShellCommands backend as the GUI menu; "?" (or ":?")
-    -- shows the same list as help. Commands whose report/apply follow-up
-    -- UI exists only in the GUI are marked so the user knows. Queued
-    -- tasks report progress in the status line until all tasks finish.
+    -- BDS.Desktop.ShellCommands backend as the GUI menu; typing ":?"
+    -- shows the full list as help. Overlays clear the cells beneath
+    -- them. Commands whose follow-up UI is GUI-only (validate
+    -- translations, find duplicates) are marked. Queued tasks report
+    -- progress in the status line until all tasks finish.
     ensures: CommandListShownOrExecuted()
+}
+
+rule ReportPanels {
+    when: ShellTaskCompleted(route: "metadata_diff" | "site_validation")
+    -- Completed metadata diff and site validation tasks open a
+    -- scrollable report panel showing the differences. Enter applies
+    -- the whole report — metadata diff repairs all items from the
+    -- filesystem (file → db) and imports orphan files; site validation
+    -- applies the full report incrementally (render missing, remove
+    -- extra, re-render updated), matching the GUI defaults. Esc closes
+    -- the report without applying. Reports completed before this
+    -- session started never pop up.
+    ensures: ReportShownThenAppliedOrCancelled()
 }
 
 rule MultiClientSync {

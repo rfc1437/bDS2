@@ -169,8 +169,8 @@ defmodule BDS.TUITest do
       parent = self()
 
       mount!(
-        command_executor: fn action ->
-          send(parent, {:executed, action})
+        command_executor: fn action, params ->
+          send(parent, {:executed, action, params})
           {:ok, %{kind: "output", title: "T", message: "done"}}
         end
       )
@@ -185,9 +185,19 @@ defmodule BDS.TUITest do
       assert text =~ "validate_site"
     end
 
-    test "'?' opens the command help list with GUI markers" do
-      state = mount_with_executor!() |> press("?")
+    test "the palette clears the background underneath" do
+      state = mount_with_executor!()
+      assert screen_text(state) =~ "Select an entry"
 
+      state = press(state, ":")
+      refute screen_text(state) =~ "Select an entry"
+    end
+
+    test "'?' alone does nothing; ':?' opens the command help with GUI markers" do
+      state = mount_with_executor!() |> press("?")
+      assert state.command == nil
+
+      state = state |> press(":") |> press("?")
       assert state.command.help?
       text = screen_text(state)
       assert text =~ "metadata_diff"
@@ -208,7 +218,7 @@ defmodule BDS.TUITest do
         |> press("a")
         |> press("enter")
 
-      assert_receive {:executed, "metadata_diff"}
+      assert_receive {:executed, "metadata_diff", %{}}
       assert state.command == nil
       assert state.status =~ "done"
     end
@@ -216,7 +226,7 @@ defmodule BDS.TUITest do
     test "up/down move the selection" do
       state = mount_with_executor!() |> press(":") |> press("down") |> press("enter")
 
-      assert_receive {:executed, action}
+      assert_receive {:executed, action, %{}}
       assert is_binary(action)
     end
 
@@ -228,7 +238,7 @@ defmodule BDS.TUITest do
         |> press("z")
         |> press("enter")
 
-      refute_receive {:executed, _action}, 50
+      refute_receive {:executed, _action, _params}, 50
       assert state.command == nil
       assert state.status != nil
     end
@@ -238,7 +248,7 @@ defmodule BDS.TUITest do
 
       state =
         mount!(
-          command_executor: fn action ->
+          command_executor: fn action, _params ->
             send(parent, {:executed, action})
             {:ok, %{kind: "task_queued", title: "Rebuild", message: "queued"}}
           end
@@ -253,6 +263,147 @@ defmodule BDS.TUITest do
       {:noreply, state} = BDS.TUI.handle_info(:poll_tasks, state)
       refute state.task_polling
       assert state.status != nil
+    end
+  end
+
+  describe "report panels" do
+    defp diff_snapshot do
+      %{
+        running_task_message: nil,
+        tasks: [
+          %{
+            id: "task-diff",
+            status: :completed,
+            result: %{
+              kind: "open_editor",
+              route: "metadata_diff",
+              title: "Metadata Diff",
+              payload: %{
+                summary: %{diff_count: 1, orphan_count: 1},
+                diff_reports: [
+                  %{
+                    "entity_type" => "post",
+                    "entity_id" => "p1",
+                    "differences" => [
+                      %{"name" => "title", "db_value" => "Old", "file_value" => "New"}
+                    ]
+                  }
+                ],
+                orphan_reports: [%{"file_path" => "posts/2026/07/lost.md"}]
+              }
+            }
+          }
+        ]
+      }
+    end
+
+    defp validation_snapshot do
+      %{
+        running_task_message: nil,
+        tasks: [
+          %{
+            id: "task-validate",
+            status: :completed,
+            result: %{
+              kind: "open_editor",
+              route: "site_validation",
+              title: "Site Validation",
+              payload: %{
+                sitemap_path: "sitemap.xml",
+                sitemap_changed: true,
+                summary: %{
+                  expected_count: 10,
+                  existing_count: 8,
+                  missing_count: 2,
+                  extra_count: 1,
+                  updated_count: 1
+                },
+                missing_url_paths: ["/2026/07/a/", "/2026/07/b/"],
+                extra_url_paths: ["/stale/"],
+                updated_post_url_paths: ["/2026/07/c/"],
+                expected_url_count: 10,
+                existing_html_url_count: 8
+              }
+            }
+          }
+        ]
+      }
+    end
+
+    defp mount_for_report!(snapshot) do
+      parent = self()
+
+      state =
+        mount!(
+          command_executor: fn action, params ->
+            send(parent, {:executed, action, params})
+            {:ok, %{kind: "task_queued", title: "T", message: "queued"}}
+          end,
+          task_snapshot_fun: fn -> snapshot end,
+          # Pre-existing completed tasks must not pop up reports, so the
+          # tests hand the snapshot in only after mount via this switch.
+          initial_task_snapshot: %{running_task_message: nil, tasks: []}
+        )
+
+      {:noreply, state} = BDS.TUI.handle_info(:poll_tasks, %{state | task_polling: true})
+      state
+    end
+
+    test "a completed metadata diff task opens the report panel" do
+      state = mount_for_report!(diff_snapshot())
+
+      assert state.report.route == "metadata_diff"
+      text = screen_text(state)
+      assert text =~ "post p1"
+      assert text =~ "title"
+      assert text =~ "lost.md"
+    end
+
+    test "esc closes the report without applying" do
+      state = mount_for_report!(diff_snapshot()) |> press("esc")
+
+      assert state.report == nil
+      refute_receive {:executed, _action, _params}, 50
+    end
+
+    test "enter repairs all metadata diffs from files and imports orphans" do
+      state = mount_for_report!(diff_snapshot()) |> press("enter")
+
+      assert state.report == nil
+
+      assert_receive {:executed, "repair_metadata_diff", %{items: items, direction: "file_to_db"}}
+      assert [%{"entity_type" => "post", "entity_id" => "p1"} | _] = items
+
+      assert_receive {:executed, "import_metadata_diff_orphans", %{orphans: orphans}}
+      assert [%{"file_path" => "posts/2026/07/lost.md"}] = orphans
+    end
+
+    test "a completed site validation task opens the report and enter applies it" do
+      state = mount_for_report!(validation_snapshot())
+
+      assert state.report.route == "site_validation"
+      text = screen_text(state)
+      assert text =~ "/2026/07/a/"
+      assert text =~ "/stale/"
+
+      state = press(state, "enter")
+      assert state.report == nil
+
+      assert_receive {:executed, "apply_site_validation", %{report: report}}
+      assert report.missing_url_paths == ["/2026/07/a/", "/2026/07/b/"]
+    end
+
+    test "completed tasks from before mount never open a report" do
+      parent = self()
+
+      state =
+        mount!(
+          command_executor: fn action, params -> send(parent, {:executed, action, params}) end,
+          task_snapshot_fun: fn -> diff_snapshot() end
+        )
+
+      {:noreply, state} = BDS.TUI.handle_info(:poll_tasks, %{state | task_polling: true})
+      assert state.report == nil
     end
   end
 

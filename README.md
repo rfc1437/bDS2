@@ -195,7 +195,9 @@ appears in every open shell.
 
 `↑/↓` or `j/k` navigate · `enter` open · `n` new post · `1-5` switch view
 (posts/media/templates/scripts/tags) · `:` command prompt (metadata
-diff, validate site, force render, rebuilds, …) · `?` command help ·
+diff, validate site, force render, rebuilds, …; `:?` lists all) ·
+metadata-diff/site-validation reports open as panels — `enter` applies
+the whole report (repair from files / incremental apply), `esc` cancels ·
 `r` refresh · in the editor:
 `ctrl+s` save, `ctrl+p` publish, `ctrl+e` word-wrapped preview,
 `ctrl+t` title, `ctrl+l` language, `ctrl+g` AI suggestions

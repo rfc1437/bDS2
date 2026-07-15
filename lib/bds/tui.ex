@@ -33,7 +33,7 @@ defmodule BDS.TUI do
   alias ExRatatui.Layout
   alias ExRatatui.Layout.Rect
   alias ExRatatui.Style
-  alias ExRatatui.Widgets.{Block, List, Markdown, Paragraph, Tabs, Textarea}
+  alias ExRatatui.Widgets.{Block, Clear, List, Markdown, Paragraph, Tabs, Textarea}
 
   @views ~w(posts media templates scripts tags)
 
@@ -52,8 +52,11 @@ defmodule BDS.TUI do
       stop_vm_on_exit: Keyword.get(opts, :stop_vm_on_exit, false),
       stop_fun: Keyword.get(opts, :stop_fun, &System.stop/0),
       command_executor:
-        Keyword.get(opts, :command_executor, &BDS.Desktop.ShellCommands.execute/1),
+        Keyword.get(opts, :command_executor, &BDS.Desktop.ShellCommands.execute/2),
+      task_snapshot_fun: Keyword.get(opts, :task_snapshot_fun, &BDS.Tasks.status_snapshot/0),
       command: nil,
+      report: nil,
+      handled_task_ids: nil,
       task_polling: false,
       project_id: project_id,
       view: "posts",
@@ -68,7 +71,21 @@ defmodule BDS.TUI do
       status: nil
     }
 
+    # Tasks completed before this session started must never pop their
+    # report panels here — another client already consumed them.
+    initial_snapshot =
+      Keyword.get_lazy(opts, :initial_task_snapshot, state.task_snapshot_fun)
+
+    state = %{state | handled_task_ids: completed_task_ids(initial_snapshot)}
+
     {:ok, load_sidebar(state)}
+  end
+
+  defp completed_task_ids(snapshot) do
+    snapshot
+    |> Map.get(:tasks, [])
+    |> Enum.filter(&(&1.status == :completed))
+    |> MapSet.new(& &1.id)
   end
 
   @impl true
@@ -84,6 +101,10 @@ defmodule BDS.TUI do
   @impl true
   def handle_event(%ExRatatui.Event.Key{code: "q", modifiers: ["ctrl"]}, state),
     do: {:stop, state}
+
+  def handle_event(%ExRatatui.Event.Key{kind: "press"} = key, %{report: report} = state)
+      when report != nil,
+      do: report_key(key, state)
 
   def handle_event(%ExRatatui.Event.Key{kind: "press"} = key, %{command: command} = state)
       when command != nil,
@@ -119,9 +140,6 @@ defmodule BDS.TUI do
   defp sidebar_key(%{code: ":"}, state),
     do: {:noreply, %{state | command: %{input: "", selected: 0, help?: false}}}
 
-  defp sidebar_key(%{code: "?"}, state),
-    do: {:noreply, %{state | command: %{input: "", selected: 0, help?: true}}}
-
   defp sidebar_key(%{code: "n"}, %{project_id: project_id} = state)
        when is_binary(project_id) do
     case Posts.create_post(%{project_id: project_id, title: "", content: ""}) do
@@ -146,6 +164,74 @@ defmodule BDS.TUI do
     do: {:noreply, %{state | focus: :editor}}
 
   defp sidebar_key(_key, state), do: {:noreply, state}
+
+  # ── Events: report panels (metadata diff / site validation) ──────────────
+
+  defp report_key(%{code: "esc"}, state), do: {:noreply, %{state | report: nil}}
+
+  defp report_key(%{code: "enter"}, %{report: report} = state),
+    do: {:noreply, apply_report(%{state | report: nil}, report)}
+
+  defp report_key(%{code: code}, %{report: report} = state) when code in ["down", "j"] do
+    max_scroll = max(length(report_lines(report)) - 1, 0)
+    {:noreply, put_in(state.report.scroll, min(report.scroll + 1, max_scroll))}
+  end
+
+  defp report_key(%{code: code}, %{report: report} = state) when code in ["up", "k"],
+    do: {:noreply, put_in(state.report.scroll, max(report.scroll - 1, 0))}
+
+  defp report_key(_key, state), do: {:noreply, state}
+
+  # Whole-report application, mirroring the GUI defaults: metadata diffs are
+  # repaired from the filesystem (file → db, all items, orphans imported);
+  # site validation applies the full report incrementally.
+  defp apply_report(state, %{route: "metadata_diff", payload: payload}) do
+    items = BDS.MapUtils.attr(payload, :diff_reports, [])
+    orphans = BDS.MapUtils.attr(payload, :orphan_reports, [])
+
+    if items == [] and orphans == [] do
+      toast(state, dgettext("ui", "Metadata Diff"), dgettext("ui", "Nothing to repair."))
+    else
+      state =
+        if items == [] do
+          state
+        else
+          execute_action(state, dgettext("ui", "Metadata Diff"), "repair_metadata_diff", %{
+            items: items,
+            direction: "file_to_db"
+          })
+        end
+
+      if orphans == [] do
+        state
+      else
+        execute_action(
+          state,
+          dgettext("ui", "Metadata Diff"),
+          "import_metadata_diff_orphans",
+          %{orphans: orphans}
+        )
+      end
+    end
+  end
+
+  defp apply_report(state, %{route: "site_validation", payload: payload}) do
+    nothing_to_apply? =
+      BDS.MapUtils.attr(payload, :missing_url_paths, []) == [] and
+        BDS.MapUtils.attr(payload, :extra_url_paths, []) == [] and
+        BDS.MapUtils.attr(payload, :updated_post_url_paths, []) == [] and
+        not BDS.MapUtils.attr(payload, :sitemap_changed, false)
+
+    if nothing_to_apply? do
+      toast(state, dgettext("ui", "Site Validation"), dgettext("ui", "Nothing to apply."))
+    else
+      execute_action(state, dgettext("ui", "Site Validation"), "apply_site_validation", %{
+        report: payload
+      })
+    end
+  end
+
+  defp apply_report(state, _report), do: state
 
   # ── Events: command prompt (vi-style) ────────────────────────────────────
 
@@ -302,7 +388,10 @@ defmodule BDS.TUI do
   end
 
   def handle_info(:poll_tasks, %{task_polling: true} = state) do
-    case BDS.Tasks.status_snapshot() do
+    snapshot = state.task_snapshot_fun.()
+    state = open_completed_reports(state, snapshot)
+
+    case snapshot do
       %{running_task_message: message} when is_binary(message) and message != "" ->
         Process.send_after(self(), :poll_tasks, 1_000)
         {:noreply, %{state | status: message}}
@@ -316,6 +405,40 @@ defmodule BDS.TUI do
   end
 
   def handle_info(_message, state), do: {:noreply, state}
+
+  # A finished metadata diff / site validation task carries its report as
+  # the task result; unseen ones open the report panel.
+  defp open_completed_reports(state, snapshot) do
+    completed = Map.get(snapshot, :tasks, []) |> Enum.filter(&(&1.status == :completed))
+
+    report_task =
+      Enum.find(completed, fn task ->
+        is_map(task.result) and
+          Map.get(task.result, :kind) == "open_editor" and
+          Map.get(task.result, :route) in ["metadata_diff", "site_validation"] and
+          not MapSet.member?(state.handled_task_ids, task.id)
+      end)
+
+    state = %{
+      state
+      | handled_task_ids: MapSet.union(state.handled_task_ids, MapSet.new(completed, & &1.id))
+    }
+
+    case report_task do
+      nil ->
+        state
+
+      task ->
+        %{
+          state
+          | report: %{
+              route: task.result.route,
+              payload: Map.get(task.result, :payload, %{}),
+              scroll: 0
+            }
+        }
+    end
+  end
 
   # ── Render ───────────────────────────────────────────────────────────────
 
@@ -338,6 +461,7 @@ defmodule BDS.TUI do
       main_widgets(state, main_rect) ++
       status_widgets(state, status_rect) ++
       image_widgets(state, body_rect) ++
+      report_widgets(state, body_rect) ++
       command_widgets(state, body_rect)
   end
 
@@ -461,6 +585,7 @@ defmodule BDS.TUI do
     [inner] = Layout.split(overlay, :vertical, [{:min, 3}])
 
     [
+      {%Clear{}, overlay},
       {%Block{title: title <> " — " <> dgettext("ui", "esc to close"), borders: [:all]}, overlay},
       {widget,
        %Rect{x: inner.x + 1, y: inner.y + 1, width: inner.width - 2, height: inner.height - 2}}
@@ -493,6 +618,7 @@ defmodule BDS.TUI do
       end
 
     [
+      {%Clear{}, overlay},
       {%List{
          items: items,
          selected: if(command.help?, do: nil, else: command.selected),
@@ -502,11 +628,119 @@ defmodule BDS.TUI do
     ]
   end
 
+  defp report_widgets(%{report: nil}, _rect), do: []
+
+  defp report_widgets(%{report: report}, rect) do
+    overlay = %Rect{
+      x: rect.x + 2,
+      y: rect.y + 1,
+      width: max(rect.width - 4, 30),
+      height: max(rect.height - 2, 8)
+    }
+
+    [
+      {%Clear{}, overlay},
+      {%List{
+         items: report_lines(report),
+         selected: report.scroll,
+         scroll_padding: 2,
+         highlight_style: %Style{modifiers: [:bold]},
+         block: %Block{title: report_title(report), borders: [:all]}
+       }, overlay}
+    ]
+  end
+
+  defp report_title(%{route: "metadata_diff"}) do
+    dgettext("ui", "Metadata Diff") <>
+      " — " <> dgettext("ui", "enter repair all from files · esc close")
+  end
+
+  defp report_title(%{route: "site_validation"}) do
+    dgettext("ui", "Site Validation") <>
+      " — " <> dgettext("ui", "enter apply changes · esc close")
+  end
+
+  defp report_title(_report), do: ""
+
+  defp report_lines(%{route: "metadata_diff", payload: payload}) do
+    diffs = BDS.MapUtils.attr(payload, :diff_reports, [])
+    orphans = BDS.MapUtils.attr(payload, :orphan_reports, [])
+
+    summary =
+      dgettext("ui", "%{diffs} differences · %{orphans} orphan files",
+        diffs: length(diffs),
+        orphans: length(orphans)
+      )
+
+    diff_lines =
+      Enum.flat_map(diffs, fn item ->
+        entity =
+          "#{BDS.MapUtils.attr(item, :entity_type)} #{BDS.MapUtils.attr(item, :entity_id)}"
+
+        differences =
+          item
+          |> BDS.MapUtils.attr(:differences, [])
+          |> Enum.map(fn diff ->
+            "    #{BDS.MapUtils.attr(diff, :name)}: db=#{format_value(BDS.MapUtils.attr(diff, :db_value))} → file=#{format_value(BDS.MapUtils.attr(diff, :file_value))}"
+          end)
+
+        ["  " <> entity | differences]
+      end)
+
+    orphan_lines =
+      case orphans do
+        [] -> []
+        _some -> ["", dgettext("ui", "Orphan files (not in database):")] ++
+            Enum.map(orphans, &("  " <> to_string(BDS.MapUtils.attr(&1, :file_path))))
+      end
+
+    [summary, ""] ++ diff_lines ++ orphan_lines
+  end
+
+  defp report_lines(%{route: "site_validation", payload: payload}) do
+    summary =
+      dgettext("ui", "Expected %{expected} · Existing %{existing}",
+        expected: BDS.MapUtils.attr(payload, :expected_url_count, 0),
+        existing: BDS.MapUtils.attr(payload, :existing_html_url_count, 0)
+      )
+
+    sitemap =
+      if BDS.MapUtils.attr(payload, :sitemap_changed, false),
+        do: [dgettext("ui", "Sitemap changed.")],
+        else: []
+
+    [summary, ""] ++
+      sitemap ++
+      path_section(
+        dgettext("ui", "Missing pages (will be rendered):"),
+        BDS.MapUtils.attr(payload, :missing_url_paths, [])
+      ) ++
+      path_section(
+        dgettext("ui", "Extra files (will be removed):"),
+        BDS.MapUtils.attr(payload, :extra_url_paths, [])
+      ) ++
+      path_section(
+        dgettext("ui", "Updated posts (will be re-rendered):"),
+        BDS.MapUtils.attr(payload, :updated_post_url_paths, [])
+      )
+  end
+
+  defp report_lines(_report), do: []
+
+  defp path_section(_title, []), do: []
+  defp path_section(title, paths), do: [title | Enum.map(paths, &("  " <> to_string(&1)))] ++ [""]
+
+  defp format_value(value) when is_binary(value), do: truncate(value)
+  defp format_value(value), do: truncate(inspect(value))
+
+  defp truncate(text) when byte_size(text) > 40, do: String.slice(text, 0, 40) <> "…"
+  defp truncate(text), do: text
+
   defp default_status(%{focus: :sidebar}),
     do:
       dgettext(
         "ui",
-        "enter open · n new post · 1-5 views · : commands · ? help · r refresh · ctrl+q quit"
+        "enter open · n new post · 1-5 views · : commands (:? help) · r refresh · ctrl+q quit"
       )
 
   defp default_status(%{focus: :editor}),
@@ -721,12 +955,13 @@ defmodule BDS.TUI do
 
   # The parameterless Blog-menu commands. `gui: true` marks commands whose
   # report/apply follow-up UI exists only in the GUI shell for now — the
-  # command still runs here, but reviewing and applying its report (repair,
-  # orphan import, validation apply) needs the desktop app.
+  # command still runs here, but acting on its report needs the desktop
+  # app. Metadata diff and site validation have TUI report panels with
+  # whole-report apply, so they are not marked.
   defp commands do
     [
-      %{action: "metadata_diff", label: dgettext("ui", "Metadata Diff"), gui: true},
-      %{action: "validate_site", label: dgettext("ui", "Validate Site"), gui: true},
+      %{action: "metadata_diff", label: dgettext("ui", "Metadata Diff"), gui: false},
+      %{action: "validate_site", label: dgettext("ui", "Validate Site"), gui: false},
       %{action: "force_render_site", label: dgettext("ui", "Force Render Site"), gui: false},
       %{action: "generate_sitemap", label: dgettext("ui", "Generate Site"), gui: false},
       %{action: "rebuild_database", label: dgettext("ui", "Rebuild Database"), gui: false},
@@ -763,8 +998,10 @@ defmodule BDS.TUI do
     end)
   end
 
-  defp run_command(state, entry) do
-    case state.command_executor.(entry.action) do
+  defp run_command(state, entry), do: execute_action(state, entry.label, entry.action, %{})
+
+  defp execute_action(state, label, action, params) do
+    case state.command_executor.(action, params) do
       {:ok, %{kind: "task_queued", title: title, message: message}} ->
         state
         |> toast(title, message)
@@ -778,13 +1015,13 @@ defmodule BDS.TUI do
         toast(state, title, message)
 
       {:ok, _other} ->
-        toast(state, entry.label, dgettext("ui", "Command completed"))
+        toast(state, label, dgettext("ui", "Command completed"))
 
       {:error, %{message: message}} ->
-        toast(state, entry.label, message)
+        toast(state, label, message)
 
       {:error, reason} ->
-        toast(state, entry.label, inspect(reason))
+        toast(state, label, inspect(reason))
     end
   end
 
