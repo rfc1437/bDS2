@@ -13,8 +13,11 @@ defmodule BDS.Application do
   end
 
   # Local TUI: the headless server plus a TUI on the launching terminal, so
-  # a GUI (via tunnel) and the local terminal can work in parallel.
-  def mode_children(:tui, env), do: mode_children(:server, env) ++ [{BDS.TUI, []}]
+  # a GUI (via tunnel) and the local terminal can work in parallel. Quitting
+  # this TUI stops the whole VM — the terminal is the app in this mode.
+  # SSH-served TUI sessions never get this flag and stay session-local.
+  def mode_children(:tui, env),
+    do: mode_children(:server, env) ++ [{BDS.TUI, [stop_vm_on_exit: true]}]
 
   def mode_children(:desktop, env), do: desktop_children(env)
 

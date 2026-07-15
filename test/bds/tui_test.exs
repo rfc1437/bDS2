@@ -132,4 +132,20 @@ defmodule BDS.TUITest do
   test "quit key stops the app" do
     assert {:stop, _state} = BDS.TUI.handle_event(key("q", ["ctrl"]), mount!())
   end
+
+  test "local tui mode stops the VM when the app exits" do
+    parent = self()
+    state = mount!(stop_vm_on_exit: true, stop_fun: fn -> send(parent, :vm_stopped) end)
+
+    assert :ok = BDS.TUI.terminate(:normal, state)
+    assert_receive :vm_stopped
+  end
+
+  test "ssh-served sessions never stop the VM on exit" do
+    parent = self()
+    state = mount!(stop_fun: fn -> send(parent, :vm_stopped) end)
+
+    assert :ok = BDS.TUI.terminate(:normal, state)
+    refute_receive :vm_stopped, 100
+  end
 end

@@ -37,13 +37,17 @@ defmodule BDS.TUI do
   # ── Mount ────────────────────────────────────────────────────────────────
 
   @impl true
-  def mount(_opts) do
+  def mount(opts) do
     UILocale.put(BDS.Desktop.ShellData.ui_language())
     :ok = Events.subscribe()
 
     project_id = Projects.shell_snapshot().active_project_id
 
     state = %{
+      # Set only for the local BDS_MODE=tui child: quitting the TUI then
+      # shuts the VM down instead of leaving a headless server behind.
+      stop_vm_on_exit: Keyword.get(opts, :stop_vm_on_exit, false),
+      stop_fun: Keyword.get(opts, :stop_fun, &System.stop/0),
       project_id: project_id,
       view: "posts",
       sidebar: nil,
@@ -59,6 +63,14 @@ defmodule BDS.TUI do
 
     {:ok, load_sidebar(state)}
   end
+
+  @impl true
+  def terminate(_reason, %{stop_vm_on_exit: true, stop_fun: stop_fun}) do
+    stop_fun.()
+    :ok
+  end
+
+  def terminate(_reason, _state), do: :ok
 
   # ── Events: global keys ──────────────────────────────────────────────────
 

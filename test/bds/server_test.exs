@@ -107,9 +107,10 @@ defmodule BDS.ServerTest do
              end)
     end
 
-    test "tui mode is the server plus a local TUI" do
+    test "tui mode is the server plus a local TUI that stops the VM on quit" do
       assert BDS.Application.mode_children(:tui, :prod) ==
-               BDS.Application.mode_children(:server, :prod) ++ [{BDS.TUI, []}]
+               BDS.Application.mode_children(:server, :prod) ++
+                 [{BDS.TUI, [stop_vm_on_exit: true]}]
     end
 
     test "desktop mode delegates to desktop_children" do
