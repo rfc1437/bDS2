@@ -23,7 +23,8 @@ defmodule BDS.Desktop.Endpoint do
   plug(BDS.Desktop.Router)
 
   defp maybe_require_desktop_auth(conn, _opts) do
-    if System.get_env("BDS_DESKTOP_AUTOMATION") in ["1", "true", "TRUE"] do
+    if System.get_env("BDS_DESKTOP_AUTOMATION") in ["1", "true", "TRUE"] or
+         not BDS.Server.desktop_auth_required?() do
       conn
     else
       Desktop.Auth.call(conn, [])

@@ -28,6 +28,17 @@ defmodule BDS.Server do
 
   def mode(nil), do: :desktop
 
+  @doc """
+  Whether the HTTP endpoint requires the desktop webview auth token. Only
+  desktop mode does: in server/tui mode the endpoint stays loopback-only
+  and clients arrive through the key-authenticated SSH tunnel, which the
+  per-boot webview token would otherwise lock out.
+  """
+  @spec desktop_auth_required?(:desktop | :server | :tui) :: boolean()
+  def desktop_auth_required?(mode \\ mode())
+  def desktop_auth_required?(:desktop), do: true
+  def desktop_auth_required?(_mode), do: false
+
   @doc "SSH key-material directory: `<data dir>/ssh` next to the database."
   @spec ssh_dir() :: Path.t()
   def ssh_dir do

@@ -90,7 +90,8 @@ defmodule BDS.Application do
       [
         {Desktop.Window, window_opts},
         Supervisor.child_spec({BDS.Desktop.MainWindow, []}, id: BDS.Desktop.MainWindow.Watcher),
-        {BDS.Desktop.DeepLink, []}
+        {BDS.Desktop.DeepLink, []},
+        {BDS.Desktop.RemoteConnection, []}
       ]
     end
   end

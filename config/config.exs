@@ -29,6 +29,9 @@ config :bds, :server, ssh_port: 2222
 
 config :bds, BDS.Desktop.Endpoint,
   url: [host: "127.0.0.1"],
+  # Any-port loopback origins: the remote-GUI SSH tunnel terminates on an
+  # ephemeral local port, so the websocket origin port varies per connect.
+  check_origin: ["//127.0.0.1", "//localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [formats: [html: BDS.Desktop.ErrorHTML], layout: false],
   pubsub_server: BDS.PubSub,

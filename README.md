@@ -210,8 +210,11 @@ ssh -p 2222 -L 4010:127.0.0.1:4010 -N <server-host> &
 open http://127.0.0.1:4010
 ```
 
-A built-in "Connect to Server…" mode in the desktop app is in progress
-(issue #26, phase 5).
+Or use the desktop app directly: **File → Connect to Server…** takes
+`user@host[:port]`, connects with the client key from the same local
+`ssh/` directory (public-key auth, trust-on-first-use `known_hosts`),
+tunnels to the server, and points the window at it. **File → Disconnect
+from Server** returns to the local workspace.
 
 ## Monaco Editor
 

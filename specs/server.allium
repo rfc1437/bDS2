@@ -25,6 +25,7 @@ surface ServerRuntimeSurface {
     provides:
         ApplicationStarted(mode)
         SshClientConnected()
+        GuiConnectRequested()
 }
 
 rule ModeResolution {
@@ -51,6 +52,15 @@ rule ServerBoot {
         -- endpoint through the same SSH connection and the same keys
     ensures: SshKeyMaterial.created()
         -- host key generated and authorized_keys touched on first boot only
+}
+
+rule GuiRemoteConnection {
+    when: GuiConnectRequested()
+    -- Desktop "Connect to Server…": ssh connect with the same public keys
+    -- (client identity + known_hosts in the private ssh dir), then an OTP
+    -- TCP/IP tunnel to the server's loopback endpoint; the webview loads
+    -- the local tunnel end. Disconnect returns to the local shell URL.
+    ensures: WebviewTunneledToServer()
 }
 
 rule TuiSession {

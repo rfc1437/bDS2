@@ -108,7 +108,9 @@ defmodule BDS.Desktop.ShellLive do
                          :quit,
                          :view_on_github,
                          :report_issue,
-                         :about
+                         :about,
+                         :connect_server,
+                         :disconnect_server
                        ])
   @runtime_menu_actions MapSet.new([
                           :undo,
@@ -1088,6 +1090,34 @@ defmodule BDS.Desktop.ShellLive do
 
   defp handle_socket_menu_action(socket, :report_issue) do
     OS.launch_default_browser("https://github.com/rfc1437/bDS2/issues")
+    socket
+  end
+
+  defp handle_socket_menu_action(socket, :connect_server) do
+    prompt = dgettext("ui", "Server address (user@host or user@host:port), public-key auth:")
+
+    with {:ok, target} <- BDS.Desktop.Dialogs.prompt_text(prompt, "user@host"),
+         {:ok, url} <- BDS.Desktop.RemoteConnection.connect(target) do
+      Desktop.Window.show(BDS.Desktop.MainWindow.window_id(), url)
+      socket
+    else
+      :cancel ->
+        socket
+
+      {:error, reason} ->
+        append_output_entry(
+          socket,
+          dgettext("ui", "Connect to Server"),
+          BDS.Desktop.RemoteConnection.format_reason(reason),
+          nil,
+          "error"
+        )
+    end
+  end
+
+  defp handle_socket_menu_action(socket, :disconnect_server) do
+    :ok = BDS.Desktop.RemoteConnection.disconnect()
+    Desktop.Window.show(BDS.Desktop.MainWindow.window_id(), BDS.Desktop.url())
     socket
   end
 

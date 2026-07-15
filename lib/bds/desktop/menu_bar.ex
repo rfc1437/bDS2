@@ -67,6 +67,35 @@ defmodule BDS.Desktop.MenuBar do
     {:noreply, menu}
   end
 
+  def handle_event("connect_server", menu) do
+    prompt =
+      dgettext("ui", "Server address (user@host or user@host:port), public-key auth:")
+
+    with {:ok, target} <- BDS.Desktop.Dialogs.prompt_text(prompt, "user@host"),
+         {:ok, url} <- BDS.Desktop.RemoteConnection.connect(target) do
+      Window.show(BDS.Desktop.MainWindow.window_id(), url)
+    else
+      :cancel ->
+        :ok
+
+      {:error, reason} ->
+        BDS.Desktop.Dialogs.alert(
+          dgettext("ui", "Connect to Server"),
+          dgettext("ui", "Connection failed: %{reason}",
+            reason: BDS.Desktop.RemoteConnection.format_reason(reason)
+          )
+        )
+    end
+
+    {:noreply, menu}
+  end
+
+  def handle_event("disconnect_server", menu) do
+    :ok = BDS.Desktop.RemoteConnection.disconnect()
+    Window.show(BDS.Desktop.MainWindow.window_id(), BDS.Desktop.url())
+    {:noreply, menu}
+  end
+
   def handle_event("open_data_folder", menu) do
     _ = BDS.Desktop.ShellCommands.execute("open_data_folder")
     {:noreply, menu}
@@ -186,6 +215,8 @@ defmodule BDS.Desktop.MenuBar do
   defp item_label(:import_media), do: dgettext("ui", "Import Media")
   defp item_label(:save), do: dgettext("ui", "Save")
   defp item_label(:open_in_browser), do: dgettext("ui", "Open in Browser")
+  defp item_label(:connect_server), do: dgettext("ui", "Connect to Server…")
+  defp item_label(:disconnect_server), do: dgettext("ui", "Disconnect from Server")
   defp item_label(:open_data_folder), do: dgettext("ui", "Open Data Folder")
   defp item_label(:close_tab), do: dgettext("ui", "Close Tab")
   defp item_label(:quit), do: dgettext("ui", "Quit")
