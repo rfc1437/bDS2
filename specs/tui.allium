@@ -68,7 +68,12 @@ rule ProjectSwitcher {
     -- "p" opens the projects overlay: all projects from the caching
     -- database with the active one marked; enter activates the selected
     -- project (BDS.Projects.set_active_project) and reloads the sidebar.
-    -- "o" switches to a folder-path prompt — a typed path is validated
+    -- "o" switches to a folder-path prompt with bash-style tab
+    -- completion: tab completes a unique directory (trailing slash
+    -- appended), an ambiguous prefix completes to the longest common
+    -- prefix and lists the candidate folders; only directories are
+    -- offered, dotfolders only for a dot-prefixed input, and a leading
+    -- "~" expands to the home directory. A typed path is validated
     -- to be an existing directory, then opened as a project
     -- (BDS.Projects.create_project with data_path, named after the
     -- folder) and activated; a full database rebuild is queued

@@ -524,6 +524,67 @@ defmodule BDS.TUITest do
     end
   end
 
+  describe "path completion" do
+    setup do
+      base = Path.join(System.tmp_dir!(), "bds-tui-tab-#{System.unique_integer([:positive])}")
+
+      for dir <- ["blog-one", "blog-two", "alpha-unique", ".secret"] do
+        File.mkdir_p!(Path.join(base, dir))
+      end
+
+      File.write!(Path.join(base, "blog-notes.txt"), "not a folder")
+      on_exit(fn -> File.rm_rf(base) end)
+      {:ok, base: base}
+    end
+
+    defp prompt!(path) do
+      mount!() |> press("p") |> press("o") |> type(path)
+    end
+
+    test "tab completes a unique directory prefix with a trailing slash", %{base: base} do
+      state = prompt!(Path.join(base, "alph")) |> press("tab")
+
+      assert state.projects.input == Path.join(base, "alpha-unique") <> "/"
+      assert state.projects.matches == []
+    end
+
+    test "tab completes ambiguous prefixes to the longest common prefix and lists candidates",
+         %{base: base} do
+      state = prompt!(Path.join(base, "bl")) |> press("tab")
+
+      # Files are not offered — this is a folder picker.
+      assert state.projects.input == Path.join(base, "blog-")
+      assert state.projects.matches == ["blog-one", "blog-two"]
+      assert screen_text(state, 140, 40) =~ "blog-one"
+    end
+
+    test "candidates are cleared as soon as typing continues", %{base: base} do
+      state = prompt!(Path.join(base, "bl")) |> press("tab") |> press("o")
+      assert state.projects.matches == []
+    end
+
+    test "hidden folders are not offered unless the prefix starts with a dot", %{base: base} do
+      state = prompt!(base <> "/") |> press("tab")
+      refute ".secret" in state.projects.matches
+
+      state = prompt!(Path.join(base, ".se")) |> press("tab")
+      assert state.projects.input == Path.join(base, ".secret") <> "/"
+    end
+
+    test "tab with no matches leaves the input unchanged", %{base: base} do
+      input = Path.join(base, "zzz")
+      state = prompt!(input) |> press("tab")
+
+      assert state.projects.input == input
+      assert state.projects.matches == []
+    end
+
+    test "a leading ~ expands to the home directory" do
+      state = prompt!("~/") |> press("tab")
+      assert String.starts_with?(state.projects.input, System.user_home!() <> "/")
+    end
+  end
+
   test "local tui mode stops the VM when the app exits" do
     parent = self()
     state = mount!(stop_vm_on_exit: true, stop_fun: fn -> send(parent, :vm_stopped) end)

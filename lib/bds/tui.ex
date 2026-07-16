@@ -12,7 +12,8 @@ defmodule BDS.TUI do
   Sidebar focus: `↑/↓`/`j/k` navigate, `enter` open, `n` new post,
   `1..5` switch view (posts/media/templates/scripts/tags), `r` refresh,
   `p` projects overlay (switch the active project or open an existing
-  blog folder by path — opening one queues a full database rebuild),
+  blog folder by path, with bash-style tab completion — opening one
+  queues a full database rebuild),
   `:` vi-style command prompt over the Blog-menu shell commands, `?`
   command help (commands whose report/apply UI is GUI-only are marked).
   Editor focus: text keys edit, `ctrl+s` save, `ctrl+p` publish,
@@ -152,7 +153,16 @@ defmodule BDS.TUI do
     selected = Enum.find_index(snapshot.projects, & &1.is_active) || 0
 
     {:noreply,
-     %{state | projects: %{mode: :list, projects: snapshot.projects, selected: selected, input: ""}}}
+     %{
+       state
+       | projects: %{
+           mode: :list,
+           projects: snapshot.projects,
+           selected: selected,
+           input: "",
+           matches: []
+         }
+     }}
   end
 
   defp sidebar_key(%{code: "n"}, %{project_id: project_id} = state)
@@ -251,20 +261,30 @@ defmodule BDS.TUI do
   # ── Events: projects overlay (switch / open existing) ────────────────────
 
   defp projects_key(%{code: "esc"}, %{projects: %{mode: :open} = projects} = state),
-    do: {:noreply, %{state | projects: %{projects | mode: :list, input: ""}}}
+    do: {:noreply, %{state | projects: %{projects | mode: :list, input: "", matches: []}}}
 
   defp projects_key(%{code: "esc"}, state), do: {:noreply, %{state | projects: nil}}
 
   defp projects_key(%{code: "enter"}, %{projects: %{mode: :open, input: input}} = state),
     do: {:noreply, open_existing_project(state, input)}
 
-  defp projects_key(%{code: "backspace"}, %{projects: %{mode: :open} = projects} = state),
-    do: {:noreply, %{state | projects: %{projects | input: String.slice(projects.input, 0..-2//1)}}}
+  defp projects_key(%{code: "tab"}, %{projects: %{mode: :open} = projects} = state) do
+    {input, matches} = complete_path(projects.input)
+    {:noreply, %{state | projects: %{projects | input: input, matches: matches}}}
+  end
+
+  defp projects_key(%{code: "backspace"}, %{projects: %{mode: :open} = projects} = state) do
+    {:noreply,
+     %{
+       state
+       | projects: %{projects | input: String.slice(projects.input, 0..-2//1), matches: []}
+     }}
+  end
 
   defp projects_key(%{code: code, modifiers: []}, %{projects: %{mode: :open} = projects} = state)
        when byte_size(code) >= 1 do
     if String.length(code) == 1 do
-      {:noreply, %{state | projects: %{projects | input: projects.input <> code}}}
+      {:noreply, %{state | projects: %{projects | input: projects.input <> code, matches: []}}}
     else
       {:noreply, state}
     end
@@ -313,6 +333,65 @@ defmodule BDS.TUI do
       {:error, reason} ->
         toast(state, dgettext("ui", "Projects"), inspect(reason))
     end
+  end
+
+  # Bash-style directory completion for the path prompt: a unique match
+  # completes fully (plus trailing slash), an ambiguous one completes to
+  # the longest common prefix and returns the candidates for display.
+  # Only directories are offered, and dotfolders only when the typed
+  # prefix itself starts with a dot.
+  defp complete_path(""), do: {"", []}
+
+  defp complete_path(input) do
+    input = expand_tilde(input)
+    {base, prefix} = split_at_last_slash(input)
+    scan_dir = if base == "", do: ".", else: base
+
+    case completion_candidates(scan_dir, prefix) do
+      [] -> {input, []}
+      [single] -> {base <> single <> "/", []}
+      many -> {base <> longest_common_prefix(many), many}
+    end
+  end
+
+  defp expand_tilde("~" <> rest), do: System.user_home!() <> rest
+  defp expand_tilde(input), do: input
+
+  defp split_at_last_slash(input) do
+    case :binary.matches(input, "/") do
+      [] ->
+        {"", input}
+
+      offsets ->
+        # List is aliased to the ratatui widget here, so no List.last/1.
+        {position, _length} = Enum.at(offsets, -1)
+        String.split_at(input, position + 1)
+    end
+  end
+
+  defp completion_candidates(scan_dir, prefix) do
+    case File.ls(scan_dir) do
+      {:ok, entries} ->
+        entries
+        |> Enum.filter(&String.starts_with?(&1, prefix))
+        |> Enum.reject(&(String.starts_with?(&1, ".") and not String.starts_with?(prefix, ".")))
+        |> Enum.filter(&File.dir?(Path.join(scan_dir, &1)))
+        |> Enum.sort()
+
+      {:error, _reason} ->
+        []
+    end
+  end
+
+  defp longest_common_prefix([first | rest]),
+    do: Enum.reduce(rest, first, &grapheme_common_prefix/2)
+
+  defp grapheme_common_prefix(a, b) do
+    a
+    |> String.graphemes()
+    |> Enum.zip(String.graphemes(b))
+    |> Enum.take_while(fn {left, right} -> left == right end)
+    |> Enum.map_join("", fn {grapheme, _} -> grapheme end)
   end
 
   defp open_existing_project(state, input) do
@@ -756,16 +835,22 @@ defmodule BDS.TUI do
       height: 3
     }
 
-    [
+    input_widgets = [
       {%Clear{}, overlay},
       {%Paragraph{
          text: projects.input,
          block: %Block{
-           title: dgettext("ui", "Open Existing Blog — type a folder path · enter open · esc back"),
+           title:
+             dgettext(
+               "ui",
+               "Open Existing Blog — type a folder path · tab complete · enter open · esc back"
+             ),
            borders: [:all]
          }
        }, overlay}
     ]
+
+    input_widgets ++ completion_widgets(projects.matches, rect, overlay)
   end
 
   defp projects_widgets(%{projects: projects}, rect) do
@@ -795,6 +880,33 @@ defmodule BDS.TUI do
          }
        }, overlay}
     ]
+  end
+
+  defp completion_widgets([], _rect, _input_overlay), do: []
+
+  defp completion_widgets(matches, rect, input_overlay) do
+    below = input_overlay.y + input_overlay.height
+    available = rect.y + rect.height - below
+
+    if available < 3 do
+      []
+    else
+      overlay = %Rect{
+        x: input_overlay.x,
+        y: below,
+        width: input_overlay.width,
+        height: min(length(matches) + 2, available)
+      }
+
+      [
+        {%Clear{}, overlay},
+        {%List{
+           items: matches,
+           selected: nil,
+           block: %Block{title: dgettext("ui", "Matching folders"), borders: [:all]}
+         }, overlay}
+      ]
+    end
   end
 
   defp report_widgets(%{report: nil}, _rect), do: []
