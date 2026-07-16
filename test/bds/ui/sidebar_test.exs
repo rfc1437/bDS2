@@ -175,6 +175,47 @@ defmodule BDS.UI.SidebarTest do
     assert Enum.map(import_view.items, & &1.title) == ["New Import", "Old Import"]
   end
 
+  test "posts and media can be filtered to a single ISO date", %{
+    project: project,
+    temp_dir: temp_dir
+  } do
+    on_ms =
+      DateTime.new!(~D[2026-07-04], ~T[10:00:00], "Etc/UTC") |> DateTime.to_unix(:millisecond)
+
+    off_ms =
+      DateTime.new!(~D[2026-07-05], ~T[10:00:00], "Etc/UTC") |> DateTime.to_unix(:millisecond)
+
+    assert {:ok, on_post} = Posts.create_post(%{project_id: project.id, title: "On Date"})
+    assert {:ok, off_post} = Posts.create_post(%{project_id: project.id, title: "Off Date"})
+    update_post_sidebar_row(on_post.id, updated_at: on_ms)
+    update_post_sidebar_row(off_post.id, updated_at: off_ms)
+
+    view = Sidebar.view(project.id, "posts", %{year: 2026, month: 7, day: 4})
+    assert titles_in_section(view, "Drafts") == ["On Date"]
+    assert view.filters.has_active_filters
+
+    on_file = Path.join(temp_dir, "on.txt")
+    off_file = Path.join(temp_dir, "off.txt")
+    File.write!(on_file, "on")
+    File.write!(off_file, "off")
+
+    assert {:ok, on_media} =
+             Media.import_media(%{project_id: project.id, source_path: on_file, title: "Media On"})
+
+    assert {:ok, off_media} =
+             Media.import_media(%{
+               project_id: project.id,
+               source_path: off_file,
+               title: "Media Off"
+             })
+
+    update_media_sidebar_row(on_media.id, updated_at: on_ms)
+    update_media_sidebar_row(off_media.id, updated_at: off_ms)
+
+    media_view = Sidebar.view(project.id, "media", %{year: 2026, month: 7, day: 4})
+    assert Enum.map(media_view.items, & &1.title) == ["Media On"]
+  end
+
   defp titles_in_section(view, title) do
     view.sections
     |> Enum.find(&(&1.title == title))

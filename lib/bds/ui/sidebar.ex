@@ -363,6 +363,7 @@ defmodule BDS.UI.Sidebar do
     |> maybe_where_search(filters.search)
     |> maybe_where_year(filters.year)
     |> maybe_where_month(filters.month)
+    |> maybe_where_day(filters.day)
     |> maybe_where_all_tags(filters.tags)
     |> maybe_where_all_categories(filters.categories)
   end
@@ -420,6 +421,25 @@ defmodule BDS.UI.Sidebar do
         p.published_at,
         p.updated_at,
         ^month_str
+      )
+    )
+  end
+
+  # Day-of-month filter used by the TUI's ISO-date search (yyyy-mm-dd);
+  # always combined with year and month by the caller.
+  defp maybe_where_day(query, nil), do: query
+
+  defp maybe_where_day(query, day) do
+    day_str = String.pad_leading(to_string(day), 2, "0")
+
+    where(
+      query,
+      [p],
+      fragment(
+        "strftime('%d', datetime(COALESCE(?, ?) / 1000, 'unixepoch')) = ?",
+        p.published_at,
+        p.updated_at,
+        ^day_str
       )
     )
   end
@@ -609,6 +629,7 @@ defmodule BDS.UI.Sidebar do
     |> maybe_where_media_search(filters.search)
     |> maybe_where_media_year(filters.year)
     |> maybe_where_media_month(filters.month)
+    |> maybe_where_media_day(filters.day)
     |> maybe_where_all_media_tags(filters.tags)
   end
 
@@ -663,6 +684,22 @@ defmodule BDS.UI.Sidebar do
         "strftime('%m', datetime(? / 1000, 'unixepoch')) = ?",
         m.updated_at,
         ^month_str
+      )
+    )
+  end
+
+  defp maybe_where_media_day(query, nil), do: query
+
+  defp maybe_where_media_day(query, day) do
+    day_str = String.pad_leading(to_string(day), 2, "0")
+
+    where(
+      query,
+      [m],
+      fragment(
+        "strftime('%d', datetime(? / 1000, 'unixepoch')) = ?",
+        m.updated_at,
+        ^day_str
       )
     )
   end
@@ -1028,6 +1065,7 @@ defmodule BDS.UI.Sidebar do
       search: normalize_string(BDS.MapUtils.attr(params, :search)),
       year: normalize_integer(BDS.MapUtils.attr(params, :year)),
       month: normalize_integer(BDS.MapUtils.attr(params, :month)),
+      day: normalize_integer(BDS.MapUtils.attr(params, :day)),
       tags: normalize_string_list(BDS.MapUtils.attr(params, :tags)),
       categories: normalize_string_list(BDS.MapUtils.attr(params, :categories)),
       display_limit:
@@ -1045,6 +1083,7 @@ defmodule BDS.UI.Sidebar do
       search: nil,
       year: nil,
       month: nil,
+      day: nil,
       tags: [],
       categories: [],
       display_limit: @default_page_size
@@ -1052,8 +1091,8 @@ defmodule BDS.UI.Sidebar do
   end
 
   defp filter_active?(filters) do
-    present?(filters.search) or not is_nil(filters.year) or filters.tags != [] or
-      filters.categories != []
+    present?(filters.search) or not is_nil(filters.year) or not is_nil(filters.day) or
+      filters.tags != [] or filters.categories != []
   end
 
   defp post_search_blob(post) do

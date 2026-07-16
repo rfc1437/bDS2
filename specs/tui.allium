@@ -83,6 +83,19 @@ rule ProjectSwitcher {
     ensures: ProjectSwitchedOrOpened()
 }
 
+rule SidebarSearch {
+    when: TuiKeyPressed(code: "/")
+    -- "/" in sidebar focus opens a vi-style search prompt in the status
+    -- line that live-filters the current view through the same
+    -- BDS.UI.Sidebar filter params the GUI sidebar uses (posts, pages,
+    -- media). Plain words are a text search, "tag:x" and "category:x"
+    -- filter like the GUI chips, and an ISO date (yyyy-mm-dd) narrows
+    -- to that day — the day filter extends the shared sidebar queries.
+    -- Tokens combine with AND. Enter keeps the filter (shown appended
+    -- to the sidebar title), esc clears it; filters are per view.
+    ensures: SidebarFiltered()
+}
+
 rule CommandPrompt {
     when: TuiKeyPressed(code: ":")
     -- Vi-style prompt: ":" opens a filterable list of the parameterless

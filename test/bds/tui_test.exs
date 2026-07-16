@@ -524,6 +524,101 @@ defmodule BDS.TUITest do
     end
   end
 
+  describe "sidebar search" do
+    setup %{project: project} do
+      {:ok, tagged} =
+        BDS.Posts.create_post(%{
+          project_id: project.id,
+          title: "Tagged Post",
+          content: "x",
+          tags: ["elixir"],
+          categories: ["news"]
+        })
+
+      {:ok, tagged: tagged}
+    end
+
+    defp item_titles(state) do
+      for {:item, item} <- state.items, do: to_string(item[:title] || item[:name])
+    end
+
+    defp search(state, query) do
+      state |> press("/") |> type(query)
+    end
+
+    test "'/' opens the prompt and typing filters the list live" do
+      state = mount!() |> search("tagged")
+
+      assert state.search != nil
+      assert item_titles(state) == ["Tagged Post"]
+      assert screen_text(state) =~ "/tagged"
+    end
+
+    test "tag: filters by tag" do
+      state = mount!() |> search("tag:elixir")
+      assert item_titles(state) == ["Tagged Post"]
+    end
+
+    test "category: filters by category" do
+      state = mount!() |> search("category:news")
+      assert item_titles(state) == ["Tagged Post"]
+    end
+
+    test "an ISO date shows the posts from that date", %{post: post} do
+      on_ms =
+        DateTime.new!(~D[2026-07-04], ~T[10:00:00], "Etc/UTC") |> DateTime.to_unix(:millisecond)
+
+      BDS.Repo.update_all(
+        from(p in BDS.Posts.Post, where: p.id == ^post.id),
+        set: [updated_at: on_ms]
+      )
+
+      state = mount!() |> search("2026-07-04")
+      assert item_titles(state) == ["Hello TUI"]
+    end
+
+    test "tokens combine: tag plus text must both match" do
+      state = mount!() |> search("tag:elixir hello")
+      assert item_titles(state) == []
+    end
+
+    test "enter keeps the filter and shows it in the sidebar title" do
+      state = mount!() |> search("tag:elixir") |> press("enter")
+
+      assert state.search == nil
+      assert item_titles(state) == ["Tagged Post"]
+      assert screen_text(state) =~ "/tag:elixir"
+    end
+
+    test "esc clears the filter and restores the full list" do
+      state = mount!() |> search("tag:elixir") |> press("esc")
+
+      assert state.search == nil
+      assert "Hello TUI" in item_titles(state)
+      assert "Tagged Post" in item_titles(state)
+    end
+
+    test "the filter applies per view and works for media", %{project: project} do
+      media_file = Path.join(System.tmp_dir!(), "bds-tui-media-#{System.unique_integer([:positive])}.txt")
+      File.write!(media_file, "media body")
+      on_exit(fn -> File.rm(media_file) end)
+
+      {:ok, _media} =
+        BDS.Media.import_media(%{
+          project_id: project.id,
+          source_path: media_file,
+          title: "Findable Media"
+        })
+
+      state = mount!() |> press("2") |> search("findable") |> press("enter")
+      assert item_titles(state) == ["Findable Media"]
+
+      # posts view keeps its own (empty) filter
+      state = press(state, "1")
+      assert "Hello TUI" in item_titles(state)
+    end
+  end
+
   describe "path completion" do
     setup do
       base = Path.join(System.tmp_dir!(), "bds-tui-tab-#{System.unique_integer([:positive])}")

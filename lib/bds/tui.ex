@@ -13,7 +13,9 @@ defmodule BDS.TUI do
   `1..5` switch view (posts/media/templates/scripts/tags), `r` refresh,
   `p` projects overlay (switch the active project or open an existing
   blog folder by path, with bash-style tab completion — opening one
-  queues a full database rebuild),
+  queues a full database rebuild), `/` vi-style search that live-filters
+  the current view (plain text, `tag:x`, `category:x`, or an ISO date
+  `yyyy-mm-dd`; enter keeps the filter, esc clears it),
   `:` vi-style command prompt over the Blog-menu shell commands, `?`
   command help (commands whose report/apply UI is GUI-only are marked).
   Editor focus: text keys edit, `ctrl+s` save, `ctrl+p` publish,
@@ -59,6 +61,8 @@ defmodule BDS.TUI do
       task_snapshot_fun: Keyword.get(opts, :task_snapshot_fun, &BDS.Tasks.status_snapshot/0),
       command: nil,
       projects: nil,
+      search: nil,
+      filters_by_view: %{},
       report: nil,
       handled_task_ids: nil,
       task_polling: false,
@@ -118,6 +122,10 @@ defmodule BDS.TUI do
       when projects != nil,
       do: projects_key(key, state)
 
+  def handle_event(%ExRatatui.Event.Key{kind: "press"} = key, %{search: search} = state)
+      when search != nil,
+      do: search_key(key, state)
+
   def handle_event(%ExRatatui.Event.Key{code: "esc"}, %{image: image} = state)
       when image != nil,
       do: {:noreply, %{state | image: nil}}
@@ -147,6 +155,9 @@ defmodule BDS.TUI do
 
   defp sidebar_key(%{code: ":"}, state),
     do: {:noreply, %{state | command: %{input: "", selected: 0, help?: false}}}
+
+  defp sidebar_key(%{code: "/"}, state),
+    do: {:noreply, %{state | search: %{input: Map.get(state.filters_by_view, state.view, "")}}}
 
   defp sidebar_key(%{code: "p"}, state) do
     snapshot = Projects.shell_snapshot()
@@ -257,6 +268,86 @@ defmodule BDS.TUI do
   end
 
   defp apply_report(state, _report), do: state
+
+  # ── Events: sidebar search (vi-style "/") ─────────────────────────────────
+
+  # The prompt lives in the status line and filters the current view live
+  # on every keystroke. Esc clears the view's filter, enter keeps it (the
+  # active filter stays visible in the sidebar title).
+  defp search_key(%{code: "esc"}, state) do
+    state = %{state | search: nil, filters_by_view: Map.delete(state.filters_by_view, state.view)}
+    {:noreply, load_sidebar(state)}
+  end
+
+  defp search_key(%{code: "enter"}, state), do: {:noreply, %{state | search: nil}}
+
+  defp search_key(%{code: "backspace"}, %{search: search} = state),
+    do: {:noreply, apply_search(state, String.slice(search.input, 0..-2//1))}
+
+  defp search_key(%{code: code, modifiers: []}, %{search: search} = state)
+       when byte_size(code) >= 1 do
+    if String.length(code) == 1 do
+      {:noreply, apply_search(state, search.input <> code)}
+    else
+      {:noreply, state}
+    end
+  end
+
+  defp search_key(_key, state), do: {:noreply, state}
+
+  defp apply_search(state, input) do
+    filters_by_view =
+      case String.trim(input) do
+        "" -> Map.delete(state.filters_by_view, state.view)
+        _some -> Map.put(state.filters_by_view, state.view, input)
+      end
+
+    load_sidebar(%{
+      state
+      | search: %{input: input},
+        filters_by_view: filters_by_view,
+        selected: 0
+    })
+  end
+
+  # "/" query syntax: plain words are a text search, "tag:x" and
+  # "category:x" filter exactly like the GUI filter chips, and an ISO date
+  # (yyyy-mm-dd) narrows to that day. Tokens combine with AND.
+  defp parse_search_query(query) do
+    initial = %{words: [], tags: [], categories: [], date: nil}
+
+    parsed =
+      query
+      |> String.split()
+      |> Enum.reduce(initial, fn token, acc ->
+        cond do
+          String.starts_with?(token, "tag:") ->
+            add_filter_token(acc, :tags, String.replace_prefix(token, "tag:", ""))
+
+          String.starts_with?(token, "category:") ->
+            add_filter_token(acc, :categories, String.replace_prefix(token, "category:", ""))
+
+          match?({:ok, _date}, Date.from_iso8601(token)) ->
+            {:ok, date} = Date.from_iso8601(token)
+            %{acc | date: date}
+
+          true ->
+            %{acc | words: acc.words ++ [token]}
+        end
+      end)
+
+    %{
+      search: if(parsed.words == [], do: nil, else: Enum.join(parsed.words, " ")),
+      tags: parsed.tags,
+      categories: parsed.categories,
+      year: parsed.date && parsed.date.year,
+      month: parsed.date && parsed.date.month,
+      day: parsed.date && parsed.date.day
+    }
+  end
+
+  defp add_filter_token(acc, _key, ""), do: acc
+  defp add_filter_token(acc, key, value), do: Map.update!(acc, key, &(&1 ++ [value]))
 
   # ── Events: projects overlay (switch / open existing) ────────────────────
 
@@ -685,9 +776,16 @@ defmodule BDS.TUI do
              do: %Style{fg: :black, bg: :cyan},
              else: %Style{modifiers: [:bold]}
            ),
-         block: %Block{title: view_label(state.view), borders: [:all]}
+         block: %Block{title: sidebar_title(state), borders: [:all]}
        }, rect}
     ]
+  end
+
+  defp sidebar_title(state) do
+    case Map.get(state.filters_by_view, state.view) do
+      nil -> view_label(state.view)
+      query -> view_label(state.view) <> " /" <> query
+    end
   end
 
   # The List widget requires selected: nil when the collection is empty
@@ -761,6 +859,7 @@ defmodule BDS.TUI do
   defp status_widgets(state, rect) do
     text =
       cond do
+        state.search -> "/" <> state.search.input
         state.busy -> dgettext("ui", "Working…")
         state.status -> state.status
         true -> default_status(state)
@@ -1021,7 +1120,7 @@ defmodule BDS.TUI do
     do:
       dgettext(
         "ui",
-        "enter open · n new post · 1-5 views · p projects · : commands (:? help) · r refresh · ctrl+q quit"
+        "enter open · n new post · 1-5 views · p projects · / search · : commands (:? help) · r refresh · ctrl+q quit"
       )
 
   defp default_status(%{focus: :editor}),
@@ -1034,7 +1133,7 @@ defmodule BDS.TUI do
   # ── Sidebar data ─────────────────────────────────────────────────────────
 
   defp load_sidebar(state) do
-    view = Sidebar.view(state.project_id, state.view)
+    view = Sidebar.view(state.project_id, state.view, search_filter_params(state))
     items = flatten_items(view, state.view)
 
     selected =
@@ -1044,6 +1143,13 @@ defmodule BDS.TUI do
       end
 
     %{state | sidebar: view, items: items, selected: selected}
+  end
+
+  defp search_filter_params(state) do
+    case Map.get(state.filters_by_view, state.view) do
+      nil -> %{}
+      query -> parse_search_query(query)
+    end
   end
 
   defp flatten_items(view, route) do
