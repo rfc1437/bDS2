@@ -63,6 +63,21 @@ rule AiQuickAction {
     ensures: AiSuggestionsRequestedOrRefused()
 }
 
+rule ProjectSwitcher {
+    when: TuiKeyPressed(code: "p")
+    -- "p" opens the projects overlay: all projects from the caching
+    -- database with the active one marked; enter activates the selected
+    -- project (BDS.Projects.set_active_project) and reloads the sidebar.
+    -- "o" switches to a folder-path prompt — a typed path is validated
+    -- to be an existing directory, then opened as a project
+    -- (BDS.Projects.create_project with data_path, named after the
+    -- folder) and activated; a full database rebuild is queued
+    -- automatically through the rebuild_database shell command so the
+    -- folder's content is loaded into the caching database. Invalid
+    -- paths keep the prompt open and report the error.
+    ensures: ProjectSwitchedOrOpened()
+}
+
 rule CommandPrompt {
     when: TuiKeyPressed(code: ":")
     -- Vi-style prompt: ":" opens a filterable list of the parameterless

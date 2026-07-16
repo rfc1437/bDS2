@@ -53,7 +53,7 @@ defmodule BDS.TUITest do
     end)
   end
 
-  defp key(code, modifiers \\ []), do: %Key{code: code, kind: "press", modifiers: modifiers}
+  defp key(code, modifiers), do: %Key{code: code, kind: "press", modifiers: modifiers}
 
   defp press(state, code, modifiers \\ []) do
     {:noreply, state} = BDS.TUI.handle_event(key(code, modifiers), state)
@@ -224,7 +224,7 @@ defmodule BDS.TUITest do
     end
 
     test "up/down move the selection" do
-      state = mount_with_executor!() |> press(":") |> press("down") |> press("enter")
+      _state = mount_with_executor!() |> press(":") |> press("down") |> press("enter")
 
       assert_receive {:executed, action, %{}}
       assert is_binary(action)
@@ -413,6 +413,114 @@ defmodule BDS.TUITest do
 
       {:noreply, state} = BDS.TUI.handle_info(:poll_tasks, %{state | task_polling: true})
       assert state.report == nil
+    end
+  end
+
+  describe "projects overlay" do
+    defp type(state, text) do
+      text |> String.graphemes() |> Enum.reduce(state, &press(&2, &1))
+    end
+
+    defp move_to(state, index) do
+      moves = index - state.projects.selected
+      code = if moves >= 0, do: "down", else: "up"
+      Enum.reduce(List.duplicate(code, abs(moves)), state, &press(&2, &1))
+    end
+
+    test "'p' opens the overlay listing all projects with the active one selected", %{
+      project: project
+    } do
+      state = mount!() |> press("p")
+
+      assert state.projects.mode == :list
+      active = Enum.at(state.projects.projects, state.projects.selected)
+      assert active.id == project.id
+
+      text = screen_text(state, 140, 40)
+      assert text =~ project.name
+    end
+
+    test "esc closes the overlay" do
+      state = mount!() |> press("p") |> press("esc")
+      assert state.projects == nil
+    end
+
+    test "enter switches the active project and reloads the sidebar", %{project: project} do
+      other_dir = Path.join(System.tmp_dir!(), "bds-tui-other-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(other_dir)
+      on_exit(fn -> File.rm_rf(other_dir) end)
+
+      {:ok, other} = BDS.Projects.create_project(%{name: "Other Blog", data_path: other_dir})
+
+      {:ok, _} =
+        BDS.Posts.create_post(%{project_id: other.id, title: "Other Post", content: "x"})
+
+      state = mount!() |> press("p")
+      index = Enum.find_index(state.projects.projects, &(&1.id == other.id))
+      state = state |> move_to(index) |> press("enter")
+
+      assert state.projects == nil
+      assert state.project_id == other.id
+      assert BDS.Projects.get_active_project().id == other.id
+      assert screen_text(state) =~ "Other Post"
+
+      # switching back must not churn: selecting the active project is a no-op
+      {:ok, _} = BDS.Projects.set_active_project(project.id)
+    end
+
+    test "'o' plus a valid path opens the folder as a project and queues a rebuild" do
+      parent = self()
+
+      import_dir =
+        Path.join(System.tmp_dir!(), "bds-tui-import-#{System.unique_integer([:positive])}")
+
+      File.mkdir_p!(import_dir)
+      on_exit(fn -> File.rm_rf(import_dir) end)
+
+      state =
+        mount!(
+          command_executor: fn action, params ->
+            send(parent, {:executed, action, params})
+            {:ok, %{kind: "task_queued", title: "Rebuild", message: "queued"}}
+          end
+        )
+        |> press("p")
+        |> press("o")
+
+      assert state.projects.mode == :open
+
+      state = state |> type(import_dir) |> press("enter")
+
+      assert state.projects == nil
+      imported = Enum.find(BDS.Projects.list_projects(), &(&1.data_path == import_dir))
+      assert imported != nil
+      assert BDS.Projects.get_active_project().id == imported.id
+      assert state.project_id == imported.id
+
+      assert_receive {:executed, "rebuild_database", %{}}
+      assert state.task_polling
+    end
+
+    test "an invalid path keeps the prompt open and reports the error" do
+      parent = self()
+      count_before = length(BDS.Projects.list_projects())
+
+      state =
+        mount!(command_executor: fn action, params -> send(parent, {:executed, action, params}) end)
+        |> press("p")
+        |> press("o")
+        |> type("/nonexistent-bds-folder-xyz")
+        |> press("enter")
+
+      assert state.projects.mode == :open
+      assert state.status != nil
+      assert length(BDS.Projects.list_projects()) == count_before
+      refute_receive {:executed, _action, _params}, 50
+    end
+
+    test "esc in the path prompt returns to the project list" do
+      state = mount!() |> press("p") |> press("o") |> press("esc")
+      assert state.projects.mode == :list
     end
   end
 

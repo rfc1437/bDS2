@@ -11,6 +11,8 @@ defmodule BDS.TUI do
 
   Sidebar focus: `↑/↓`/`j/k` navigate, `enter` open, `n` new post,
   `1..5` switch view (posts/media/templates/scripts/tags), `r` refresh,
+  `p` projects overlay (switch the active project or open an existing
+  blog folder by path — opening one queues a full database rebuild),
   `:` vi-style command prompt over the Blog-menu shell commands, `?`
   command help (commands whose report/apply UI is GUI-only are marked).
   Editor focus: text keys edit, `ctrl+s` save, `ctrl+p` publish,
@@ -55,6 +57,7 @@ defmodule BDS.TUI do
         Keyword.get(opts, :command_executor, &BDS.Desktop.ShellCommands.execute/2),
       task_snapshot_fun: Keyword.get(opts, :task_snapshot_fun, &BDS.Tasks.status_snapshot/0),
       command: nil,
+      projects: nil,
       report: nil,
       handled_task_ids: nil,
       task_polling: false,
@@ -110,6 +113,10 @@ defmodule BDS.TUI do
       when command != nil,
       do: command_key(key, state)
 
+  def handle_event(%ExRatatui.Event.Key{kind: "press"} = key, %{projects: projects} = state)
+      when projects != nil,
+      do: projects_key(key, state)
+
   def handle_event(%ExRatatui.Event.Key{code: "esc"}, %{image: image} = state)
       when image != nil,
       do: {:noreply, %{state | image: nil}}
@@ -139,6 +146,14 @@ defmodule BDS.TUI do
 
   defp sidebar_key(%{code: ":"}, state),
     do: {:noreply, %{state | command: %{input: "", selected: 0, help?: false}}}
+
+  defp sidebar_key(%{code: "p"}, state) do
+    snapshot = Projects.shell_snapshot()
+    selected = Enum.find_index(snapshot.projects, & &1.is_active) || 0
+
+    {:noreply,
+     %{state | projects: %{mode: :list, projects: snapshot.projects, selected: selected, input: ""}}}
+  end
 
   defp sidebar_key(%{code: "n"}, %{project_id: project_id} = state)
        when is_binary(project_id) do
@@ -232,6 +247,103 @@ defmodule BDS.TUI do
   end
 
   defp apply_report(state, _report), do: state
+
+  # ── Events: projects overlay (switch / open existing) ────────────────────
+
+  defp projects_key(%{code: "esc"}, %{projects: %{mode: :open} = projects} = state),
+    do: {:noreply, %{state | projects: %{projects | mode: :list, input: ""}}}
+
+  defp projects_key(%{code: "esc"}, state), do: {:noreply, %{state | projects: nil}}
+
+  defp projects_key(%{code: "enter"}, %{projects: %{mode: :open, input: input}} = state),
+    do: {:noreply, open_existing_project(state, input)}
+
+  defp projects_key(%{code: "backspace"}, %{projects: %{mode: :open} = projects} = state),
+    do: {:noreply, %{state | projects: %{projects | input: String.slice(projects.input, 0..-2//1)}}}
+
+  defp projects_key(%{code: code, modifiers: []}, %{projects: %{mode: :open} = projects} = state)
+       when byte_size(code) >= 1 do
+    if String.length(code) == 1 do
+      {:noreply, %{state | projects: %{projects | input: projects.input <> code}}}
+    else
+      {:noreply, state}
+    end
+  end
+
+  defp projects_key(%{code: "o"}, %{projects: projects} = state),
+    do: {:noreply, %{state | projects: %{projects | mode: :open}}}
+
+  defp projects_key(%{code: code}, %{projects: projects} = state) when code in ["down", "j"] do
+    count = length(projects.projects)
+    {:noreply, put_in(state.projects.selected, min(projects.selected + 1, max(count - 1, 0)))}
+  end
+
+  defp projects_key(%{code: code}, %{projects: projects} = state) when code in ["up", "k"],
+    do: {:noreply, put_in(state.projects.selected, max(projects.selected - 1, 0))}
+
+  defp projects_key(%{code: "enter"}, %{projects: projects} = state) do
+    case Enum.at(projects.projects, projects.selected) do
+      nil -> {:noreply, %{state | projects: nil}}
+      summary -> {:noreply, switch_project(%{state | projects: nil}, summary.id)}
+    end
+  end
+
+  defp projects_key(_key, state), do: {:noreply, state}
+
+  defp switch_project(%{project_id: project_id} = state, project_id), do: state
+
+  defp switch_project(state, project_id) do
+    case Projects.set_active_project(project_id) do
+      {:ok, project} ->
+        %{
+          state
+          | project_id: project.id,
+            view: "posts",
+            selected: 0,
+            focus: :sidebar,
+            editor: nil,
+            image: nil
+        }
+        |> load_sidebar()
+        |> toast(
+          dgettext("ui", "Projects"),
+          dgettext("ui", "Switched to %{name}.", name: project.name)
+        )
+
+      {:error, reason} ->
+        toast(state, dgettext("ui", "Projects"), inspect(reason))
+    end
+  end
+
+  defp open_existing_project(state, input) do
+    path = input |> String.trim() |> Path.expand()
+
+    if File.dir?(path) do
+      name =
+        case Path.basename(path) do
+          "" -> dgettext("ui", "Imported Blog")
+          value -> value
+        end
+
+      case Projects.create_project(%{name: name, data_path: path}) do
+        {:ok, project} ->
+          # The folder's content only exists on disk at this point: activate
+          # the project, then queue the full database rebuild automatically.
+          %{state | projects: nil}
+          |> switch_project(project.id)
+          |> execute_action(dgettext("ui", "Rebuild Database"), "rebuild_database", %{})
+
+        {:error, reason} ->
+          toast(%{state | projects: nil}, dgettext("ui", "Open Existing Blog"), inspect(reason))
+      end
+    else
+      toast(
+        state,
+        dgettext("ui", "Open Existing Blog"),
+        dgettext("ui", "Not a folder: %{path}", path: path)
+      )
+    end
+  end
 
   # ── Events: command prompt (vi-style) ────────────────────────────────────
 
@@ -462,7 +574,8 @@ defmodule BDS.TUI do
       status_widgets(state, status_rect) ++
       image_widgets(state, body_rect) ++
       report_widgets(state, body_rect) ++
-      command_widgets(state, body_rect)
+      command_widgets(state, body_rect) ++
+      projects_widgets(state, body_rect)
   end
 
   defp view_tabs(state, rect) do
@@ -633,6 +746,57 @@ defmodule BDS.TUI do
     ]
   end
 
+  defp projects_widgets(%{projects: nil}, _rect), do: []
+
+  defp projects_widgets(%{projects: %{mode: :open} = projects}, rect) do
+    overlay = %Rect{
+      x: rect.x + 4,
+      y: rect.y + 2,
+      width: max(rect.width - 8, 20),
+      height: 3
+    }
+
+    [
+      {%Clear{}, overlay},
+      {%Paragraph{
+         text: projects.input,
+         block: %Block{
+           title: dgettext("ui", "Open Existing Blog — type a folder path · enter open · esc back"),
+           borders: [:all]
+         }
+       }, overlay}
+    ]
+  end
+
+  defp projects_widgets(%{projects: projects}, rect) do
+    overlay = %Rect{
+      x: rect.x + 4,
+      y: rect.y + 1,
+      width: max(rect.width - 8, 20),
+      height: max(rect.height - 2, 6)
+    }
+
+    items =
+      Enum.map(projects.projects, fn summary ->
+        marker = if summary.is_active, do: "● ", else: "  "
+        path = summary.data_path || ""
+        marker <> summary.name <> if(path == "", do: "", else: " — " <> path)
+      end)
+
+    [
+      {%Clear{}, overlay},
+      {%List{
+         items: items,
+         selected: list_selected(items, projects.selected),
+         highlight_style: %Style{fg: :black, bg: :cyan},
+         block: %Block{
+           title: dgettext("ui", "Projects — enter switch · o open existing · esc close"),
+           borders: [:all]
+         }
+       }, overlay}
+    ]
+  end
+
   defp report_widgets(%{report: nil}, _rect), do: []
 
   defp report_widgets(%{report: report}, rect) do
@@ -745,7 +909,7 @@ defmodule BDS.TUI do
     do:
       dgettext(
         "ui",
-        "enter open · n new post · 1-5 views · : commands (:? help) · r refresh · ctrl+q quit"
+        "enter open · n new post · 1-5 views · p projects · : commands (:? help) · r refresh · ctrl+q quit"
       )
 
   defp default_status(%{focus: :editor}),
