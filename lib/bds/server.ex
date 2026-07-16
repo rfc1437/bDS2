@@ -30,26 +30,51 @@ defmodule BDS.Server do
 
   @doc """
   The mode the app actually boots in: the resolved `BDS_MODE`, except that
-  desktop mode falls back to the TUI when no graphical display is available
-  (issue #33). Starting the app on a display-less Linux server then still
-  opens a UI — the terminal one — instead of crashing wx.
+  desktop mode falls back to the TUI when no graphical session is available
+  (issue #33). Starting the app anywhere then still opens a UI — graphical
+  when possible, the terminal one otherwise.
 
-  Only non-Darwin unix systems fall back: they need `DISPLAY` or
-  `WAYLAND_DISPLAY` to run wx, while macOS and Windows always have a
-  graphical session for a launched app.
+  Per platform: non-Darwin unix needs `DISPLAY` or `WAYLAND_DISPLAY` to run
+  wx — that check also covers plain ssh sessions, while `ssh -X` with a
+  forwarded display keeps the GUI. macOS never sets `DISPLAY`, so there an
+  ssh session (`SSH_CONNECTION`/`SSH_CLIENT`/`SSH_TTY`) is the headless
+  signal and a local launch always has a graphical session. Windows always
+  boots the GUI.
   """
   @spec effective_mode(:desktop | :server | :tui, {atom(), atom()}, %{
           optional(String.t()) => String.t()
         }) :: :desktop | :server | :tui
   def effective_mode(mode \\ mode(), os_type \\ :os.type(), env \\ System.get_env())
 
-  def effective_mode(:desktop, {:unix, os}, env) when os != :darwin do
-    if Enum.any?(["DISPLAY", "WAYLAND_DISPLAY"], &(env[&1] not in [nil, ""])),
-      do: :desktop,
-      else: :tui
+  def effective_mode(:desktop, {:unix, :darwin}, env) do
+    if env_any?(env, ["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"]), do: :tui, else: :desktop
+  end
+
+  def effective_mode(:desktop, {:unix, _os}, env) do
+    if env_any?(env, ["DISPLAY", "WAYLAND_DISPLAY"]), do: :desktop, else: :tui
   end
 
   def effective_mode(mode, _os_type, _env), do: mode
+
+  defp env_any?(env, vars), do: Enum.any?(vars, &(env[&1] not in [nil, ""]))
+
+  @doc """
+  Prepares the OS environment for the given effective boot mode and returns
+  it. The `:desktop` dependency application boots wx inside its own
+  `Application.start/2` — before any BDS supervisor runs — and that wx load
+  crashes the whole VM on a display-less system. For every non-desktop mode
+  this sets `NO_WX=1`, elixir-desktop's own switch that turns all of its wx
+  calls into no-ops, so the dependency starts inert and the TUI fallback
+  (issue #33) can actually boot.
+
+  Called from `config/runtime.exs`: runtime config is the only hook that
+  runs before dependency applications start, in both `mix run` and releases.
+  """
+  @spec prepare_boot_env(:desktop | :server | :tui) :: :desktop | :server | :tui
+  def prepare_boot_env(mode \\ effective_mode()) do
+    if mode != :desktop, do: System.put_env("NO_WX", "1")
+    mode
+  end
 
   @doc """
   Whether the HTTP endpoint requires the desktop webview auth token. Only

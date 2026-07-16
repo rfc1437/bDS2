@@ -31,11 +31,17 @@ surface ServerRuntimeSurface {
 rule ModeResolution {
     when: ApplicationStarted(mode)
     -- BDS_MODE environment variable decides the mode once per boot.
-    -- Fallback (issue #33): resolved desktop mode on a non-Darwin unix
-    -- system without DISPLAY/WAYLAND_DISPLAY boots as tui instead, so a
-    -- display-less Linux server still opens a UI rather than crashing wx;
-    -- a log line records the switch. Explicit server/tui modes and
-    -- macOS/Windows are never rewritten.
+    -- Fallback (issue #33): resolved desktop mode boots as tui when no
+    -- graphical session is available, so the app always opens a UI
+    -- rather than crashing wx; a log line records the switch. Headless
+    -- means: non-Darwin unix without DISPLAY/WAYLAND_DISPLAY (plain ssh
+    -- included; ssh -X with a forwarded display keeps the GUI), or macOS
+    -- inside an ssh session (SSH_CONNECTION/SSH_CLIENT/SSH_TTY — macOS
+    -- never sets DISPLAY). Explicit server/tui modes and Windows are
+    -- never rewritten. Because the :desktop dependency boots wx in its
+    -- own application start, config/runtime.exs sets NO_WX=1 for every
+    -- non-desktop effective mode (BDS.Server.prepare_boot_env) so the
+    -- dependency starts inert before any BDS supervisor runs.
     ensures: BootMode.created(kind: mode)
 }
 

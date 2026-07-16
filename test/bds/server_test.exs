@@ -37,15 +37,68 @@ defmodule BDS.ServerTest do
       assert Server.effective_mode(:desktop, {:unix, :freebsd}, %{"WAYLAND_DISPLAY" => ""}) == :tui
     end
 
-    test "macOS and Windows never fall back" do
+    test "macOS keeps the GUI locally but falls back to the TUI over ssh" do
+      # macOS has no DISPLAY variable; a local launch always has a
+      # graphical session, an ssh session never does.
       assert Server.effective_mode(:desktop, {:unix, :darwin}, %{}) == :desktop
+
+      assert Server.effective_mode(:desktop, {:unix, :darwin}, %{
+               "SSH_CONNECTION" => "10.0.0.5 52000 10.0.0.9 22"
+             }) == :tui
+
+      assert Server.effective_mode(:desktop, {:unix, :darwin}, %{"SSH_TTY" => "/dev/ttys003"}) ==
+               :tui
+
+      assert Server.effective_mode(:desktop, {:unix, :darwin}, %{"SSH_CLIENT" => "10.0.0.5"}) ==
+               :tui
+
+      assert Server.effective_mode(:desktop, {:unix, :darwin}, %{"SSH_CONNECTION" => ""}) ==
+               :desktop
+    end
+
+    test "linux over ssh with a forwarded display keeps the GUI" do
+      env = %{"SSH_CONNECTION" => "10.0.0.5 52000 10.0.0.9 22", "DISPLAY" => "localhost:10.0"}
+      assert Server.effective_mode(:desktop, {:unix, :linux}, env) == :desktop
+    end
+
+    test "Windows never falls back" do
       assert Server.effective_mode(:desktop, {:win32, :nt}, %{}) == :desktop
+
+      assert Server.effective_mode(:desktop, {:win32, :nt}, %{"SSH_CONNECTION" => "10.0.0.5"}) ==
+               :desktop
     end
 
     test "explicit server and tui modes are untouched" do
       assert Server.effective_mode(:server, {:unix, :linux}, %{}) == :server
       assert Server.effective_mode(:tui, {:unix, :linux}, %{"DISPLAY" => ":0"}) == :tui
       assert Server.effective_mode(:server, {:unix, :darwin}, %{"DISPLAY" => ":0"}) == :server
+    end
+  end
+
+  describe "prepare_boot_env/1" do
+    setup do
+      original = System.get_env("NO_WX")
+      System.delete_env("NO_WX")
+
+      on_exit(fn ->
+        if original, do: System.put_env("NO_WX", original), else: System.delete_env("NO_WX")
+      end)
+
+      :ok
+    end
+
+    test "non-desktop modes disable wx so the :desktop dep boots inert" do
+      assert Server.prepare_boot_env(:tui) == :tui
+      assert System.get_env("NO_WX") == "1"
+
+      System.delete_env("NO_WX")
+      assert Server.prepare_boot_env(:server) == :server
+      assert System.get_env("NO_WX") == "1"
+    end
+
+    test "desktop mode leaves wx enabled" do
+      assert Server.prepare_boot_env(:desktop) == :desktop
+      assert System.get_env("NO_WX") == nil
     end
   end
 

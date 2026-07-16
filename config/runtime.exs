@@ -1,5 +1,11 @@
 import Config
 
+# Headless boots (BDS_MODE=server/tui, or desktop mode without a graphical
+# display — issue #33) must neuter wx before the :desktop dependency
+# application starts it and crashes the VM. Runtime config is the only hook
+# that runs before dependency applications start.
+BDS.Server.prepare_boot_env()
+
 if config_env() == :prod do
   database_path =
     System.get_env("BDS_DATABASE_PATH") ||
