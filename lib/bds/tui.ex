@@ -21,9 +21,10 @@ defmodule BDS.TUI do
   `yyyy-mm-dd`; enter keeps the filter, esc clears it),
   `:` vi-style command prompt over the Blog-menu shell commands, `?`
   command help (commands whose report/apply UI is GUI-only are marked).
-  Editor focus: text keys edit, `ctrl+s` save, `ctrl+p` publish,
-  `ctrl+e` word-wrapped preview, `ctrl+t` edit title, `ctrl+l` cycle
-  language, `ctrl+g` AI suggestions, `esc` back to sidebar. `ctrl+q`
+  Posts open in the rendered markdown preview (new empty posts open in
+  the editor). Editor focus: `ctrl+e` toggles preview/editor, text keys
+  edit, `ctrl+s` save, `ctrl+p` publish, `ctrl+t` edit title, `ctrl+l`
+  cycle language, `ctrl+g` AI suggestions, `esc` back to sidebar. `ctrl+q`
   quits, `esc` also closes a media preview. The UI locale is the
   server-side UI language setting.
   """
@@ -215,7 +216,9 @@ defmodule BDS.TUI do
        when is_binary(project_id) do
     case Posts.create_post(%{project_id: project_id, title: "", content: ""}) do
       {:ok, post} ->
-        {:noreply, state |> load_sidebar() |> open_post(post.id)}
+        # A fresh, empty post starts in the editor — there is nothing to
+        # preview yet; existing posts open in the preview instead.
+        {:noreply, state |> load_sidebar() |> open_post(post.id, false)}
 
       {:error, reason} ->
         {:noreply, toast(state, dgettext("ui", "New Post"), inspect(reason))}
@@ -690,9 +693,6 @@ defmodule BDS.TUI do
 
   defp editor_key(%{code: "esc"}, %{editor: %{editing_title?: true}} = state),
     do: {:noreply, put_in(state.editor.editing_title?, false)}
-
-  defp editor_key(%{code: "esc"}, %{editor: %{preview?: true}} = state),
-    do: {:noreply, put_in(state.editor.preview?, false)}
 
   defp editor_key(%{code: "esc"}, state), do: {:noreply, %{state | focus: :sidebar}}
 
@@ -1470,7 +1470,9 @@ defmodule BDS.TUI do
 
   # ── Post editor ──────────────────────────────────────────────────────────
 
-  defp open_post(state, post_id) do
+  # Posts open in the rendered markdown preview by default — the editor is
+  # one ctrl+e away. New (empty) posts pass preview?: false.
+  defp open_post(state, post_id, preview? \\ true) do
     case Posts.get_post(post_id) do
       nil ->
         toast(state, dgettext("ui", "Posts"), dgettext("ui", "Post not found."))
@@ -1478,11 +1480,17 @@ defmodule BDS.TUI do
       post ->
         metadata = Metadata.project_metadata(post.project_id)
         language = Metadata.canonical_language(post, metadata)
-        %{state | editor: build_editor(post, metadata, language), focus: :editor, image: nil}
+
+        %{
+          state
+          | editor: build_editor(post, metadata, language, preview?),
+            focus: :editor,
+            image: nil
+        }
     end
   end
 
-  defp build_editor(post, metadata, language) do
+  defp build_editor(post, metadata, language, preview?) do
     form = Draft.persisted_form(post, metadata, language)
     textarea = ExRatatui.textarea_new()
     :ok = ExRatatui.textarea_insert_str(textarea, form["content"] || "")
@@ -1495,7 +1503,7 @@ defmodule BDS.TUI do
       title: form["title"] || "",
       textarea: textarea,
       editing_title?: false,
-      preview?: false,
+      preview?: preview?,
       dirty: false
     }
   end
@@ -1505,7 +1513,7 @@ defmodule BDS.TUI do
   defp reload_editor(%{editor: editor} = state) do
     case Posts.get_post(editor.post.id) do
       nil -> %{state | editor: nil, focus: :sidebar}
-      post -> %{state | editor: build_editor(post, editor.metadata, editor.language)}
+      post -> %{state | editor: build_editor(post, editor.metadata, editor.language, editor.preview?)}
     end
   end
 
@@ -1541,7 +1549,7 @@ defmodule BDS.TUI do
       languages = Metadata.languages(editor.metadata)
       index = Enum.find_index(languages, &(&1 == editor.language)) || 0
       next = Enum.at(languages, rem(index + 1, length(languages)))
-      %{state | editor: build_editor(editor.post, editor.metadata, next)}
+      %{state | editor: build_editor(editor.post, editor.metadata, next, editor.preview?)}
     end
   end
 

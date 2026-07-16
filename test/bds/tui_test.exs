@@ -68,13 +68,27 @@ defmodule BDS.TUITest do
     assert text =~ "Hello TUI"
   end
 
-  test "navigates and opens a post in the editor", %{post: post} do
+  test "opening a post lands in the markdown preview, not the editor", %{post: post} do
+    {:ok, _} =
+      BDS.Posts.update_post(post.id, %{content: "# Big Heading\n\nsome **bold** words"})
+
     state = mount!() |> press("enter")
 
     assert state.focus == :editor
     assert state.editor.post.id == post.id
-    assert ExRatatui.textarea_get_value(state.editor.textarea) == "terminal body"
-    assert screen_text(state) =~ "terminal body"
+    assert state.editor.preview?
+
+    text = screen_text(state)
+    assert text =~ "Big Heading"
+    # Rendered markdown: inline markers are consumed by the styling
+    # (headings keep their # but get styled, invisible in a text dump).
+    assert text =~ "some bold words"
+    refute text =~ "**bold**"
+
+    # ctrl+e drops into the editing textarea with the raw source.
+    state = press(state, "e", ["ctrl"])
+    refute state.editor.preview?
+    assert ExRatatui.textarea_get_value(state.editor.textarea) =~ "**bold**"
   end
 
   test "ctrl+s persists textarea edits", %{post: post} do
@@ -95,13 +109,16 @@ defmodule BDS.TUITest do
     assert state.editor.post.status == :published
   end
 
-  test "n creates a new draft post", %{project: project} do
+  test "n creates a new draft post and starts in the editor, not the preview", %{
+    project: project
+  } do
     count_before = post_count(project.id)
     state = mount!() |> press("n")
 
     assert post_count(project.id) == count_before + 1
     assert state.focus == :editor
     assert state.editor.post.status == :draft
+    refute state.editor.preview?
   end
 
   test "esc returns focus to the sidebar" do
@@ -109,11 +126,11 @@ defmodule BDS.TUITest do
     assert state.focus == :sidebar
   end
 
-  test "ctrl+e toggles a word-wrapped preview of the draft", %{post: post} do
+  test "the preview word-wraps and ctrl+e toggles back and forth", %{post: post} do
     long_line = String.duplicate("lorem ipsum dolor sit amet ", 8) <> "FINALWORD"
     {:ok, _} = BDS.Posts.update_post(post.id, %{content: long_line})
 
-    state = mount!() |> press("enter") |> press("e", ["ctrl"])
+    state = mount!() |> press("enter")
     assert state.editor.preview?
 
     # The textarea cannot soft-wrap, so the tail of a long line is off-screen
@@ -122,10 +139,14 @@ defmodule BDS.TUITest do
 
     state = press(state, "e", ["ctrl"])
     refute state.editor.preview?
+
+    state = press(state, "e", ["ctrl"])
+    assert state.editor.preview?
   end
 
   test "keys in preview mode do not edit the content" do
-    state = mount!() |> press("enter") |> press("e", ["ctrl"])
+    state = mount!() |> press("enter")
+    assert state.editor.preview?
     before = ExRatatui.textarea_get_value(state.editor.textarea)
 
     state = press(state, "x")
@@ -133,11 +154,12 @@ defmodule BDS.TUITest do
     refute state.editor.dirty
   end
 
-  test "esc in preview returns to editing, not to the sidebar" do
-    state = mount!() |> press("enter") |> press("e", ["ctrl"]) |> press("esc")
+  test "esc returns to the sidebar from both preview and editor" do
+    state = mount!() |> press("enter") |> press("esc")
+    assert state.focus == :sidebar
 
-    refute state.editor.preview?
-    assert state.focus == :editor
+    state = state |> press("enter") |> press("e", ["ctrl"]) |> press("esc")
+    assert state.focus == :sidebar
   end
 
   test "entity_changed refreshes the sidebar", %{project: project} do

@@ -33,9 +33,12 @@ rule SidebarNavigation {
 
 rule OpenEntry {
     when: TuiKeyPressed(code: "enter")
-    -- Posts open in the editor (title + textarea seeded from the
-    -- persisted form). Images open in the terminal image preview.
-    -- Other entities report that terminal editing is not available yet.
+    -- Posts open in the rendered markdown preview by default (title +
+    -- textarea still seeded from the persisted form; ctrl+e switches to
+    -- editing). New empty posts created with "n" open in the editor
+    -- instead — there is nothing to preview yet. Images open in the
+    -- terminal image preview. Other entities report that terminal
+    -- editing is not available yet.
     ensures: TuiState.editing_post.updated()
 }
 
@@ -49,9 +52,12 @@ rule SaveAndPublish {
 
 rule WrappedPreview {
     when: TuiKeyPressed(code: "e", modifiers: "ctrl")
-    -- The editing textarea cannot soft-wrap (upstream ratatui-textarea
-    -- limitation), so ctrl+e toggles a read-only word-wrapped Markdown
-    -- preview of the current draft; keys in preview never edit content.
+    -- ctrl+e toggles between the read-only word-wrapped Markdown
+    -- preview (the default mode when opening a post — rendered through
+    -- tui-markdown so headings/emphasis/lists are styled) and the
+    -- editing textarea (which cannot soft-wrap, an upstream
+    -- ratatui-textarea limitation); keys in preview never edit content,
+    -- and esc returns to the sidebar from either mode.
     ensures: PreviewToggled()
 }
 
