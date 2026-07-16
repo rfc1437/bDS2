@@ -67,13 +67,69 @@ defmodule BDS.Server do
   calls into no-ops, so the dependency starts inert and the TUI fallback
   (issue #33) can actually boot.
 
+  In tui mode the app additionally owns the launching terminal, so every
+  other terminal writer is silenced: the default (console) logger handler
+  is replaced with a rotating file handler at `tui_log_file/0`, and
+  Bumblebee's model-download progress bar (raw stdout writes) is disabled.
+  Each stray line would otherwise scroll the TUI's alternate screen up one
+  row and corrupt the rendering. Desktop and server modes keep logging to
+  the terminal, and SSH-served TUI sessions are unaffected either way —
+  their cells travel over the SSH channel, away from the server console.
+
   Called from `config/runtime.exs`: runtime config is the only hook that
   runs before dependency applications start, in both `mix run` and releases.
   """
-  @spec prepare_boot_env(:desktop | :server | :tui) :: :desktop | :server | :tui
-  def prepare_boot_env(mode \\ effective_mode()) do
+  @spec prepare_boot_env(:desktop | :server | :tui, (-> :ok)) :: :desktop | :server | :tui
+  def prepare_boot_env(mode \\ effective_mode(), redirect_logs \\ &redirect_logging_to_file/0) do
     if mode != :desktop, do: System.put_env("NO_WX", "1")
+
+    if mode == :tui do
+      Application.put_env(:bumblebee, :progress_bar_enabled, false)
+      redirect_logs.()
+    end
+
     mode
+  end
+
+  @doc """
+  Log file that replaces console logging in local tui mode: a
+  machine-specific, regenerable artifact, so it lives in the private app
+  dir (PrivateArtifactsLiveInOsAppDir). Overridable via `:bds, :tui_log_file`.
+  """
+  @spec tui_log_file() :: Path.t()
+  def tui_log_file do
+    Application.get_env(:bds, :tui_log_file) ||
+      Path.join([BDS.Projects.private_dir(), "logs", "bds.log"])
+  end
+
+  @doc """
+  Replaces the default (console) logger handler with a rotating file
+  handler writing to `tui_log_file/0`, keeping the configured level,
+  filters, and Elixir formatter. See `prepare_boot_env/2`.
+  """
+  @spec redirect_logging_to_file() :: :ok
+  def redirect_logging_to_file do
+    log_file = tui_log_file()
+    File.mkdir_p!(Path.dirname(log_file))
+
+    with {:ok, handler} <- :logger.get_handler_config(:default) do
+      :ok = :logger.remove_handler(:default)
+
+      :ok =
+        :logger.add_handler(
+          :default,
+          :logger_std_h,
+          handler
+          |> Map.take([:level, :filters, :filter_default, :formatter])
+          |> Map.put(:config, %{
+            file: String.to_charlist(log_file),
+            max_no_bytes: 10_000_000,
+            max_no_files: 5
+          })
+        )
+    end
+
+    :ok
   end
 
   @doc """

@@ -41,7 +41,13 @@ rule ModeResolution {
     -- never rewritten. Because the :desktop dependency boots wx in its
     -- own application start, config/runtime.exs sets NO_WX=1 for every
     -- non-desktop effective mode (BDS.Server.prepare_boot_env) so the
-    -- dependency starts inert before any BDS supervisor runs.
+    -- dependency starts inert before any BDS supervisor runs. In tui
+    -- mode prepare_boot_env also silences every other terminal writer —
+    -- the default logger handler moves to a rotating file in the private
+    -- app dir and Bumblebee's model-download progress bar is disabled —
+    -- because the TUI owns the terminal and each stray console line
+    -- scrolls the alternate screen up one row. Desktop/server modes and
+    -- SSH-served TUI sessions keep normal console logging.
     ensures: BootMode.created(kind: mode)
 }
 

@@ -2,8 +2,11 @@ import Config
 
 # Headless boots (BDS_MODE=server/tui, or desktop mode without a graphical
 # display — issue #33) must neuter wx before the :desktop dependency
-# application starts it and crashes the VM. Runtime config is the only hook
-# that runs before dependency applications start.
+# application starts it and crashes the VM. Local tui mode additionally
+# silences all other terminal writers (console logging goes to a file,
+# model-download progress bars are disabled) — the TUI owns the terminal
+# and every stray line scrolls its rendering up one row. Runtime config is
+# the only hook that runs before dependency applications start.
 BDS.Server.prepare_boot_env()
 
 if config_env() == :prod do
