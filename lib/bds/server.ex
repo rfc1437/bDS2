@@ -29,13 +29,36 @@ defmodule BDS.Server do
   def mode(nil), do: :desktop
 
   @doc """
+  The mode the app actually boots in: the resolved `BDS_MODE`, except that
+  desktop mode falls back to the TUI when no graphical display is available
+  (issue #33). Starting the app on a display-less Linux server then still
+  opens a UI — the terminal one — instead of crashing wx.
+
+  Only non-Darwin unix systems fall back: they need `DISPLAY` or
+  `WAYLAND_DISPLAY` to run wx, while macOS and Windows always have a
+  graphical session for a launched app.
+  """
+  @spec effective_mode(:desktop | :server | :tui, {atom(), atom()}, %{
+          optional(String.t()) => String.t()
+        }) :: :desktop | :server | :tui
+  def effective_mode(mode \\ mode(), os_type \\ :os.type(), env \\ System.get_env())
+
+  def effective_mode(:desktop, {:unix, os}, env) when os != :darwin do
+    if Enum.any?(["DISPLAY", "WAYLAND_DISPLAY"], &(env[&1] not in [nil, ""])),
+      do: :desktop,
+      else: :tui
+  end
+
+  def effective_mode(mode, _os_type, _env), do: mode
+
+  @doc """
   Whether the HTTP endpoint requires the desktop webview auth token. Only
   desktop mode does: in server/tui mode the endpoint stays loopback-only
   and clients arrive through the key-authenticated SSH tunnel, which the
   per-boot webview token would otherwise lock out.
   """
   @spec desktop_auth_required?(:desktop | :server | :tui) :: boolean()
-  def desktop_auth_required?(mode \\ mode())
+  def desktop_auth_required?(mode \\ effective_mode())
   def desktop_auth_required?(:desktop), do: true
   def desktop_auth_required?(_mode), do: false
 

@@ -57,7 +57,7 @@ defmodule BDS.Application do
         {Task.Supervisor, name: BDS.Scripting.TaskSupervisor},
         BDS.Scripting.JobSupervisor,
         BDS.Embeddings.Index
-      ] ++ embedding_children() ++ mode_children(BDS.Server.mode(), current_env())
+      ] ++ embedding_children() ++ mode_children(boot_mode(), current_env())
 
     opts = [strategy: :one_for_one, name: BDS.Supervisor]
     Supervisor.start_link(children, opts)
@@ -75,6 +75,20 @@ defmodule BDS.Application do
 
   defp current_env do
     Application.get_env(:bds, :current_env_override) || @compiled_env
+  end
+
+  # Desktop mode without a graphical display boots the TUI instead
+  # (issue #33); the log line explains the surprise mode switch.
+  defp boot_mode do
+    resolved = BDS.Server.mode()
+    effective = BDS.Server.effective_mode(resolved)
+
+    if effective != resolved do
+      require Logger
+      Logger.info("No graphical display available, starting the terminal UI instead")
+    end
+
+    effective
   end
 
   defp desktop_window_children do

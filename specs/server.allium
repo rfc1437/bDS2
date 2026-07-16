@@ -30,7 +30,12 @@ surface ServerRuntimeSurface {
 
 rule ModeResolution {
     when: ApplicationStarted(mode)
-    -- BDS_MODE environment variable decides the mode once per boot
+    -- BDS_MODE environment variable decides the mode once per boot.
+    -- Fallback (issue #33): resolved desktop mode on a non-Darwin unix
+    -- system without DISPLAY/WAYLAND_DISPLAY boots as tui instead, so a
+    -- display-less Linux server still opens a UI rather than crashing wx;
+    -- a log line records the switch. Explicit server/tui modes and
+    -- macOS/Windows are never rewritten.
     ensures: BootMode.created(kind: mode)
 }
 

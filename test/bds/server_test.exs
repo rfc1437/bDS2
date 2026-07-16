@@ -23,6 +23,32 @@ defmodule BDS.ServerTest do
     end
   end
 
+  describe "effective_mode/3" do
+    test "desktop stays desktop when a display is available" do
+      assert Server.effective_mode(:desktop, {:unix, :linux}, %{"DISPLAY" => ":0"}) == :desktop
+
+      assert Server.effective_mode(:desktop, {:unix, :linux}, %{"WAYLAND_DISPLAY" => "wayland-0"}) ==
+               :desktop
+    end
+
+    test "desktop falls back to the TUI on unix without a display" do
+      assert Server.effective_mode(:desktop, {:unix, :linux}, %{}) == :tui
+      assert Server.effective_mode(:desktop, {:unix, :linux}, %{"DISPLAY" => ""}) == :tui
+      assert Server.effective_mode(:desktop, {:unix, :freebsd}, %{"WAYLAND_DISPLAY" => ""}) == :tui
+    end
+
+    test "macOS and Windows never fall back" do
+      assert Server.effective_mode(:desktop, {:unix, :darwin}, %{}) == :desktop
+      assert Server.effective_mode(:desktop, {:win32, :nt}, %{}) == :desktop
+    end
+
+    test "explicit server and tui modes are untouched" do
+      assert Server.effective_mode(:server, {:unix, :linux}, %{}) == :server
+      assert Server.effective_mode(:tui, {:unix, :linux}, %{"DISPLAY" => ":0"}) == :tui
+      assert Server.effective_mode(:server, {:unix, :darwin}, %{"DISPLAY" => ":0"}) == :server
+    end
+  end
+
   describe "ensure_ssh_dir!/1" do
     setup do
       dir = Path.join(System.tmp_dir!(), "bds-ssh-test-#{System.unique_integer([:positive])}")
