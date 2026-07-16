@@ -11,9 +11,9 @@ defmodule BDS.TUI do
 
   Sidebar focus: `↑/↓`/`j/k` navigate, `enter` open, `n` new post,
   `1..5` switch view (posts/media/templates/scripts/tags), `7` git panel
-  (changed files in the sidebar, scrollable whole-folder diff in the main
-  area; `c` commit all, `u` pull, `s` push, enter jumps the diff to the
-  selected file), `r` refresh,
+  (changed files plus commit history in the sidebar, scrollable
+  whole-folder diff in the main area; `c` commit all, `u` pull, `s` push,
+  enter jumps the diff to the selected file), `r` refresh,
   `p` projects overlay (switch the active project or open an existing
   blog folder by path, with bash-style tab completion — opening one
   queues a full database rebuild), `/` vi-style search that live-filters
@@ -901,7 +901,27 @@ defmodule BDS.TUI do
     ]
   end
 
-  defp sidebar_widgets(state, rect) do
+  # The git sidebar mirrors the GUI: changed files on top, commit history
+  # in the lower half (↑ needs push, ↓ remote-only, blank when synced).
+  defp sidebar_widgets(%{view: "git", sidebar: %{git_state: "active"} = sidebar} = state, rect) do
+    [changes_rect, history_rect] =
+      Layout.split(rect, :vertical, [{:percentage, 50}, {:percentage, 50}])
+
+    history_items = Enum.map(sidebar.history_entries, &history_line/1)
+
+    [
+      sidebar_list_widget(state, changes_rect),
+      {%List{
+         items: history_items,
+         selected: nil,
+         block: %Block{title: dgettext("ui", "History"), borders: [:all]}
+       }, history_rect}
+    ]
+  end
+
+  defp sidebar_widgets(state, rect), do: [sidebar_list_widget(state, rect)]
+
+  defp sidebar_list_widget(state, rect) do
     items =
       Enum.map(state.items, fn
         {:header, title} -> "── #{title}"
@@ -910,18 +930,27 @@ defmodule BDS.TUI do
 
     focused? = state.focus == :sidebar
 
-    [
-      {%List{
-         items: items,
-         selected: list_selected(items, state.selected),
-         highlight_style:
-           if(focused?,
-             do: %Style{fg: :black, bg: :cyan},
-             else: %Style{modifiers: [:bold]}
-           ),
-         block: %Block{title: sidebar_title(state), borders: [:all]}
-       }, rect}
-    ]
+    {%List{
+       items: items,
+       selected: list_selected(items, state.selected),
+       highlight_style:
+         if(focused?,
+           do: %Style{fg: :black, bg: :cyan},
+           else: %Style{modifiers: [:bold]}
+         ),
+       block: %Block{title: sidebar_title(state), borders: [:all]}
+     }, rect}
+  end
+
+  defp history_line(entry) do
+    marker =
+      case entry.sync_status do
+        "local_only" -> "↑ "
+        "remote_only" -> "↓ "
+        _synced -> "  "
+      end
+
+    marker <> entry.short_hash <> " " <> to_string(entry.subject || "")
   end
 
   defp sidebar_title(%{view: "git", sidebar: %{git_state: "active"} = sidebar}) do

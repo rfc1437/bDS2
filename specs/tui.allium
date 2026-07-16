@@ -114,7 +114,9 @@ rule GitPanel {
     when: TuiKeyPressed(code: "7")
     -- "7" opens the git panel (issue #30) for content sync: the sidebar
     -- lists the changed files from git status (code + path, branch with
-    -- ahead/behind counts in the title), the main area shows a
+    -- ahead/behind counts in the title) with the commit history in its
+    -- lower half, like the GUI (short hash + subject; ↑ marks commits
+    -- that still need a push, ↓ remote-only ones), the main area shows a
     -- scrollable whole-folder diff (staged + unstaged, capped) paged
     -- with pgup/pgdn; enter on a file jumps the diff to it. "c" opens a
     -- status-line commit prompt (git add -A + commit, empty messages

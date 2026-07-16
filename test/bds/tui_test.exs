@@ -800,6 +800,27 @@ defmodule BDS.TUITest do
       assert_receive {:git_result, :push, {:error, _reason}}, 5_000
     end
 
+    test "the sidebar shows the commit history in its lower half", %{project: project} do
+      dir = BDS.Projects.project_data_dir(project)
+      init_repo!(dir)
+
+      state = mount!() |> press("7")
+
+      assert [entry | _] = state.sidebar.history_entries
+      assert entry.subject == "initial"
+
+      text = screen_text(state, 140, 40)
+      assert text =~ "History"
+      # No remote exists, so the commit is local-only and marked for push.
+      assert text =~ "↑ #{entry.short_hash} initial"
+
+      # A commit from the panel shows up in the history immediately.
+      modify!(dir, "tracked.md", "changed\n")
+      state = state |> press("r") |> press("c") |> type("sync commit") |> press("enter")
+
+      assert screen_text(state, 140, 40) =~ "sync commit"
+    end
+
     test "git keys in a non-repo project only report", %{project: project} do
       state = mount!() |> press("7")
 
