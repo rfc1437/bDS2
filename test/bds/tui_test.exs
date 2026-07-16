@@ -680,6 +680,145 @@ defmodule BDS.TUITest do
     end
   end
 
+  describe "git view" do
+    defp git!(dir, args) do
+      {output, 0} = System.cmd("git", args, cd: dir, stderr_to_stdout: true)
+      output
+    end
+
+    defp init_repo!(dir) do
+      git!(dir, ["init"])
+      git!(dir, ["config", "user.email", "tui@test"])
+      git!(dir, ["config", "user.name", "TUI Test"])
+      File.write!(Path.join(dir, "tracked.md"), "original\n")
+      git!(dir, ["add", "-A"])
+      git!(dir, ["commit", "-m", "initial"])
+    end
+
+    defp modify!(dir, file, content), do: File.write!(Path.join(dir, file), content)
+
+    test "'7' opens the git view with changed files and a scrollable diff", %{project: project} do
+      dir = BDS.Projects.project_data_dir(project)
+      init_repo!(dir)
+      modify!(dir, "tracked.md", "changed\n")
+      File.write!(Path.join(dir, "new-file.md"), "brand new\n")
+
+      state = mount!() |> press("7")
+
+      assert state.view == "git"
+      labels = for {:item, item} <- state.items, do: item.label
+      assert "M tracked.md" in labels
+      assert "U new-file.md" in labels
+
+      assert state.git != nil
+      assert Enum.any?(state.git.lines, &String.starts_with?(&1, "diff --git"))
+      assert screen_text(state, 140, 40) =~ "diff --git"
+    end
+
+    test "pgdn/pgup scroll the diff", %{project: project} do
+      dir = BDS.Projects.project_data_dir(project)
+      init_repo!(dir)
+      modify!(dir, "tracked.md", Enum.map_join(1..60, "\n", &"line #{&1}") <> "\n")
+
+      state = mount!() |> press("7") |> press("pagedown")
+      assert state.git.scroll > 0
+
+      state = press(state, "pageup")
+      assert state.git.scroll == 0
+    end
+
+    test "enter on a changed file jumps the diff to that file", %{project: project} do
+      dir = BDS.Projects.project_data_dir(project)
+      init_repo!(dir)
+      File.write!(Path.join(dir, "zz-later.md"), "z\n")
+      git!(dir, ["add", "-A"])
+      git!(dir, ["commit", "-m", "second file"])
+      modify!(dir, "tracked.md", "changed\n")
+      modify!(dir, "zz-later.md", "changed too\n")
+
+      state = mount!() |> press("7")
+      index = Enum.find_index(state.items, fn {:item, item} -> item.id == "zz-later.md" end)
+      state = %{state | selected: index} |> press("enter")
+
+      line = Enum.at(state.git.lines, state.git.scroll)
+      assert line =~ "diff --git"
+      assert line =~ "zz-later.md"
+    end
+
+    test "'c' opens the commit prompt and enter commits everything", %{project: project} do
+      dir = BDS.Projects.project_data_dir(project)
+      init_repo!(dir)
+      modify!(dir, "tracked.md", "changed\n")
+
+      state = mount!() |> press("7") |> press("c")
+      assert state.git_commit != nil
+      assert screen_text(state) =~ "Commit message:"
+
+      state = state |> type("content sync")
+      assert screen_text(state) =~ "content sync"
+
+      state = press(state, "enter")
+
+      assert state.git_commit == nil
+      assert {:ok, %{files: []}} = BDS.Git.status(project.id)
+      assert state.items == []
+      assert git!(dir, ["log", "-1", "--format=%s"]) =~ "content sync"
+    end
+
+    test "an empty commit message is rejected", %{project: project} do
+      dir = BDS.Projects.project_data_dir(project)
+      init_repo!(dir)
+      modify!(dir, "tracked.md", "changed\n")
+
+      state = mount!() |> press("7") |> press("c") |> press("enter")
+
+      assert state.git_commit == nil
+      assert state.status != nil
+      assert {:ok, %{files: [_change]}} = BDS.Git.status(project.id)
+    end
+
+    test "'u' pulls asynchronously and reports the result", %{project: project} do
+      dir = BDS.Projects.project_data_dir(project)
+      init_repo!(dir)
+
+      state = mount!() |> press("7") |> press("u")
+      assert state.busy
+
+      # No remote is configured, so the streamed result is an error toast.
+      assert_receive {:git_result, :pull, {:error, _reason}}, 5_000
+      {:noreply, state} = BDS.TUI.handle_info({:git_result, :pull, {:error, {:git_failed, "no remote"}}}, state)
+      refute state.busy
+      assert state.status =~ "no remote"
+    end
+
+    test "'s' pushes asynchronously", %{project: project} do
+      dir = BDS.Projects.project_data_dir(project)
+      init_repo!(dir)
+
+      state = mount!() |> press("7") |> press("s")
+      assert state.busy
+      assert_receive {:git_result, :push, {:error, _reason}}, 5_000
+    end
+
+    test "git keys in a non-repo project only report", %{project: project} do
+      state = mount!() |> press("7")
+
+      assert state.view == "git"
+      assert state.git == nil
+      assert state.items == []
+      assert screen_text(state, 140, 40) =~ "Not a git repository."
+
+      state = press(state, "c")
+      assert state.git_commit == nil
+      assert state.status != nil
+
+      state = press(state, "u")
+      refute state.busy
+      refute_receive {:git_result, _op, _result}, 100
+      _ = project
+    end
+  end
+
   test "local tui mode stops the VM when the app exits" do
     parent = self()
     state = mount!(stop_vm_on_exit: true, stop_fun: fn -> send(parent, :vm_stopped) end)

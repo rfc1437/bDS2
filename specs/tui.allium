@@ -110,6 +110,22 @@ rule CommandPrompt {
     ensures: CommandListShownOrExecuted()
 }
 
+rule GitPanel {
+    when: TuiKeyPressed(code: "7")
+    -- "7" opens the git panel (issue #30) for content sync: the sidebar
+    -- lists the changed files from git status (code + path, branch with
+    -- ahead/behind counts in the title), the main area shows a
+    -- scrollable whole-folder diff (staged + unstaged, capped) paged
+    -- with pgup/pgdn; enter on a file jumps the diff to it. "c" opens a
+    -- status-line commit prompt (git add -A + commit, empty messages
+    -- rejected), "u" pulls (ff-only) and "s" pushes — both run off the
+    -- UI process and report back as a status toast. Every action is
+    -- BDS.Git, the same backend as the GUI git panel. A project folder
+    -- that is not a git repository shows a message and refuses the
+    -- actions.
+    ensures: GitPanelShownOrSynced()
+}
+
 rule ReportPanels {
     when: ShellTaskCompleted(route: "metadata_diff" | "site_validation")
     -- Completed metadata diff and site validation tasks open a

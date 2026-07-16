@@ -10,7 +10,10 @@ defmodule BDS.TUI do
   ## Keys
 
   Sidebar focus: `↑/↓`/`j/k` navigate, `enter` open, `n` new post,
-  `1..5` switch view (posts/media/templates/scripts/tags), `r` refresh,
+  `1..5` switch view (posts/media/templates/scripts/tags), `7` git panel
+  (changed files in the sidebar, scrollable whole-folder diff in the main
+  area; `c` commit all, `u` pull, `s` push, enter jumps the diff to the
+  selected file), `r` refresh,
   `p` projects overlay (switch the active project or open an existing
   blog folder by path, with bash-style tab completion — opening one
   queues a full database rebuild), `/` vi-style search that live-filters
@@ -31,6 +34,7 @@ defmodule BDS.TUI do
   alias BDS.AI
   alias BDS.Desktop.UILocale
   alias BDS.Events
+  alias BDS.Git
   alias BDS.Posts
   alias BDS.Projects
   alias BDS.UI.PostEditor.{Draft, Metadata, Persistence}
@@ -40,7 +44,9 @@ defmodule BDS.TUI do
   alias ExRatatui.Style
   alias ExRatatui.Widgets.{Block, Clear, List, Markdown, Paragraph, Tabs, Textarea}
 
-  @views ~w(posts media templates scripts tags)
+  @views ~w(posts media templates scripts tags git)
+  @git_diff_scroll_step 10
+  @git_max_diff_lines 5000
 
   # ── Mount ────────────────────────────────────────────────────────────────
 
@@ -63,6 +69,8 @@ defmodule BDS.TUI do
       projects: nil,
       search: nil,
       filters_by_view: %{},
+      git: nil,
+      git_commit: nil,
       report: nil,
       handled_task_ids: nil,
       task_polling: false,
@@ -122,6 +130,10 @@ defmodule BDS.TUI do
       when projects != nil,
       do: projects_key(key, state)
 
+  def handle_event(%ExRatatui.Event.Key{kind: "press"} = key, %{git_commit: git_commit} = state)
+      when git_commit != nil,
+      do: git_commit_key(key, state)
+
   def handle_event(%ExRatatui.Event.Key{kind: "press"} = key, %{search: search} = state)
       when search != nil,
       do: search_key(key, state)
@@ -150,6 +162,29 @@ defmodule BDS.TUI do
     view = Enum.at(@views, String.to_integer(code) - 1)
     {:noreply, load_sidebar(%{state | view: view, selected: 0, image: nil})}
   end
+
+  # Git is panel "7", matching the GUI panel numbering (issue #30).
+  defp sidebar_key(%{code: "7"}, state),
+    do: {:noreply, load_sidebar(%{state | view: "git", selected: 0, image: nil})}
+
+  defp sidebar_key(%{code: "c"}, %{view: "git"} = state) do
+    if state.git do
+      {:noreply, %{state | git_commit: %{input: ""}}}
+    else
+      {:noreply, not_a_repo_toast(state)}
+    end
+  end
+
+  defp sidebar_key(%{code: "u"}, %{view: "git"} = state), do: run_git_async(state, :pull)
+  defp sidebar_key(%{code: "s"}, %{view: "git"} = state), do: run_git_async(state, :push)
+
+  defp sidebar_key(%{code: "pagedown"}, %{view: "git", git: git} = state) when git != nil do
+    max_scroll = max(length(git.lines) - 1, 0)
+    {:noreply, put_in(state.git.scroll, min(git.scroll + @git_diff_scroll_step, max_scroll))}
+  end
+
+  defp sidebar_key(%{code: "pageup"}, %{view: "git", git: git} = state) when git != nil,
+    do: {:noreply, put_in(state.git.scroll, max(git.scroll - @git_diff_scroll_step, 0))}
 
   defp sidebar_key(%{code: "r"}, state), do: {:noreply, load_sidebar(state)}
 
@@ -191,6 +226,7 @@ defmodule BDS.TUI do
     case selected_item(state) do
       %{route: "post", id: post_id} -> {:noreply, open_post(state, post_id)}
       %{route: "media", id: media_id} -> {:noreply, open_media(state, media_id)}
+      %{route: "git_file", id: path} -> {:noreply, jump_to_file_diff(state, path)}
       %{id: _id} -> {:noreply, toast(state, view_label(state.view), dgettext("ui", "Editing this item is not available in the terminal UI yet."))}
       _other -> {:noreply, state}
     end
@@ -268,6 +304,95 @@ defmodule BDS.TUI do
   end
 
   defp apply_report(state, _report), do: state
+
+  # ── Events: git panel (issue #30) ─────────────────────────────────────────
+
+  # Commit prompt in the status line, mirroring the search prompt: enter
+  # commits the whole working tree (git add -A + commit), esc cancels.
+  defp git_commit_key(%{code: "esc"}, state), do: {:noreply, %{state | git_commit: nil}}
+
+  defp git_commit_key(%{code: "enter"}, %{git_commit: %{input: input}} = state) do
+    message = String.trim(input)
+    state = %{state | git_commit: nil}
+
+    cond do
+      message == "" ->
+        {:noreply,
+         toast(state, dgettext("ui", "Commit"), dgettext("ui", "Commit message required."))}
+
+      true ->
+        case Git.commit_all(state.project_id, message) do
+          {:ok, _result} ->
+            {:noreply,
+             state |> load_sidebar() |> toast(dgettext("ui", "Commit"), dgettext("ui", "Committed."))}
+
+          {:error, reason} ->
+            {:noreply, toast(state, dgettext("ui", "Commit"), format_git_error(reason))}
+        end
+    end
+  end
+
+  defp git_commit_key(%{code: "backspace"}, %{git_commit: git_commit} = state) do
+    {:noreply,
+     %{state | git_commit: %{git_commit | input: String.slice(git_commit.input, 0..-2//1)}}}
+  end
+
+  defp git_commit_key(%{code: code, modifiers: []}, %{git_commit: git_commit} = state)
+       when byte_size(code) >= 1 do
+    if String.length(code) == 1 do
+      {:noreply, %{state | git_commit: %{git_commit | input: git_commit.input <> code}}}
+    else
+      {:noreply, state}
+    end
+  end
+
+  defp git_commit_key(_key, state), do: {:noreply, state}
+
+  # Pull and push hit the network, so they run off the UI process and
+  # report back via {:git_result, op, result}.
+  defp run_git_async(%{git: nil} = state, _operation),
+    do: {:noreply, not_a_repo_toast(state)}
+
+  defp run_git_async(state, operation) do
+    parent = self()
+    project_id = state.project_id
+
+    {:ok, _pid} =
+      Task.Supervisor.start_child(BDS.TCP.TaskSupervisor, fn ->
+        result =
+          case operation do
+            :pull -> Git.pull(project_id)
+            :push -> Git.push(project_id)
+          end
+
+        send(parent, {:git_result, operation, result})
+      end)
+
+    {:noreply, %{state | busy: true}}
+  end
+
+  defp not_a_repo_toast(state),
+    do: toast(state, view_label("git"), dgettext("ui", "Not a git repository."))
+
+  defp jump_to_file_diff(%{git: nil} = state, _path), do: state
+
+  defp jump_to_file_diff(%{git: git} = state, path) do
+    index =
+      Enum.find_index(git.lines, fn line ->
+        String.starts_with?(line, "diff --git") and String.contains?(line, " b/" <> path)
+      end)
+
+    case index do
+      nil ->
+        toast(state, view_label("git"), dgettext("ui", "No diff for this file."))
+
+      scroll ->
+        put_in(state.git.scroll, scroll)
+    end
+  end
+
+  defp format_git_error({:git_failed, output}), do: output
+  defp format_git_error(reason), do: inspect(reason)
 
   # ── Events: sidebar search (vi-style "/") ─────────────────────────────────
 
@@ -669,6 +794,24 @@ defmodule BDS.TUI do
     {:noreply, toast(%{state | busy: false}, dgettext("ui", "AI Suggestions"), inspect(reason))}
   end
 
+  def handle_info({:git_result, operation, result}, state) do
+    title =
+      case operation do
+        :pull -> dgettext("ui", "Pull")
+        :push -> dgettext("ui", "Push")
+      end
+
+    state = %{state | busy: false}
+
+    case result do
+      {:ok, %{output: output}} ->
+        {:noreply, state |> load_sidebar() |> toast(title, first_output_line(output))}
+
+      {:error, reason} ->
+        {:noreply, toast(state, title, format_git_error(reason))}
+    end
+  end
+
   def handle_info(:poll_tasks, %{task_polling: true} = state) do
     snapshot = state.task_snapshot_fun.()
     state = open_completed_reports(state, snapshot)
@@ -781,6 +924,11 @@ defmodule BDS.TUI do
     ]
   end
 
+  defp sidebar_title(%{view: "git", sidebar: %{git_state: "active"} = sidebar}) do
+    branch = sidebar[:branch] || "?"
+    view_label("git") <> " [#{branch} ↑#{sidebar[:ahead] || 0} ↓#{sidebar[:behind] || 0}]"
+  end
+
   defp sidebar_title(state) do
     case Map.get(state.filters_by_view, state.view) do
       nil -> view_label(state.view)
@@ -792,6 +940,27 @@ defmodule BDS.TUI do
   # and raises otherwise — clamp every dynamic list through this.
   defp list_selected([], _selected), do: nil
   defp list_selected(items, selected), do: min(selected, length(items) - 1)
+
+  defp main_widgets(%{view: "git", editor: nil, git: nil}, rect) do
+    [
+      {%Paragraph{
+         text: dgettext("ui", "Not a git repository."),
+         block: %Block{title: view_label("git"), borders: [:all]}
+       }, rect}
+    ]
+  end
+
+  defp main_widgets(%{view: "git", editor: nil, git: git}, rect) do
+    [
+      {%List{
+         items: git.lines,
+         selected: list_selected(git.lines, git.scroll),
+         scroll_padding: 2,
+         highlight_style: %Style{modifiers: [:bold]},
+         block: %Block{title: dgettext("ui", "Diff (pgup/pgdn scroll)"), borders: [:all]}
+       }, rect}
+    ]
+  end
 
   defp main_widgets(%{editor: nil} = state, rect) do
     text =
@@ -859,6 +1028,7 @@ defmodule BDS.TUI do
   defp status_widgets(state, rect) do
     text =
       cond do
+        state.git_commit -> dgettext("ui", "Commit message") <> ": " <> state.git_commit.input
         state.search -> "/" <> state.search.input
         state.busy -> dgettext("ui", "Working…")
         state.status -> state.status
@@ -1116,6 +1286,13 @@ defmodule BDS.TUI do
   defp truncate(text) when byte_size(text) > 40, do: String.slice(text, 0, 40) <> "…"
   defp truncate(text), do: text
 
+  defp default_status(%{focus: :sidebar, view: "git"}),
+    do:
+      dgettext(
+        "ui",
+        "c commit · u pull · s push · enter jump to file · pgup/pgdn scroll diff · 1-5 views · ctrl+q quit"
+      )
+
   defp default_status(%{focus: :sidebar}),
     do:
       dgettext(
@@ -1142,7 +1319,33 @@ defmodule BDS.TUI do
         _some -> seek_item(items, clamp(state.selected, length(items)), 1)
       end
 
-    %{state | sidebar: view, items: items, selected: selected}
+    %{state | sidebar: view, items: items, selected: selected, git: load_git_panel(state, view)}
+  end
+
+  # The whole-folder diff (staged + unstaged) shown in the git panel's main
+  # area, reloaded together with the sidebar; the scroll position survives
+  # refreshes. Capped so a giant working tree cannot flood the terminal.
+  defp load_git_panel(%{view: "git"} = state, %{git_state: "active"}) do
+    lines =
+      case Git.diff(state.project_id) do
+        {:ok, %{staged_diff: staged, unstaged_diff: unstaged}} ->
+          case String.trim(staged <> "\n" <> unstaged) do
+            "" -> [dgettext("ui", "No changes.")]
+            diff -> diff |> String.split("\n") |> Enum.take(@git_max_diff_lines)
+          end
+
+        _error ->
+          []
+      end
+
+    old_scroll = if state.git, do: state.git.scroll, else: 0
+    %{lines: lines, scroll: min(old_scroll, max(length(lines) - 1, 0))}
+  end
+
+  defp load_git_panel(_state, _view), do: nil
+
+  defp first_output_line(output) do
+    output |> String.split("\n", parts: 2) |> hd() |> String.trim()
   end
 
   defp search_filter_params(state) do
@@ -1151,6 +1354,16 @@ defmodule BDS.TUI do
       query -> parse_search_query(query)
     end
   end
+
+  # Git sidebar entries are the changed files from git status; enter jumps
+  # the diff panel to that file.
+  defp flatten_items(%{git_state: "active"} = view, "git") do
+    Enum.map(view.status_files, fn file ->
+      {:item, %{route: "git_file", id: file.path, label: "#{file.code} #{file.path}"}}
+    end)
+  end
+
+  defp flatten_items(_view, "git"), do: []
 
   defp flatten_items(view, route) do
     sections =
@@ -1224,6 +1437,7 @@ defmodule BDS.TUI do
   defp view_label("templates"), do: dgettext("ui", "Templates")
   defp view_label("scripts"), do: dgettext("ui", "Scripts")
   defp view_label("tags"), do: dgettext("ui", "Tags")
+  defp view_label("git"), do: dgettext("ui", "Git")
 
   # ── Post editor ──────────────────────────────────────────────────────────
 
