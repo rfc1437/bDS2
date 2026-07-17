@@ -388,30 +388,8 @@ defmodule BDS.UI.SettingsForm do
     )
   end
 
-  # Project, technology and style all live in the same metadata record;
-  # `Metadata.update_project_metadata/2` treats missing keys as nil, so the
-  # current values are always passed along and only the edits override them.
   defp save_project_metadata(project_id, overrides) do
-    {:ok, metadata} = Metadata.get_project_metadata(project_id)
-
-    attrs =
-      metadata
-      |> Map.take([
-        :name,
-        :description,
-        :public_url,
-        :main_language,
-        :default_author,
-        :max_posts_per_page,
-        :image_import_concurrency,
-        :blogmark_category,
-        :pico_theme,
-        :semantic_similarity_enabled,
-        :blog_languages
-      ])
-      |> Map.merge(overrides)
-
-    case Metadata.update_project_metadata(project_id, attrs) do
+    case Metadata.update_project_metadata(project_id, overrides) do
       {:ok, _metadata} -> :ok
       {:error, reason} -> {:error, reason}
     end

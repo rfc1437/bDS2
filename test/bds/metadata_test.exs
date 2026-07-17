@@ -54,6 +54,27 @@ defmodule BDS.MetadataTest do
     assert loaded.blog_languages == ["de", "fr"]
   end
 
+  test "update_project_metadata keeps fields that are absent from the attrs", %{
+    project: project
+  } do
+    assert {:ok, _metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{
+               description: "Keep me",
+               public_url: "https://example.com",
+               default_author: "Writer",
+               blog_languages: ["de"]
+             })
+
+    assert {:ok, metadata} =
+             BDS.Metadata.update_project_metadata(project.id, %{pico_theme: "blue"})
+
+    assert metadata.pico_theme == "blue"
+    assert metadata.description == "Keep me"
+    assert metadata.public_url == "https://example.com"
+    assert metadata.default_author == "Writer"
+    assert metadata.blog_languages == ["de"]
+  end
+
   test "update_project_metadata keeps committed database changes when filesystem flush fails", %{
     project: project,
     temp_dir: temp_dir

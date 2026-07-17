@@ -318,6 +318,8 @@ defmodule BDS.Metadata do
     }
   end
 
+  # Keys absent from attrs are left out entirely, so the merge in
+  # update_project_metadata/2 keeps their current values (partial update).
   defp normalize_project_metadata_attrs(attrs, project) do
     %{
       name: attr(attrs, :name) || project.name,
@@ -333,6 +335,26 @@ defmodule BDS.Metadata do
       semantic_similarity_enabled: attr(attrs, :semantic_similarity_enabled) || false,
       blog_languages: normalize_language_list(attr(attrs, :blog_languages) || [])
     }
+    |> Map.take(present_attr_keys(attrs))
+  end
+
+  defp present_attr_keys(attrs) do
+    Enum.filter(
+      [
+        :name,
+        :description,
+        :public_url,
+        :main_language,
+        :default_author,
+        :max_posts_per_page,
+        :image_import_concurrency,
+        :blogmark_category,
+        :pico_theme,
+        :semantic_similarity_enabled,
+        :blog_languages
+      ],
+      fn key -> Map.has_key?(attrs, key) or Map.has_key?(attrs, Atom.to_string(key)) end
+    )
   end
 
   defp normalize_category_settings(settings) do

@@ -3443,7 +3443,7 @@ local result = bds.meta.sync_on_startup()
 
 ### meta.update_project_metadata
 
-Update metadata for the current project.
+Update metadata for the current project. Keys omitted from updates keep their current values.
 
 **Parameters**
 

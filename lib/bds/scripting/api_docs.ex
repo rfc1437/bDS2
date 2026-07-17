@@ -762,7 +762,8 @@ defmodule BDS.Scripting.ApiDocs do
     %{
       module: "meta",
       name: "update_project_metadata",
-      description: "Update metadata for the current project.",
+      description:
+        "Update metadata for the current project. Keys omitted from updates keep their current values.",
       params: [%{name: "updates", type: "table", required: true}],
       returns: "ProjectMetadata | nil"
     },
