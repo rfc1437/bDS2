@@ -10,7 +10,11 @@ defmodule BDS.TUI do
   ## Keys
 
   Sidebar focus: `↑/↓`/`j/k` navigate, `enter` open, `n` new post,
-  `1..5` switch view (posts/media/templates/scripts/tags), `7` git panel
+  `1..5` switch view (posts/media/templates/scripts/tags), `6` settings
+  (the GUI preferences sections as sidebar entries; enter opens a
+  section's form — enter edits a text field in a status-line prompt,
+  toggles a boolean or cycles an enum, `ctrl+s` saves through the same
+  backends as the GUI, esc closes), `7` git panel
   (changed files plus commit history in the sidebar, scrollable
   whole-folder diff in the main area; `c` commit all, `u` pull, `s` push,
   enter jumps the diff to the selected file), `r` refresh,
@@ -39,13 +43,14 @@ defmodule BDS.TUI do
   alias BDS.Posts
   alias BDS.Projects
   alias BDS.UI.PostEditor.{Draft, Metadata, Persistence}
+  alias BDS.UI.SettingsForm
   alias BDS.UI.Sidebar
   alias ExRatatui.Layout
   alias ExRatatui.Layout.Rect
   alias ExRatatui.Style
   alias ExRatatui.Widgets.{Block, Clear, List, Markdown, Paragraph, Tabs, Textarea}
 
-  @views ~w(posts media templates scripts tags git)
+  @views ~w(posts media templates scripts tags settings git)
   @git_diff_scroll_step 10
   @git_max_diff_lines 5000
 
@@ -72,6 +77,7 @@ defmodule BDS.TUI do
       filters_by_view: %{},
       git: nil,
       git_commit: nil,
+      settings_form: nil,
       report: nil,
       handled_task_ids: nil,
       task_polling: false,
@@ -139,6 +145,10 @@ defmodule BDS.TUI do
       when search != nil,
       do: search_key(key, state)
 
+  def handle_event(%ExRatatui.Event.Key{kind: "press"} = key, %{settings_form: form} = state)
+      when form != nil,
+      do: settings_form_key(key, state)
+
   def handle_event(%ExRatatui.Event.Key{code: "esc"}, %{image: image} = state)
       when image != nil,
       do: {:noreply, %{state | image: nil}}
@@ -159,14 +169,12 @@ defmodule BDS.TUI do
   defp sidebar_key(%{code: code}, state) when code in ["up", "k"],
     do: {:noreply, move_selection(state, -1)}
 
-  defp sidebar_key(%{code: code}, state) when code in ~w(1 2 3 4 5) do
+  # Settings is panel "6" (issue #29) and git panel "7" (issue #30),
+  # matching the GUI panel numbering.
+  defp sidebar_key(%{code: code}, state) when code in ~w(1 2 3 4 5 6 7) do
     view = Enum.at(@views, String.to_integer(code) - 1)
     {:noreply, load_sidebar(%{state | view: view, selected: 0, image: nil})}
   end
-
-  # Git is panel "7", matching the GUI panel numbering (issue #30).
-  defp sidebar_key(%{code: "7"}, state),
-    do: {:noreply, load_sidebar(%{state | view: "git", selected: 0, image: nil})}
 
   defp sidebar_key(%{code: "c"}, %{view: "git"} = state) do
     if state.git do
@@ -230,6 +238,8 @@ defmodule BDS.TUI do
       %{route: "post", id: post_id} -> {:noreply, open_post(state, post_id)}
       %{route: "media", id: media_id} -> {:noreply, open_media(state, media_id)}
       %{route: "git_file", id: path} -> {:noreply, jump_to_file_diff(state, path)}
+      %{route: "settings", id: "settings-" <> section} -> {:noreply, open_settings_form(state, section)}
+      %{route: "style"} -> {:noreply, open_settings_form(state, "style")}
       %{id: _id} -> {:noreply, toast(state, view_label(state.view), dgettext("ui", "Editing this item is not available in the terminal UI yet."))}
       _other -> {:noreply, state}
     end
@@ -396,6 +406,153 @@ defmodule BDS.TUI do
 
   defp format_git_error({:git_failed, output}), do: output
   defp format_git_error(reason), do: inspect(reason)
+
+  # ── Events: settings form (issue #29) ─────────────────────────────────────
+
+  # A settings sidebar entry opens its section as a generic typed-field
+  # form in the main area, backed by BDS.UI.SettingsForm — the same
+  # preferences the GUI settings editor operates on.
+  defp open_settings_form(state, section) do
+    form = SettingsForm.load(section, state.project_id)
+
+    %{
+      state
+      | settings_form: %{
+          section: form.section,
+          title: form.title,
+          fields: form.fields,
+          selected: seek_field(form.fields, 0, 1),
+          input: nil,
+          dirty: false
+        },
+        image: nil
+    }
+  end
+
+  # Text fields edit in a status-line prompt (like the commit message):
+  # enter commits the value into the field, esc cancels just the prompt.
+  defp settings_form_key(%{code: "esc"}, %{settings_form: %{input: input}} = state)
+       when input != nil,
+       do: {:noreply, put_in(state.settings_form.input, nil)}
+
+  defp settings_form_key(%{code: "enter"}, %{settings_form: %{input: input} = form} = state)
+       when input != nil do
+    fields =
+      Enum.map(form.fields, fn field ->
+        if field.key == input.key, do: %{field | value: input.value}, else: field
+      end)
+
+    {:noreply, %{state | settings_form: %{form | fields: fields, input: nil, dirty: true}}}
+  end
+
+  defp settings_form_key(%{code: "backspace"}, %{settings_form: %{input: input}} = state)
+       when input != nil do
+    {:noreply, put_in(state.settings_form.input.value, String.slice(input.value, 0..-2//1))}
+  end
+
+  defp settings_form_key(%{code: code, modifiers: []}, %{settings_form: %{input: input}} = state)
+       when input != nil and byte_size(code) >= 1 do
+    if String.length(code) == 1 do
+      {:noreply, put_in(state.settings_form.input.value, input.value <> code)}
+    else
+      {:noreply, state}
+    end
+  end
+
+  defp settings_form_key(_key, %{settings_form: %{input: input}} = state) when input != nil,
+    do: {:noreply, state}
+
+  defp settings_form_key(%{code: "esc"}, state),
+    do: {:noreply, %{state | settings_form: nil}}
+
+  defp settings_form_key(%{code: "s", modifiers: ["ctrl"]}, state),
+    do: save_settings_form(state)
+
+  defp settings_form_key(%{code: code}, state) when code in ["down", "j"],
+    do: {:noreply, move_field_selection(state, 1)}
+
+  defp settings_form_key(%{code: code}, state) when code in ["up", "k"],
+    do: {:noreply, move_field_selection(state, -1)}
+
+  defp settings_form_key(%{code: "enter"}, %{settings_form: form} = state) do
+    case Enum.at(form.fields, form.selected) do
+      %{type: :text} = field ->
+        {:noreply,
+         put_in(state.settings_form.input, %{key: field.key, label: field.label, value: field.value})}
+
+      %{type: :bool} = field ->
+        {:noreply, update_field(state, field.key, not field.value)}
+
+      %{type: :enum, options: options} = field when options != [] ->
+        index = Enum.find_index(options, &(&1 == field.value)) || 0
+        {:noreply, update_field(state, field.key, Enum.at(options, rem(index + 1, length(options))))}
+
+      _other ->
+        {:noreply, state}
+    end
+  end
+
+  defp settings_form_key(_key, state), do: {:noreply, state}
+
+  defp update_field(%{settings_form: form} = state, key, value) do
+    fields =
+      Enum.map(form.fields, fn field ->
+        if field.key == key, do: %{field | value: value}, else: field
+      end)
+
+    %{state | settings_form: %{form | fields: fields, dirty: true}}
+  end
+
+  defp save_settings_form(%{settings_form: form} = state) do
+    values = Map.new(form.fields, fn field -> {field.key, field.value} end)
+
+    case SettingsForm.save(form.section, state.project_id, values) do
+      :ok ->
+        reloaded = SettingsForm.load(form.section, state.project_id)
+
+        state = %{
+          state
+          | settings_form: %{
+              form
+              | fields: reloaded.fields,
+                selected: min(form.selected, max(length(reloaded.fields) - 1, 0)),
+                input: nil,
+                dirty: false
+            }
+        }
+
+        {:noreply, toast(state, form.title, dgettext("ui", "Saved."))}
+
+      {:error, reason} ->
+        {:noreply, toast(state, form.title, settings_error(reason))}
+    end
+  end
+
+  defp settings_error(reason) when is_binary(reason), do: reason
+  defp settings_error(reason), do: inspect(reason)
+
+  # Selection skips read-only :info rows in the given direction.
+  defp move_field_selection(%{settings_form: form} = state, delta) do
+    count = length(form.fields)
+
+    if count == 0 do
+      state
+    else
+      next = seek_field(form.fields, clamp(form.selected + delta, count), delta)
+      put_in(state.settings_form.selected, next)
+    end
+  end
+
+  defp seek_field(fields, index, delta) do
+    case Enum.at(fields, index) do
+      %{type: :info} ->
+        next = clamp(index + sign(delta), length(fields))
+        if next == index, do: index, else: seek_field(fields, next, delta)
+
+      _other ->
+        index
+    end
+  end
 
   # ── Events: sidebar search (vi-style "/") ─────────────────────────────────
 
@@ -970,6 +1127,25 @@ defmodule BDS.TUI do
   defp list_selected([], _selected), do: nil
   defp list_selected(items, selected), do: min(selected, length(items) - 1)
 
+  defp main_widgets(%{settings_form: form}, rect) when form != nil do
+    items = Enum.map(form.fields, &field_line/1)
+
+    title =
+      form.title <>
+        if(form.dirty, do: " •", else: "") <>
+        " — " <> dgettext("ui", "enter edit · ctrl+s save · esc close")
+
+    [
+      {%List{
+         items: items,
+         selected: list_selected(items, form.selected),
+         scroll_padding: 2,
+         highlight_style: %Style{fg: :black, bg: :cyan},
+         block: %Block{title: title, borders: [:all]}
+       }, rect}
+    ]
+  end
+
   defp main_widgets(%{view: "git", editor: nil, git: nil}, rect) do
     [
       {%Paragraph{
@@ -1055,8 +1231,11 @@ defmodule BDS.TUI do
   end
 
   defp status_widgets(state, rect) do
+    settings_input = state.settings_form && state.settings_form.input
+
     text =
       cond do
+        settings_input -> settings_input.label <> ": " <> settings_input.value
         state.git_commit -> dgettext("ui", "Commit message") <> ": " <> state.git_commit.input
         state.search -> "/" <> state.search.input
         state.busy -> dgettext("ui", "Working…")
@@ -1315,18 +1494,25 @@ defmodule BDS.TUI do
   defp truncate(text) when byte_size(text) > 40, do: String.slice(text, 0, 40) <> "…"
   defp truncate(text), do: text
 
+  defp default_status(%{settings_form: form}) when form != nil,
+    do:
+      dgettext(
+        "ui",
+        "enter edit/toggle/cycle · ctrl+s save · esc close · ctrl+q quit"
+      )
+
   defp default_status(%{focus: :sidebar, view: "git"}),
     do:
       dgettext(
         "ui",
-        "c commit · u pull · s push · enter jump to file · pgup/pgdn scroll diff · 1-5 views · ctrl+q quit"
+        "c commit · u pull · s push · enter jump to file · pgup/pgdn scroll diff · 1-7 views · ctrl+q quit"
       )
 
   defp default_status(%{focus: :sidebar}),
     do:
       dgettext(
         "ui",
-        "enter open · n new post · 1-5 views · p projects · / search · : commands (:? help) · r refresh · ctrl+q quit"
+        "enter open · n new post · 1-7 views · p projects · / search · : commands (:? help) · r refresh · ctrl+q quit"
       )
 
   defp default_status(%{focus: :editor}),
@@ -1453,6 +1639,12 @@ defmodule BDS.TUI do
     end
   end
 
+  defp field_line(%{type: :bool} = field),
+    do: if(field.value, do: "[x] ", else: "[ ] ") <> field.label
+
+  defp field_line(%{type: :info, value: ""} = field), do: field.label
+  defp field_line(field), do: "#{field.label}: #{field.value}"
+
   defp item_label(item) do
     title =
       item[:title] || item[:name] || item[:original_name] || item[:label] || item[:id] || "?"
@@ -1466,6 +1658,7 @@ defmodule BDS.TUI do
   defp view_label("templates"), do: dgettext("ui", "Templates")
   defp view_label("scripts"), do: dgettext("ui", "Scripts")
   defp view_label("tags"), do: dgettext("ui", "Tags")
+  defp view_label("settings"), do: dgettext("ui", "Settings")
   defp view_label("git"), do: dgettext("ui", "Git")
 
   # ── Post editor ──────────────────────────────────────────────────────────

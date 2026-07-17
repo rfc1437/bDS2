@@ -862,6 +862,110 @@ defmodule BDS.TUITest do
     end
   end
 
+  describe "settings panel (issue #29)" do
+    defp open_section(state, title) do
+      index =
+        Enum.find_index(state.items, fn
+          {:item, item} -> item.title == title
+          _other -> false
+        end)
+
+      moves = index - state.selected
+      direction = if moves < 0, do: "up", else: "down"
+
+      1..abs(moves)//1
+      |> Enum.reduce(state, fn _step, acc -> press(acc, direction) end)
+      |> press("enter")
+    end
+
+    defp select_field(state, key) do
+      index = Enum.find_index(state.settings_form.fields, &(&1.key == key))
+      moves = index - state.settings_form.selected
+      direction = if moves < 0, do: "up", else: "down"
+      Enum.reduce(1..abs(moves)//1, state, fn _step, acc -> press(acc, direction) end)
+    end
+
+    test "6 opens the settings view and lists the sections" do
+      state = mount!() |> press("6")
+
+      assert state.view == "settings"
+      text = screen_text(state)
+      assert text =~ "Project"
+      assert text =~ "Publishing"
+      assert text =~ "Style"
+    end
+
+    test "enter opens a section form; editing a text field persists on ctrl+s", %{
+      project: project
+    } do
+      state = mount!() |> press("6") |> open_section("Project")
+
+      assert state.settings_form != nil
+      assert state.settings_form.section == "project"
+      assert screen_text(state, 140, 40) =~ "Posts per Page"
+
+      state = select_field(state, "name") |> press("enter")
+      assert state.settings_form.input != nil
+
+      # The prompt is seeded with the current value; replace it.
+      state =
+        Enum.reduce(1..3, state, fn _n, acc -> press(acc, "backspace") end)
+        |> type("TUI Prefs")
+        |> press("enter")
+
+      assert state.settings_form.input == nil
+      assert state.settings_form.dirty
+
+      state = press(state, "s", ["ctrl"])
+      refute state.settings_form.dirty
+
+      {:ok, metadata} = BDS.Metadata.get_project_metadata(project.id)
+      assert metadata.name == "TUI Prefs"
+    end
+
+    test "enter toggles booleans and cycles enums", %{project: project} do
+      state = mount!() |> press("6") |> open_section("Publishing")
+
+      state = select_field(state, "ssh_mode")
+      assert current_field(state).value == "scp"
+
+      state = press(state, "enter")
+      assert current_field(state).value == "rsync"
+
+      state = state |> select_field("ssh_host") |> press("enter") |> type("example.org") |> press("enter")
+      state = press(state, "s", ["ctrl"])
+
+      {:ok, metadata} = BDS.Metadata.get_project_metadata(project.id)
+      assert metadata.publishing_preferences["ssh_mode"] == "rsync"
+      assert metadata.publishing_preferences["ssh_host"] == "example.org"
+
+      # Booleans toggle in place.
+      state = state |> press("esc") |> open_section("Technology")
+      state = select_field(state, "semantic_similarity_enabled")
+      refute current_field(state).value
+      state = press(state, "enter")
+      assert current_field(state).value
+    end
+
+    test "esc in a prompt cancels only the prompt; esc again closes the form" do
+      state = mount!() |> press("6") |> open_section("Publishing")
+
+      state = select_field(state, "ssh_host") |> press("enter")
+      assert state.settings_form.input != nil
+
+      state = press(state, "esc")
+      assert state.settings_form != nil
+      assert state.settings_form.input == nil
+
+      state = press(state, "esc")
+      assert state.settings_form == nil
+      assert state.view == "settings"
+    end
+
+    defp current_field(state),
+      do: Enum.at(state.settings_form.fields, state.settings_form.selected)
+  end
+
   test "local tui mode stops the VM when the app exits" do
     parent = self()
     state = mount!(stop_vm_on_exit: true, stop_fun: fn -> send(parent, :vm_stopped) end)

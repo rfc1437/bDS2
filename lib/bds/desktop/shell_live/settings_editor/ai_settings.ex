@@ -107,6 +107,24 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
   defp do_save_ai(socket, reload, append_output) do
     attrs = ai_attrs(socket.assigns)
 
+    case save_attrs(attrs) do
+      :ok ->
+        LiveToast.send_toast(:info, dgettext("ui", "AI settings saved."))
+
+        socket
+        |> assign(:settings_editor_ai_draft, %{})
+        |> assign(:offline_mode, attrs.offline_mode)
+        |> reload.(socket.assigns.workbench)
+
+      {:error, reason} ->
+        surface_ai_error(socket, reload, append_output, reason)
+    end
+  end
+
+  # The full save pipeline as a pure function so the TUI settings form
+  # (BDS.UI.SettingsForm) drives the exact same writes as the GUI editor.
+  @spec save_attrs(map()) :: :ok | {:error, term()}
+  def save_attrs(attrs) do
     with :ok <-
            put_endpoint_preferences(
              :online,
@@ -156,15 +174,7 @@ defmodule BDS.Desktop.ShellLive.SettingsEditor.AISettings do
              attrs.offline_chat_images
            ),
          :ok <- EditorSettings.put_global_setting("ai.system_prompt", attrs.system_prompt) do
-      LiveToast.send_toast(:info, dgettext("ui", "AI settings saved."))
-
-      socket
-      |> assign(:settings_editor_ai_draft, %{})
-      |> assign(:offline_mode, attrs.offline_mode)
-      |> reload.(socket.assigns.workbench)
-    else
-      {:error, reason} ->
-        surface_ai_error(socket, reload, append_output, reason)
+      :ok
     end
   end
 

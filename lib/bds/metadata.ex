@@ -49,6 +49,11 @@ defmodule BDS.Metadata do
   @typedoc "Attribute map for `update_project_metadata/2`."
   @type attrs :: %{optional(atom()) => term(), optional(String.t()) => term()}
 
+  @spec supported_pico_themes() :: [String.t()]
+  def supported_pico_themes do
+    ["default" | @supported_pico_themes |> MapSet.delete("default") |> Enum.sort()]
+  end
+
   @spec get_project_metadata(String.t()) :: {:ok, metadata_state()}
   def get_project_metadata(project_id) do
     project = Projects.get_project!(project_id)
