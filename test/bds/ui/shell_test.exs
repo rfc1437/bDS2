@@ -400,6 +400,50 @@ defmodule BDS.UI.ShellTest do
     assert status == 0, output
   end
 
+  test "monaco hook preserves cursor and selection when applying a remote value" do
+    script = """
+    import assert from "node:assert/strict";
+    class FakeTextArea {}
+    globalThis.HTMLTextAreaElement = FakeTextArea;
+
+    const { applyRemoteEditorValue } = await import("./assets/js/hooks/monaco_editor.js");
+
+    const selections = [{ startLineNumber: 3, startColumn: 5, endLineNumber: 3, endColumn: 9 }];
+    const calls = [];
+    const editor = {
+      getSelections: () => selections,
+      setValue: (value) => calls.push(["setValue", value]),
+      setSelections: (restored) => calls.push(["setSelections", restored])
+    };
+
+    applyRemoteEditorValue(editor, "line one\\nline two\\nline three");
+
+    assert.deepEqual(calls, [
+      ["setValue", "line one\\nline two\\nline three"],
+      ["setSelections", selections]
+    ]);
+
+    // Editors without selections still get the value applied.
+    const bareCalls = [];
+    const bareEditor = {
+      getSelections: () => null,
+      setValue: (value) => bareCalls.push(["setValue", value]),
+      setSelections: () => bareCalls.push(["setSelections"])
+    };
+
+    applyRemoteEditorValue(bareEditor, "fresh");
+    assert.deepEqual(bareCalls, [["setValue", "fresh"]]);
+    """
+
+    {output, status} =
+      System.cmd("node", ["--input-type=module", "--eval", script],
+        cd: "/Users/gb/Projects/bDS2",
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+  end
+
   test "monaco ESM build config emits served worker bundles" do
     mix_exs = File.read!("/Users/gb/Projects/bDS2/mix.exs")
     config = File.read!("/Users/gb/Projects/bDS2/config/config.exs")

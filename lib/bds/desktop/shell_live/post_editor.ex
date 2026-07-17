@@ -117,7 +117,6 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
         id: socket.assigns.post_id,
         content: content
       })
-      |> assign(:shell_overlay, nil)
 
     {:ok, socket}
   end
@@ -314,18 +313,6 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
 
   def handle_event("remove_post_editor_category", %{"category" => category}, socket) do
     {:noreply, do_remove_list_value(socket, :categories, category)}
-  end
-
-  def handle_event("insert_content", %{"content" => content}, socket) do
-    socket =
-      socket
-      |> Phoenix.LiveView.push_event("post-editor-insert-content", %{
-        id: socket.assigns.post_id,
-        content: content
-      })
-      |> assign(:shell_overlay, nil)
-
-    {:noreply, socket}
   end
 
   def handle_event("close_quick_actions", _params, socket) do
@@ -892,7 +879,7 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
           end)
 
         if map_size(attrs) == 0 do
-          assign(socket, :shell_overlay, nil)
+          socket
         else
           case Posts.update_post(post_id, attrs) do
             {:ok, updated_post} ->
@@ -910,7 +897,6 @@ defmodule BDS.Desktop.ShellLive.PostEditor do
                 )
                 |> assign(:save_state, :dirty)
                 |> assign(:dirty?, true)
-                |> assign(:shell_overlay, nil)
                 |> build_data()
 
               Notify.dirty(:post, post_id, true)

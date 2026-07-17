@@ -155,7 +155,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
                  ShellOverlayComponents.markdown_link(result.title, result.canonical_url)}
               )
 
-              socket
+              assign(socket, :shell_overlay, nil)
           end
 
         {%{kind: :insert_media}, %{type: :post, id: post_id}} ->
@@ -172,7 +172,7 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
                 end
 
               Notify.parent({:post_editor_insert_content, post_id, syntax})
-              socket
+              assign(socket, :shell_overlay, nil)
           end
 
         _other ->
@@ -197,9 +197,10 @@ defmodule BDS.Desktop.ShellLive.OverlayManager do
 
           if details do
             Notify.parent({:post_editor_insert_content, post_id, details})
+            assign(socket, :shell_overlay, nil)
+          else
+            socket
           end
-
-          socket
 
         _other ->
           socket

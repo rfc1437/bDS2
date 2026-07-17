@@ -34,6 +34,20 @@ export const webKitTextAreaArrowCommand = (event) => {
   return event.shiftKey ? `${command}Select` : command;
 };
 
+// Applying a remote value via setValue resets the cursor to the buffer start,
+// which then makes follow-up actions (like link inserts targeting the current
+// selection) land at position 1,1. Capture and restore the selection so the
+// cursor survives server-driven reconciles; Monaco clamps out-of-range
+// positions to the new content.
+export const applyRemoteEditorValue = (editor, value) => {
+  const selections = editor.getSelections ? editor.getSelections() : null;
+  editor.setValue(value);
+
+  if (selections && selections.length > 0 && editor.setSelections) {
+    editor.setSelections(selections);
+  }
+};
+
 export const bridgeWebKitTextAreaArrowKey = (editor, event) => {
   if (!editor || !isMonacoInputArea(event.target)) {
     return false;
@@ -92,8 +106,12 @@ export const MonacoEditor = {
 
       if (this.editor.getValue() !== value) {
         this.isApplyingRemoteUpdate = true;
-        this.editor.setValue(value);
-        this.isApplyingRemoteUpdate = false;
+
+        try {
+          applyRemoteEditorValue(this.editor, value);
+        } finally {
+          this.isApplyingRemoteUpdate = false;
+        }
       }
 
       this.lastKnownValue = value;

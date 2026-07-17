@@ -3427,6 +3427,115 @@ defmodule BDS.Desktop.ShellLiveTest do
     assert output_html =~ "Automatic AI actions stay gated by airplane mode"
   end
 
+  test "selecting an internal insert link result pushes the link and closes the overlay", %{
+    project: project
+  } do
+    {:ok, target} =
+      Posts.create_post(%{project_id: project.id, title: "Link Target", content: "Target body"})
+
+    {:ok, post} =
+      Posts.create_post(%{project_id: project.id, title: "Editing Post", content: "Body"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    render_click(view, "pin_sidebar_item", %{
+      "route" => "post",
+      "id" => post.id,
+      "title" => post.title,
+      "subtitle" => "draft"
+    })
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='insert_link']")
+      |> render_click()
+
+    assert html =~ "insert-modal"
+
+    render_click(view, "overlay_select_result", %{"id" => target.id})
+    assert_push_event(view, "post-editor-insert-content", %{id: _id, content: content})
+    assert content =~ "Link Target"
+
+    refute render(view) =~ "insert-modal"
+  end
+
+  test "inserting an external link pushes the link and closes the overlay", %{project: project} do
+    {:ok, post} =
+      Posts.create_post(%{project_id: project.id, title: "Editing Post", content: "Body"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    render_click(view, "pin_sidebar_item", %{
+      "route" => "post",
+      "id" => post.id,
+      "title" => post.title,
+      "subtitle" => "draft"
+    })
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='insert_link']")
+      |> render_click()
+
+    assert html =~ "insert-modal"
+
+    render_click(view, "overlay_set_tab", %{"tab" => "external"})
+
+    render_change(view, "overlay_update_form", %{
+      "overlay" => %{"url" => "https://example.com", "text" => "Example"}
+    })
+
+    render_click(view, "overlay_insert_external", %{})
+    assert_push_event(view, "post-editor-insert-content", %{content: "[Example](https://example.com)"})
+
+    refute render(view) =~ "insert-modal"
+  end
+
+  test "selecting an insert media result pushes the syntax and closes the overlay", %{
+    project: project
+  } do
+    temp_dir =
+      Path.join(System.tmp_dir!(), "bds-shell-live-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(temp_dir)
+    media_source_path = Path.join(temp_dir, "insert-media.jpg")
+    File.write!(media_source_path, "fake image body")
+
+    {:ok, media} =
+      Media.import_media(%{
+        project_id: project.id,
+        source_path: media_source_path,
+        title: "Insert Media"
+      })
+
+    {:ok, post} =
+      Posts.create_post(%{project_id: project.id, title: "Editing Post", content: "Body"})
+
+    {:ok, view, _html} = live_isolated(build_conn(), BDS.Desktop.ShellLive)
+
+    render_click(view, "pin_sidebar_item", %{
+      "route" => "post",
+      "id" => post.id,
+      "title" => post.title,
+      "subtitle" => "draft"
+    })
+
+    html =
+      view
+      |> element("[phx-click='open_overlay'][phx-value-kind='insert_media']")
+      |> render_click()
+
+    assert html =~ "insert-modal"
+
+    render_click(view, "overlay_set_search", %{"overlay" => %{"query" => "Insert"}})
+    render_click(view, "overlay_select_result", %{"id" => media.id})
+
+    assert_push_event(view, "post-editor-insert-content", %{content: content})
+    assert content =~ "bds-media://#{media.id}"
+
+    refute render(view) =~ "insert-modal"
+  end
+
   test "ai suggestions overlay fetches async results for posts when online", %{project: project} do
     Application.put_env(:bds, :test_pid, self())
 
