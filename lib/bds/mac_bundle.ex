@@ -130,8 +130,10 @@ defmodule BDS.MacBundle do
 
   @doc """
   Fail the build unless the bundle is self-contained: no Mach-O under the `.app`
-  may reference a Homebrew/local (`/opt/homebrew`, `/usr/local`) path. This is a
-  hard requirement — the app must run on a Mac without Homebrew installed.
+  may reference a Homebrew/local (`/opt/homebrew`, `/usr/local`) path, and every
+  `@rpath/` dependency must resolve — via the binary's own `LC_RPATH`s — to a
+  file inside the bundle. This is a hard requirement — the app must run on a
+  Mac without Homebrew installed.
   """
   @spec verify_standalone(String.t()) ::
           :ok | {:error, {:external_refs, [{String.t(), String.t()}]}}
@@ -141,7 +143,8 @@ defmodule BDS.MacBundle do
       |> macho_files()
       |> Enum.flat_map(fn file ->
         external_refs(file, ["-L"], &Dylibs.parse_otool/1) ++
-          external_refs(file, ["-l"], &Dylibs.parse_rpaths/1)
+          external_refs(file, ["-l"], &Dylibs.parse_rpaths/1) ++
+          unresolved_rpath_refs(file, app)
       end)
 
     if offenders == [], do: :ok, else: {:error, {:external_refs, offenders}}
@@ -151,6 +154,50 @@ defmodule BDS.MacBundle do
     case System.cmd("otool", otool_args ++ [file], stderr_to_stdout: true) do
       {out, 0} -> out |> parse.() |> Enum.filter(&Dylibs.external?/1) |> Enum.map(&{file, &1})
       _ -> []
+    end
+  end
+
+  # An @rpath/ dep is an offender unless one of its rpath-resolved candidates
+  # exists inside the app — a dangling one (Homebrew's libwebp referencing
+  # @rpath/libsharpyuv.0.dylib with no copied sibling) crashes only at runtime
+  # on the user's machine, so it must fail the build here. A dylib's own
+  # LC_ID_DYLIB shows up in `otool -L` like a dep (precompiled NIFs such as
+  # hnswlib_nif.so ship an @rpath/ self id with no rpaths at all); dyld never
+  # resolves a file's id when loading that file, so self references are skipped.
+  defp unresolved_rpath_refs(file, app) do
+    root = Path.expand(app)
+
+    case otool_parse(file, ["-L"], &Dylibs.parse_otool/1) do
+      {:ok, deps} ->
+        deps
+        |> Enum.filter(&String.starts_with?(&1, "@rpath/"))
+        |> Enum.reject(&(Path.basename(&1) == Path.basename(file)))
+        |> Enum.reject(&rpath_dep_resolves?(file, &1, root))
+        |> Enum.map(&{file, &1})
+
+      _error ->
+        []
+    end
+  end
+
+  defp rpath_dep_resolves?(file, dep, root) do
+    case otool_parse(file, ["-l"], &Dylibs.parse_rpaths/1) do
+      {:ok, rpaths} ->
+        dep
+        |> Dylibs.resolve_rpath_dep(rpaths, Path.dirname(file))
+        |> Enum.any?(fn candidate ->
+          String.starts_with?(candidate, root <> "/") and File.exists?(candidate)
+        end)
+
+      _error ->
+        false
+    end
+  end
+
+  defp otool_parse(file, args, parse) do
+    case System.cmd("otool", args ++ [file], stderr_to_stdout: true) do
+      {out, 0} -> {:ok, parse.(out)}
+      {out, status} -> {:error, {:otool_failed, status, out}}
     end
   end
 

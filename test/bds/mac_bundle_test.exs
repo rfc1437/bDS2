@@ -7,6 +7,19 @@ defmodule BDS.MacBundleTest do
   alias BDS.MacBundle.Dylibs
   alias BDS.MacBundle.Icon
 
+  # Give a copied keg dylib a controlled id so verify_standalone only sees the
+  # reference under test, not the keg's absolute LC_ID_DYLIB.
+  defp fix_id!(dylib, id \\ nil) do
+    {_out, 0} =
+      System.cmd(
+        "install_name_tool",
+        Dylibs.id_args(dylib, id || "@loader_path/" <> Path.basename(dylib)),
+        stderr_to_stdout: true
+      )
+
+    :ok
+  end
+
   # Parse "#RRGGBB" into {r, g, b} for property assertions in tests.
   defp rgb("#" <> hex) do
     {r, g, b} = {String.slice(hex, 0, 2), String.slice(hex, 2, 2), String.slice(hex, 4, 2)}
@@ -173,6 +186,116 @@ defmodule BDS.MacBundleTest do
                "@loader_path/../../Frameworks"
              ) ==
                [{"/opt/homebrew/lib/libfoo.dylib", "@loader_path/../../Frameworks/libfoo.dylib"}]
+    end
+  end
+
+  describe "Dylibs.resolve_rpath_dep/3" do
+    test "expands @loader_path rpaths against the referencing binary's directory" do
+      assert Dylibs.resolve_rpath_dep(
+               "@rpath/libsharpyuv.0.dylib",
+               ["@loader_path/../lib", "/opt/homebrew/lib"],
+               "/opt/homebrew/opt/webp/lib"
+             ) == [
+               "/opt/homebrew/opt/webp/lib/libsharpyuv.0.dylib",
+               "/opt/homebrew/lib/libsharpyuv.0.dylib"
+             ]
+    end
+
+    test "resolves in-tree loader-relative rpaths (vix/exla precompiled layout)" do
+      assert Dylibs.resolve_rpath_dep(
+               "@rpath/libvips.42.dylib",
+               ["@loader_path/precompiled_libvips/lib"],
+               "/app/rel/lib/vix-0.38.0/priv"
+             ) == ["/app/rel/lib/vix-0.38.0/priv/precompiled_libvips/lib/libvips.42.dylib"]
+    end
+
+    test "skips @executable_path rpaths (not resolvable from a library) and non-@rpath deps" do
+      assert Dylibs.resolve_rpath_dep(
+               "@rpath/libfoo.dylib",
+               ["@executable_path/../Frameworks"],
+               "/any/dir"
+             ) == []
+
+      assert Dylibs.resolve_rpath_dep("/usr/lib/libSystem.B.dylib", ["@loader_path"], "/d") == []
+    end
+  end
+
+  describe "Dylibs.relink_changes/3 (@rpath deps)" do
+    test "rewrites @rpath deps whose basename was bundled, leaves the rest" do
+      deps = [
+        "/opt/homebrew/opt/webp/lib/libwebp.7.dylib",
+        "@rpath/libsharpyuv.0.dylib",
+        "@rpath/libvips.42.dylib",
+        "/usr/lib/libSystem.B.dylib"
+      ]
+
+      assert Dylibs.relink_changes(deps, "@loader_path", ["libsharpyuv.0.dylib"]) == [
+               {"/opt/homebrew/opt/webp/lib/libwebp.7.dylib", "@loader_path/libwebp.7.dylib"},
+               {"@rpath/libsharpyuv.0.dylib", "@loader_path/libsharpyuv.0.dylib"}
+             ]
+    end
+  end
+
+  describe "MacBundle.verify_standalone/1 (@rpath resolution gate)" do
+    @describetag :macos_tools
+
+    # Regression for the July 2026 crash: Homebrew's libwebp references its
+    # sibling as @rpath/libsharpyuv.0.dylib (rpath @loader_path/../lib). A copy
+    # in Frameworks without the sibling must fail verification; a copy whose
+    # rpath resolves inside the tree must pass.
+    test "fails on an @rpath dep that does not resolve inside the bundle and passes when it does" do
+      keg_webp = "/opt/homebrew/opt/webp/lib/libwebp.7.dylib"
+      keg_sharpyuv = "/opt/homebrew/opt/webp/lib/libsharpyuv.0.dylib"
+
+      if File.exists?(keg_webp) and File.exists?(keg_sharpyuv) do
+        tmp = Path.join(System.tmp_dir!(), "bds-rpath-#{System.unique_integer([:positive])}")
+        on_exit(fn -> File.rm_rf!(tmp) end)
+
+        # Broken layout: libwebp in Frameworks, libsharpyuv missing entirely.
+        broken = Path.join(tmp, "broken/Contents/Frameworks")
+        File.mkdir_p!(broken)
+        File.cp!(keg_webp, Path.join(broken, "libwebp.7.dylib"))
+        File.chmod!(Path.join(broken, "libwebp.7.dylib"), 0o644)
+        fix_id!(Path.join(broken, "libwebp.7.dylib"))
+
+        assert {:error, {:external_refs, offenders}} =
+                 MacBundle.verify_standalone(Path.join(tmp, "broken"))
+
+        assert Enum.any?(offenders, fn {_file, ref} -> ref == "@rpath/libsharpyuv.0.dylib" end)
+
+        # Healthy layout: @loader_path/../lib resolves next to the library, so
+        # placing the sibling there satisfies the reference (vix-style in-tree
+        # resolution must not be flagged). libsharpyuv keeps an @rpath/ self id
+        # — precompiled NIF deps (hnswlib, libvips, libmlx) ship exactly that,
+        # and a library's own LC_ID_DYLIB must never count as unresolved.
+        healthy = Path.join(tmp, "healthy/Contents/pkg/lib")
+        File.mkdir_p!(healthy)
+        File.cp!(keg_webp, Path.join(healthy, "libwebp.7.dylib"))
+        File.cp!(keg_sharpyuv, Path.join(healthy, "libsharpyuv.0.dylib"))
+        Enum.each(["libwebp.7.dylib", "libsharpyuv.0.dylib"], fn base ->
+          File.chmod!(Path.join(healthy, base), 0o644)
+        end)
+
+        fix_id!(Path.join(healthy, "libwebp.7.dylib"))
+        fix_id!(Path.join(healthy, "libsharpyuv.0.dylib"), "@rpath/libsharpyuv.0.dylib")
+
+        # Match the precompiled-NIF shape exactly: @rpath/ self id with NO
+        # LC_RPATH left to resolve it (hnswlib_nif.so ships like this).
+        sharpyuv = Path.join(healthy, "libsharpyuv.0.dylib")
+
+        {rpath_out, 0} = System.cmd("otool", ["-l", sharpyuv], stderr_to_stdout: true)
+
+        Enum.each(Dylibs.parse_rpaths(rpath_out), fn rpath ->
+          {_out, 0} =
+            System.cmd("install_name_tool", ["-delete_rpath", rpath, sharpyuv],
+              stderr_to_stdout: true
+            )
+        end)
+
+        assert MacBundle.verify_standalone(Path.join(tmp, "healthy")) == :ok
+      else
+        :ok
+      end
     end
   end
 

@@ -103,16 +103,43 @@ defmodule BDS.MacBundle.Dylibs do
   end
 
   @doc """
-  Build `{old, new}` rewrites for a binary's `otool -L` dependency list: every
-  external dep becomes `<prefix>/<basename>`. System (`/usr/lib`, `/System`) and
-  already-relocatable (`@rpath`/`@loader_path`/`@executable_path`) deps are
-  dropped. Rewriting by basename — not by the exact source path — is what makes
-  this catch every absolute spelling of the same library.
+  Resolve an `@rpath/<name>` dependency to absolute candidate paths using the
+  referencing binary's `LC_RPATH` list, the way dyld would: each rpath entry is
+  tried in order with `@loader_path` expanded to the binary's own directory.
+  `@executable_path` rpaths are skipped (not resolvable from a library), and
+  non-`@rpath` deps yield no candidates. Homebrew links keg siblings this way
+  (`@rpath/libsharpyuv.0.dylib` + rpath `@loader_path/../lib` in libwebp), so
+  these deps are just as external as absolute `/opt/homebrew` ones.
   """
-  @spec relink_changes([String.t()], String.t()) :: [{String.t(), String.t()}]
-  def relink_changes(deps, prefix) when is_list(deps) do
+  @spec resolve_rpath_dep(String.t(), [String.t()], String.t()) :: [String.t()]
+  def resolve_rpath_dep("@rpath/" <> name, rpaths, loader_dir) when is_list(rpaths) do
+    rpaths
+    |> Enum.map(fn
+      "@loader_path" <> rest -> Path.expand(loader_dir <> rest)
+      "@executable_path" <> _rest -> nil
+      absolute -> absolute
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&Path.join(&1, name))
+  end
+
+  def resolve_rpath_dep(_dep, _rpaths, _loader_dir), do: []
+
+  @doc """
+  Build `{old, new}` rewrites for a binary's `otool -L` dependency list: every
+  external dep becomes `<prefix>/<basename>`, and every `@rpath/<name>` dep
+  whose basename is in `bundled` (it was copied into Frameworks) is rewritten
+  the same way. System (`/usr/lib`, `/System`) and other already-relocatable
+  deps are dropped. Rewriting by basename — not by the exact source path — is
+  what makes this catch every absolute spelling of the same library.
+  """
+  @spec relink_changes([String.t()], String.t(), [String.t()]) :: [{String.t(), String.t()}]
+  def relink_changes(deps, prefix, bundled \\ []) when is_list(deps) do
     deps
-    |> Enum.filter(&external?/1)
+    |> Enum.filter(fn
+      "@rpath/" <> name -> name in bundled
+      dep -> external?(dep)
+    end)
     |> Enum.map(fn dep -> {dep, prefix <> "/" <> Path.basename(dep)} end)
   end
 
@@ -135,9 +162,10 @@ defmodule BDS.MacBundle.Dylibs do
 
     with {:ok, externals} <- collect(nifs, %{}) do
       reals = materialize(externals, frameworks_dir)
+      bundled = Map.keys(externals)
 
-      with :ok <- relink_each(reals, fn _real -> "@loader_path" end, set_id: true),
-           :ok <- relink_each(nifs, prefix_for, set_id: false) do
+      with :ok <- relink_each(reals, fn _real -> "@loader_path" end, bundled, set_id: true),
+           :ok <- relink_each(nifs, prefix_for, bundled, set_id: false) do
         {:ok, reals}
       end
     end
@@ -147,10 +175,9 @@ defmodule BDS.MacBundle.Dylibs do
   # basename — different absolute spellings of the same leaf collapse here).
   defp collect(binaries, acc) do
     Enum.reduce_while(binaries, {:ok, acc}, fn bin, {:ok, acc} ->
-      case otool(bin) do
+      case external_deps(bin) do
         {:ok, deps} ->
           deps
-          |> Enum.filter(&external?/1)
           |> Enum.reduce_while({:ok, acc}, fn dep, {:ok, acc} ->
             base = Path.basename(dep)
 
@@ -172,6 +199,42 @@ defmodule BDS.MacBundle.Dylibs do
           {:halt, error}
       end
     end)
+  end
+
+  # A binary's external deps: absolute Homebrew/local references, plus any
+  # @rpath/ reference that resolves (via the binary's own LC_RPATHs) to an
+  # existing Homebrew/local file. @rpath deps resolving inside the release tree
+  # (vix/exla-style precompiled NIFs) are relocatable as-is and stay untouched.
+  defp external_deps(bin) do
+    with {:ok, deps} <- otool(bin) do
+      direct = Enum.filter(deps, &external?/1)
+
+      case resolve_external_rpath_deps(bin, deps) do
+        {:ok, resolved} -> {:ok, direct ++ resolved}
+        error -> error
+      end
+    end
+  end
+
+  defp resolve_external_rpath_deps(bin, deps) do
+    case Enum.filter(deps, &String.starts_with?(&1, "@rpath/")) do
+      [] ->
+        {:ok, []}
+
+      rpath_deps ->
+        with {:ok, search_paths} <- rpaths(bin) do
+          resolved =
+            rpath_deps
+            |> Enum.map(fn dep ->
+              dep
+              |> resolve_rpath_dep(search_paths, Path.dirname(bin))
+              |> Enum.find(fn candidate -> external?(candidate) and File.exists?(candidate) end)
+            end)
+            |> Enum.reject(&is_nil/1)
+
+          {:ok, resolved}
+        end
+    end
   end
 
   # Copy each external once (deduped by device+inode, which follows symlinks to
@@ -206,12 +269,12 @@ defmodule BDS.MacBundle.Dylibs do
     {stat.major_device, stat.inode}
   end
 
-  defp relink_each(binaries, prefix_for, opts) do
+  defp relink_each(binaries, prefix_for, bundled, opts) do
     set_id? = Keyword.fetch!(opts, :set_id)
 
     Enum.reduce_while(binaries, :ok, fn binary, :ok ->
       with :ok <- maybe_set_id(binary, set_id?),
-           :ok <- relink(binary, prefix_for.(binary)) do
+           :ok <- relink(binary, prefix_for.(binary), bundled) do
         {:cont, :ok}
       else
         error -> {:halt, error}
@@ -225,9 +288,9 @@ defmodule BDS.MacBundle.Dylibs do
     run("install_name_tool", id_args(binary, "@loader_path/" <> Path.basename(binary)))
   end
 
-  defp relink(binary, prefix) do
+  defp relink(binary, prefix, bundled) do
     with {:ok, deps} <- otool(binary),
-         :ok <- apply_changes(binary, change_args(binary, relink_changes(deps, prefix))) do
+         :ok <- apply_changes(binary, change_args(binary, relink_changes(deps, prefix, bundled))) do
       strip_external_rpaths(binary)
     end
   end
